@@ -36,6 +36,13 @@ export class Hud {
     el.style.transition = `opacity ${seconds}s linear`;
     el.style.opacity = to;
   }
+  // A burst of light that fades out: a gunshot, an explosion.
+  flash(color = '#fff', seconds = 0.5) {
+    const el = $('flash');
+    el.style.transition = 'none'; el.style.background = color; el.style.opacity = 0.95;
+    void el.offsetWidth; // restart the transition
+    el.style.transition = `opacity ${seconds}s ease-out`; el.style.opacity = 0;
+  }
   // 0..1: the blurred, tunnel-vision look of a panic attack.
   panic(k) {
     $('fx').style.opacity = k;

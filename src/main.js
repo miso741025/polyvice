@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { NX, NZ, ROAD, nodeX, nodeZ, blockCenter, colliders, pushOut, clamp, wrapAngle, mulberry32 } from './grid.js';
+import { NX, NZ, ROAD, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, clamp, wrapAngle, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
 import { makeTony, Car, Ped, spawnTraffic, driveAI, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
-import { runStory } from './missions.js';
+import { runStory, savedMission, clearSave } from './missions.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -15,7 +15,8 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xf2a0b4, 140, 800);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 1900);
 
-scene.add(new THREE.HemisphereLight(0xffd9ea, 0x5d4c7c, 1.5));
+const hemi = new THREE.HemisphereLight(0xffd9ea, 0x5d4c7c, 1.5);
+scene.add(hemi);
 const SUN_DIR = new THREE.Vector3(0.75, 0.6, 0.3).normalize();
 const sun = new THREE.DirectionalLight(0xffcf9e, 2.3);
 sun.castShadow = true;
@@ -49,16 +50,19 @@ async function boot() {
   const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, 0x7a1626, 'suv');
   const cars = [tonyCar, ...spawnTraffic(scene, 16, rand)];
   const parkedColors = [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0xd9342b, 0x8ecbff];
+  const parkedKinds = ['sedan', 'coupe', 'sedan', 'suv', 'coupe'];
   for (let n = 0; n < 14; n++) {
     const off = (rand() - 0.5) * 36, far = ROAD / 2 - 1.2, color = parkedColors[n % parkedColors.length];
     if (rand() < 0.5) { // on a north-south road, facing south on the west kerb
       const i = Math.floor(rand() * (NX + 1)), j = Math.floor(rand() * NZ);
-      cars.push(new Car(scene, nodeX(i) - far, blockCenter(0, j).z + off, 0, color));
+      cars.push(new Car(scene, nodeX(i) - far, blockCenter(0, j).z + off, 0, color, parkedKinds[n % parkedKinds.length]));
     } else { // on an east-west road, facing east on the south kerb
       const i = Math.floor(rand() * NX), j = Math.floor(rand() * (NZ + 1));
-      cars.push(new Car(scene, blockCenter(i, 0).x + off, nodeZ(j) + far, Math.PI / 2, color));
+      cars.push(new Car(scene, blockCenter(i, 0).x + off, nodeZ(j) + far, Math.PI / 2, color, parkedKinds[n % parkedKinds.length]));
     }
   }
+
+  places.bing.parking.forEach((spot, n) => cars.push(new Car(scene, spot.x, spot.z, spot.h, parkedColors[(n + 2) % parkedColors.length], parkedKinds[(n + 1) % parkedKinds.length])));
 
   // ----- Pedestrians -----
   const peds = [];
@@ -75,7 +79,7 @@ async function boot() {
   const pressed = new Set(), keys = {};
   const g = {
     scene, camera, hud, places, cars, peds,
-    time: 0, cash: 0, started: false,
+    time: 0, cash: 0, started: false, night: 0, tonyCar,
     waiters: [], updaters: [], markers: [], blips: [],
     player: { pos: new THREE.Vector3(places.home.spawn.x, 0, places.home.spawn.z), heading: 0, human: tony, car: null, locked: true, hidden: false, down: 0, motion: 'idle' },
     cam: { yaw: 0, pitch: 0.25, fixed: null, sway: 0, lastMouse: -10 },
@@ -102,6 +106,30 @@ async function boot() {
     },
 
     enterCar(car) { p.car = car; car.nav = null; },
+    spawnCar(x, z, heading, color, kind) {
+      const car = new Car(scene, x, z, heading, color, kind);
+      cars.push(car);
+      return car;
+    },
+    removeCar(car) {
+      if (p.car === car) g.leaveCar();
+      scene.remove(car.mesh);
+      cars.splice(cars.indexOf(car), 1);
+    },
+    // Play as someone else (Christopher has a mission of his own); the previous body is hidden.
+    setPlayer(human) {
+      p.human.group.visible = false;
+      p.human = human;
+      scene.add(human.group);
+    },
+    // 0 = the usual sunset, 1 = night. Lights, fog, sky and sea follow.
+    setNight(k) {
+      g.night = k;
+      hemi.intensity = 1.5 - k * 0.95; hemi.color.set(0xffd9ea).lerp(tmpColor.set(0x6f7fd0), k); hemi.groundColor.set(0x5d4c7c).lerp(tmpColor.set(0x1a1830), k);
+      sun.intensity = 2.3 - k * 1.75; sun.color.set(0xffcf9e).lerp(tmpColor.set(0x9db4ff), k);
+      scene.fog.color.set(0xf2a0b4).lerp(tmpColor.set(0x120f26), k);
+      places.setNight(k);
+    },
     // Step out on the driver's side (or at an explicit spot for cutscenes).
     leaveCar(at) {
       const car = p.car;
@@ -116,8 +144,9 @@ async function boot() {
       p.heading = car.heading;
     },
   };
-  const p = g.player;
+  const p = g.player, tmpColor = new THREE.Color();
   window.game = g; // handy in the console
+  g.renderer = renderer;
 
   // ----- Input -----
   addEventListener('keydown', e => {
@@ -151,18 +180,26 @@ async function boot() {
   const startBtn = document.getElementById('start');
   startBtn.disabled = false;
   startBtn.textContent = 'Start';
-  startBtn.addEventListener('click', () => {
+  const begin = () => {
     if (g.started) return;
     g.started = true;
     document.getElementById('title').classList.add('off');
     hud.fade(1, 0.6);
     g.wait(0.7).then(() => runStory(g)).catch(err => console.error(err));
-  });
+  };
+  startBtn.addEventListener('click', begin);
+  // A saved game continues from its last mission; "New game" forgets it.
+  const freshBtn = document.getElementById('fresh');
+  if (savedMission() > 0) {
+    startBtn.textContent = 'Continue';
+    freshBtn.hidden = false;
+    freshBtn.addEventListener('click', () => { clearSave(); begin(); });
+  }
 
   // ----- Per-frame systems -----
   const tmp = new THREE.Vector3(), focus = new THREE.Vector3(), want = new THREE.Vector3();
   const circlesOf = car => {
-    const fx = Math.sin(car.heading) * 1.2, fz = Math.cos(car.heading) * 1.2;
+    const fx = Math.sin(car.heading) * (car.reach - 0.1), fz = Math.cos(car.heading) * (car.reach - 0.1);
     return [[car.pos.x + fx, car.pos.z + fz], [car.pos.x - fx, car.pos.z - fz]];
   };
 
@@ -255,8 +292,8 @@ async function boot() {
     const car = p.car;
     // Behind a moving car, drift back to the chase view once the mouse is left alone.
     if (car && car.speed > 3 && g.time - cam.lastMouse > 1.2) cam.yaw += wrapAngle(car.heading - cam.yaw) * (1 - Math.exp(-3 * dt));
-    const dist = car ? 9.5 : 5.2, cp = Math.cos(cam.pitch);
-    focus.set(p.pos.x, car ? 1.9 : 1.6, p.pos.z);
+    const dist = car ? 6.2 + car.reach * 2.5 : 5.2, cp = Math.cos(cam.pitch);
+    focus.set(p.pos.x, (car ? 1.9 : 1.6) + groundAt(p.pos.x, p.pos.z), p.pos.z);
     tmp.set(-Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp);
     want.copy(focus).addScaledVector(tmp, dist);
     const clear = clearRatio(focus, want);
@@ -282,10 +319,11 @@ async function boot() {
     g.updaters = g.updaters.filter(fn => fn(dt));
     g.waiters = g.waiters.filter(w => { if (!w.fn()) return true; w.resolve(); return false; });
 
-    tony.group.visible = !p.car && !p.hidden;
-    tony.group.position.set(p.pos.x, 0, p.pos.z);
-    tony.group.rotation.y = p.heading;
-    tony.set(p.down ? 'down' : p.car || p.locked ? 'idle' : p.motion);
+    const me = p.human;
+    me.group.visible = !p.car && !p.hidden;
+    me.group.position.set(p.pos.x, groundAt(p.pos.x, p.pos.z), p.pos.z);
+    me.group.rotation.y = p.heading;
+    me.set(p.down ? 'down' : p.pose || (p.car || p.locked ? 'idle' : p.motion));
 
     for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
 
@@ -294,6 +332,7 @@ async function boot() {
     sun.target.position.copy(focus);
     sun.position.copy(focus).addScaledVector(SUN_DIR, 200);
     places.sky.position.copy(camera.position);
+    places.update(g.time);
 
     hud.clock(g.time);
     hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips]);

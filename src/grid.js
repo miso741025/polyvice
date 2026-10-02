@@ -17,6 +17,20 @@ export const bounds = {
 // Axis-aligned boxes: { minX, maxX, minZ, maxZ, h, thin? }
 export const colliders = [];
 
+// Height of the ground under (x, z): sidewalks are raised, the beach lies a little lower.
+// lowGround lists squares inside blocks that stay at road level (car parks): { x, z, half }.
+// piers run east out over the water: { minZ, maxZ, ramp (x where it leaves the sand), deck (x where it is level), maxX, y }.
+export const lowGround = [], piers = [];
+export function groundAt(x, z) {
+  for (const p of piers) if (z > p.minZ && z < p.maxZ && x > p.ramp) return x < p.deck ? -0.1 + (p.y + 0.1) * (x - p.ramp) / (p.deck - p.ramp) : p.y;
+  if (x > SHORE) return x < SHORE + 4.6 ? 0.04 : -0.1;
+  if (x < OX - ROAD / 2 || z < OZ - ROAD / 2 || z > OZ + NZ * CELL + ROAD / 2) return -0.1;
+  const u = ((x - OX) % CELL + CELL) % CELL, v = ((z - OZ) % CELL + CELL) % CELL;
+  if (u < ROAD / 2 || u > CELL - ROAD / 2 || v < ROAD / 2 || v > CELL - ROAD / 2) return 0;
+  for (const g of lowGround) if (Math.abs(x - g.x) < g.half && Math.abs(z - g.z) < g.half) return 0.03;
+  return 0.14;
+}
+
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
 export const near = (a, b, r) => Math.hypot(a.x - b.x, a.z - b.z) < r;
@@ -49,7 +63,11 @@ export function pushOut(pos, r) {
       else if (m === t) pos.z = c.minZ - r; else pos.z = c.maxZ + r;
     }
   }
-  const x = clamp(pos.x, bounds.minX + r, bounds.maxX - r), z = clamp(pos.z, bounds.minZ + r, bounds.maxZ - r);
+  // The island's edge, except along a pier, which carries on over the water between its rails.
+  const pier = piers.find(p => pos.z > p.minZ && pos.z < p.maxZ && pos.x > p.deck);
+  const out = pier && pos.x > bounds.maxX - r;
+  const x = clamp(pos.x, bounds.minX + r, (pier ? pier.maxX : bounds.maxX) - r);
+  const z = out ? clamp(pos.z, pier.minZ + r, pier.maxZ - r) : clamp(pos.z, bounds.minZ + r, bounds.maxZ - r);
   if (x !== pos.x || z !== pos.z) { pos.x = x; pos.z = z; hit = true; }
   return hit;
 }

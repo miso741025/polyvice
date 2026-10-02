@@ -4,7 +4,8 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
 
 #game { display: block; width: 100vw; height: 100vh; }
 
-#fx, #fade { position: fixed; inset: 0; pointer-events: none; }
+#fx, #fade, #flash { position: fixed; inset: 0; pointer-events: none; }
+#flash { opacity: 0; }
 #fx { opacity: 0; background: radial-gradient(ellipse at center, transparent 20%, rgba(0, 0, 0, .95) 85%); }
 #fade { opacity: 1; background: #000; }
 
@@ -79,6 +80,11 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
 }
 #start:hover { background: #fff; }
 #start:disabled { opacity: .5; cursor: wait; }
+#fresh {
+  pointer-events: auto; cursor: pointer; margin-top: -14px; padding: 6px 22px; background: none; border: 0;
+  font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 4px; color: #e6dcf5; text-decoration: underline; text-underline-offset: 5px;
+}
+#fresh:hover { color: #ff7adf; }
 .keys { font-size: 15px; color: #e6dcf5; text-align: center; padding: 0 24px; line-height: 1.8; }
 .keys b { color: #ffd34d; }
 .fine { position: absolute; bottom: 18px; font-size: 12px; color: #a99bc0; text-align: center; padding: 0 24px; }
