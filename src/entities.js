@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { NX, NZ, ROAD, LANE, nodeX, nodeZ, clamp, wrapAngle, pushOut } from './grid.js';
-import { makeHuman, makeLook, makeTony, LOOKS } from './people.js';
+import { makeHuman, makeLook, makeTony, LOOKS, loadPeople, updatePeople } from './people.js';
 
 // Headings: an angle h means "facing (sin h, cos h)" in (x, z); local +z of a mesh is its front.
 
@@ -11,7 +11,7 @@ export function box(w, h, d, color, basic = false) {
 
 // ---------- People ----------
 // The character model lives in people.js; re-exported here for the modules that build scenes.
-export { makeHuman, makeLook, makeTony, LOOKS };
+export { makeHuman, makeLook, makeTony, LOOKS, loadPeople, updatePeople };
 
 export function makeDuck() {
   const group = new THREE.Group();
@@ -30,10 +30,19 @@ export function makeDuck() {
   return { group, wingL: wing(1), wingR: wing(-1) };
 }
 
-const PED_SHIRTS = [0xff5fd2, 0x49e0d0, 0xffe066, 0xffffff, 0xff8a5c, 0x8f7bff, 0x4fb8ff, 0xf25c7a];
-const PED_PANTS = [0xf5f0e6, 0x2b2b3a, 0x3b6ea8, 0xd9c7a0, 0x6b4a8a];
-const PED_SKIN = [0xf0c8a0, 0xd9a273, 0xa86e45, 0x7a4a2c];
-const PED_HAIR = [0x2b1b12, 0x111111, 0xc9a14a, 0x7a3b1a, 0xdddddd];
+// A handful of street outfits; pedestrians sharing one also share its painted texture.
+const PED_LOOKS = [
+  { shirt: 0xff5fd2, tee: true, pants: 0xf5f0e6, hair: 0x2b1b12, hairMesh: 'parted' },
+  { shirt: 0x49e0d0, pants: 0x2b2b3a, hair: 0x111111, hairMesh: 'buzzed', dark: true },
+  { shirt: 0xffe066, tee: true, pants: 0x3b6ea8, hair: 0x7a3b1a, hairMesh: 'parted' },
+  { jacket: 0xf5f0e6, shirt: 0x49e0d0, tee: true, pants: 0xf5f0e6, tucked: true, hair: 0xc9a14a, hairMesh: 'parted' },
+  { pattern: 'plaid', shirt: 0x8d93cc, pants: 0xd9c7a0, hair: 0xdddddd, hairStyle: 'balding' },
+  { shirt: 0xff8a5c, tee: true, pants: 0x2b2b3a, hair: 0x111111, hairMesh: 'buzzed', dark: true },
+  { body: 'female', shirt: 0xff5fd2, tee: true, pants: 0xf5f0e6, hair: 0x2b1b12, hairMesh: 'long' },
+  { body: 'female', shirt: 0xffffff, tee: true, pants: 0x3b6ea8, hair: 0xc9a14a, hairMesh: 'long' },
+  { body: 'female', jacket: 0x8f7bff, shirt: 0xffffff, pants: 0x8f7bff, tucked: true, hair: 0x7a3b1a, hairMesh: 'long' },
+  { body: 'female', shirt: 0x4fb8ff, tee: true, pants: 0x2b2b3a, hair: 0x111111, hairMesh: 'long' },
+];
 const pick = (arr, rand) => arr[Math.floor(rand() * arr.length)];
 
 // A pedestrian who walks laps around the sidewalk of one block.
@@ -42,10 +51,10 @@ export class Ped {
     this.c = center; this.s = 27.6;
     this.u = rand() * 8 * this.s;
     this.dir = rand() < 0.5 ? 1 : -1;
-    this.speed = 1.2 + rand() * 0.9;
-    this.human = makeHuman({ shirt: pick(PED_SHIRTS, rand), pants: pick(PED_PANTS, rand), skin: pick(PED_SKIN, rand), hair: pick(PED_HAIR, rand), hairStyle: pick(['short', 'short', 'long', 'curly', 'balding'], rand), bulk: 0.9 + rand() * 0.35, tee: rand() < 0.4, tucked: rand() < 0.4 });
+    this.speed = 1.2 + rand() * 0.6;
+    this.human = makeHuman({ ...pick(PED_LOOKS, rand), bulk: 0.9 + Math.floor(rand() * 4) * 0.1 });
     this.pos = new THREE.Vector3();
-    this.down = 0; this.phase = rand() * 6;
+    this.down = 0;
     scene.add(this.human.group);
   }
 
@@ -53,7 +62,6 @@ export class Ped {
     const g = this.human.group;
     if (this.down > 0) {
       this.down -= dt;
-      if (this.down <= 0) { g.rotation.x = 0; g.position.y = 0; }
       return;
     }
     const s = this.s, L = 8 * s;
@@ -65,15 +73,14 @@ export class Ped {
     else if (side === 2) { x = -t; z = s; h = -Math.PI / 2; }
     else { x = -s; z = -t; h = Math.PI; }
     this.pos.set(this.c.x + x, 0, this.c.z + z);
-    this.phase += this.speed * dt * 3.2;
-    this.human.animate(this.phase, 0.7);
-    g.position.copy(this.pos);
+    this.human.set('walk', this.speed / 1.4);
+    g.position.set(this.pos.x, 0.14, this.pos.z);
     g.rotation.y = this.dir > 0 ? h : h + Math.PI;
 
     for (const car of cars) {
       if (Math.abs(car.speed) > 3 && Math.hypot(car.pos.x - this.pos.x, car.pos.z - this.pos.z) < 1.8) {
-        this.down = 7; g.rotation.x = -Math.PI / 2; g.position.y = 0.2;
-        this.human.animate(0, 0);
+        this.down = 9;
+        this.human.set('down');
         break;
       }
     }

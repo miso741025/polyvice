@@ -1,74 +1,199 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { mulberry32 } from './grid.js';
 
-// Characters in the PS2-era style: rounded low-poly bodies built from elliptical tubes,
-// jointed elbows and knees, and faces, hairlines and clothing details painted onto small textures.
-// Headings: local +z is the front of the body.
+// Characters use the CC0 Quaternius base bodies (rigged, ~13k triangles) and animation library.
+// The bodies come unclothed, so clothing is painted into each character's texture the way
+// PS2-era games did it: every texel knows where it sits on the body (baked once per body),
+// and a look decides what garment covers that spot.
 
-const css = hex => '#' + new THREE.Color(hex).getHexString();
-const shade = (hex, k) => '#' + new THREE.Color(hex).multiplyScalar(k).getHexString();
-const lambert = color => new THREE.MeshLambertMaterial({ color });
-const lerp = (a, b, t) => a + (b - a) * Math.max(0, Math.min(1, t));
+const DIR = 'assets/models/';
+const MAP = 1024;                 // texture size per character
+const STAND_FRAME = 0.25;         // point in the walk cycle whose upper body is used for standing still
+const SEAT_HEIGHT = 0.6;          // hip height when sitting in a chair
+const bodies = {};                // 'male' | 'female' -> prepared base body
+const hairMeshes = {};            // 'parted' | 'buzzed' | 'long' -> mesh
+const people = [];                // live characters, advanced by updatePeople
+const textures = new Map();       // painted textures, shared between identical looks
+
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const lerp = (a, b, t) => a + (b - a) * clamp01(t);
+const rgb = h => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
 
 function canvasOf(size) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
-  return [c, c.getContext('2d')];
-}
-function textured(canvas, repeat = false) {
-  const t = new THREE.CanvasTexture(canvas);
-  t.colorSpace = THREE.SRGBColorSpace;
-  if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  return new THREE.MeshLambertMaterial({ map: t });
+  return [c, c.getContext('2d', { willReadFrequently: true })];
 }
 
-// A closed tube through elliptical rings [y, rx, rz, zOffset], listed bottom to top.
-// u runs around the body with 0.5 at the front; v runs bottom to top.
-function tube(rings, segs, mat) {
-  const pos = [], uv = [], idx = [], row = segs + 1;
-  const y0 = rings[0][0], span = rings[rings.length - 1][0] - y0;
-  for (const [y, rx, rz, zo = 0] of rings) for (let j = 0; j <= segs; j++) {
-    const a = Math.PI + j / segs * Math.PI * 2;
-    pos.push(rx * Math.sin(a), y, rz * Math.cos(a) + zo);
-    uv.push(j / segs, (y - y0) / span);
-  }
-  for (let i = 0; i < rings.length - 1; i++) for (let j = 0; j < segs; j++) {
-    const a = i * row + j, b = a + 1, c = a + row, d = c + 1;
-    idx.push(a, b, c, b, d, c);
-  }
-  const n = pos.length / 3, last = (rings.length - 1) * row;
-  const bottom = rings[0], top = rings[rings.length - 1];
-  pos.push(0, bottom[0], bottom[3] || 0, 0, top[0], top[3] || 0);
-  uv.push(0.5, 0, 0.5, 1);
-  for (let j = 0; j < segs; j++) idx.push(j + 1, j, n, last + j, last + j + 1, n + 1);
+// Vertex groups, by which bones move a vertex.
+const HEAD = 0, TORSO = 1, UPPERARM = 2, LOWERARM = 3, HAND = 4, THIGH = 5, CALF = 6, FOOT = 7, GROUPS = 8;
+const groupOf = bone =>
+  /^(Head|neck)/.test(bone) ? HEAD : /^(root|pelvis|spine|clavicle)/.test(bone) ? TORSO :
+  /^upperarm/.test(bone) ? UPPERARM : /^lowerarm/.test(bone) ? LOWERARM :
+  /^thigh/.test(bone) ? THIGH : /^calf/.test(bone) ? CALF : /^(foot|ball)/.test(bone) ? FOOT : HAND;
 
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geo.setIndex(idx);
-  geo.computeVertexNormals();
-  // The first and last vertex of each ring coincide; average their normals so no seam shows.
-  const nor = geo.attributes.normal, v = new THREE.Vector3();
-  for (let i = 0; i < rings.length; i++) {
-    const a = i * row, b = a + segs;
-    v.set(nor.getX(a) + nor.getX(b), nor.getY(a) + nor.getY(b), nor.getZ(a) + nor.getZ(b)).normalize();
-    nor.setXYZ(a, v.x, v.y, v.z); nor.setXYZ(b, v.x, v.y, v.z);
-  }
-  const m = new THREE.Mesh(geo, mat);
-  m.castShadow = true;
-  return m;
+// The clips each character can play, by state name.
+const CLIPS = {
+  talk: 'Idle_Talking_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop', sprint: 'Sprint_Loop',
+  down: 'Death01',
+};
+
+// ---------- Loading ----------
+
+export async function loadPeople() {
+  const loader = new GLTFLoader();
+  const gltf = file => loader.loadAsync(DIR + file);
+  const image = file => new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i); i.onerror = () => reject(new Error('Could not load ' + file));
+    i.src = DIR + file;
+  });
+  const [male, female, anims, parted, buzzed, long, skinLight, skinDark, skinFemale] = await Promise.all([
+    gltf('Superhero_Male_FullBody.gltf'), gltf('Superhero_Female_FullBody.gltf'), gltf('UAL1_Standard.glb'),
+    gltf('Hair_SimpleParted.gltf'), gltf('Hair_Buzzed.gltf'), gltf('Hair_Long.gltf'),
+    image('T_Superhero_Male_Ligh.png'), image('T_Superhero_Male_Dark.png'), image('T_Superhero_Female_Light_BaseColor.png'),
+  ]);
+  let sourcePelvis = 0.9167;
+  anims.scene.traverse(o => { if (o.isBone && o.name === 'pelvis') sourcePelvis = o.position.length(); });
+  bodies.male = prepareBody(male.scene, { light: skinLight, dark: skinDark }, anims.animations, sourcePelvis);
+  bodies.female = prepareBody(female.scene, { light: skinFemale, dark: skinFemale }, anims.animations, sourcePelvis);
+  const firstMesh = scene => { let m; scene.traverse(o => { if (o.isMesh && !m) m = o; }); return m; };
+  hairMeshes.parted = firstMesh(parted.scene); hairMeshes.buzzed = firstMesh(buzzed.scene); hairMeshes.long = firstMesh(long.scene);
 }
 
-function blob(rx, ry, rz, mat, segs = 8) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1, segs, Math.max(4, segs - 2)), mat);
-  m.scale.set(rx, ry, rz); m.castShadow = true;
-  return m;
+function prepareBody(scene, skins, animations, sourcePelvis) {
+  scene.updateMatrixWorld(true);
+  let body;
+  scene.traverse(o => { if (o.isSkinnedMesh && /superhero/i.test(o.name)) body = o; });
+  const geo = body.geometry, bones = body.skeleton.bones;
+  const at = name => bones.find(b => b.name === name).getWorldPosition(new THREE.Vector3());
+  const pelvis = at('pelvis');
+  const J = {
+    neck: at('neck_01'), shoulder: at('upperarm_l'), wrist: at('hand_l'), hip: at('thigh_l'), ankle: at('foot_l'),
+    waistY: pelvis.y + 0.075, midZ: pelvis.z + 0.03,
+  };
+
+  // Per-vertex group weights.
+  const P = geo.attributes.position, SI = geo.attributes.skinIndex, SW = geo.attributes.skinWeight;
+  const boneGroup = bones.map(b => groupOf(b.name));
+  const vw = new Float32Array(P.count * GROUPS);
+  let topY = 0;
+  for (let v = 0; v < P.count; v++) {
+    for (let k = 0; k < 4; k++) vw[v * GROUPS + boneGroup[SI.getComponent(v, k)]] += SW.getComponent(v, k);
+    topY = Math.max(topY, P.getY(v));
+  }
+
+  const B = { scene, bodyName: body.name, geometry: geo, vw, J, topY, skins, shapes: new Map(), ...bake(geo, vw) };
+
+  // Animation: keep rotations as they are (the rigs share bone orientations) but drop bone translations,
+  // which carry the source mannequin's proportions. Only the hips move, scaled to this body's leg length.
+  const ratio = bones.find(b => b.name === 'pelvis').position.length() / sourcePelvis;
+  B.clips = {};
+  for (const [state, name] of Object.entries(CLIPS)) {
+    const src = animations.find(a => a.name === name);
+    const tracks = [];
+    for (const t of src.tracks) {
+      if (t.name.endsWith('.quaternion')) tracks.push(t);
+      else if (t.name === 'pelvis.position') {
+        const c = t.clone();
+        for (let i = 0; i < c.values.length; i++) c.values[i] *= ratio;
+        tracks.push(c);
+      }
+    }
+    B.clips[state] = new THREE.AnimationClip(name, src.duration, tracks);
+  }
+
+  // The library's idle is a combat-ready stance, so standing still is built instead:
+  // straight legs from the A-pose, with the relaxed arms and torso of a mid-stride walk frame.
+  const walk = animations.find(a => a.name === 'Walk_Loop'), apose = animations.find(a => a.name === 'A_TPose');
+  const still = [];
+  for (const t of walk.tracks) {
+    const bone = t.name.split('.')[0], legs = /^(root|pelvis|thigh|calf|foot|ball)/.test(bone);
+    if (!t.name.endsWith('.quaternion') && t.name !== 'pelvis.position') continue;
+    const src = legs ? apose.tracks.find(a => a.name === t.name) : t;
+    const values = Array.from(src.createInterpolant().evaluate(legs ? 0 : walk.duration * STAND_FRAME));
+    if (t.name === 'pelvis.position') still.push(new THREE.VectorKeyframeTrack(t.name, [0], values.map(v => v * ratio)));
+    else still.push(new THREE.QuaternionKeyframeTrack(t.name, [0], values));
+  }
+  B.clips.idle = new THREE.AnimationClip('Stand', 0.1, still);
+
+  // The library only sits on the ground, so sitting in a chair is posed from the standing pose:
+  // thighs forward, shins down, hands toward the lap, hips at seat height.
+  const bone = name => bones.find(b => b.name === name), X = new THREE.Vector3(1, 0, 0);
+  for (const t of still) {
+    const b = bone(t.name.split('.')[0]);
+    if (t.name.endsWith('.position')) b.position.fromArray(t.values); else b.quaternion.fromArray(t.values);
+  }
+  const bend = (name, angle) => {
+    scene.updateMatrixWorld(true);
+    for (const side of ['_l', '_r']) {
+      const b = bone(name + side), pw = b.parent.getWorldQuaternion(new THREE.Quaternion());
+      b.quaternion.premultiply(pw.clone().invert().multiply(new THREE.Quaternion().setFromAxisAngle(X, angle)).multiply(pw));
+    }
+  };
+  bend('thigh', -1.5); bend('calf', 1.5); bend('upperarm', -0.45); bend('lowerarm', -0.9);
+  const hips = bone('pelvis');
+  hips.position.multiplyScalar(SEAT_HEIGHT / hips.getWorldPosition(new THREE.Vector3()).y);
+  B.clips.sit = new THREE.AnimationClip('Sit', 0.1, still.map(t => {
+    const b = bone(t.name.split('.')[0]);
+    return t.name.endsWith('.position') ? new THREE.VectorKeyframeTrack(t.name, [0], b.position.toArray()) : new THREE.QuaternionKeyframeTrack(t.name, [0], b.quaternion.toArray());
+  }));
+  body.skeleton.pose();
+  scene.updateMatrixWorld(true);
+  return B;
+}
+
+// Rasterise the body's triangles into texture space, recording for every texel
+// its position on the bind-pose body and its vertex-group weights.
+function bake(geo, vw) {
+  const S = MAP, N = S * S;
+  const pos = new Float32Array(N * 3), grp = new Uint8Array(N * GROUPS), mask = new Uint8Array(N);
+  const P = geo.attributes.position, UV = geo.attributes.uv, idx = geo.index;
+  for (let t = 0; t < idx.count; t += 3) {
+    const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+    const ax = UV.getX(a) * S, ay = UV.getY(a) * S, bx = UV.getX(b) * S, by = UV.getY(b) * S, cx = UV.getX(c) * S, cy = UV.getY(c) * S;
+    const area = (bx - ax) * (cy - ay) - (cx - ax) * (by - ay);
+    if (Math.abs(area) < 1e-9) continue;
+    const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx))), x1 = Math.min(S - 1, Math.ceil(Math.max(ax, bx, cx)));
+    const y0 = Math.max(0, Math.floor(Math.min(ay, by, cy))), y1 = Math.min(S - 1, Math.ceil(Math.max(ay, by, cy)));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const px = x + 0.5, py = y + 0.5;
+      const w0 = ((bx - px) * (cy - py) - (cx - px) * (by - py)) / area;
+      const w1 = ((cx - px) * (ay - py) - (ax - px) * (cy - py)) / area;
+      const w2 = 1 - w0 - w1;
+      if (w0 < -0.02 || w1 < -0.02 || w2 < -0.02) continue;
+      const i = y * S + x;
+      mask[i] = 1;
+      pos[i * 3] = w0 * P.getX(a) + w1 * P.getX(b) + w2 * P.getX(c);
+      pos[i * 3 + 1] = w0 * P.getY(a) + w1 * P.getY(b) + w2 * P.getY(c);
+      pos[i * 3 + 2] = w0 * P.getZ(a) + w1 * P.getZ(b) + w2 * P.getZ(c);
+      for (let g = 0; g < GROUPS; g++) grp[i * GROUPS + g] = 255 * clamp01(w0 * vw[a * GROUPS + g] + w1 * vw[b * GROUPS + g] + w2 * vw[c * GROUPS + g]);
+    }
+  }
+  // Grow each UV island by a few texels so filtering never pulls in unpainted skin at the seams.
+  for (let pass = 0; pass < 3; pass++) {
+    const grown = [];
+    for (let i = 0; i < N; i++) {
+      if (mask[i]) continue;
+      const x = i % S, n = x > 0 && mask[i - 1] ? i - 1 : x < S - 1 && mask[i + 1] ? i + 1 : i >= S && mask[i - S] ? i - S : i < N - S && mask[i + S] ? i + S : -1;
+      if (n >= 0) grown.push(i, n);
+    }
+    for (let k = 0; k < grown.length; k += 2) {
+      const i = grown[k], n = grown[k + 1];
+      mask[i] = 1;
+      pos.copyWithin(i * 3, n * 3, n * 3 + 3);
+      grp.copyWithin(i * GROUPS, n * GROUPS, n * GROUPS + GROUPS);
+    }
+  }
+  return { pos, grp, mask };
 }
 
 // ---------- Shirt prints ----------
 
 const prints = {};
-function printCanvas(kind) {
+function printData(kind) {
   if (prints[kind]) return prints[kind];
   const [c, g] = canvasOf(64), r = mulberry32(7);
   const fill = color => { g.fillStyle = color; g.fillRect(0, 0, 64, 64); };
@@ -97,265 +222,260 @@ function printCanvas(kind) {
     g.fillStyle = '#c9c2d2';
     for (let k = 0; k < 64; k += 6) g.fillRect(k, 0, 2, 64);
   }
-  return prints[kind] = c;
-}
-const tile = (g, canvas, S) => { g.fillStyle = g.createPattern(canvas, 'repeat'); g.fillRect(0, 0, S, S); };
-
-// ---------- Painted textures ----------
-
-// Head: skin, hairline, eyes, brows, nose and mouth. The face is centred on u = 0.5.
-function headCanvas(o) {
-  const S = 128, [c, g] = canvasOf(S), Y = v => (1 - v) * S, cx = S / 2;
-  g.fillStyle = css(o.skin); g.fillRect(0, 0, S, S);
-
-  g.fillStyle = css(o.hair);
-  const recede = o.hairStyle === 'receding', bald = o.hairStyle === 'balding';
-  for (let x = 0; x < S; x++) {
-    const du = Math.abs((x + 0.5) / S - 0.5);
-    let top = 1, bottom;
-    if (bald) {
-      if (du < 0.16) continue;
-      top = lerp(0.6, 0.8, (du - 0.16) / 0.12);
-      bottom = du < 0.24 ? lerp(0.5, 0.4, (du - 0.16) / 0.08) : 0.28;
-    } else if (du < 0.15) bottom = recede ? lerp(0.87, 0.97, (du - 0.06) / 0.09) : 0.8;
-    else if (du < 0.22) bottom = lerp(recede ? 0.97 : 0.8, 0.52, (du - 0.15) / 0.07);
-    else if (du < 0.3) bottom = lerp(0.52, 0.4, (du - 0.22) / 0.08);
-    else bottom = 0.28;
-    g.fillRect(x, Y(top), 1, (top - bottom) * S);
-  }
-  if (o.hairSides !== undefined) { // grey at the temples
-    g.fillStyle = css(o.hairSides);
-    for (const s of [-1, 1]) g.fillRect(cx + s * 0.25 * S - 10, Y(0.84), 20, 0.34 * S);
-  }
-
-  const dark = shade(o.skin, 0.72);
-  g.fillStyle = shade(o.skin, 0.86);
-  g.fillRect(cx - 17, 51, 34, 8);                       // eye sockets
-  g.fillRect(cx - 20, 78, 6, 20); g.fillRect(cx + 14, 78, 6, 20); // cheek hollows
-  for (const s of [-1, 1]) {
-    const ex = cx + s * 9;
-    g.fillStyle = '#ece6dc'; g.fillRect(ex - 3.5, 53.5, 7, 3.5);
-    g.fillStyle = '#1b1410'; g.fillRect(ex - 1.2, 53.5, 2.6, 3.5);
-    g.fillStyle = dark; g.fillRect(ex - 4, 52.5, 8, 1);
-    g.fillStyle = o.age ? css(o.hair) : shade(o.hair, 0.8); g.fillRect(ex - 5, 48 - (o.brow || 2), 10, o.brow || 2);
-  }
-  g.fillStyle = dark;
-  g.fillRect(cx - 4, 71, 8, 1.6);                       // under the nose
-  g.fillRect(cx - 9, 84, 1.2, 9); g.fillRect(cx + 8, 84, 1.2, 9); // smile lines
-  g.fillStyle = '#7d4038'; g.fillRect(cx - 6.5, 89, 13, 2.2); // mouth
-  g.fillStyle = dark; g.fillRect(cx - 4, 96, 8, 1.2);
-  if (o.age) {
-    g.globalAlpha = 0.35;
-    for (const y of [36, 40, 44]) g.fillRect(cx - 12, y, 24, 1);
-    g.fillRect(cx - 15, 60, 6, 1); g.fillRect(cx + 9, 60, 6, 1);
-    g.globalAlpha = 1;
-  }
-  if (o.stubble) {
-    g.globalAlpha = 0.2; g.fillStyle = '#15151c';
-    g.fillRect(cx - 28, 80, 56, 48); g.clearRect(0, 0, 0, 0);
-    g.globalAlpha = 1; g.fillStyle = '#7d4038'; g.fillRect(cx - 6.5, 89, 13, 2.2);
-  }
-  return c;
+  return prints[kind] = g.getImageData(0, 0, 64, 64).data;
 }
 
-// Torso: the outer garment, plus whatever shows in an open front, collar, chain and belt.
-function torsoCanvas(o) {
-  const S = 256, [c, g] = canvasOf(S), cx = S / 2;
-  const print = o.pattern ? printCanvas(o.pattern) : null;
-  const outer = () => { if (o.jacket !== undefined) { g.fillStyle = css(o.jacket); g.fillRect(0, 0, S, S); } else if (print) tile(g, print, S); else { g.fillStyle = css(o.shirt); g.fillRect(0, 0, S, S); } };
-  outer();
+// ---------- Painting a look onto the body texture ----------
 
-  const openFront = o.jacket !== undefined || o.open !== undefined;
-  if (openFront) {
-    g.save();
-    g.beginPath(); g.moveTo(cx - 34, 0); g.lineTo(cx + 34, 0); g.lineTo(cx + 15, S); g.lineTo(cx - 15, S); g.closePath(); g.clip();
-    if (o.jacket !== undefined && print) tile(g, print, S);
-    else { g.fillStyle = css(o.jacket !== undefined ? o.shirt : o.open); g.fillRect(0, 0, S, S); }
-    g.fillStyle = css(o.skin);
-    g.beginPath(); g.moveTo(cx - 20, 0); g.lineTo(cx + 20, 0); g.lineTo(cx, o.tank ? 56 : 30); g.closePath(); g.fill();
-    g.restore();
-    g.strokeStyle = shade(o.jacket !== undefined ? o.jacket : o.shirt, 0.6); g.lineWidth = 5;
-    g.beginPath(); g.moveTo(cx - 34, 0); g.lineTo(cx - 15, S); g.moveTo(cx + 34, 0); g.lineTo(cx + 15, S); g.stroke();
-  } else if (o.tee) {
-    g.fillStyle = css(o.skin);
-    g.beginPath(); g.ellipse(cx, 0, 20, 12, 0, 0, 7); g.fill();
-  } else {
-    g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(cx - 1.5, 0, 3, S);
-    g.fillStyle = '#e9e3d2';
-    for (let y = 58; y < S - 20; y += 38) g.fillRect(cx - 3, y, 6, 6);
-    g.fillStyle = css(o.skin);
-    g.beginPath(); g.moveTo(cx - 15, 0); g.lineTo(cx + 15, 0); g.lineTo(cx, 40); g.closePath(); g.fill();
-    g.fillStyle = shade(o.shirt, 1.12); g.strokeStyle = shade(o.shirt, 0.6); g.lineWidth = 2;
-    for (const s of [-1, 1]) { // collar wings
-      g.beginPath(); g.moveTo(cx + s * 13, 0); g.lineTo(cx + s * 34, 0); g.lineTo(cx + s * 27, 26); g.lineTo(cx + s * 3, 36); g.closePath(); g.fill(); g.stroke();
+const SHOE = [24, 19, 16], BELT = [19, 19, 23], GOLD = [232, 192, 64], STEEL = [201, 201, 207], BUTTON = [233, 227, 210];
+
+function paint(B, o) {
+  const S = MAP, [canvas, g] = canvasOf(S);
+  g.drawImage(o.dark ? B.skins.dark : B.skins.light, 0, 0, S, S);
+  const img = g.getImageData(0, 0, S, S), d = img.data, { pos, grp, mask, J, topY } = B;
+
+  const jacket = o.jacket !== undefined, openFront = jacket || o.open !== undefined;
+  const outer = rgb(jacket ? o.jacket : o.shirt), inner = rgb(jacket ? o.shirt : o.open ?? 0xffffff), shirt = rgb(o.shirt);
+  const pants = rgb(o.pants), hairC = rgb(o.hair), sideC = o.hairSides !== undefined ? rgb(o.hairSides) : null;
+  const stripe = o.stripe !== undefined ? rgb(o.stripe) : null;
+  const print = o.pattern ? printData(o.pattern) : null, printOuter = print && !jacket, printInner = print && jacket;
+  const sleeve = o.sleeves === 'long' || jacket ? 0.96 : o.tee ? 0.3 : 0.45;
+  const waistY = J.waistY, hemY = o.tucked ? waistY : waistY - 0.1, neck = J.neck, shoeTop = J.ankle.y + 0.035;
+  const armLen = J.wrist.x - J.shoulder.x, legLen = J.hip.y - J.ankle.y;
+  const striped = a => { a = Math.abs(a); return a < 0.09 || Math.abs(a - 0.27) < 0.06; };
+
+  let r, gr, b;
+  const set = (c, f = 1) => { r = c[0] * f; gr = c[1] * f; b = c[2] * f; };
+  const sample = (u, v) => {
+    const k = (((Math.floor(v * 64) % 64) + 64) % 64 * 64 + ((Math.floor(u * 64) % 64) + 64) % 64) * 4;
+    r = print[k]; gr = print[k + 1]; b = print[k + 2];
+  };
+
+  for (let i = 0; i < S * S; i++) {
+    if (!mask[i]) continue;
+    const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2], ax = Math.abs(x), k8 = i * GROUPS, o4 = i * 4;
+    const head = grp[k8 + HEAD], torso = grp[k8 + TORSO], arm = grp[k8 + UPPERARM] + grp[k8 + LOWERARM];
+    const leg = grp[k8 + THIGH] + grp[k8 + CALF], foot = grp[k8 + FOOT];
+    const front = z > J.midZ;
+    r = -1;
+    let shaded = false; // cloth picks up the body's painted light and shadow
+
+    const torsoPrint = () => sample((Math.atan2(x, z + 0.03) / (Math.PI * 2) + 0.5) * 5, y / 0.17);
+    const top = () => {
+      const dn = Math.hypot(x, y - neck.y, z - neck.z);
+      if (dn < 0.062) return;
+      shaded = true;
+      if (openFront && front) {
+        const half = 0.035 + clamp01((y - waistY) / 0.45) * 0.065;
+        if (ax < half) {
+          if (o.chain && y < neck.y - 0.02 && Math.abs(Math.hypot(x, y - neck.y - 0.03) - 0.115) < 0.0045) { set(GOLD); shaded = false; return; }
+          if (ax < (y - (neck.y - (o.tank ? 0.21 : 0.09))) * 0.55) { shaded = false; return; } // bare chest
+          if (ax > half - 0.007) { set(outer, 0.55); return; }                                  // lapel edge
+          if (printInner) torsoPrint(); else set(inner);
+          return;
+        }
+      } else if (!openFront && o.tee) {
+        if (dn < 0.09) { shaded = false; return; }
+      } else if (!openFront && front) {
+        const v = (y - (neck.y - 0.12)) * 0.5;
+        if (ax < v) { shaded = false; return; }                                                   // open collar
+        if (ax < v + 0.028 && dn < 0.17) { set(shirt, 1.18); return; }                            // collar wings
+        if (ax < 0.0045) { set(shirt, 0.6); return; }                                             // placket
+        const by = (y - waistY) % 0.085;
+        if (ax < 0.011 && Math.abs(by - 0.04) < 0.008) { set(BUTTON); return; }
+      }
+      if (printOuter) torsoPrint(); else set(outer);
+    };
+
+    if (head > 128) {
+      // Hair is painted on the scalp; hair meshes sit on top of it for the fuller styles.
+      const th = Math.atan2(ax, z + 0.01);
+      let bottom, hair = true;
+      if (o.hairStyle === 'balding') {
+        hair = th > 1.15 && y < topY - 0.045;
+        bottom = th < 2 ? lerp(topY - 0.085, topY - 0.2, (th - 1.35) / 0.65) : topY - 0.2;
+      } else {
+        const frontLine = o.hairStyle === 'receding' ? (th < 0.4 ? topY - 0.022 : topY - 0.008) : topY - 0.035;
+        bottom = th < 0.75 ? frontLine : th < 1.35 ? lerp(frontLine, topY - 0.085, (th - 0.75) / 0.6) : th < 2 ? lerp(topY - 0.085, topY - 0.2, (th - 1.35) / 0.65) : topY - 0.2;
+      }
+      if (hair && y > bottom) {
+        const a = clamp01((y - bottom) / 0.01), c = sideC && th > 1 && th < 2 && y < topY - 0.055 ? sideC : hairC;
+        r = lerp(d[o4], c[0], a); gr = lerp(d[o4 + 1], c[1], a); b = lerp(d[o4 + 2], c[2], a);
+      }
+    } else if (foot > 128 || y < shoeTop) set(SHOE);
+    else if ((leg > 100 && leg >= torso) || (torso > 100 && y < waistY)) {
+      if (y > hemY && torso + leg > 100) top();
+      else {
+        const t = (J.hip.y - y) / legLen;
+        set(pants);
+        if (stripe && striped(Math.atan2(z - lerp(J.hip.z, J.ankle.z, t), ax - lerp(J.hip.x, J.ankle.x, t)))) set(stripe);
+      }
+      if (o.tucked && Math.abs(y - waistY) < 0.02) {
+        set(BELT); shaded = false;
+        if (front && ax < 0.035) set(STEEL);
+        else if (o.badge && front && x > 0.075 && x < 0.115) set(GOLD);
+      }
+    } else if (torso > 90 && torso >= head) {
+      top();
+      if (o.tucked && Math.abs(y - waistY) < 0.02) { set(BELT); shaded = false; if (front && ax < 0.035) set(STEEL); }
+    } else if (arm > 100) {
+      const t = (ax - J.shoulder.x) / armLen;
+      if (t < sleeve) {
+        shaded = true;
+        const a = Math.atan2(z - J.shoulder.z, y - J.shoulder.y);
+        if (printOuter) sample(a / (Math.PI * 2) * 2, ax / 0.17); else set(outer);
+        if (stripe && striped(a)) { set(stripe); shaded = false; }
+      } else if (o.watch && x > 0 && t > 0.9 && t < 0.96) set(GOLD);
     }
+
+    if (r < 0) continue;
+    if (shaded) {
+      const f = Math.max(0.78, Math.min(1.08, 0.5 + 0.5 * (d[o4] + d[o4 + 1] + d[o4 + 2]) / 480));
+      r *= f; gr *= f; b *= f;
+    }
+    d[o4] = r; d[o4 + 1] = gr; d[o4 + 2] = b;
   }
-  if (o.chain) {
-    g.strokeStyle = '#e8c040'; g.lineWidth = 3;
-    g.beginPath(); g.ellipse(cx, 0, 15, 36, 0, 0, Math.PI); g.stroke();
-  }
-  if (o.tucked) {
-    g.fillStyle = '#131317'; g.fillRect(0, S - 16, S, 16);
-    g.fillStyle = '#c9c9cf'; g.fillRect(cx - 9, S - 15, 18, 13);
-    if (o.badge) { g.fillStyle = '#d9b23c'; g.fillRect(cx + 34, S - 16, 14, 16); }
-  }
-  // Soft shading under the chest and at the sides so the torso does not read as a flat tube.
-  const grad = g.createLinearGradient(0, 0, S, 0);
-  grad.addColorStop(0, 'rgba(0,0,0,.22)'); grad.addColorStop(0.3, 'rgba(0,0,0,0)');
-  grad.addColorStop(0.7, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,.22)');
-  g.fillStyle = grad; g.fillRect(0, 0, S, S);
-  return c;
+  g.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  return tex;
 }
 
-// ---------- The figure ----------
+// ---------- Body shape ----------
+
+// Reshape the bind-pose body for a build: `bulk` above 1 thickens the waist, adds a belly and
+// heavier limbs; below 1 slims the athletic base down. Skinning weights are untouched.
+function shaped(B, bulk) {
+  const key = Math.round(bulk * 20);
+  if (B.shapes.has(key)) return B.shapes.get(key);
+  const k = bulk - 1, J = B.J, src = B.geometry.attributes.position, out = src.clone(), vw = B.vw;
+  const chest = 1 + k * 0.45, shoulderShift = J.shoulder.x * (chest - 1), hipShift = J.hip.x * k * 0.3;
+  for (let v = 0; v < src.count; v++) {
+    let x = src.getX(v), y = src.getY(v), z = src.getZ(v);
+    const g = v * GROUPS, tw = vw[g + TORSO], aw = vw[g + UPPERARM] + vw[g + LOWERARM] + vw[g + HAND], lw = vw[g + THIGH] + vw[g + CALF] + vw[g + FOOT];
+    const belly = clamp01(1 - Math.abs(y - (J.waistY + 0.1)) / 0.3), s = Math.sign(x);
+    if (tw > 0) {
+      x *= 1 + tw * (0.03 + k * 0.45 + (0.12 + Math.max(0, k) * 0.4) * belly);
+      z = J.midZ + (z - J.midZ) * (1 + tw * (0.03 + k * 0.45 + (0.1 + Math.max(0, k) * 0.6) * belly));
+      if (z > J.midZ) z += tw * belly * Math.max(0, k) * 0.2;
+    }
+    if (aw > 0) {
+      const f = 1 + aw * k * 0.5;
+      y = J.shoulder.y + (y - J.shoulder.y) * f; z = J.shoulder.z + (z - J.shoulder.z) * f;
+      x += s * shoulderShift * aw;
+    }
+    if (lw > 0) {
+      const t = (J.hip.y - y) / (J.hip.y - J.ankle.y), cx = s * lerp(J.hip.x, J.ankle.x, t), cz = lerp(J.hip.z, J.ankle.z, t);
+      const fw = vw[g + FOOT], cuff = clamp01((t - 0.45) / 0.5);
+      const f = 1 + (lw - fw) * (0.14 + k * 0.45 + 0.4 * cuff * cuff) + fw * 0.2;
+      x = cx + (x - cx) * f + s * hipShift * lw; z = cz + (z - cz) * f;
+      if (fw > 0.5) y *= 1.25;
+    }
+    out.setXYZ(v, x, y, z);
+  }
+  const geo = B.geometry.clone();
+  geo.setAttribute('position', out);
+  B.shapes.set(key, geo);
+  return geo;
+}
+
+// ---------- A character ----------
 
 // Options:
-//   skin, hair, shirt, pants   colours
-//   bulk       1 = average build; above ~1.2 adds a belly
+//   body       'male' | 'female'
+//   dark       use the darker skin texture
+//   bulk       1 = the athletic base; above ~1.2 gets a belly, below 1 is slimmer
 //   height     overall scale
-//   hairStyle  'short' | 'receding' | 'balding' | 'pompadour' | 'curly' | 'slick' | 'long'
+//   shirt, pants, hair   colours
+//   hairStyle  'short' | 'receding' | 'balding' (painted hairline)
+//   hairMesh   'parted' | 'buzzed' | 'long' for hair with volume; hairScale stretches it [x, y, z]
 //   hairSides  colour of the hair at the temples
 //   pattern    'blocks' | 'plaid' | 'paisley' | 'stripes' printed shirt
 //   jacket     colour of an open jacket worn over the shirt
 //   open       colour of an undershirt showing through an unbuttoned shirt or track top
 //   tank       the undershirt is a low-cut tank
 //   sleeves    'short' | 'long'
-//   tee, tucked, badge, chain, watch, muscle, age, stubble   details
+//   tee, tucked, badge, chain, watch   details
 //   stripe     colour of side stripes down arms and legs (tracksuit)
 export function makeHuman(opts = {}) {
-  const o = { skin: 0xe3b58f, shirt: 0xffffff, pants: 0x23232b, hair: 0x2b1b12, bulk: 1, height: 1, hairStyle: 'short', sleeves: 'short', ...opts };
-  const b = o.bulk, belly = Math.max(0, b - 1.1) * 0.22;
+  const o = { body: 'male', shirt: 0xffffff, pants: 0x23232b, hair: 0x2b1b12, bulk: 1, height: 1, hairStyle: 'short', sleeves: 'short', ...opts };
+  const B = bodies[o.body];
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';
   group.scale.setScalar(o.height);
-  const put = (m, x, y, z, parent = group) => { m.position.set(x, y, z); parent.add(m); return m; };
+  const root = cloneSkinned(B.scene);
+  group.add(root);
 
-  const skin = lambert(o.skin), hairMat = lambert(o.hair), pantsMat = lambert(o.pants);
-  const upper = o.jacket !== undefined ? o.jacket : o.shirt;
-  const sleeveMat = o.jacket === undefined && o.pattern ? textured(printCanvas(o.pattern), true) : lambert(upper);
+  const { hairMesh, hairScale, bulk, height, ...paintKey } = o;
+  const key = JSON.stringify(paintKey);
+  if (!textures.has(key)) textures.set(key, paint(B, o));
+  const hairMat = new THREE.MeshLambertMaterial({ color: o.hair });
 
-  // Torso
-  const hem = o.tucked ? 0.9 : 0.8;
-  put(tube([
-    [hem, 0.165 * b, 0.115 * b + belly * 0.8, belly * 0.5],
-    [0.98, 0.17 * b, 0.12 * b + belly, belly * 0.6],
-    [1.1, 0.168 * b, 0.118 * b + belly * 0.9, belly * 0.5],
-    [1.24, 0.185 * b, 0.125 * b + belly * 0.4, belly * 0.2],
-    [1.36, 0.2 * b, 0.128 * b, 0],
-    [1.44, 0.195 * b, 0.112 * b, 0],
-    [1.49, 0.12 * b, 0.085, 0],
-    [1.52, 0.06, 0.06, 0],
-  ], 14, textured(torsoCanvas(o))), 0, 0, 0);
-  put(tube([[1.47, 0.055, 0.058], [1.6, 0.05, 0.053]], 8, skin), 0, 0, 0);
-
-  // Head
-  const head = new THREE.Group();
-  put(head, 0, 1.7, 0);
-  head.scale.setScalar(1.14);
-  const jaw = 1 + (b - 1) * 0.35;
-  put(tube([
-    [-0.125, 0.03, 0.03, 0.035],
-    [-0.105, 0.06 * jaw, 0.066, 0.022],
-    [-0.06, 0.082 * jaw, 0.092, 0.01],
-    [-0.01, 0.092, 0.104, 0.003],
-    [0.04, 0.095, 0.108, 0],
-    [0.085, 0.088, 0.102, -0.003],
-    [0.118, 0.062, 0.075, -0.006],
-    [0.135, 0.025, 0.03, -0.008],
-  ], 14, textured(headCanvas(o))), 0, 0, 0, head);
-  const nose = put(new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.055, 4), skin), 0, -0.012, 0.108, head);
-  nose.rotation.x = -0.35;
-  for (const s of [-1, 1]) put(blob(0.012, 0.028, 0.02, skin, 6), s * 0.096, 0, -0.005, head);
-
-  const cap = (sx, sy, sz, tilt, z = -0.01) => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 5, 0, Math.PI * 2, 0, Math.PI / 2), hairMat);
-    m.scale.set(sx, sy, sz); m.rotation.x = tilt; m.castShadow = true;
-    return put(m, 0, 0.045, z, head);
-  };
-  if (o.hairStyle === 'receding') cap(0.098, 0.095, 0.1, -0.62, -0.022);
-  else if (o.hairStyle === 'curly') cap(0.108, 0.115, 0.12, -0.3);
-  else if (o.hairStyle !== 'balding') cap(0.101, 0.1, 0.112, -0.35);
-  if (o.hairStyle === 'pompadour') put(blob(0.07, 0.042, 0.06, hairMat), 0, 0.125, 0.055, head);
-  if (o.hairStyle === 'long') put(blob(0.098, 0.13, 0.05, hairMat), 0, -0.05, -0.085, head);
-
-  // Limbs: a pivot at the shoulder or hip, a second pivot at the elbow or knee.
-  // Tracksuit stripes are painted down the outer side of each limb (u = 0.75 is +x, 0.25 is -x).
-  const striped = (base, side) => {
-    if (o.stripe === undefined) return lambert(base);
-    const [c, g] = canvasOf(64);
-    g.fillStyle = css(base); g.fillRect(0, 0, 64, 64);
-    g.fillStyle = css(o.stripe);
-    for (const dx of [-5, 0, 5]) g.fillRect((side > 0 ? 48 : 16) + dx - 1, 0, 2.4, 64);
-    return textured(c);
-  };
-
-  const long = o.sleeves === 'long' || o.jacket !== undefined;
-  const at = o.muscle ? 1.3 : 0.92 + 0.25 * (b - 1); // arm thickness
-  const arm = side => {
-    const limbMat = o.stripe !== undefined ? striped(upper, side) : sleeveMat;
-    const shoulder = new THREE.Group();
-    put(shoulder, side * (0.195 * b + 0.04), 1.43, 0);
-    shoulder.rotation.z = side * 0.08;
-    put(tube([[-0.3, 0.043 * at, 0.043 * at], [-0.15, 0.05 * at, 0.053 * at], [-0.03, 0.055 * at, 0.056 * at], [0.02, 0.035 * at, 0.035 * at]], 8, long ? limbMat : skin), 0, 0, 0, shoulder);
-    if (!long) {
-      const cuff = o.tee ? -0.13 : -0.19, k = at * (o.tee ? 1.06 : 1.12);
-      put(tube([[cuff, 0.05 * k, 0.053 * k], [-0.03, 0.057 * k, 0.058 * k], [0.03, 0.04 * k, 0.04 * k]], 8, sleeveMat), 0, 0, 0, shoulder);
+  let headBone;
+  root.traverse(n => {
+    if (n.isBone && n.name === 'Head') headBone = n;
+    if (!n.isSkinnedMesh) return;
+    if (n.name === B.bodyName) {
+      n.geometry = shaped(B, o.bulk);
+      n.material = new THREE.MeshLambertMaterial({ map: textures.get(key) });
+      n.castShadow = true;
+    } else if (/brow/i.test(n.name)) n.material = hairMat;
+  });
+  if (hairMesh && hairMeshes[hairMesh]) {
+    const hair = new THREE.Mesh(hairMeshes[hairMesh].geometry, hairMat);
+    hair.castShadow = true;
+    if (hairScale) { // stretch about the crown so the hair stays seated on the head
+      hair.scale.set(...hairScale);
+      hair.position.set(0, B.topY * (1 - hairScale[1]) * 0.94, 0);
     }
-    const elbow = new THREE.Group();
-    put(elbow, 0, -0.3, 0, shoulder);
-    put(tube([[-0.27, 0.03 * at, 0.032 * at], [-0.12, 0.04 * at, 0.042 * at], [0.01, 0.043 * at, 0.044 * at]], 8, long ? limbMat : skin), 0, 0, 0, elbow);
-    put(blob(0.034, 0.05, 0.026, skin, 6), 0, -0.31, 0.005, elbow);
-    if (o.watch && side === 1) put(tube([[-0.265, 0.036 * at, 0.038 * at], [-0.24, 0.036 * at, 0.038 * at]], 8, lambert(0xe8c040)), 0, 0, 0, elbow);
-    elbow.rotation.x = -0.12;
-    return [shoulder, elbow];
-  };
-  const [armL, elbowL] = arm(1), [armR, elbowR] = arm(-1);
+    root.add(hair);
+    root.updateMatrixWorld(true);
+    headBone.attach(hair);
+  }
 
-  const lt = 0.9 + 0.2 * b; // leg thickness
-  const shoeMat = lambert(0x16120f);
-  const leg = side => {
-    const pantsMat = striped(o.pants, side);
-    const hip = new THREE.Group();
-    put(hip, side * 0.085 * b, 0.92, 0);
-    put(tube([[-0.44, 0.062 * lt, 0.068 * lt], [-0.2, 0.076 * lt, 0.082 * lt], [0, 0.086 * lt, 0.092 * lt], [0.03, 0.05 * lt, 0.06 * lt]], 8, pantsMat), 0, 0, 0, hip);
-    const knee = new THREE.Group();
-    put(knee, 0, -0.44, 0, hip);
-    put(tube([[-0.43, 0.052 * lt, 0.06 * lt], [-0.2, 0.056 * lt, 0.062 * lt], [0.01, 0.063 * lt, 0.069 * lt]], 8, pantsMat), 0, 0, 0, knee);
-    put(blob(0.05, 0.04, 0.13, shoeMat, 6), 0, -0.445, 0.05, knee);
-    return [hip, knee];
-  };
-  const [legL, kneeL] = leg(1), [legR, kneeR] = leg(-1);
-  put(tube([[0.84, 0.15 * b, 0.11 * b], [0.93, 0.165 * b, 0.115 * b + belly * 0.5, belly * 0.3]], 12, pantsMat), 0, 0, 0); // seat of the trousers
-
-  return {
-    group,
-    animate(phase, amp) {
-      const s = Math.sin(phase), c = Math.cos(phase);
-      legL.rotation.x = -s * 0.6 * amp; legR.rotation.x = s * 0.6 * amp;
-      kneeL.rotation.x = Math.max(0, c) * 0.9 * amp; kneeR.rotation.x = Math.max(0, -c) * 0.9 * amp;
-      armL.rotation.x = s * 0.5 * amp; armR.rotation.x = -s * 0.5 * amp;
-      elbowL.rotation.x = -0.12 - (0.25 + 0.25 * Math.max(0, -s)) * amp;
-      elbowR.rotation.x = -0.12 - (0.25 + 0.25 * Math.max(0, s)) * amp;
-    },
-    sit() {
-      legL.rotation.x = legR.rotation.x = -1.5;
-      kneeL.rotation.x = kneeR.rotation.x = 1.45;
-      armL.rotation.x = armR.rotation.x = -0.35;
-      elbowL.rotation.x = elbowR.rotation.x = -1.0;
+  const mixer = new THREE.AnimationMixer(root), actions = {};
+  const person = {
+    group, mixer, state: null,
+    // Switch animation: 'idle' | 'talk' | 'walk' | 'run' | 'sprint' | 'sit' | 'down'.
+    set(state, speed = 1) {
+      if (this.state !== state) {
+        const next = actions[state] ??= mixer.clipAction(B.clips[state]);
+        if (state === 'down') { next.setLoop(THREE.LoopOnce); next.clampWhenFinished = true; }
+        next.reset().fadeIn(this.state ? 0.2 : 0).play();
+        if (this.state) actions[this.state].fadeOut(0.2);
+        this.state = state;
+      }
+      actions[state].timeScale = speed;
     },
   };
+  person.set('idle');
+  mixer.update(Math.random() * 2); // so a crowd does not move in unison
+  people.push(person);
+  return person;
+}
+
+// Advance every character's animation; ones far from the camera or out of the scene are skipped.
+export function updatePeople(dt, eye) {
+  for (const p of people) {
+    let top = p.group;
+    while (top.parent) top = top.parent;
+    if (!top.isScene) continue;
+    const g = p.group.position;
+    if (Math.hypot(g.x - eye.x, g.y - eye.y, g.z - eye.z) < 160) p.mixer.update(dt);
+  }
 }
 
 // The crew's looks, taken from the reference image (left to right).
 // Hesh runs his record label in this world; Furio only arrives late in the storyline.
 export const LOOKS = {
-  pussy:      { jacket: 0xa9bcd8, pants: 0xa9bcd8, pattern: 'stripes', tucked: true, hair: 0x14110f, hairStyle: 'curly', bulk: 1.38, skin: 0xd9a57c, brow: 3 },
-  tony:       { pattern: 'blocks', shirt: 0x171c44, pants: 0x15151b, hair: 0x2a1c14, hairStyle: 'receding', bulk: 1.42, height: 1.04, skin: 0xe0ae88 },
-  christopher: { pattern: 'stripes', shirt: 0xece6dc, pants: 0x4a3324, tucked: true, hair: 0x1c1410, bulk: 0.95, brow: 3 },
-  paulie:     { shirt: 0x15141a, open: 0xf4f4f4, tank: true, chain: true, sleeves: 'long', pants: 0x15141a, stripe: 0xc9202a, hair: 0x17120f, hairStyle: 'slick', hairSides: 0xcfcfd4, bulk: 1.05, skin: 0xd9a57c },
-  hesh:       { pattern: 'plaid', shirt: 0x8d93cc, pants: 0x6f6f7a, hair: 0x9a9690, hairStyle: 'balding', age: true, bulk: 1.15, skin: 0xe0b090 },
-  silvio:     { pattern: 'paisley', shirt: 0x232228, open: 0xf4f4f4, sleeves: 'long', pants: 0x1d1d26, hair: 0x120e0c, hairStyle: 'pompadour', bulk: 1.0 },
-  furio:      { shirt: 0x5c6157, tee: true, tucked: true, badge: true, watch: true, muscle: true, pants: 0x15151b, hair: 0x17120f, bulk: 1.2, skin: 0xd09a70 },
+  pussy:       { jacket: 0xa9bcd8, pants: 0xa9bcd8, shirt: 0xece6dc, pattern: 'stripes', tucked: true, hair: 0x14110f, hairMesh: 'parted', bulk: 1.38 },
+  tony:        { pattern: 'blocks', shirt: 0x171c44, pants: 0x15151b, hair: 0x2a1c14, hairStyle: 'receding', bulk: 1.42, height: 1.04 },
+  christopher: { pattern: 'stripes', shirt: 0xece6dc, pants: 0x4a3324, tucked: true, hair: 0x1c1410, hairMesh: 'parted', bulk: 0.92 },
+  paulie:      { shirt: 0x15141a, open: 0xf4f4f4, tank: true, chain: true, sleeves: 'long', pants: 0x15141a, stripe: 0xc9202a, hair: 0x17120f, hairMesh: 'parted', hairSides: 0xcfcfd4, bulk: 1.02 },
+  hesh:        { pattern: 'plaid', shirt: 0x8d93cc, pants: 0x6f6f7a, hair: 0x9a9690, hairStyle: 'balding', bulk: 1.18 },
+  silvio:      { pattern: 'paisley', shirt: 0x232228, open: 0xf4f4f4, sleeves: 'long', pants: 0x1d1d26, hair: 0x120e0c, hairMesh: 'parted', hairScale: [1.03, 1.12, 1.06], bulk: 1.0 },
+  furio:       { shirt: 0x5c6157, tee: true, tucked: true, badge: true, watch: true, pants: 0x15151b, hair: 0x17120f, hairMesh: 'long', bulk: 1.08 },
+  melfi:       { body: 'female', jacket: 0x3d4658, shirt: 0xf1ede4, pants: 0x3d4658, tucked: true, hair: 0x2a1a14, hairMesh: 'long' },
 };
 export const makeLook = name => makeHuman(LOOKS[name]);
 export const makeTony = () => makeLook('tony');

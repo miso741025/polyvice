@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { NX, NZ, ROAD, nodeX, nodeZ, blockCenter, colliders, pushOut, clamp, wrapAngle, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
-import { makeTony, Car, Ped, spawnTraffic, driveAI } from './entities.js';
+import { makeTony, Car, Ped, spawnTraffic, driveAI, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
 import { runStory } from './missions.js';
 
@@ -39,6 +39,8 @@ async function boot() {
     new Promise(r => setTimeout(r, 2500)),
   ]);
 
+  await loadPeople();
+
   const rand = mulberry32(77);
   const hud = new Hud();
   const places = buildWorld(scene);
@@ -75,7 +77,7 @@ async function boot() {
     scene, camera, hud, places, cars, peds,
     time: 0, cash: 0, started: false,
     waiters: [], updaters: [], markers: [], blips: [],
-    player: { pos: new THREE.Vector3(places.home.spawn.x, 0, places.home.spawn.z), heading: 0, human: tony, car: null, locked: true, hidden: false, down: 0, phase: 0, amp: 0 },
+    player: { pos: new THREE.Vector3(places.home.spawn.x, 0, places.home.spawn.z), heading: 0, human: tony, car: null, locked: true, hidden: false, down: 0, motion: 'idle' },
     cam: { yaw: 0, pitch: 0.25, fixed: null, sway: 0, lastMouse: -10 },
 
     until(fn) { return new Promise(resolve => g.waiters.push({ fn, resolve })); },
@@ -147,6 +149,8 @@ async function boot() {
   });
   hud.fade(0, 1.2);
   const startBtn = document.getElementById('start');
+  startBtn.disabled = false;
+  startBtn.textContent = 'Start';
   startBtn.addEventListener('click', () => {
     if (g.started) return;
     g.started = true;
@@ -188,7 +192,7 @@ async function boot() {
     }
 
     const mx = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), mz = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
-    let moving = false;
+    p.motion = 'idle';
     if (!p.locked && (mx || mz)) {
       const s = Math.sin(g.cam.yaw), c = Math.cos(g.cam.yaw);
       let vx = s * mz - c * mx, vz = c * mz + s * mx;
@@ -196,10 +200,8 @@ async function boot() {
       vx /= n; vz /= n;
       p.pos.x += vx * speed * dt; p.pos.z += vz * speed * dt;
       p.heading += wrapAngle(Math.atan2(vx, vz) - p.heading) * (1 - Math.exp(-12 * dt));
-      p.phase += speed * dt * 2.1;
-      moving = true;
+      p.motion = speed > 5 ? 'sprint' : 'run';
     }
-    p.amp += ((moving ? 1 : 0) - p.amp) * (1 - Math.exp(-10 * dt));
     pushOut(p.pos, 0.45);
     for (const o of cars) {
       if (Math.abs(o.pos.x - p.pos.x) > 5 || Math.abs(o.pos.z - p.pos.z) > 5) continue;
@@ -281,14 +283,14 @@ async function boot() {
     g.waiters = g.waiters.filter(w => { if (!w.fn()) return true; w.resolve(); return false; });
 
     tony.group.visible = !p.car && !p.hidden;
-    tony.group.position.set(p.pos.x, 0.2 * p.down, p.pos.z);
+    tony.group.position.set(p.pos.x, 0, p.pos.z);
     tony.group.rotation.y = p.heading;
-    tony.group.rotation.x = -Math.PI / 2 * p.down;
-    tony.animate(p.phase, p.amp);
+    tony.set(p.down ? 'down' : p.car || p.locked ? 'idle' : p.motion);
 
     for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
 
     updateCamera(dt);
+    updatePeople(dt, camera.position);
     sun.target.position.copy(focus);
     sun.position.copy(focus).addScaledVector(SUN_DIR, 200);
     places.sky.position.copy(camera.position);

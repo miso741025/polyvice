@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { NX, NZ, BLOCK, ROAD, CELL, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, mulberry32 } from './grid.js';
-import { box, makeHuman, makeTony, makeDuck } from './entities.js';
+import { box, makeLook, makeTony, makeDuck } from './entities.js';
 
 const PASTELS = [0xf7a8c4, 0x8fe0d4, 0xffd3a1, 0xc9b6f2, 0xfff1c9, 0x9fd0f5, 0xf5f5f0, 0xff9e8a];
 const CURB = 0.14; // sidewalk height
@@ -297,13 +297,13 @@ function buildOffice(scene) {
   add(box(2.4, 1.8, 0.06, 0xffc9a0, true), 5.95, 2.4, 0).rotation.y = Math.PI / 2; // sunset window
 
   const tony = makeTony();
-  tony.sit(); tony.group.rotation.y = Math.PI / 2; add(tony.group, -2.2, -0.42, 0);
-  const melfi = makeHuman({ shirt: 0x3d4658, pants: 0x3d4658, hair: 0x2a1a14, skin: 0xe8c3a3, hairStyle: 'long' });
-  melfi.sit(); melfi.group.rotation.y = -Math.PI / 2; add(melfi.group, 2.2, -0.42, 0);
+  tony.set('sit'); tony.group.rotation.y = Math.PI / 2; add(tony.group, -2.02, 0, 0);
+  const melfi = makeLook('melfi');
+  melfi.set('sit'); melfi.group.rotation.y = -Math.PI / 2; add(melfi.group, 2.02, 0, 0);
 
   const lamp = new THREE.PointLight(0xffd9a8, 45, 30);
   add(lamp, 0, 3.9, 1);
-  return { cam: new THREE.Vector3(0, base + 1.7, 4.6), look: new THREE.Vector3(0, base + 1.15, 0) };
+  return { cam: new THREE.Vector3(0, base + 1.45, 3.9), look: new THREE.Vector3(0, base + 0.95, 0) };
 }
 
 // Sunset sky dome with the sun over the ocean; the caller keeps it centred on the camera.
