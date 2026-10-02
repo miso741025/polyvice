@@ -1,24 +1,29 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mulberry32 } from './grid.js';
 
 // Characters use the CC0 Quaternius base bodies (rigged, ~13k triangles) and animation library.
-// The bodies come unclothed, so clothing is painted into each character's texture the way
-// PS2-era games did it: every texel knows where it sits on the body (baked once per body),
-// and a look decides what garment covers that spot.
+// The bodies come unclothed and built like superheroes, so two things happen per character:
+//   - the mesh is relaxed (muscle definition smoothed away) and reshaped into a clothed
+//     silhouette: a shirt that hangs from the chest, trouser legs, shoes, a gut, a jaw;
+//   - clothing and face details are painted into the texture the way PS2-era games did it:
+//     every texel knows where it sits on the body (baked once per body), and a look decides
+//     what covers that spot.
 
 const DIR = 'assets/models/';
 const MAP = 1024;                 // texture size per character
 const STAND_FRAME = 0.25;         // point in the walk cycle whose upper body is used for standing still
 const SEAT_HEIGHT = 0.6;          // hip height when sitting in a chair
 const bodies = {};                // 'male' | 'female' -> prepared base body
-const hairMeshes = {};            // 'parted' | 'buzzed' | 'long' -> mesh
+const hairMeshes = {};            // 'parted' | 'buzzed' | 'long' | 'beard' -> { geometry, map }
 const people = [];                // live characters, advanced by updatePeople
 const textures = new Map();       // painted textures, shared between identical looks
 
 const clamp01 = v => Math.max(0, Math.min(1, v));
 const lerp = (a, b, t) => a + (b - a) * clamp01(t);
+const smooth = t => { t = clamp01(t); return t * t * (3 - 2 * t); };
 const rgb = h => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
 
 function canvasOf(size) {
@@ -50,20 +55,21 @@ export async function loadPeople() {
     i.onload = () => resolve(i); i.onerror = () => reject(new Error('Could not load ' + file));
     i.src = DIR + file;
   });
-  const [male, female, anims, parted, buzzed, long, skinLight, skinDark, skinFemale] = await Promise.all([
+  const [male, female, anims, parted, buzzed, long, beard, skinLight, skinDark, skinFemale] = await Promise.all([
     gltf('Superhero_Male_FullBody.gltf'), gltf('Superhero_Female_FullBody.gltf'), gltf('UAL1_Standard.glb'),
-    gltf('Hair_SimpleParted.gltf'), gltf('Hair_Buzzed.gltf'), gltf('Hair_Long.gltf'),
+    gltf('Hair_SimpleParted.gltf'), gltf('Hair_Buzzed.gltf'), gltf('Hair_Long.gltf'), gltf('Hair_Beard.gltf'),
     image('T_Superhero_Male_Ligh.png'), image('T_Superhero_Male_Dark.png'), image('T_Superhero_Female_Light_BaseColor.png'),
   ]);
   let sourcePelvis = 0.9167;
   anims.scene.traverse(o => { if (o.isBone && o.name === 'pelvis') sourcePelvis = o.position.length(); });
-  bodies.male = prepareBody(male.scene, { light: skinLight, dark: skinDark }, anims.animations, sourcePelvis);
-  bodies.female = prepareBody(female.scene, { light: skinFemale, dark: skinFemale }, anims.animations, sourcePelvis);
-  const firstMesh = scene => { let m; scene.traverse(o => { if (o.isMesh && !m) m = o; }); return m; };
-  hairMeshes.parted = firstMesh(parted.scene); hairMeshes.buzzed = firstMesh(buzzed.scene); hairMeshes.long = firstMesh(long.scene);
+  bodies.male = prepareBody(male.scene, { light: skinLight, dark: skinDark }, anims.animations, sourcePelvis, false);
+  bodies.female = prepareBody(female.scene, { light: skinFemale, dark: skinFemale }, anims.animations, sourcePelvis, true);
+  const hairOf = scene => { let m; scene.traverse(o => { if (o.isMesh && !m) m = o; }); return { geometry: m.geometry, map: m.material.map }; };
+  hairMeshes.parted = hairOf(parted.scene); hairMeshes.buzzed = hairOf(buzzed.scene);
+  hairMeshes.long = hairOf(long.scene); hairMeshes.beard = hairOf(beard.scene);
 }
 
-function prepareBody(scene, skins, animations, sourcePelvis) {
+function prepareBody(scene, skins, animations, sourcePelvis, female) {
   scene.updateMatrixWorld(true);
   let body;
   scene.traverse(o => { if (o.isSkinnedMesh && /superhero/i.test(o.name)) body = o; });
@@ -75,17 +81,29 @@ function prepareBody(scene, skins, animations, sourcePelvis) {
     waistY: pelvis.y + 0.075, midZ: pelvis.z + 0.03,
   };
 
-  // Per-vertex group weights.
+  // Per-vertex group weights, the top of the head and the tip of the nose (the face's anchor point).
   const P = geo.attributes.position, SI = geo.attributes.skinIndex, SW = geo.attributes.skinWeight;
   const boneGroup = bones.map(b => groupOf(b.name));
   const vw = new Float32Array(P.count * GROUPS);
+  const nose = new THREE.Vector3(0, 0, -1);
   let topY = 0;
   for (let v = 0; v < P.count; v++) {
     for (let k = 0; k < 4; k++) vw[v * GROUPS + boneGroup[SI.getComponent(v, k)]] += SW.getComponent(v, k);
     topY = Math.max(topY, P.getY(v));
+    if (vw[v * GROUPS + HEAD] > 0.9 && P.getZ(v) > nose.z) nose.set(0, P.getY(v), P.getZ(v));
   }
 
-  const B = { scene, bodyName: body.name, geometry: geo, vw, J, topY, skins, shapes: new Map(), ...bake(geo, vw) };
+  // The relaxed body every build starts from, and the torso's outline measured on it.
+  const weld = weldOf(geo);
+  const base = new Float32Array(P.count * 3);
+  for (let v = 0; v < P.count; v++) { base[v * 3] = P.getX(v); base[v * 3 + 1] = P.getY(v); base[v * 3 + 2] = P.getZ(v); }
+  relax(base, weld, v => clamp01(1 - 1.3 * (vw[v * GROUPS + HEAD] + vw[v * GROUPS + HAND])), 7);
+  relax(base, weld, v => vw[v * GROUPS + FOOT], 7); // toes melt into the shape of a shoe
+
+  const B = {
+    scene, bodyName: body.name, geometry: geo, vw, J, topY, nose, skins, female, weld, base,
+    prof: measure(base, vw, J), shapes: new Map(), ...bake(geo, vw, base),
+  };
 
   // Animation: keep rotations as they are (the rigs share bone orientations) but drop bone translations,
   // which carry the source mannequin's proportions. Only the hips move, scaled to this body's leg length.
@@ -114,6 +132,10 @@ function prepareBody(scene, skins, animations, sourcePelvis) {
     if (!t.name.endsWith('.quaternion') && t.name !== 'pelvis.position') continue;
     const src = legs ? apose.tracks.find(a => a.name === t.name) : t;
     const values = Array.from(src.createInterpolant().evaluate(legs ? 0 : walk.duration * STAND_FRAME));
+    if (/^(index|middle|pinky|ring|thumb)/.test(bone)) { // the walk cycle makes fists; let the hands hang half open
+      const open = apose.tracks.find(a => a.name === t.name);
+      if (open) new THREE.Quaternion().fromArray(open.createInterpolant().evaluate(0)).slerp(new THREE.Quaternion().fromArray(values), 0.35).toArray(values);
+    }
     if (t.name === 'pelvis.position') still.push(new THREE.VectorKeyframeTrack(t.name, [0], values.map(v => v * ratio)));
     else still.push(new THREE.QuaternionKeyframeTrack(t.name, [0], values));
   }
@@ -145,12 +167,107 @@ function prepareBody(scene, skins, animations, sourcePelvis) {
   return B;
 }
 
+// ---------- Mesh helpers ----------
+
+// Vertices are duplicated along UV seams. Give every distinct position one id and list its neighbours,
+// so smoothing and normals treat the body as one continuous surface.
+function weldOf(geo) {
+  const P = geo.attributes.position, idx = geo.index, id = new Uint32Array(P.count), seen = new Map();
+  for (let v = 0; v < P.count; v++) {
+    const key = `${Math.round(P.getX(v) * 2e4)},${Math.round(P.getY(v) * 2e4)},${Math.round(P.getZ(v) * 2e4)}`;
+    let n = seen.get(key);
+    if (n === undefined) seen.set(key, n = seen.size);
+    id[v] = n;
+  }
+  const near = Array.from({ length: seen.size }, () => new Set());
+  for (let t = 0; t < idx.count; t += 3) {
+    const a = id[idx.getX(t)], b = id[idx.getX(t + 1)], c = id[idx.getX(t + 2)];
+    near[a].add(b).add(c); near[b].add(a).add(c); near[c].add(a).add(b);
+  }
+  return { id, count: seen.size, near: near.map(s => Uint32Array.from(s)) };
+}
+
+// Laplacian smoothing of the positions in `xyz`, by `amount(v)` (0..1) per vertex.
+function relax(xyz, weld, amount, passes) {
+  const { id, count, near } = weld;
+  let p = new Float32Array(count * 3), q = new Float32Array(count * 3);
+  const w = new Float32Array(count);
+  for (let v = 0; v < id.length; v++) {
+    const n = id[v];
+    p[n * 3] = xyz[v * 3]; p[n * 3 + 1] = xyz[v * 3 + 1]; p[n * 3 + 2] = xyz[v * 3 + 2];
+    w[n] = Math.max(w[n], amount(v));
+  }
+  for (let pass = 0; pass < passes; pass++) {
+    for (let n = 0; n < count; n++) {
+      const list = near[n], k = 0.55 * w[n];
+      let x = 0, y = 0, z = 0;
+      for (const m of list) { x += p[m * 3]; y += p[m * 3 + 1]; z += p[m * 3 + 2]; }
+      const inv = list.length ? 1 / list.length : 0;
+      q[n * 3] = p[n * 3] + (x * inv - p[n * 3]) * k;
+      q[n * 3 + 1] = p[n * 3 + 1] + (y * inv - p[n * 3 + 1]) * k;
+      q[n * 3 + 2] = p[n * 3 + 2] + (z * inv - p[n * 3 + 2]) * k;
+    }
+    [p, q] = [q, p];
+  }
+  for (let v = 0; v < id.length; v++) {
+    const n = id[v];
+    xyz[v * 3] = p[n * 3]; xyz[v * 3 + 1] = p[n * 3 + 1]; xyz[v * 3 + 2] = p[n * 3 + 2];
+  }
+}
+
+// Smooth normals across UV seams.
+function weldedNormals(geo, weld) {
+  const P = geo.attributes.position, idx = geo.index, { id, count } = weld;
+  const acc = new Float32Array(count * 3), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t < idx.count; t += 3) {
+    const i = idx.getX(t), j = idx.getX(t + 1), k = idx.getX(t + 2);
+    a.fromBufferAttribute(P, i); b.fromBufferAttribute(P, j).sub(a); c.fromBufferAttribute(P, k).sub(a);
+    b.cross(c);
+    for (const n of [id[i], id[j], id[k]]) { acc[n * 3] += b.x; acc[n * 3 + 1] += b.y; acc[n * 3 + 2] += b.z; }
+  }
+  const N = new Float32Array(P.count * 3);
+  for (let v = 0; v < P.count; v++) {
+    const n = id[v] * 3, l = Math.hypot(acc[n], acc[n + 1], acc[n + 2]) || 1;
+    N[v * 3] = acc[n] / l; N[v * 3 + 1] = acc[n + 1] / l; N[v * 3 + 2] = acc[n + 2] / l;
+  }
+  geo.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+}
+
+// The torso's half-width, front depth and back depth by height, measured on the relaxed body.
+function measure(base, vw, J) {
+  const Y0 = 1, DY = 0.02, n = 30;
+  const w = new Float32Array(n), f = new Float32Array(n), b = new Float32Array(n);
+  for (let v = 0; v < base.length / 3; v++) {
+    const g = v * GROUPS;
+    if (vw[g + TORSO] < 0.6 || vw[g + UPPERARM] + vw[g + LOWERARM] > 0.15) continue;
+    const i = Math.floor((base[v * 3 + 1] - Y0) / DY), dz = base[v * 3 + 2] - J.midZ;
+    if (i < 0 || i >= n) continue;
+    w[i] = Math.max(w[i], Math.abs(base[v * 3])); f[i] = Math.max(f[i], dz); b[i] = Math.max(b[i], -dz);
+  }
+  for (const arr of [w, f, b]) {
+    for (let i = 1; i < n; i++) if (arr[i] < 0.02) arr[i] = arr[i - 1];
+    for (let pass = 0; pass < 2; pass++) for (let i = 1, prev = arr[0]; i < n - 1; i++) {
+      const v = (prev + 2 * arr[i] + arr[i + 1]) / 4;
+      prev = arr[i]; arr[i] = v;
+    }
+  }
+  const at = arr => y => {
+    const u = Math.max(0, Math.min(n - 1.001, (y - Y0) / DY - 0.5)), i = Math.floor(u);
+    return arr[i] + (arr[i + 1] - arr[i]) * (u - i);
+  };
+  const peak = (arr, y0, y1) => { let m = 0; for (let i = Math.round((y0 - Y0) / DY); i < (y1 - Y0) / DY; i++) m = Math.max(m, arr[i]); return m; };
+  const chestW = peak(w, 1.25, 1.5);
+  let chestY = 1.3;
+  for (let i = 10; i < n; i++) if (w[i] >= chestW * 0.97) { chestY = Y0 + i * DY - 0.03; break; }
+  return { w: at(w), f: at(f), b: at(b), chestW, chestY, chestF: peak(f, 1.2, 1.45), backD: peak(b, 1.25, 1.45) };
+}
+
 // Rasterise the body's triangles into texture space, recording for every texel
-// its position on the bind-pose body and its vertex-group weights.
-function bake(geo, vw) {
+// its position on the relaxed bind-pose body (`xyz`) and its vertex-group weights.
+function bake(geo, vw, xyz) {
   const S = MAP, N = S * S;
   const pos = new Float32Array(N * 3), grp = new Uint8Array(N * GROUPS), mask = new Uint8Array(N);
-  const P = geo.attributes.position, UV = geo.attributes.uv, idx = geo.index;
+  const UV = geo.attributes.uv, idx = geo.index;
   for (let t = 0; t < idx.count; t += 3) {
     const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
     const ax = UV.getX(a) * S, ay = UV.getY(a) * S, bx = UV.getX(b) * S, by = UV.getY(b) * S, cx = UV.getX(c) * S, cy = UV.getY(c) * S;
@@ -166,9 +283,7 @@ function bake(geo, vw) {
       if (w0 < -0.02 || w1 < -0.02 || w2 < -0.02) continue;
       const i = y * S + x;
       mask[i] = 1;
-      pos[i * 3] = w0 * P.getX(a) + w1 * P.getX(b) + w2 * P.getX(c);
-      pos[i * 3 + 1] = w0 * P.getY(a) + w1 * P.getY(b) + w2 * P.getY(c);
-      pos[i * 3 + 2] = w0 * P.getZ(a) + w1 * P.getZ(b) + w2 * P.getZ(c);
+      for (let k = 0; k < 3; k++) pos[i * 3 + k] = w0 * xyz[a * 3 + k] + w1 * xyz[b * 3 + k] + w2 * xyz[c * 3 + k];
       for (let g = 0; g < GROUPS; g++) grp[i * GROUPS + g] = 255 * clamp01(w0 * vw[a * GROUPS + g] + w1 * vw[b * GROUPS + g] + w2 * vw[c * GROUPS + g]);
     }
   }
@@ -217,6 +332,15 @@ function printData(kind) {
       g.fillStyle = ['#6f6b66', '#8c8371', '#45434c'][k % 3];
       g.beginPath(); g.ellipse(r() * 64, r() * 64, 1.5 + r() * 3, 1 + r() * 2, r() * 3, 0, 7); g.fill();
     }
+  } else if (kind === 'palms') { // tropical shirt: leaves and blossoms on a warm ground
+    fill('#e0563f');
+    for (let k = 0; k < 26; k++) {
+      const x = r() * 64, y = r() * 64, a = r() * 6.3;
+      g.strokeStyle = ['#f6e7b4', '#1f7d6b', '#ffd23f'][k % 3]; g.lineWidth = 1.6;
+      for (let leaf = -2; leaf <= 2; leaf++) {
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a + leaf * 0.45) * 7, y + Math.sin(a + leaf * 0.45) * 7); g.stroke();
+      }
+    }
   } else { // fine stripes
     fill('#ece6dc');
     g.fillStyle = '#c9c2d2';
@@ -227,25 +351,45 @@ function printData(kind) {
 
 // ---------- Painting a look onto the body texture ----------
 
-const SHOE = [24, 19, 16], BELT = [19, 19, 23], GOLD = [232, 192, 64], STEEL = [201, 201, 207], BUTTON = [233, 227, 210];
+const SHOE = [26, 20, 17], BELT = [19, 19, 23], GOLD = [232, 192, 64], STEEL = [201, 201, 207], BUTTON = [233, 227, 210];
+
+// Distance from point (x, y, z) to the segment a-b.
+function segDist(x, y, z, a, b) {
+  const vx = b[0] - a[0], vy = b[1] - a[1], vz = b[2] - a[2], wx = x - a[0], wy = y - a[1], wz = z - a[2];
+  const t = clamp01((wx * vx + wy * vy + wz * vz) / (vx * vx + vy * vy + vz * vz));
+  return Math.hypot(wx - vx * t, wy - vy * t, wz - vz * t);
+}
 
 function paint(B, o) {
   const S = MAP, [canvas, g] = canvasOf(S);
   g.drawImage(o.dark ? B.skins.dark : B.skins.light, 0, 0, S, S);
-  const img = g.getImageData(0, 0, S, S), d = img.data, { pos, grp, mask, J, topY } = B;
+  const img = g.getImageData(0, 0, S, S), d = img.data, { pos, grp, mask, J, topY, nose } = B;
 
   const jacket = o.jacket !== undefined, openFront = jacket || o.open !== undefined;
   const outer = rgb(jacket ? o.jacket : o.shirt), inner = rgb(jacket ? o.shirt : o.open ?? 0xffffff), shirt = rgb(o.shirt);
   const pants = rgb(o.pants), hairC = rgb(o.hair), sideC = o.hairSides !== undefined ? rgb(o.hairSides) : null;
+  const shoe = o.shoes !== undefined ? rgb(o.shoes) : SHOE, sole = o.shoes !== undefined ? [150, 120, 90] : [12, 10, 9];
   const stripe = o.stripe !== undefined ? rgb(o.stripe) : null;
+  const tie = o.tie !== undefined ? rgb(o.tie) : null;
+  const beard = o.beard !== undefined ? rgb(o.beard) : null, mustache = o.mustache !== undefined ? rgb(o.mustache) : null;
+  const goatee = o.goatee !== undefined ? rgb(o.goatee) : null;
+  const tint = o.skin || [1, 1, 1], age = o.age || 0, stubble = o.stubble || 0;
   const print = o.pattern ? printData(o.pattern) : null, printOuter = print && !jacket, printInner = print && jacket;
   const sleeve = o.sleeves === 'long' || jacket ? 0.96 : o.tee ? 0.3 : 0.45;
-  const waistY = J.waistY, hemY = o.tucked ? waistY : waistY - 0.1, neck = J.neck, shoeTop = J.ankle.y + 0.035;
+  const waistY = J.waistY, hemY = o.tucked && !jacket ? waistY : jacket ? waistY - 0.17 : waistY - 0.1, neck = J.neck;
+  const cuffY = J.ankle.y - 0.03;
   const armLen = J.wrist.x - J.shoulder.x, legLen = J.hip.y - J.ankle.y;
+  const prof = B.prof, fill = B.female ? 0.76 : 0.94;
   const striped = a => { a = Math.abs(a); return a < 0.09 || Math.abs(a - 0.27) < 0.06; };
 
-  let r, gr, b;
+  // Lines on the face, as segments relative to the tip of the nose (mirrored left and right).
+  const NY = nose.y, NZ = nose.z;
+  const fold = [[0.019, NY - 0.004, NZ - 0.024], [0.033, NY - 0.034, NZ - 0.036]];   // nose to mouth corner
+  const frown = [[0.025, NY - 0.031, NZ - 0.031], [0.031, NY - 0.045, NZ - 0.038]];  // mouth corner, turned down
+
+  let r, gr, b, shade;
   const set = (c, f = 1) => { r = c[0] * f; gr = c[1] * f; b = c[2] * f; };
+  const mix = (c, a) => { r = lerp(r, c[0], a); gr = lerp(gr, c[1], a); b = lerp(b, c[2], a); };
   const sample = (u, v) => {
     const k = (((Math.floor(v * 64) % 64) + 64) % 64 * 64 + ((Math.floor(u * 64) % 64) + 64) % 64) * 4;
     r = print[k]; gr = print[k + 1]; b = print[k + 2];
@@ -255,41 +399,73 @@ function paint(B, o) {
     if (!mask[i]) continue;
     const x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2], ax = Math.abs(x), k8 = i * GROUPS, o4 = i * 4;
     const head = grp[k8 + HEAD], torso = grp[k8 + TORSO], arm = grp[k8 + UPPERARM] + grp[k8 + LOWERARM];
-    const leg = grp[k8 + THIGH] + grp[k8 + CALF], foot = grp[k8 + FOOT];
+    const leg = grp[k8 + THIGH] + grp[k8 + CALF] + grp[k8 + FOOT];
     const front = z > J.midZ;
     r = -1;
-    let shaded = false; // cloth picks up the body's painted light and shadow
+    shade = 0; // > 0 for cloth: the fabric's own light and shadow, replacing the body's painted muscles
 
-    const torsoPrint = () => sample((Math.atan2(x, z + 0.03) / (Math.PI * 2) + 0.5) * 5, y / 0.17);
-    const top = () => {
+    const belt = () => {
+      set(BELT); shade = 0;
+      if (front && ax < 0.03) set(STEEL);
+      else if (o.badge && front && x > 0.075 && x < 0.115) set(GOLD);
+    };
+    // The upper garment at this texel. `low` is true below the waist, where trousers show through any opening.
+    // Returns false where nothing is drawn (bare skin, or trousers when low).
+    const top = low => {
       const dn = Math.hypot(x, y - neck.y, z - neck.z);
-      if (dn < 0.062) return;
-      shaded = true;
+      if (dn < 0.062) return false;
+      // The body is widened into its clothes after painting (see shaped), unevenly by height;
+      // measure across the finished cloth so edges and prints come out straight.
+      const w0 = Math.max(0.03, prof.w(y)), wide = lerp(Math.max(w0, prof.chestW * fill) / w0, 1, smooth((y - prof.chestY) / 0.1));
+      const ax = Math.abs(x) * wide, cx = x * wide;
+      // Darker under the arms and where the cloth turns away at the sides.
+      shade = 1 - 0.16 * clamp01((ax - 0.13) / 0.07) * clamp01((J.shoulder.y - 0.03 - y) / 0.08);
       if (openFront && front) {
-        const half = 0.035 + clamp01((y - waistY) / 0.45) * 0.065;
+        const half = low ? 0.03 + (waistY - y) * 0.3 : 0.035 + clamp01((y - waistY) / 0.45) * 0.065;
         if (ax < half) {
-          if (o.chain && y < neck.y - 0.02 && Math.abs(Math.hypot(x, y - neck.y - 0.03) - 0.115) < 0.0045) { set(GOLD); shaded = false; return; }
-          if (ax < (y - (neck.y - (o.tank ? 0.21 : 0.09))) * 0.55) { shaded = false; return; } // bare chest
-          if (ax > half - 0.007) { set(outer, 0.55); return; }                                  // lapel edge
-          if (printInner) torsoPrint(); else set(inner);
-          return;
+          if (low) return false;
+          if (o.tucked && Math.abs(y - waistY) < 0.02) { belt(); return true; }
+          if (o.chain && y < neck.y - 0.02 && Math.abs(Math.hypot(cx, y - neck.y - 0.03) - 0.115) < 0.0045) { set(GOLD); shade = 0; return true; }
+          const v = y - (neck.y - (o.tank ? 0.21 : 0.09));
+          if (ax < v * 0.55) { shade = 0; return false; }                                         // bare chest
+          if (tie && ax < 0.017 - Math.max(0, y - neck.y + 0.16) * 0.12 && y < neck.y - 0.085) { set(tie); return true; }
+          if (ax < v * 0.55 + 0.02 && !o.tank && jacket) { set(inner, 1.12); return true; }       // shirt collar
+          if (printInner) sample(cx / 0.15, y / 0.15); else set(inner);
+          if (jacket && ax < 0.004) set(inner, 0.72);                                             // shirt placket
+          return true;
         }
+        if (jacket) {
+          // Lapels: widest at the chest, tapering to the button point, with a notch below the collar.
+          const lapel = 0.05 * smooth((y - waistY - 0.06) / 0.2), e = ax - half;
+          if (e < lapel) {
+            const notch = Math.abs(y - (neck.y - 0.115) - e * 0.6) < 0.006 && e > lapel * 0.35;
+            set(outer, notch || e > lapel - 0.006 || e < 0.005 ? 0.62 : 1.1);
+            return true;
+          }
+          if (!low && Math.abs(y - (waistY + 0.035)) < 0.004 && ax > 0.1 && ax < 0.165) { set(outer, 0.62); return true; } // pocket flaps
+          if (cx > 0.085 && cx < 0.145 && Math.abs(y - (neck.y - 0.2)) < 0.0035) { set(outer, 0.62); return true; }          // breast pocket
+        } else if (ax < half + 0.006) { set(outer, 0.6); return true; }                            // edge of an open shirt
       } else if (!openFront && o.tee) {
-        if (dn < 0.09) { shaded = false; return; }
+        if (dn < 0.09) { shade = 0; return false; }
+        if (dn < 0.098) { set(outer, 0.8); return true; }                                         // neck band
       } else if (!openFront && front) {
-        const v = (y - (neck.y - 0.12)) * 0.5;
-        if (ax < v) { shaded = false; return; }                                                   // open collar
-        if (ax < v + 0.028 && dn < 0.17) { set(shirt, 1.18); return; }                            // collar wings
-        if (ax < 0.0045) { set(shirt, 0.6); return; }                                             // placket
+        const v = (y - (neck.y - 0.1)) * 0.5;
+        if (ax < v) { shade = 0; return false; }                                                  // open collar
+        if (ax < v + 0.03 && dn < 0.18) { set(shirt, ax > v + 0.024 ? 0.7 : 1.16); return true; } // collar wings
+        if (ax < 0.0045) { set(shirt, 0.6); return true; }                                        // placket
         const by = (y - waistY) % 0.085;
-        if (ax < 0.011 && Math.abs(by - 0.04) < 0.008) { set(BUTTON); return; }
+        if (ax < 0.011 && Math.abs(by - 0.04) < 0.008) { set(BUTTON); return true; }
+        if (!o.tucked && !print && cx > 0.07 && cx < 0.13 && y < neck.y - 0.17 && y > neck.y - 0.24 &&
+            (Math.abs(cx - 0.07) < 0.003 || Math.abs(cx - 0.13) < 0.003 || y < neck.y - 0.236)) { set(shirt, 0.72); return true; } // chest pocket
       }
-      if (printOuter) torsoPrint(); else set(outer);
+      if (y < hemY + 0.012) { set(outer, 0.72); return true; }                                    // hem
+      if (printOuter) sample(cx / 0.15, y / 0.15); else set(outer);
+      return true;
     };
 
     if (head > 128) {
       // Hair is painted on the scalp; hair meshes sit on top of it for the fuller styles.
-      const th = Math.atan2(ax, z + 0.01);
+      const th = Math.atan2(ax, z + 0.01), fy = y - NY, fz = z - NZ;
       let bottom, hair = true;
       if (o.hairStyle === 'balding') {
         hair = th > 1.15 && y < topY - 0.045;
@@ -298,107 +474,265 @@ function paint(B, o) {
         const frontLine = o.hairStyle === 'receding' ? (th < 0.4 ? topY - 0.022 : topY - 0.008) : topY - 0.035;
         bottom = th < 0.75 ? frontLine : th < 1.35 ? lerp(frontLine, topY - 0.085, (th - 0.75) / 0.6) : th < 2 ? lerp(topY - 0.085, topY - 0.2, (th - 1.35) / 0.65) : topY - 0.2;
       }
+      r = d[o4] * tint[0]; gr = d[o4 + 1] * tint[1]; b = d[o4 + 2] * tint[2];
       if (hair && y > bottom) {
-        const a = clamp01((y - bottom) / 0.01), c = sideC && th > 1 && th < 2 && y < topY - 0.055 ? sideC : hairC;
-        r = lerp(d[o4], c[0], a); gr = lerp(d[o4 + 1], c[1], a); b = lerp(d[o4 + 2], c[2], a);
+        const c = sideC && th > 1 && th < 2.2 && y < topY - 0.05 ? sideC : hairC;
+        mix(c, clamp01((y - bottom) / 0.01) * (o.hairStyle === 'receding' && th < 0.9 ? 0.72 : 1));
+      } else if (fz > -0.14) {
+        // The face: whiskers, then the lines of age.
+        const lips = ax < 0.027 && Math.abs(fy + 0.031) < 0.008 && fz > -0.04;
+        // Where a beard grows: below a line that runs from under the nose, down around the mouth and up to the ear.
+        const line = -0.008 - 0.022 * clamp01((ax - 0.025) / 0.02) + 0.05 * clamp01((-fz - 0.075) / 0.05);
+        const jaw = clamp01((line - fy) / 0.008) * clamp01((fz + 0.14) / 0.03) * clamp01((fy + 0.12) / 0.03);
+        const lip = ax < 0.031 && fy < -0.008 && fy > -0.026 && fz > -0.045; // between nose and mouth
+        if (!lips) {
+          if (beard) mix(beard, Math.min(1, jaw * 1.4));
+          else if (stubble) mix([58, 54, 60], jaw * stubble * 0.5);
+          if (mustache && lip) mix(mustache, 0.92 * clamp01((0.031 - ax) / 0.004) * clamp01((-0.008 - fy) / 0.003));
+          if (goatee && fz > -0.06) { // a ring around the mouth, filled in over the chin
+            const ring = Math.hypot(ax * 0.95, (fy + 0.036) * 0.8);
+            mix(goatee, 0.9 * clamp01((0.036 - ring) / 0.005) * (fy < -0.04 ? 1 : clamp01((ring - 0.02) / 0.005)));
+          }
+        } else if (!B.female) mix([150, 100, 84], 0.45);                                           // quieter lips
+        if (age) {
+          let dark = 0;
+          const fd = segDist(ax, y, z, fold[0], fold[1]);
+          if (fd < 0.0045) dark = Math.max(dark, 0.3 * (1 - fd / 0.0045));
+          const bag = Math.abs(Math.hypot(ax - 0.032, fy - 0.047) - 0.017);                        // under the eyes
+          if (bag < 0.003 && fy < 0.036 && fz > -0.05) dark = Math.max(dark, 0.22 * (1 - bag / 0.003));
+          for (const line of [0.082, 0.094, 0.106]) {                                              // forehead
+            const dl = Math.abs(fy - line - ax * ax * 3);
+            if (dl < 0.0022 && ax < 0.042 && fz > -0.07) dark = Math.max(dark, 0.16 * (1 - dl / 0.0022));
+          }
+          if (dark) { const f = 1 - dark * age; r *= f; gr *= f; b *= f; }
+        }
+        if (o.frown) {
+          const fd = segDist(ax, y, z, frown[0], frown[1]);
+          if (fd < 0.004) { const f = 1 - 0.32 * (1 - fd / 0.004); r *= f; gr *= f; b *= f; }
+        }
       }
-    } else if (foot > 128 || y < shoeTop) set(SHOE);
-    else if ((leg > 100 && leg >= torso) || (torso > 100 && y < waistY)) {
-      if (y > hemY && torso + leg > 100) top();
-      else {
+    } else if (leg > 100 && y < cuffY) {
+      if (y < 0.014) set(sole);
+      else set(shoe, 1 + 0.5 * clamp01((z - 0.05) / 0.05) * clamp01((y - 0.03) / 0.03));           // shine on the toe cap
+    } else if ((leg > 100 && leg >= torso) || (torso > 100 && y < waistY)) {
+      if (!(y > hemY && torso + leg > 100 && top(true))) {
         const t = (J.hip.y - y) / legLen;
+        const a = Math.atan2(z - lerp(J.hip.z, J.ankle.z, t), ax - lerp(J.hip.x, J.ankle.x, t));  // 0 = outside, pi/2 = front
         set(pants);
-        if (stripe && striped(Math.atan2(z - lerp(J.hip.z, J.ankle.z, t), ax - lerp(J.hip.x, J.ankle.x, t)))) set(stripe);
-      }
-      if (o.tucked && Math.abs(y - waistY) < 0.02) {
-        set(BELT); shaded = false;
-        if (front && ax < 0.035) set(STEEL);
-        else if (o.badge && front && x > 0.075 && x < 0.115) set(GOLD);
+        shade = 1 - 0.14 * clamp01(-Math.cos(a)) * clamp01((0.95 - y) / 0.2);                      // inner leg
+        if (stripe && striped(a)) { set(stripe); shade = 1; }
+        else if (t > 0.1 && Math.abs(a - Math.PI / 2) < 0.045) shade *= 1.14;                      // pressed crease
+        else if (Math.abs(a) < 0.03) shade *= 0.84;                                                // side seam
+        if (y < cuffY + 0.014) shade *= 0.72;                                                      // cuff
+        if (front && ax < 0.0035 && y > waistY - 0.15) shade *= 0.7;                               // fly
+        const pocket = Math.abs((waistY - 0.025 - y) - (ax - 0.085) * 1.6);                        // slanted hip pockets
+        if (front && !stripe && pocket < 0.0035 && ax > 0.085 && ax < 0.145) shade *= 0.7;
+        if (o.tucked && Math.abs(y - waistY) < 0.02) belt();
       }
     } else if (torso > 90 && torso >= head) {
-      top();
-      if (o.tucked && Math.abs(y - waistY) < 0.02) { set(BELT); shaded = false; if (front && ax < 0.035) set(STEEL); }
+      if (o.tucked && !jacket && Math.abs(y - waistY) < 0.02) belt();
+      else top(false);
     } else if (arm > 100) {
       const t = (ax - J.shoulder.x) / armLen;
       if (t < sleeve) {
-        shaded = true;
         const a = Math.atan2(z - J.shoulder.z, y - J.shoulder.y);
+        shade = 1 - 0.14 * clamp01(-Math.cos(a));                                                  // underside of the arm
         if (printOuter) sample(a / (Math.PI * 2) * 2, ax / 0.17); else set(outer);
-        if (stripe && striped(a)) { set(stripe); shaded = false; }
-      } else if (o.watch && x > 0 && t > 0.9 && t < 0.96) set(GOLD);
-    }
+        if (stripe && striped(a)) { set(stripe); shade = 1; }
+        if (t > sleeve - 0.03) shade *= 0.76;                                                      // sleeve hem or cuff
+      } else if (jacket && t < sleeve + 0.035) { set(inner); shade = 1; }                          // shirt cuff
+      else if (o.watch && x > 0 && t > 0.9 && t < 0.96) set(GOLD);
+      else { r = d[o4] * tint[0]; gr = d[o4 + 1] * tint[1]; b = d[o4 + 2] * tint[2]; }
+    } else { r = d[o4] * tint[0]; gr = d[o4 + 1] * tint[1]; b = d[o4 + 2] * tint[2]; }
 
-    if (r < 0) continue;
-    if (shaded) {
-      const f = Math.max(0.78, Math.min(1.08, 0.5 + 0.5 * (d[o4] + d[o4 + 1] + d[o4 + 2]) / 480));
+    if (r < 0) { r = d[o4] * tint[0]; gr = d[o4 + 1] * tint[1]; b = d[o4 + 2] * tint[2]; }
+    else if (shade) {
+      const f = shade * (0.97 + 0.06 * (((i * 2654435761) >>> 24) / 255));                         // a little weave
       r *= f; gr *= f; b *= f;
     }
     d[o4] = r; d[o4 + 1] = gr; d[o4 + 2] = b;
   }
   g.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(canvas);
+  // Edges are decided per texel; a slight blur turns their stair-steps into clean lines.
+  const [soft, sg] = canvasOf(S);
+  sg.filter = 'blur(0.6px)';
+  sg.drawImage(canvas, 0, 0);
+  const tex = new THREE.CanvasTexture(soft);
   tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   return tex;
 }
 
 // ---------- Body shape ----------
 
-// Reshape the bind-pose body for a build: `bulk` above 1 thickens the waist, adds a belly and
-// heavier limbs; below 1 slims the athletic base down. Skinning weights are untouched.
-function shaped(B, bulk) {
-  const key = Math.round(bulk * 20);
+// Reshape the head: `f` holds amounts for jaw (width of the lower face), cheeks, chin (a second one),
+// neck (thickness) and nose. Works on any point near the head, so beards can follow the face.
+function morphHead(B, f, p) {
+  const N = B.nose, s = Math.sign(p.x), dy = p.y - N.y, dz = p.z - N.z;
+  const bump = (cx, cy, cz, r) => Math.exp(-(((Math.abs(p.x) - cx) / r) ** 2 + ((p.y - cy) / r) ** 2 + ((p.z - cz) / r) ** 2));
+  if (f.jaw) p.x *= 1 + f.jaw * smooth((0.03 - dy) / 0.05) * smooth((dy + 0.14) / 0.05);
+  if (f.neck && dy < -0.03) {
+    const m = f.neck * smooth((-0.03 - dy) / 0.04) * smooth((p.y - B.J.neck.y + 0.03) / 0.06);
+    p.x *= 1 + m; p.z = B.J.neck.z + (p.z - B.J.neck.z) * (1 + m * 0.8);
+  }
+  if (f.cheeks) { const g = bump(0.052, N.y - 0.014, N.z - 0.06, 0.032) * f.cheeks; p.x += s * g * 0.011; p.z += g * 0.004; }
+  if (f.chin) { const g = bump(0, N.y - 0.088, N.z - 0.062, 0.042) * f.chin; p.z += g * 0.026; p.y -= g * 0.012; }
+  if (f.nose) { const g = bump(0, N.y + 0.003, N.z - 0.006, 0.019) * f.nose; p.z += g * 0.011; p.x *= 1 + g * 0.45; p.y -= g * 0.004; }
+  return p;
+}
+
+// The clothed body for a look: the relaxed base, given a shirt that hangs from the chest, a gut,
+// trouser legs and shoes. `bulk` above 1 is heavier, below 1 slimmer. Skinning weights are untouched.
+function shaped(B, o) {
+  const jacket = o.jacket !== undefined, long = jacket || o.sleeves === 'long', face = o.face || {};
+  const key = JSON.stringify([o.bulk, o.belly, jacket, long, !!o.tucked, face]);
   if (B.shapes.has(key)) return B.shapes.get(key);
-  const k = bulk - 1, J = B.J, src = B.geometry.attributes.position, out = src.clone(), vw = B.vw;
-  const chest = 1 + k * 0.45, shoulderShift = J.shoulder.x * (chest - 1), hipShift = J.hip.x * k * 0.3;
-  for (let v = 0; v < src.count; v++) {
-    let x = src.getX(v), y = src.getY(v), z = src.getZ(v);
-    const g = v * GROUPS, tw = vw[g + TORSO], aw = vw[g + UPPERARM] + vw[g + LOWERARM] + vw[g + HAND], lw = vw[g + THIGH] + vw[g + CALF] + vw[g + FOOT];
-    const belly = clamp01(1 - Math.abs(y - (J.waistY + 0.1)) / 0.3), s = Math.sign(x);
+
+  const k = o.bulk - 1, kp = Math.max(0, k), fem = B.female, J = B.J, vw = B.vw, base = B.base, prof = B.prof;
+  const cloth = jacket ? 1.07 : 1.02;
+  const shoulders = (fem ? 0.98 : 0.95) + k * 0.3;
+  const fill = (fem ? 0.76 : o.tucked && !jacket ? 0.88 : 0.94) + Math.min(0, k) * 0.25;   // waist, as a share of the chest
+  const gut = kp * 0.2 + (o.belly || 0), thick = 1 + k * 0.3, bellyY = J.waistY + 0.05;
+  const armScale = (fem ? 0.94 : 0.86) + k * 0.4 + (long ? 0.09 : 0);
+  const thighR = (fem ? 0.083 : 0.09) * (1 + k * 0.45), cuffR = (fem ? 0.058 : 0.07) * (1 + k * 0.2), tube = fem ? 0.5 : 0.78;
+  const hipShift = J.hip.x * k * 0.3, shoulderShift = J.shoulder.x * (shoulders - 1);
+  const legLen = J.hip.y - J.ankle.y, cuffY = J.ankle.y - 0.03;
+
+  const out = new Float32Array(base.length), p = new THREE.Vector3();
+  for (let v = 0; v < base.length / 3; v++) {
+    let x = base[v * 3], y = base[v * 3 + 1], z = base[v * 3 + 2];
+    const g = v * GROUPS, tw = vw[g + TORSO], hw = vw[g + HEAD], s = Math.sign(x);
+    const aw = vw[g + UPPERARM] + vw[g + LOWERARM] + vw[g + HAND], lw = vw[g + THIGH] + vw[g + CALF] + vw[g + FOOT];
     if (tw > 0) {
-      x *= 1 + tw * (0.03 + k * 0.45 + (0.12 + Math.max(0, k) * 0.4) * belly);
-      z = J.midZ + (z - J.midZ) * (1 + tw * (0.03 + k * 0.45 + (0.1 + Math.max(0, k) * 0.6) * belly));
-      if (z > J.midZ) z += tw * belly * Math.max(0, k) * 0.2;
+      const up = smooth((y - prof.chestY) / 0.1); // 0 below the chest, 1 at the shoulders
+      const w0 = Math.max(0.03, prof.w(y)), f0 = Math.max(0.03, prof.f(y)), b0 = Math.max(0.03, prof.b(y));
+      const bell = Math.exp(-(((y - bellyY) / (y > bellyY ? 0.17 : 0.085)) ** 2));
+      const wide = Math.max(w0, prof.chestW * fill) * thick * cloth * (1 + kp * 0.45 * bell);
+      const deep = Math.max(f0, prof.chestF * (fem ? 0.7 : 0.9)) * (1 + k * 0.25) * cloth + gut * bell;
+      const back = Math.max(b0, prof.backD * (fem ? 0.75 : 0.9)) * (1 + k * 0.2) * cloth;
+      const dz = z - J.midZ;
+      x *= lerp(1, lerp(wide / w0, shoulders, up), tw);
+      z = J.midZ + dz * lerp(1, lerp(dz > 0 ? deep / f0 : back / b0, 1 + k * 0.25, up), tw);
     }
     if (aw > 0) {
-      const f = 1 + aw * k * 0.5;
+      const f = lerp(1, armScale, aw - vw[g + HAND] * 0.8);
       y = J.shoulder.y + (y - J.shoulder.y) * f; z = J.shoulder.z + (z - J.shoulder.z) * f;
       x += s * shoulderShift * aw;
     }
     if (lw > 0) {
-      const t = (J.hip.y - y) / (J.hip.y - J.ankle.y), cx = s * lerp(J.hip.x, J.ankle.x, t), cz = lerp(J.hip.z, J.ankle.z, t);
-      const fw = vw[g + FOOT], cuff = clamp01((t - 0.45) / 0.5);
-      const f = 1 + (lw - fw) * (0.14 + k * 0.45 + 0.4 * cuff * cuff) + fw * 0.2;
-      x = cx + (x - cx) * f + s * hipShift * lw; z = cz + (z - cz) * f;
-      if (fw > 0.5) y *= 1.25;
+      const t = (J.hip.y - y) / legLen, cx = s * lerp(J.hip.x, J.ankle.x, t), cz = lerp(J.hip.z, J.ankle.z, t);
+      let dx = x - cx, dz = z - cz;
+      if (y > cuffY) { // a trouser leg: mostly a tube from thigh to cuff
+        const dist = Math.hypot(dx, dz) || 1e-6, want = lerp(dist * (1 + k * 0.3), lerp(thighR, cuffR, t * 1.1), tube * clamp01(t / 0.25 + 0.35));
+        const f = lerp(1, want / dist, lw);
+        dx *= f; dz *= f;
+      } else { // a shoe: wider than the foot, with a toe box
+        const u = (z - J.ankle.z) / 0.2; // 0 at the ankle, 1 near the toes
+        dx *= 1.25; dz *= 1.08;
+        if (y > 0.012 && u > 0.25) y = Math.max(y, lerp(0.064, 0.042, (u - 0.25) / 0.75));
+      }
+      x = cx + dx + s * hipShift * lw; z = cz + dz;
+      if (lw > 0.5 && s * x < 0.004) x = s * 0.004; // the legs never cross the centre line
     }
-    out.setXYZ(v, x, y, z);
+    if (hw > 0) {
+      morphHead(B, face, p.set(x, y, z));
+      x = lerp(x, p.x, hw); y = lerp(y, p.y, hw); z = lerp(z, p.z, hw);
+    }
+    out[v * 3] = x; out[v * 3 + 1] = y; out[v * 3 + 2] = z;
   }
   const geo = B.geometry.clone();
-  geo.setAttribute('position', out);
+  geo.setAttribute('position', new THREE.BufferAttribute(out, 3));
+  weldedNormals(geo, B.weld);
+  geo.computeBoundingSphere();
   B.shapes.set(key, geo);
   return geo;
 }
+
+// ---------- Hair, beards, glasses ----------
+
+const hairGeos = new Map(), hairMats = new Map();
+
+// A hair mesh's geometry for a look: the base mesh, reshaped to follow the face when it is a beard,
+// and with a second colour at the temples when the look asks for one.
+function hairGeo(B, name, o) {
+  const src = hairMeshes[name].geometry, sides = name !== 'beard' && o.hairSides !== undefined, face = name === 'beard' && o.face;
+  if (!sides && !face) return src;
+  const key = JSON.stringify([B.female, name, sides && [o.hair, o.hairSides], face]);
+  if (hairGeos.has(key)) return hairGeos.get(key);
+  const geo = src.clone(), P = geo.attributes.position, p = new THREE.Vector3();
+  if (face) {
+    for (let v = 0; v < P.count; v++) { morphHead(B, face, p.fromBufferAttribute(P, v)); P.setXYZ(v, p.x, p.y, p.z); }
+    geo.computeVertexNormals();
+  }
+  if (sides) {
+    const top = new THREE.Color(o.hair), side = new THREE.Color(o.hairSides), c = new THREE.Color(), col = new Float32Array(P.count * 3);
+    for (let v = 0; v < P.count; v++) {
+      const a = clamp01((Math.abs(P.getX(v)) - 0.052) / 0.018) * clamp01((B.topY - 0.035 - P.getY(v)) / 0.02) * clamp01((0.045 - P.getZ(v)) / 0.03);
+      c.copy(top).lerp(side, a).toArray(col, v * 3);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  }
+  hairGeos.set(key, geo);
+  return geo;
+}
+
+function hairMat(name, color, vertexColors) {
+  const key = `${name},${color},${vertexColors}`;
+  if (!hairMats.has(key)) {
+    hairMats.set(key, new THREE.MeshLambertMaterial({
+      map: hairMeshes[name]?.map ?? null, color: vertexColors ? 0xffffff : color, vertexColors, side: THREE.DoubleSide,
+    }));
+    // The hair textures are a pale grey shading map; lift the colour so dark hair is not crushed to black.
+    if (hairMats.get(key).map) hairMats.get(key).color.multiplyScalar(1.7);
+  }
+  return hairMats.get(key);
+}
+
+const glassesGeos = {};
+function glassesGeo(B) {
+  const key = B.female ? 'f' : 'm';
+  if (glassesGeos[key]) return glassesGeos[key];
+  const N = B.nose, y = N.y + 0.042, z = N.z - 0.022, parts = [];
+  for (const s of [-1, 1]) {
+    const rim = new THREE.TorusGeometry(0.019, 0.0018, 5, 18);
+    rim.scale(1.12, 0.86, 1); rim.translate(s * 0.032, y, z);
+    const arm = new THREE.CylinderGeometry(0.0013, 0.0013, 0.1, 5);
+    arm.rotateX(Math.PI / 2); arm.rotateY(-s * 0.3); arm.translate(s * 0.068, y + 0.003, z - 0.05);
+    parts.push(rim, arm);
+  }
+  const bridge = new THREE.CylinderGeometry(0.0015, 0.0015, 0.022, 5);
+  bridge.rotateZ(Math.PI / 2); bridge.translate(0, y + 0.004, z);
+  parts.push(bridge);
+  const lens = [-1, 1].map(s => { const c = new THREE.CircleGeometry(0.019, 18); c.scale(1.12, 0.86, 1); c.translate(s * 0.032, y, z); return c; });
+  return glassesGeos[key] = { frame: mergeGeometries(parts.map(p => p.toNonIndexed())), lens: mergeGeometries(lens) };
+}
+const frameMat = new THREE.MeshLambertMaterial({ color: 0x1a1512 });
+const shadeMat = new THREE.MeshBasicMaterial({ color: 0x0b0b10 });
+const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true, opacity: 0.22, depthWrite: false });
 
 // ---------- A character ----------
 
 // Options:
 //   body       'male' | 'female'
-//   dark       use the darker skin texture
-//   bulk       1 = the athletic base; above ~1.2 gets a belly, below 1 is slimmer
-//   height     overall scale
-//   shirt, pants, hair   colours
+//   dark       use the darker skin texture; skin [r, g, b] tints it (a tan, a pale face)
+//   bulk       1 = an ordinary build; above ~1.2 gets a belly, below 1 is slimmer; belly adds more gut (metres)
+//   height     overall scale; head scales the head alone
+//   face       { jaw, cheeks, chin, neck, nose } amounts that reshape the head (0 = the base face)
+//   age        0..1 lines on the face; stubble 0..1; beard, mustache, goatee colours; frown
+//   shirt, pants, hair, shoes   colours
 //   hairStyle  'short' | 'receding' | 'balding' (painted hairline)
-//   hairMesh   'parted' | 'buzzed' | 'long' for hair with volume; hairScale stretches it [x, y, z]
+//   hairMesh   'parted' | 'buzzed' | 'long' for hair with volume; hairScale stretches it [x, y, z], hairShift moves it
 //   hairSides  colour of the hair at the temples
-//   pattern    'blocks' | 'plaid' | 'paisley' | 'stripes' printed shirt
-//   jacket     colour of an open jacket worn over the shirt
+//   beardMesh  a full beard with volume, in the beard colour
+//   glasses    'clear' | 'shades'
+//   pattern    'blocks' | 'plaid' | 'paisley' | 'palms' | 'stripes' printed shirt
+//   jacket     colour of an open jacket worn over the shirt; tie adds a tie in that colour
 //   open       colour of an undershirt showing through an unbuttoned shirt or track top
 //   tank       the undershirt is a low-cut tank
 //   sleeves    'short' | 'long'
 //   tee, tucked, badge, chain, watch   details
 //   stripe     colour of side stripes down arms and legs (tracksuit)
 export function makeHuman(opts = {}) {
-  const o = { body: 'male', shirt: 0xffffff, pants: 0x23232b, hair: 0x2b1b12, bulk: 1, height: 1, hairStyle: 'short', sleeves: 'short', ...opts };
+  const o = { body: 'male', shirt: 0xffffff, pants: 0x23232b, hair: 0x2b1b12, bulk: 1, height: 1, head: 1.06, hairStyle: 'short', sleeves: 'short', ...opts };
   const B = bodies[o.body];
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';
@@ -406,32 +740,42 @@ export function makeHuman(opts = {}) {
   const root = cloneSkinned(B.scene);
   group.add(root);
 
-  const { hairMesh, hairScale, bulk, height, ...paintKey } = o;
+  const { hairMesh, hairScale, hairShift, beardMesh, glasses, bulk, belly, height, head, face, ...paintKey } = o;
   const key = JSON.stringify(paintKey);
   if (!textures.has(key)) textures.set(key, paint(B, o));
-  const hairMat = new THREE.MeshLambertMaterial({ color: o.hair });
 
   let headBone;
   root.traverse(n => {
     if (n.isBone && n.name === 'Head') headBone = n;
     if (!n.isSkinnedMesh) return;
     if (n.name === B.bodyName) {
-      n.geometry = shaped(B, o.bulk);
+      n.geometry = shaped(B, o);
       n.material = new THREE.MeshLambertMaterial({ map: textures.get(key) });
       n.castShadow = true;
-    } else if (/brow/i.test(n.name)) n.material = hairMat;
+    } else if (/brow/i.test(n.name)) n.material = hairMat('brow', o.brows ?? o.hair, false);
   });
-  if (hairMesh && hairMeshes[hairMesh]) {
-    const hair = new THREE.Mesh(hairMeshes[hairMesh].geometry, hairMat);
-    hair.castShadow = true;
-    if (hairScale) { // stretch about the crown so the hair stays seated on the head
-      hair.scale.set(...hairScale);
-      hair.position.set(0, B.topY * (1 - hairScale[1]) * 0.94, 0);
+
+  // Rigid pieces that ride on the head bone.
+  const wear = (geometry, material, scale, shift) => {
+    const m = new THREE.Mesh(geometry, material);
+    if (scale) { // stretch about the crown so the hair stays seated on the head
+      m.scale.set(...scale);
+      m.position.set(0, B.topY * (1 - scale[1]) * 0.94, 0);
     }
-    root.add(hair);
+    if (shift) m.position.add(new THREE.Vector3(...shift));
+    root.add(m);
     root.updateMatrixWorld(true);
-    headBone.attach(hair);
+    headBone.attach(m);
+    return m;
+  };
+  if (hairMesh && hairMeshes[hairMesh]) wear(hairGeo(B, hairMesh, o), hairMat(hairMesh, o.hair, o.hairSides !== undefined), hairScale, hairShift).castShadow = true;
+  if (beardMesh) wear(hairGeo(B, 'beard', o), hairMat('beard', o.beard ?? o.hair, false));
+  if (glasses) {
+    const geo = glassesGeo(B);
+    wear(geo.frame, frameMat);
+    wear(geo.lens, glasses === 'shades' ? shadeMat : lensMat);
   }
+  headBone.scale.setScalar(o.head);
 
   const mixer = new THREE.AnimationMixer(root), actions = {};
   const person = {
@@ -468,14 +812,62 @@ export function updatePeople(dt, eye) {
 // The crew's looks, taken from the reference image (left to right).
 // Hesh runs his record label in this world; Furio only arrives late in the storyline.
 export const LOOKS = {
-  pussy:       { jacket: 0xa9bcd8, pants: 0xa9bcd8, shirt: 0xece6dc, pattern: 'stripes', tucked: true, hair: 0x14110f, hairMesh: 'parted', bulk: 1.38 },
-  tony:        { pattern: 'blocks', shirt: 0x171c44, pants: 0x15151b, hair: 0x2a1c14, hairStyle: 'receding', bulk: 1.42, height: 1.04 },
-  christopher: { pattern: 'stripes', shirt: 0xece6dc, pants: 0x4a3324, tucked: true, hair: 0x1c1410, hairMesh: 'parted', bulk: 0.92 },
-  paulie:      { shirt: 0x15141a, open: 0xf4f4f4, tank: true, chain: true, sleeves: 'long', pants: 0x15141a, stripe: 0xc9202a, hair: 0x17120f, hairMesh: 'parted', hairSides: 0xcfcfd4, bulk: 1.02 },
-  hesh:        { pattern: 'plaid', shirt: 0x8d93cc, pants: 0x6f6f7a, hair: 0x9a9690, hairStyle: 'balding', bulk: 1.18 },
-  silvio:      { pattern: 'paisley', shirt: 0x232228, open: 0xf4f4f4, sleeves: 'long', pants: 0x1d1d26, hair: 0x120e0c, hairMesh: 'parted', hairScale: [1.03, 1.12, 1.06], bulk: 1.0 },
-  furio:       { shirt: 0x5c6157, tee: true, tucked: true, badge: true, watch: true, pants: 0x15151b, hair: 0x17120f, hairMesh: 'long', bulk: 1.08 },
-  melfi:       { body: 'female', jacket: 0x3d4658, shirt: 0xf1ede4, pants: 0x3d4658, tucked: true, hair: 0x2a1a14, hairMesh: 'long' },
+  pussy: {
+    jacket: 0xa9bcd8, pants: 0xa9bcd8, shirt: 0xece6dc, pattern: 'stripes', tucked: true, shoes: 0xe9e4da,
+    hair: 0x14110f, hairMesh: 'parted', hairScale: [1.04, 0.95, 1.04], bulk: 1.44, height: 1.02, head: 1.1,
+    face: { jaw: 0.24, cheeks: 1.3, chin: 1.5, neck: 0.2, nose: 0.3 }, age: 0.45, stubble: 0.35,
+  },
+  tony: {
+    pattern: 'blocks', shirt: 0x171c44, pants: 0x15151b, hair: 0x2a1c14, hairStyle: 'receding', hairMesh: 'buzzed', hairScale: [1.02, 1.0, 0.94], hairShift: [0, 0.004, -0.012], bulk: 1.36, height: 1.05, head: 1.1,
+    face: { jaw: 0.2, cheeks: 1, chin: 1.2, neck: 0.2, nose: 0.5 }, age: 0.5, stubble: 0.3,
+  },
+  christopher: {
+    pattern: 'stripes', shirt: 0xece6dc, pants: 0x4a3324, tucked: true, hair: 0x1c1410, hairMesh: 'parted', hairScale: [1, 1.05, 1.02], bulk: 0.94,
+    face: { jaw: -0.03, cheeks: -0.4, nose: 0.9 }, stubble: 0.45,
+  },
+  paulie: {
+    shirt: 0x15141a, open: 0xf4f4f4, tank: true, chain: true, sleeves: 'long', pants: 0x15141a, stripe: 0xc9202a, shoes: 0xf2efe8,
+    hair: 0x17120f, hairMesh: 'parted', hairSides: 0xd8d8de, hairScale: [1.02, 1.07, 1.05], bulk: 1.0,
+    face: { cheeks: -0.5, nose: 0.5, jaw: 0.03 }, age: 0.95, skin: [1, 0.9, 0.8], brows: 0x3a3632,
+  },
+  hesh: {
+    pattern: 'plaid', shirt: 0x8d93cc, pants: 0x6f6f7a, hair: 0xb9b6b0, hairStyle: 'balding', bulk: 1.2,
+    face: { jaw: 0.08, chin: 0.6, nose: 0.8, cheeks: 0.3 }, age: 1, beard: 0xd6d3cc, beardMesh: true, brows: 0x9a9690,
+  },
+  silvio: {
+    pattern: 'paisley', shirt: 0x232228, open: 0xf4f4f4, sleeves: 'long', pants: 0x1d1d26, hair: 0x120e0c, hairMesh: 'parted', hairScale: [1.05, 1.2, 1.1], bulk: 1.08,
+    face: { jaw: 0.12, cheeks: 0.4, chin: 0.6, nose: 0.3 }, age: 0.6, frown: true, stubble: 0.3,
+  },
+  furio: {
+    shirt: 0x5c6157, tee: true, tucked: true, badge: true, watch: true, pants: 0x15151b, hair: 0x17120f, hairMesh: 'long', bulk: 1.08,
+    face: { jaw: 0.05, nose: 0.6, cheeks: -0.2 }, goatee: 0x1d1714, stubble: 0.6, age: 0.3,
+  },
+  melfi: { body: 'female', jacket: 0x3d4658, shirt: 0xf1ede4, pants: 0x3d4658, tucked: true, hair: 0x2a1a14, hairMesh: 'long', glasses: 'clear', age: 0.2 },
+
+  // Family, and the people of episode one.
+  carmela: { body: 'female', shirt: 0xf7a8c4, pants: 0xf5f0e6, shoes: 0xf2efe8, chain: true, hair: 0xd9b25a, hairMesh: 'long', age: 0.3 },
+  meadow: { body: 'female', shirt: 0x9fd0f5, tee: true, pants: 0x3b6ea8, shoes: 0xf2efe8, hair: 0x2a1a14, hairMesh: 'long', height: 0.95 },
+  aj: { pattern: 'stripes', shirt: 0xece6dc, tee: true, pants: 0x3b6ea8, shoes: 0xf2efe8, hair: 0x3a2a1c, hairMesh: 'parted', bulk: 1.22, height: 0.8, head: 1.24, face: { cheeks: 1.2, jaw: 0.1 } },
+  livia: {
+    body: 'female', jacket: 0x8a6f8f, shirt: 0xe9e2d2, pants: 0x4a4652, tucked: true, hair: 0xc4c1bb, hairMesh: 'parted', hairShift: [0, -0.045, 0.004], hairScale: [1.04, 1.02, 1.06],
+    bulk: 1.12, height: 0.92, age: 1, brows: 0x9a9690, face: { jaw: 0.1, cheeks: -0.3, chin: 0.4 }, frown: true,
+  },
+  junior: {
+    jacket: 0xb9a58a, shirt: 0xf4f4f4, tie: 0x6a1c2c, tucked: true, pants: 0x4a4652, hair: 0xb9b6b0, hairStyle: 'balding', glasses: 'clear', brows: 0x9a9690,
+    bulk: 0.96, height: 0.97, age: 1, face: { nose: 0.9, cheeks: -0.5, jaw: 0.04 }, frown: true,
+  },
+  artie: { shirt: 0xf4f4f4, sleeves: 'long', pants: 0x2b2b3a, hair: 0x1c1410, hairStyle: 'receding', hairMesh: 'buzzed', hairScale: [1.02, 1, 0.94], hairShift: [0, 0.004, -0.012], bulk: 1.18, face: { cheeks: 0.7, nose: 0.5, chin: 0.5 }, stubble: 0.3, age: 0.4 },
+  kolar: { jacket: 0x1c1c22, shirt: 0xf4f4f4, tee: true, pants: 0x3b4a66, hair: 0xc9a14a, hairMesh: 'parted', bulk: 1.02, face: { jaw: 0.12 }, stubble: 0.2 },
+  // Episode two.
+  brendan: { jacket: 0x2a1c14, shirt: 0x8a1c1c, tee: true, pants: 0x2b2b3a, hair: 0x1c1410, hairMesh: 'parted', hairScale: [1, 1.08, 1.03], bulk: 0.9, stubble: 0.6, face: { cheeks: -0.5, nose: 0.4 }, chain: true },
+  jackie: { jacket: 0x23232b, shirt: 0xe9e2d2, tucked: true, pants: 0x23232b, hair: 0x17120f, hairMesh: 'parted', hairScale: [1.02, 0.96, 1.03], bulk: 0.9, age: 0.7, skin: [0.96, 0.97, 0.94], face: { cheeks: -0.6, jaw: 0.05 } },
+  georgie: { shirt: 0x15141a, sleeves: 'long', tucked: true, pants: 0x15141a, hair: 0x2b1b12, hairStyle: 'balding', mustache: 0x2b1b12, bulk: 1.12, age: 0.4, face: { cheeks: 0.6, chin: 0.5 } },
+  miller: { pattern: 'plaid', shirt: 0x8d93cc, tucked: true, pants: 0xb9a58a, shoes: 0x6a4a34, hair: 0x7a5a3a, hairStyle: 'receding', glasses: 'clear', bulk: 0.9, age: 0.4, face: { cheeks: -0.3, nose: 0.5 } },
+  trucker: { pattern: 'plaid', shirt: 0x8d93cc, sleeves: 'long', pants: 0x3b4a66, hair: 0x4a3324, hairMesh: 'buzzed', bulk: 1.3, stubble: 0.7, age: 0.4, face: { jaw: 0.15, cheeks: 0.8, chin: 0.8 } },
+  eddie: { shirt: 0xf2c230, tee: true, pants: 0x2b2b3a, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'buzzed', dark: true, bulk: 0.95, goatee: 0x141110 },
+  perrilyn: { body: 'female', dark: true, shirt: 0x8fe0d4, pants: 0xf5f0e6, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'long', age: 0.3 },
+  fanny: { body: 'female', jacket: 0xf7a8c4, shirt: 0xf5f0e6, pants: 0x6f6f7a, tucked: true, hair: 0xdcdad4, hairMesh: 'parted', hairShift: [0, -0.045, 0.004], hairScale: [1.04, 1.02, 1.06], bulk: 1.05, height: 0.9, age: 1, glasses: 'clear', brows: 0xb9b6b0 },
+  mahaffey: { jacket: 0x8d8a8e, shirt: 0xf4f4f4, tie: 0xa3201c, tucked: true, pants: 0x8d8a8e, hair: 0x7a3b1a, hairStyle: 'receding', glasses: 'clear', bulk: 1.12, age: 0.5, face: { cheeks: 0.6, chin: 0.7 } },
 };
 export const makeLook = name => makeHuman(LOOKS[name]);
 export const makeTony = () => makeLook('tony');
