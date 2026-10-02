@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Sopranos: Vice City</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="fx"></div>
+<div id="fade"></div>
+
+<div id="hud">
+  <div id="clock">18:30</div>
+  <div id="money">$00000000</div>
+  <canvas id="radar" width="200" height="200"></canvas>
+  <div id="prompt"></div>
+  <div id="objective"></div>
+  <div id="subtitle"></div>
+</div>
+
+<div id="card"><div id="cardTitle"></div><div id="cardSub"></div></div>
+<div id="passed"><div class="big">Mission passed!</div><div id="reward"></div></div>
+
+<div id="title">
+  <div class="logo">
+    <span class="sop">The Sopranos</span>
+    <span class="vc">Vice City</span>
+  </div>
+  <button id="start">Start</button>
+  <div class="keys">
+    <b>WASD</b> move / drive &nbsp;·&nbsp; <b>Mouse</b> look &nbsp;·&nbsp; <b>Shift</b> run &nbsp;·&nbsp;
+    <b>F</b> enter / exit car &nbsp;·&nbsp; <b>Space</b> handbrake &nbsp;·&nbsp; <b>Enter</b> skip line
+  </div>
+  <div class="fine">Unofficial fan project for personal use. Not affiliated with HBO or Rockstar Games.</div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
