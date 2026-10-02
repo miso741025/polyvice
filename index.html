@@ -8,7 +8,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Mr+Dafoe&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
 </script>
 </head>
 <body>
@@ -33,7 +36,7 @@
     <span class="sop">The Sopranos</span>
     <span class="vc">Vice City</span>
   </div>
-  <button id="start">Start</button>
+  <button id="start" disabled>Loading…</button>
   <div class="keys">
     <b>WASD</b> move / drive &nbsp;·&nbsp; <b>Mouse</b> look &nbsp;·&nbsp; <b>Shift</b> run &nbsp;·&nbsp;
     <b>F</b> enter / exit car &nbsp;·&nbsp; <b>Space</b> handbrake &nbsp;·&nbsp; <b>Enter</b> skip line

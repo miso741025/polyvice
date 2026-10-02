@@ -98,9 +98,8 @@ async function theDucks(g) {
     return panicking;
   });
   await say(g, TONY, "I can't... I can't breathe.", 3);
-  const t2 = g.time;
-  g.updaters.push(() => { p.down = Math.min(1, (g.time - t2) / 0.5); return p.down < 1; });
-  await g.wait(1.4);
+  p.down = 1;
+  await g.wait(2.6);
   await fade(g, 1, 1.2);
   panicking = false;
   g.hud.panic(0);
@@ -171,7 +170,7 @@ async function collections(g) {
   const chris = makeLook('christopher');
   chris.group.position.set(ocean.chris.x, 0, ocean.chris.z);
   chris.group.rotation.y = -Math.PI / 2;
-  const debtor = makeHuman({ shirt: 0xffe066, pants: 0xf5f0e6, hair: 0x7a3b1a, skin: 0xf0c8a0 });
+  const debtor = makeHuman({ shirt: 0xffe066, tee: true, pants: 0xf5f0e6, hair: 0x7a3b1a, hairMesh: 'parted', bulk: 0.95 });
   const d = { pos: new THREE.Vector3(ocean.debtor.x, 0, ocean.debtor.z), side: -1, phase: 0, running: false, caught: false };
   debtor.group.position.copy(d.pos);
   debtor.group.rotation.y = Math.PI / 2;
@@ -200,11 +199,10 @@ async function collections(g) {
       if (Math.abs(az) < 0.55) { az = 0.85 * d.side; const n = Math.hypot(ax, az); ax /= n; az /= n; } else d.side = Math.sign(az);
       d.pos.x = clamp(d.pos.x + ax * 6.3 * dt, SHORE + 3, bounds.maxX - 3);
       d.pos.z = clamp(d.pos.z + az * 6.3 * dt, minZ, maxZ);
-      d.phase += dt * 14;
-      debtor.animate(d.phase, 1);
+      debtor.set('sprint');
       debtor.group.rotation.y = Math.atan2(ax, az);
       debtor.group.position.copy(d.pos);
-    } else debtor.animate(0, 0);
+    } else debtor.set('idle');
     blip.x = d.pos.x; blip.z = d.pos.z;
     return true;
   });
@@ -215,9 +213,7 @@ async function collections(g) {
   g.blips.splice(g.blips.indexOf(blip), 1);
   g.hud.objective();
   p.locked = true;
-  debtor.animate(0, 0);
-  debtor.group.rotation.x = -Math.PI / 2;
-  debtor.group.position.y = 0.2;
+  debtor.set('down');
   await g.wait(0.8);
   await say(g, DEBTOR, "My leg! Tony, please, I'll have it Friday, I swear on my mother!");
   await say(g, TONY, 'You had Friday. Three Fridays ago.');
