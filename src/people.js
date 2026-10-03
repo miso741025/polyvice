@@ -345,6 +345,14 @@ function printData(kind) {
         g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a + leaf * 0.45) * 7, y + Math.sin(a + leaf * 0.45) * 7); g.stroke();
       }
     }
+  } else if (kind === 'pinstripe') { // a suit: chalk lines on charcoal
+    fill('#26242c');
+    g.fillStyle = 'rgba(220,214,230,.55)';
+    for (let k = 2; k < 64; k += 8) g.fillRect(k, 0, 1, 64);
+  } else if (kind === 'check') { // a gingham sport shirt
+    fill('#f1ece2');
+    g.fillStyle = 'rgba(120,30,40,.45)';
+    for (let k = 0; k < 64; k += 8) { g.fillRect(k, 0, 4, 64); g.fillRect(0, k, 64, 4); }
   } else { // fine stripes
     fill('#ece6dc');
     g.fillStyle = '#c9c2d2';
@@ -379,6 +387,7 @@ function paint(B, o) {
   const goatee = o.goatee !== undefined ? rgb(o.goatee) : null;
   const tint = o.skin || [1, 1, 1], age = o.age || 0, stubble = o.stubble || 0;
   const print = o.pattern ? printData(o.pattern) : null, printOuter = print && !jacket, printInner = print && jacket;
+  const jprint = jacket && o.jacketPattern ? printData(o.jacketPattern) : null;
   const sleeve = o.sleeves === 'long' || jacket ? 0.96 : o.tee ? 0.3 : 0.45;
   const waistY = J.waistY, hemY = o.tucked && !jacket ? waistY : jacket ? waistY - 0.17 : waistY - 0.1, neck = J.neck;
   const cuffY = J.ankle.y - 0.03;
@@ -394,10 +403,11 @@ function paint(B, o) {
   let r, gr, b, shade;
   const set = (c, f = 1) => { r = c[0] * f; gr = c[1] * f; b = c[2] * f; };
   const mix = (c, a) => { r = lerp(r, c[0], a); gr = lerp(gr, c[1], a); b = lerp(b, c[2], a); };
-  const sample = (u, v) => {
+  const sample = (u, v, from = print) => {
     const k = (((Math.floor(v * 64) % 64) + 64) % 64 * 64 + ((Math.floor(u * 64) % 64) + 64) % 64) * 4;
-    r = print[k]; gr = print[k + 1]; b = print[k + 2];
+    r = from[k]; gr = from[k + 1]; b = from[k + 2];
   };
+  const outerAt = (u, v) => { if (printOuter) sample(u, v); else if (jprint) sample(u, v, jprint); else set(outer); };
 
   for (let i = 0; i < S * S; i++) {
     if (!mask[i]) continue;
@@ -463,7 +473,7 @@ function paint(B, o) {
             (Math.abs(cx - 0.07) < 0.003 || Math.abs(cx - 0.13) < 0.003 || y < neck.y - 0.236)) { set(shirt, 0.72); return true; } // chest pocket
       }
       if (y < hemY + 0.012) { set(outer, 0.72); return true; }                                    // hem
-      if (printOuter) sample(cx / 0.15, y / 0.15); else set(outer);
+      outerAt(cx / 0.15, y / 0.15);
       return true;
     };
 
@@ -541,7 +551,7 @@ function paint(B, o) {
       if (t < sleeve) {
         const a = Math.atan2(z - J.shoulder.z, y - J.shoulder.y);
         shade = 1 - 0.14 * clamp01(-Math.cos(a));                                                  // underside of the arm
-        if (printOuter) sample(a / (Math.PI * 2) * 2, ax / 0.17); else set(outer);
+        outerAt(a / (Math.PI * 2) * 2, ax / 0.17);
         if (stripe && striped(a)) { set(stripe); shade = 1; }
         if (t > sleeve - 0.03) shade *= 0.76;                                                      // sleeve hem or cuff
       } else if (jacket && t < sleeve + 0.035) { set(inner); shade = 1; }                          // shirt cuff
@@ -569,11 +579,17 @@ function paint(B, o) {
 // ---------- Body shape ----------
 
 // Reshape the head: `f` holds amounts for jaw (width of the lower face), cheeks, chin (a second one),
-// neck (thickness) and nose. Works on any point near the head, so beards can follow the face.
+// neck (thickness), nose, jowls (heavy flesh either side of the chin), brow (a heavier ridge over the eyes),
+// width (the whole skull) and crown (height of the skull). Works on any point near the head, so beards can follow the face.
 function morphHead(B, f, p) {
   const N = B.nose, s = Math.sign(p.x), dy = p.y - N.y, dz = p.z - N.z;
   const bump = (cx, cy, cz, r) => Math.exp(-(((Math.abs(p.x) - cx) / r) ** 2 + ((p.y - cy) / r) ** 2 + ((p.z - cz) / r) ** 2));
+  const skull = smooth((p.y - B.J.neck.y + 0.01) / 0.05);
+  if (f.width) p.x *= 1 + f.width * skull;
+  if (f.crown) p.y += f.crown * 0.03 * smooth((dy - 0.03) / 0.08);
   if (f.jaw) p.x *= 1 + f.jaw * smooth((0.03 - dy) / 0.05) * smooth((dy + 0.14) / 0.05);
+  if (f.jowls) { const g = bump(0.046, N.y - 0.078, N.z - 0.052, 0.03) * f.jowls; p.x += s * g * 0.012; p.y -= g * 0.009; p.z += g * 0.004; }
+  if (f.brow) { const g = bump(0.028, N.y + 0.052, N.z - 0.024, 0.028) * f.brow; p.z += g * 0.009; p.y += g * 0.002; }
   if (f.neck && dy < -0.03) {
     const m = f.neck * smooth((-0.03 - dy) / 0.04) * smooth((p.y - B.J.neck.y + 0.03) / 0.06);
     p.x *= 1 + m; p.z = B.J.neck.z + (p.z - B.J.neck.z) * (1 + m * 0.8);
@@ -658,9 +674,11 @@ const hairGeos = new Map(), hairMats = new Map();
 // A hair mesh's geometry for a look: the base mesh, reshaped to follow the face when it is a beard,
 // and with a second colour at the temples when the look asks for one.
 function hairGeo(B, name, o) {
-  const src = hairMeshes[name].geometry, sides = name !== 'beard' && o.hairSides !== undefined, face = name === 'beard' && o.face;
+  const src = hairMeshes[name].geometry, sides = name !== 'beard' && o.hairSides !== undefined;
+  const face = o.face && (name === 'beard' || o.face.width || o.face.crown) ? o.face : null; // hair follows a wider or taller skull
   if (!sides && !face) return src;
-  const key = JSON.stringify([B.female, name, sides && [o.hair, o.hairSides], face]);
+  const edge = o.hairSidesWidth ?? 0.052;
+  const key = JSON.stringify([B.female, name, sides && [o.hair, o.hairSides, edge], face]);
   if (hairGeos.has(key)) return hairGeos.get(key);
   const geo = src.clone(), P = geo.attributes.position, p = new THREE.Vector3();
   if (face) {
@@ -670,7 +688,7 @@ function hairGeo(B, name, o) {
   if (sides) {
     const top = new THREE.Color(o.hair), side = new THREE.Color(o.hairSides), c = new THREE.Color(), col = new Float32Array(P.count * 3);
     for (let v = 0; v < P.count; v++) {
-      const a = clamp01((Math.abs(P.getX(v)) - 0.052) / 0.018) * clamp01((B.topY - 0.035 - P.getY(v)) / 0.02) * clamp01((0.045 - P.getZ(v)) / 0.03);
+      const a = clamp01((Math.abs(P.getX(v)) - edge) / 0.018) * clamp01((B.topY - 0.035 - P.getY(v)) / 0.02) * clamp01((0.045 - P.getZ(v)) / 0.03);
       c.copy(top).lerp(side, a).toArray(col, v * 3);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -709,6 +727,31 @@ function glassesGeo(B) {
   const lens = [-1, 1].map(s => { const c = new THREE.CircleGeometry(0.019, 18); c.scale(1.12, 0.86, 1); c.translate(s * 0.032, y, z); return c; });
   return glassesGeos[key] = { frame: mergeGeometries(parts.map(p => p.toNonIndexed())), lens: mergeGeometries(lens) };
 }
+// Hats sit on the crown: a fedora (crown, band and a brim that dips at the front) or a baseball cap.
+const hatGeos = {};
+function hatGeo(B, kind) {
+  const key = (B.female ? 'f' : 'm') + kind;
+  if (hatGeos[key]) return hatGeos[key];
+  const top = B.topY, cz = B.nose.z - 0.082, parts = [], bands = [];
+  if (kind === 'fedora') {
+    const crown = new THREE.CylinderGeometry(0.088, 0.1, 0.11, 18).scale(1.06, 1, 1.16).translate(0, top + 0.005, cz);
+    const dent = crown.attributes.position; // pinch the crown's top at the front
+    for (let i = 0; i < dent.count; i++) if (dent.getY(i) > top + 0.05 && dent.getZ(i) > cz) dent.setY(i, dent.getY(i) - 0.014 * clamp01((dent.getZ(i) - cz) / 0.09));
+    crown.computeVertexNormals();
+    const brim = new THREE.CylinderGeometry(0.165, 0.165, 0.005, 24).scale(1, 1, 1.14).rotateX(0.16).translate(0, top - 0.046, cz + 0.012);
+    parts.push(crown, brim);
+    bands.push(new THREE.CylinderGeometry(0.102, 0.104, 0.024, 18).scale(1.06, 1, 1.16).translate(0, top - 0.032, cz));
+  } else { // cap
+    const dome = new THREE.SphereGeometry(0.118, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.85, 1.08).translate(0, top - 0.07, cz);
+    const peak = new THREE.CylinderGeometry(0.1, 0.1, 0.006, 16, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 1.3).rotateX(0.2).translate(0, top - 0.068, cz + 0.095);
+    parts.push(dome, peak);
+    bands.push(new THREE.SphereGeometry(0.012, 6, 4).translate(0, top + 0.03, cz));
+  }
+  return hatGeos[key] = { hat: mergeGeometries(parts.map(p => p.toNonIndexed())), band: mergeGeometries(bands.map(p => p.toNonIndexed())) };
+}
+const hatMats = new Map();
+const hatMat = color => hatMats.get(color) ?? hatMats.set(color, new THREE.MeshLambertMaterial({ color })).get(color);
+
 const frameMat = new THREE.MeshLambertMaterial({ color: 0x1a1512 });
 const pistolMat = new THREE.MeshPhongMaterial({ color: 0x1c1c22, shininess: 60, specular: 0x666666 });
 const shadeMat = new THREE.MeshBasicMaterial({ color: 0x0b0b10 });
@@ -728,9 +771,10 @@ const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true
 //   hairMesh   'parted' | 'buzzed' | 'long' for hair with volume; hairScale stretches it [x, y, z], hairShift moves it
 //   hairSides  colour of the hair at the temples
 //   beardMesh  a full beard with volume, in the beard colour
-//   glasses    'clear' | 'shades'
-//   pattern    'blocks' | 'plaid' | 'paisley' | 'palms' | 'stripes' printed shirt
-//   jacket     colour of an open jacket worn over the shirt; tie adds a tie in that colour
+//   glasses    'clear' | 'shades'; glassesScale makes them larger
+//   hat        'fedora' | 'cap', in hatColor, with hatBand for the band or button
+//   pattern    'blocks' | 'plaid' | 'paisley' | 'palms' | 'stripes' | 'pinstripe' | 'check' printed shirt
+//   jacket     colour of an open jacket worn over the shirt; jacketPattern prints the jacket; tie adds a tie in that colour
 //   open       colour of an undershirt showing through an unbuttoned shirt or track top
 //   tank       the undershirt is a low-cut tank
 //   sleeves    'short' | 'long'
@@ -743,9 +787,10 @@ export function makeHuman(opts = {}) {
   group.rotation.order = 'YXZ';
   group.scale.setScalar(o.height);
   const root = cloneSkinned(B.scene);
+  root.position.y = 0.04; // the clips plant the heels a little under the ground; stand on top of it
   group.add(root);
 
-  const { hairMesh, hairScale, hairShift, beardMesh, glasses, bulk, belly, height, head, face, ...paintKey } = o;
+  const { hairMesh, hairScale, hairShift, beardMesh, glasses, glassesScale, hat, hatColor, hatBand, bulk, belly, height, head, face, ...paintKey } = o;
   const key = JSON.stringify(paintKey);
   if (!textures.has(key)) textures.set(key, paint(B, o));
 
@@ -776,9 +821,15 @@ export function makeHuman(opts = {}) {
   if (hairMesh && hairMeshes[hairMesh]) wear(hairGeo(B, hairMesh, o), hairMat(hairMesh, o.hair, o.hairSides !== undefined), hairScale, hairShift).castShadow = true;
   if (beardMesh) wear(hairGeo(B, 'beard', o), hairMat('beard', o.beard ?? o.hair, false));
   if (glasses) {
-    const geo = glassesGeo(B);
-    wear(geo.frame, frameMat);
-    wear(geo.lens, glasses === 'shades' ? shadeMat : lensMat);
+    const geo = glassesGeo(B), gs = glassesScale ? [glassesScale, glassesScale, 1] : null, N = B.nose;
+    const seat = gs && [0, (N.y + 0.042 - B.topY * 0.94) * (1 - glassesScale), 0]; // scale about the bridge, not the crown
+    wear(geo.frame, frameMat, gs, seat);
+    wear(geo.lens, glasses === 'shades' ? shadeMat : lensMat, gs, seat);
+  }
+  if (hat) {
+    const geo = hatGeo(B, hat);
+    wear(geo.hat, hatMat(hatColor ?? (hat === 'cap' ? 0x2f56c8 : 0x3a3230))).castShadow = true;
+    wear(geo.band, hatMat(hatBand ?? (hat === 'cap' ? hatColor ?? 0x2f56c8 : 0x1a1512)));
   }
   headBone.scale.setScalar(o.head);
 
@@ -843,49 +894,50 @@ export function updatePeople(dt, eye) {
 // The crew's looks, taken from the reference image (left to right).
 // Hesh runs his record label in this world; Furio only arrives late in the storyline.
 export const LOOKS = {
-  pussy: {
-    jacket: 0xa9bcd8, pants: 0xa9bcd8, shirt: 0xece6dc, pattern: 'stripes', tucked: true, shoes: 0xe9e4da,
-    hair: 0x14110f, hairMesh: 'parted', hairScale: [1.04, 0.95, 1.04], bulk: 1.44, height: 1.02, head: 1.1,
-    face: { jaw: 0.24, cheeks: 1.3, chin: 1.5, neck: 0.2, nose: 0.3 }, age: 0.45, stubble: 0.35,
+  pussy: { // the biggest man in the room: a round face on no neck, slicked hair, a loose two-piece in powder blue
+    jacket: 0xa9bcd8, pants: 0xa9bcd8, shirt: 0xece6dc, pattern: 'stripes', tucked: true, shoes: 0xe9e4da, chain: true,
+    hair: 0x14110f, hairMesh: 'parted', hairScale: [1.06, 0.92, 1.06], bulk: 1.5, belly: 0.015, height: 1.02, head: 1.12,
+    face: { jaw: 0.3, cheeks: 1.4, chin: 1.6, neck: 0.35, nose: 0.3, jowls: 1.2, width: 0.05 }, age: 0.45, stubble: 0.35, skin: [1, 0.94, 0.86],
   },
-  tony: {
-    pattern: 'blocks', shirt: 0x171c44, pants: 0x15151b, hair: 0x2a1c14, hairStyle: 'receding', hairMesh: 'buzzed', hairScale: [1.02, 1.0, 0.94], hairShift: [0, 0.004, -0.012], bulk: 1.36, height: 1.05, head: 1.1,
-    face: { jaw: 0.2, cheeks: 1, chin: 1.2, neck: 0.2, nose: 0.5 }, age: 0.5, stubble: 0.3,
+  tony: { // a bull: thick neck, heavy brow and jowls, the hairline going at the temples, a bowling shirt over slacks
+    pattern: 'blocks', shirt: 0x171c44, pants: 0x15151b, hair: 0x2a1c14, hairStyle: 'receding', hairMesh: 'buzzed', hairScale: [1.02, 1.0, 0.94], hairShift: [0, 0.004, -0.012],
+    bulk: 1.4, belly: 0.01, height: 1.05, head: 1.12, watch: true,
+    face: { jaw: 0.26, cheeks: 1.1, chin: 1.3, neck: 0.32, nose: 0.5, jowls: 1, brow: 0.6, width: 0.04 }, age: 0.55, stubble: 0.4, skin: [1, 0.95, 0.88],
   },
-  christopher: {
-    pattern: 'stripes', shirt: 0xece6dc, pants: 0x4a3324, tucked: true, hair: 0x1c1410, hairMesh: 'parted', hairScale: [1, 1.05, 1.02], bulk: 0.94,
-    face: { jaw: -0.03, cheeks: -0.4, nose: 0.9 }, stubble: 0.45,
+  christopher: { // young and narrow: a long nose, hair slicked back, a leather jacket over a striped shirt and a chain
+    jacket: 0x24201f, shirt: 0xece6dc, pattern: 'stripes', pants: 0x2b2b3a, tucked: true, chain: true, hair: 0x1c1410, hairMesh: 'parted', hairScale: [1, 1.12, 1.05], hairShift: [0, 0.002, -0.006], bulk: 0.94,
+    face: { jaw: -0.04, cheeks: -0.5, nose: 0.9, brow: 0.25, crown: 0.3 }, stubble: 0.45,
   },
-  paulie: {
+  paulie: { // the silver wings over the ears, a pointed face, pale; a tracksuit with white sneakers
     shirt: 0x15141a, open: 0xf4f4f4, tank: true, chain: true, sleeves: 'long', pants: 0x15141a, stripe: 0xc9202a, shoes: 0xf2efe8,
-    hair: 0x17120f, hairMesh: 'parted', hairSides: 0xd8d8de, hairScale: [1.02, 1.07, 1.05], bulk: 1.0,
-    face: { cheeks: -0.5, nose: 0.5, jaw: 0.03 }, age: 0.95, skin: [1, 0.9, 0.8], brows: 0x3a3632,
+    hair: 0x17120f, hairMesh: 'parted', hairSides: 0xd8d8de, hairSidesWidth: 0.04, hairScale: [1.02, 1.1, 1.06], bulk: 1.0,
+    face: { cheeks: -0.6, nose: 0.55, jaw: 0.0, brow: 0.4, jowls: 0.35, chin: 0.2 }, age: 1, skin: [1, 0.9, 0.8], brows: 0x3a3632,
   },
   hesh: {
     pattern: 'plaid', shirt: 0x8d93cc, pants: 0x6f6f7a, hair: 0xb9b6b0, hairStyle: 'balding', bulk: 1.2,
-    face: { jaw: 0.08, chin: 0.6, nose: 0.8, cheeks: 0.3 }, age: 1, beard: 0xd6d3cc, beardMesh: true, brows: 0x9a9690,
+    face: { jaw: 0.08, chin: 0.6, nose: 0.8, cheeks: 0.3, brow: 0.3, jowls: 0.4 }, age: 1, beard: 0xd6d3cc, beardMesh: true, brows: 0x9a9690,
   },
-  silvio: {
-    pattern: 'paisley', shirt: 0x232228, open: 0xf4f4f4, sleeves: 'long', pants: 0x1d1d26, hair: 0x120e0c, hairMesh: 'parted', hairScale: [1.05, 1.2, 1.1], bulk: 1.08,
-    face: { jaw: 0.12, cheeks: 0.4, chin: 0.6, nose: 0.3 }, age: 0.6, frown: true, stubble: 0.3,
+  silvio: { // the pompadour, the set mouth, a pinstripe suit over a paisley shirt
+    jacket: 0x26242c, jacketPattern: 'pinstripe', pattern: 'paisley', shirt: 0x232228, pants: 0x26242c, tucked: true, hair: 0x120e0c, hairMesh: 'parted', hairScale: [1.06, 1.32, 1.14], hairShift: [0, 0.012, 0.012], bulk: 1.08,
+    face: { jaw: 0.14, cheeks: 0.5, chin: 0.7, nose: 0.35, jowls: 0.7, brow: 0.35 }, age: 0.6, frown: true, stubble: 0.3,
   },
   furio: {
     shirt: 0x5c6157, tee: true, tucked: true, badge: true, watch: true, pants: 0x15151b, hair: 0x17120f, hairMesh: 'long', bulk: 1.08,
-    face: { jaw: 0.05, nose: 0.6, cheeks: -0.2 }, goatee: 0x1d1714, stubble: 0.6, age: 0.3,
+    face: { jaw: 0.05, nose: 0.6, cheeks: -0.2, brow: 0.3 }, goatee: 0x1d1714, stubble: 0.6, age: 0.3,
   },
-  melfi: { body: 'female', jacket: 0x3d4658, shirt: 0xf1ede4, pants: 0x3d4658, tucked: true, hair: 0x2a1a14, hairMesh: 'long', glasses: 'clear', age: 0.2 },
+  melfi: { body: 'female', jacket: 0x3d4658, shirt: 0xf1ede4, pants: 0x3d4658, tucked: true, hair: 0x2a1a14, hairMesh: 'long', hairScale: [1.08, 1.04, 1.06], glasses: 'clear', age: 0.2, face: { cheeks: 0.2 } },
 
   // Family, and the people of episode one.
-  carmela: { body: 'female', shirt: 0xf7a8c4, pants: 0xf5f0e6, shoes: 0xf2efe8, chain: true, hair: 0xd9b25a, hairMesh: 'long', age: 0.3 },
+  carmela: { body: 'female', jacket: 0xf7a8c4, shirt: 0xf5f0e6, pants: 0xf5f0e6, tucked: true, shoes: 0xf2efe8, chain: true, hair: 0xd9b25a, hairMesh: 'long', hairScale: [1.12, 1.16, 1.1], age: 0.3, face: { cheeks: 0.3, chin: 0.2 } },
   meadow: { body: 'female', shirt: 0x9fd0f5, tee: true, pants: 0x3b6ea8, shoes: 0xf2efe8, hair: 0x2a1a14, hairMesh: 'long', height: 0.95 },
   aj: { pattern: 'stripes', shirt: 0xece6dc, tee: true, pants: 0x3b6ea8, shoes: 0xf2efe8, hair: 0x3a2a1c, hairMesh: 'parted', bulk: 1.22, height: 0.8, head: 1.24, face: { cheeks: 1.2, jaw: 0.1 } },
   livia: {
     body: 'female', jacket: 0x8a6f8f, shirt: 0xe9e2d2, pants: 0x4a4652, tucked: true, hair: 0xc4c1bb, hairMesh: 'parted', hairShift: [0, -0.045, 0.004], hairScale: [1.04, 1.02, 1.06],
-    bulk: 1.12, height: 0.92, age: 1, brows: 0x9a9690, face: { jaw: 0.1, cheeks: -0.3, chin: 0.4 }, frown: true,
+    bulk: 1.12, height: 0.92, age: 1, brows: 0x9a9690, face: { jaw: 0.1, cheeks: -0.3, chin: 0.4, jowls: 0.6 }, frown: true,
   },
-  junior: {
-    jacket: 0xb9a58a, shirt: 0xf4f4f4, tie: 0x6a1c2c, tucked: true, pants: 0x4a4652, hair: 0xb9b6b0, hairStyle: 'balding', glasses: 'clear', brows: 0x9a9690,
-    bulk: 0.96, height: 0.97, age: 1, face: { nose: 0.9, cheeks: -0.5, jaw: 0.04 }, frown: true,
+  junior: { // the big glasses, the beak, the sunken cheeks
+    jacket: 0xb9a58a, shirt: 0xf4f4f4, tie: 0x6a1c2c, tucked: true, pants: 0x4a4652, hair: 0xb9b6b0, hairStyle: 'balding', glasses: 'clear', glassesScale: 1.3, brows: 0x9a9690,
+    bulk: 0.96, height: 0.97, age: 1, face: { nose: 0.95, cheeks: -0.6, jaw: 0.04, jowls: 0.4, brow: 0.3 }, frown: true,
   },
   artie: { shirt: 0xf4f4f4, sleeves: 'long', pants: 0x2b2b3a, hair: 0x1c1410, hairStyle: 'receding', hairMesh: 'buzzed', hairScale: [1.02, 1, 0.94], hairShift: [0, 0.004, -0.012], bulk: 1.18, face: { cheeks: 0.7, nose: 0.5, chin: 0.5 }, stubble: 0.3, age: 0.4 },
   kolar: { jacket: 0x1c1c22, shirt: 0xf4f4f4, tee: true, pants: 0x3b4a66, hair: 0xc9a14a, hairMesh: 'parted', bulk: 1.02, face: { jaw: 0.12 }, stubble: 0.2 },

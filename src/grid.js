@@ -1,7 +1,7 @@
 // City layout constants and the shared collision list.
 // The city is a grid of NX x NZ blocks separated by roads; +x is east (the ocean), +z is south.
 
-export const NX = 12, NZ = 10, BLOCK = 60, ROAD = 16, CELL = BLOCK + ROAD, LANE = 3.6;
+export const NX = 16, NZ = 13, BLOCK = 60, ROAD = 16, CELL = BLOCK + ROAD, LANE = 3.6;
 export const OX = -NX * CELL / 2, OZ = -NZ * CELL / 2;
 
 export const nodeX = k => OX + k * CELL; // centre line of north-south road k (0..NX)
@@ -20,8 +20,9 @@ export const colliders = [];
 // Height of the ground under (x, z): sidewalks are raised, the beach lies a little lower.
 // lowGround lists squares inside blocks that stay at road level (car parks): { x, z, half }.
 // piers run east out over the water: { minZ, maxZ, ramp (x where it leaves the sand), deck (x where it is level), maxX, y }.
-// interiors are rooms built far out over the water; a player inside one is kept inside it.
+// interiors are rooms built far out over the water; a player inside one is kept inside it. Each lists its `lights`.
 export const lowGround = [], piers = [], interiors = [];
+export const roomAt = (x, z, margin = 1) => interiors.find(q => x > q.minX - margin && x < q.maxX + margin && z > q.minZ - margin && z < q.maxZ + margin);
 export function groundAt(x, z) {
   for (const p of piers) if (z > p.minZ && z < p.maxZ && x > p.ramp) return x < p.deck ? -0.1 + (p.y + 0.1) * (x - p.ramp) / (p.deck - p.ramp) : p.y;
   if (x > SHORE) return x < SHORE + 4.6 ? 0.04 : -0.1;
@@ -65,7 +66,7 @@ export function pushOut(pos, r) {
     }
   }
   // Inside a room, the walls are the limit.
-  const room = interiors.find(q => pos.x > q.minX - 1 && pos.x < q.maxX + 1 && pos.z > q.minZ - 1 && pos.z < q.maxZ + 1);
+  const room = roomAt(pos.x, pos.z);
   if (room) {
     const x = clamp(pos.x, room.minX + r, room.maxX - r), z = clamp(pos.z, room.minZ + r, room.maxZ - r);
     if (x !== pos.x || z !== pos.z) { pos.x = x; pos.z = z; hit = true; }

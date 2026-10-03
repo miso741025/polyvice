@@ -52,6 +52,12 @@ const PED_LOOKS = [
   { body: 'female', jacket: 0x8f7bff, shirt: 0xffffff, pants: 0x8f7bff, tucked: true, hair: 0x7a3b1a, hairMesh: 'long' },
   { body: 'female', shirt: 0x4fb8ff, tee: true, pants: 0x2b2b3a, hair: 0x111111, hairMesh: 'long', dark: true },
   { body: 'female', pattern: 'palms', shirt: 0xe0563f, pants: 0xffe066, shoes: 0xf2efe8, hair: 0xd9b25a, hairMesh: 'long', glasses: 'shades' },
+  { jacket: 0x8d8a8e, shirt: 0xf4f4f4, tie: 0x2f56c8, tucked: true, pants: 0x8d8a8e, hair: 0x9a9690, hairStyle: 'balding', hat: 'fedora', hatColor: 0x6f6a66, age: 0.8, face: { nose: 0.5, cheeks: -0.3 } },
+  { shirt: 0x2f56c8, tee: true, pants: 0xf5f0e6, shoes: 0xf2efe8, hair: 0x2b1b12, hairMesh: 'buzzed', hat: 'cap', hatColor: 0xd8342c, stubble: 0.2 },
+  { pattern: 'check', shirt: 0xf1ece2, tucked: true, pants: 0x4a3324, shoes: 0x6a4a34, hair: 0x7a3b1a, hairMesh: 'parted', hat: 'cap', hatColor: 0x1f6b4a, age: 0.3 },
+  { jacket: 0x16161c, shirt: 0xf4f4f4, tucked: true, pants: 0x16161c, hair: 0x1c1410, hairMesh: 'parted', hat: 'fedora', hatColor: 0x1c1c22, hatBand: 0x8a1c1c, stubble: 0.3, face: { jaw: 0.1 } },
+  { body: 'female', jacket: 0xffd3a1, shirt: 0xffffff, tee: true, pants: 0xffffff, tucked: true, hair: 0xc4c1bb, hairMesh: 'parted', hairShift: [0, -0.045, 0.004], age: 0.9, glasses: 'clear', height: 0.92 },
+  { shirt: 0xf4f4f4, sleeves: 'long', tucked: true, pants: 0x23232b, tie: 0x8a1c1c, hair: 0x111111, hairMesh: 'buzzed', dark: true, age: 0.3 },
 ];
 const pick = (arr, rand) => arr[Math.floor(rand() * arr.length)];
 export const randomPedLook = (rand = Math.random) => ({ ...pick(PED_LOOKS, rand), bulk: 0.9 + Math.floor(rand() * 4) * 0.1 });
@@ -82,6 +88,13 @@ export class Ped {
     return this.dir > 0 ? h : h + Math.PI;
   }
 
+  // Start a fresh lap around another block (the crowd follows the player around the city).
+  relocate(center, rand) {
+    this.c = center; this.u = rand() * 8 * this.s; this.dir = rand() < 0.5 ? 1 : -1;
+    this.flight = 0; this.returning = false; this.down = 0;
+    this.human.group.rotation.y = this.pathPoint(this.pos);
+    this.human.group.position.set(this.pos.x, groundAt(this.pos.x, this.pos.z), this.pos.z);
+  }
   // Run from `from` for a while.
   flee(from, seconds = 8) {
     if (this.dead) return;
@@ -159,6 +172,10 @@ const CAR_KINDS = {
   suv: { L: 5.1, W: 2.02, clear: 0.36, R: 0.4, axle: 1.62, nose: 1.0, cowl: [1.08, 1.12], roofF: 0.72, roofR: -2.32, roof: 1.84, deck: [-2.46, 1.12], tail: 1.1, pillars: [-0.2, -1.32], rack: true },
   taxi: { base: 'sedan', sign: true },
   police: { base: 'sedan', lightbar: true },
+  // A panel van: a short nose and a tall box of a body, windowless behind the cab.
+  van: { L: 5.0, W: 2.0, clear: 0.34, R: 0.36, axle: 1.55, nose: 0.95, cowl: [1.3, 1.05], roofF: 0.9, roofR: -2.25, roof: 2.05, deck: [-2.4, 1.05], tail: 1.05, pillars: [0.1], blind: true },
+  // A pickup: a sedan's cab and a flat bed behind it.
+  pickup: { L: 5.3, W: 1.96, clear: 0.4, R: 0.38, axle: 1.6, nose: 0.98, cowl: [0.95, 1.1], roofF: 0.35, roofR: -0.55, roof: 1.78, deck: [-0.72, 1.1], tail: 1.1, pillars: [], bed: -0.8 },
   // A box truck: the profile is the cab and chassis, `cargo` the box behind it (from z0 to z1, up to height h).
   truck: { L: 7.6, W: 2.4, clear: 0.5, R: 0.46, axle: 2.5, nose: 1.35, cowl: [2.75, 1.55], roofF: 2.3, roofR: 1.3, roof: 2.55, deck: [1.2, 1.55], tail: 1.2, pillars: [], cargo: { z0: -3.75, z1: 1.05, h: 3.35 } },
 };
@@ -225,6 +242,7 @@ function buildCar(kind) {
   const frontAt = y => cz + (k.roofF - cz) * (y - cy) / (ry - cy) - 0.13, rearAt = y => dz + (k.roofR - dz) * (y - dy) / (ry - dy) + 0.13;
   const posts = [null, ...k.pillars.slice().sort((a, b) => b - a), null];
   for (const s of [-1, 1]) for (let i = 0; i < posts.length - 1; i++) {
+    if (k.blind && i > 0) continue; // a van's body is solid behind the cab
     const x = s * (gw / 2 + 0.006);
     const f0 = posts[i] === null ? frontAt(yw0) : posts[i] - 0.045, f1 = posts[i] === null ? frontAt(yw1) : posts[i] - 0.045;
     const r0 = posts[i + 1] === null ? rearAt(yw0) : posts[i + 1] + 0.045, r1 = posts[i + 1] === null ? rearAt(yw1) : posts[i + 1] + 0.045;
@@ -261,6 +279,12 @@ function buildCar(kind) {
   if (k.wing) {
     paint.push(new THREE.BoxGeometry(W - 0.1, 0.045, 0.34).translate(0, k.tail + 0.24, -hl + 0.24));
     for (const s of [-1, 1]) paint.push(new THREE.BoxGeometry(0.06, 0.24, 0.2).translate(s * (W / 2 - 0.2), k.tail + 0.1, -hl + 0.24));
+  }
+  if (k.bed !== undefined) { // the open bed of a pickup: a dark liner between low rails
+    const z0 = -hl + 0.12, z1 = k.bed, mid = (z0 + z1) / 2, len = z1 - z0;
+    trim.push(slab(W - 0.36, 0.03, len, 0, k.tail - 0.08, mid, BLACK));
+    trim.push(slab(W - 0.3, 0.02, 0.04, 0, k.tail + 0.02, z1 + 0.02, BLACK));
+    for (const s of [-1, 1]) trim.push(slab(0.04, 0.03, len, s * (W / 2 - 0.1), k.tail + 0.02, mid, CHROME));
   }
   if (k.cargo) {
     const { z0, z1, h } = k.cargo, mid = (z0 + z1) / 2, len = z1 - z0;
@@ -305,17 +329,24 @@ function makeCarMesh(color, kind) {
     m.castShadow = mat !== lightMat; m.receiveShadow = mat !== lightMat;
     g.add(m);
   }
-  g.userData.wheels = [];
   g.userData.radius = k.R;
   g.userData.reach = k.L / 2 - 1; // how far the collision circles sit from the centre
-  for (const x of [-1, 1]) for (const z of [-k.axle, k.axle]) {
-    const w = new THREE.Mesh(parts.wheel, wheelMat);
-    w.position.set(x * (k.W / 2 - 0.1), k.R, z); w.castShadow = true;
-    g.add(w); g.userData.wheels.push(w);
-  }
   return g;
 }
 
+// All the wheels of one kind of car are a single instanced mesh: four slots per car, written each sync.
+const wheelPools = {};
+function wheelPool(scene, kind) {
+  let pool = wheelPools[kind];
+  if (!pool) {
+    const mesh = new THREE.InstancedMesh(buildCar(kind).wheel, wheelMat, 1024);
+    mesh.count = 0; mesh.castShadow = true; mesh.frustumCulled = false;
+    pool = wheelPools[kind] = { mesh, free: [] };
+    scene.add(mesh);
+  }
+  return pool;
+}
+const wheelM = new THREE.Matrix4(), wheelL = new THREE.Matrix4(), wheelSpin = new THREE.Matrix4();
 const probe = new THREE.Vector3();
 
 export class Car {
@@ -325,12 +356,16 @@ export class Car {
     this.nav = null; // set for traffic cars driven by the AI
     this.mesh = makeCarMesh(color, kind);
     this.reach = this.mesh.userData.reach;
+    this.k = CAR_KINDS[kind].base ? { ...CAR_KINDS[CAR_KINDS[kind].base], ...CAR_KINDS[kind] } : CAR_KINDS[kind];
+    this.pool = wheelPool(scene, kind);
+    this.wheel = this.pool.free.length ? this.pool.free.pop() : (this.pool.mesh.count += 4) - 4;
+    this.spin = 0; this.wheelsShown = true;
     scene.add(this.mesh);
     this.sync();
   }
 
   drive(dt, throttle, steer, handbrake) {
-    const top = this.kind === 'truck' ? 21 : this.kind === 'suv' ? 29 : 32;
+    const top = { truck: 21, van: 25, suv: 29, pickup: 28 }[this.kind] ?? 32;
     if (throttle > 0) this.speed += (this.speed < 0 ? 30 : 15 * (1 - this.speed / top)) * dt;
     else if (throttle < 0) this.speed -= (this.speed > 0.5 ? 30 : 9 * (1 + this.speed / 11)) * dt;
     else this.speed -= Math.sign(this.speed) * Math.min(Math.abs(this.speed), 3.5 * dt);
@@ -363,13 +398,34 @@ export class Car {
   sync() {
     this.mesh.position.set(this.pos.x, groundAt(this.pos.x, this.pos.z), this.pos.z);
     this.mesh.rotation.y = this.heading;
+    this.placeWheels();
+  }
+
+  // Write the four wheels into the pool, under the body wherever it is.
+  placeWheels() {
+    const { k, pool } = this, body = this.mesh;
+    body.updateMatrix();
+    wheelSpin.makeRotationX(this.spin);
+    let n = 0;
+    for (const x of [-1, 1]) for (const z of [-k.axle, k.axle]) {
+      if (this.wheelsShown) wheelM.copy(body.matrix).multiply(wheelL.makeTranslation(x * (k.W / 2 - 0.1), k.R, z)).multiply(wheelSpin);
+      else wheelM.makeScale(0, 0, 0);
+      pool.mesh.setMatrixAt(this.wheel + n++, wheelM);
+    }
+    pool.mesh.instanceMatrix.needsUpdate = true;
+  }
+  hideWheels() { this.wheelsShown = false; this.placeWheels(); }
+
+  // Take the car out of the world.
+  remove(scene) {
+    scene.remove(this.mesh);
+    this.wheelsShown = false; this.placeWheels();
+    this.pool.free.push(this.wheel);
   }
 
   repaint(color) { this.mesh.children[0].material = paintMat(color); }
 
-  spinWheels(dt) {
-    for (const w of this.mesh.userData.wheels) w.rotation.x += this.speed * dt / this.mesh.userData.radius;
-  }
+  spinWheels(dt) { this.spin += this.speed * dt / this.k.R; }
 }
 
 // ---------- Traffic AI ----------
@@ -384,7 +440,7 @@ const entryPoint = (i, j, d) => { const r = rightOf(d); return { x: nodeX(i) + r
 const exitPoint = (i, j, d) => { const r = rightOf(d); return { x: nodeX(i) + r.x * LANE + d.x * edge, z: nodeZ(j) + r.z * LANE + d.z * edge }; };
 
 const TRAFFIC_COLORS = [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0x1d1d24, 0xd9342b, 0x8ecbff, 0xf08a3c, 0x7d5cff];
-const TRAFFIC_KINDS = ['sedan', 'sedan', 'sedan', 'coupe', 'coupe', 'suv', 'taxi'];
+const TRAFFIC_KINDS = ['sedan', 'sedan', 'sedan', 'coupe', 'coupe', 'suv', 'taxi', 'taxi', 'van', 'pickup'];
 
 export function spawnTraffic(scene, count, rand) {
   const cars = [], used = new Set();

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { NX, NZ, ROAD, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
+import { NX, NZ, ROAD, CELL, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
-import { makeTony, Car, Ped, spawnTraffic, driveAI, loadPeople, updatePeople } from './entities.js';
+import { makeTony, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
 import { runStory, savedMission, clearSave } from './missions.js';
 import { installCombat } from './combat.js';
@@ -48,11 +48,12 @@ async function boot() {
   const places = buildWorld(scene);
 
   // ----- Cars: Tony's SUV, parked cars at the kerb, traffic -----
+  const g_scenery = [];
   const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, 0x7a1626, 'suv');
-  const cars = [tonyCar, ...spawnTraffic(scene, 30, rand)];
-  const parkedColors = [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0xd9342b, 0x8ecbff];
-  const parkedKinds = ['sedan', 'coupe', 'sedan', 'suv', 'coupe'];
-  for (let n = 0; n < 26; n++) {
+  const cars = [tonyCar, ...spawnTraffic(scene, 38, rand)];
+  const parkedColors = [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0xd9342b, 0x8ecbff, 0xf08a3c, 0x7d5cff, 0x1d1d24];
+  const parkedKinds = ['sedan', 'coupe', 'sedan', 'suv', 'coupe', 'van', 'pickup'];
+  for (let n = 0; n < 44; n++) {
     const off = (rand() - 0.5) * 36, far = ROAD / 2 - 1.2, color = parkedColors[n % parkedColors.length];
     if (rand() < 0.5) { // on a north-south road, facing south on the west kerb
       const i = Math.floor(rand() * (NX + 1)), j = Math.floor(rand() * NZ);
@@ -64,14 +65,27 @@ async function boot() {
   }
 
   places.bing.parking.forEach((spot, n) => cars.push(new Car(scene, spot.x, spot.z, spot.h, parkedColors[(n + 2) % parkedColors.length], parkedKinds[(n + 1) % parkedKinds.length])));
+  places.parkedSpots.forEach((spot, n) => cars.push(new Car(scene, spot.x, spot.z, spot.h, spot.kind === 'truck' ? 0xf2f0ea : parkedColors[(n * 5 + 1) % parkedColors.length], spot.kind)));
+  { // the car on the showroom turntable and the one up on the body shop's lift are scenery
+    const { SHOWROOM, BODYSHOP } = places.rooms;
+    const show = new Car(scene, SHOWROOM.showcar.x, SHOWROOM.showcar.z, SHOWROOM.showcar.h, 0xd9342b, 'coupe'); show.mesh.position.y = SHOWROOM.Y + 0.3; show.placeWheels(); show.sync = () => {};
+    const lift = new Car(scene, BODYSHOP.lift.x, BODYSHOP.lift.z, BODYSHOP.lift.h, 0x8ecbff, 'sedan'); lift.mesh.position.y = BODYSHOP.lift.y; lift.placeWheels(); lift.sync = () => {};
+    g_scenery.push(show, lift);
+  }
 
   // ----- Pedestrians -----
-  const peds = [];
-  for (let n = 0; n < 54; n++) {
+  // A random block within `far` of a point, never Tony's own.
+  const blockNear = (at, far) => {
+    for (let tries = 0; tries < 20; tries++) {
+      const i = Math.floor(rand() * NX), j = Math.floor(rand() * NZ), c = blockCenter(i, j), d = Math.hypot(c.x - at.x, c.z - at.z);
+      if ((i || j) && d > far * 0.55 && d < far) return c;
+    }
     let i, j;
     do { i = Math.floor(rand() * NX); j = Math.floor(rand() * NZ); } while (i === 0 && j === 0);
-    peds.push(new Ped(scene, blockCenter(i, j), rand));
-  }
+    return blockCenter(i, j);
+  };
+  const peds = [];
+  for (let n = 0; n < 68; n++) peds.push(new Ped(scene, blockNear(places.home.spawn, 260), rand));
 
   const tony = makeTony();
   scene.add(tony.group);
@@ -119,7 +133,7 @@ async function boot() {
     },
     removeCar(car) {
       if (p.car === car) g.leaveCar();
-      scene.remove(car.mesh);
+      car.remove(scene);
       cars.splice(cars.indexOf(car), 1);
     },
     // Play as someone else (Christopher has a mission of his own); the previous body is hidden.
@@ -198,6 +212,7 @@ async function boot() {
     },
   };
   const p = g.player, tmpColor = new THREE.Color();
+  let streamIndex = 0;
   const fade = (to, seconds) => { hud.fade(to, seconds); return g.wait(seconds + 0.05); };
   const combat = installCombat(g, { scene, hud, peds, cars, keys });
   window.game = g; // handy in the console
@@ -228,10 +243,10 @@ async function boot() {
   });
 
   // ----- Title screen: orbit the city until Start is pressed -----
-  g.cam.fixed = { pos: new THREE.Vector3(), look: new THREE.Vector3(60, 10, 40) };
+  g.cam.fixed = { pos: new THREE.Vector3(), look: new THREE.Vector3(0, 10, 0) };
   g.updaters.push(() => {
     if (g.started) return false;
-    g.cam.fixed.pos.set(60 + Math.sin(g.time * 0.05) * 430, 120, 40 + Math.cos(g.time * 0.05) * 430);
+    g.cam.fixed.pos.set(Math.sin(g.time * 0.05) * 600, 150, Math.cos(g.time * 0.05) * 600);
     return true;
   });
   hud.fade(0, 1.2);
@@ -386,11 +401,21 @@ async function boot() {
       ped.update(dt, cars, scare);
       if (ped.dead && ped.diedAt > 20) { // the dead are replaced by someone new on another block
         scene.remove(ped.human.group);
-        let bi, bj;
-        do { bi = Math.floor(rand() * NX); bj = Math.floor(rand() * NZ); } while (bi === 0 && bj === 0);
-        peds[i] = new Ped(scene, blockCenter(bi, bj), rand);
+        peds[i] = new Ped(scene, blockNear(p.pos, 240), rand);
       }
     });
+    // The crowd and the traffic keep to the part of the city the player is in: whoever is left far
+    // behind turns up again on a block or a road ahead, out of sight.
+    const far = p.car ? 420 : 300;
+    if (!p.inside) for (let k = 0; k < 2; k++) {
+      const ped = peds[(streamIndex++) % peds.length];
+      if (!ped.dead && !ped.npc && ped.flight <= 0 && Math.hypot(ped.pos.x - p.pos.x, ped.pos.z - p.pos.z) > far) ped.relocate(blockNear(p.pos, 240), rand);
+      const car = cars[(streamIndex * 7) % cars.length];
+      if (car.nav && !car.mission && !car.ai && car !== p.car && !car.nav.goal && Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) > far + 60) {
+        const c = blockNear(p.pos, 260), i = Math.round((c.x - CELL / 2 - nodeX(0)) / CELL), j = Math.round((c.z - CELL / 2 - nodeZ(0)) / CELL);
+        roam(car, clamp(i, 0, NX), clamp(j, 0, NZ), Math.floor(rand() * 4), 8 + rand() * 4);
+      }
+    }
     if (p.health <= 0 && !p.dying) g.wasted();
     if (p.inside && Math.hypot(p.pos.x - p.inside.inside.x, p.pos.z - p.inside.inside.z) > 40) { // a mission moved Tony outside
       for (const h of p.inside.hide || []) h.group.visible = true;
@@ -410,6 +435,7 @@ async function boot() {
     for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
 
     updateCamera(dt);
+    places.lightRoom(roomAt(camera.position.x, camera.position.z, 3));
     updatePeople(dt, camera.position);
     sun.target.position.copy(focus);
     sun.position.copy(focus).addScaledVector(SUN_DIR, 200);

@@ -1471,7 +1471,7 @@ async function millersCar(g) {
   p.locked = true;
   const shell = new Car(g.scene, chop.x + 5, chop.z - 3, 0.6, 0xd9c7a0, 'sedan');
   g.track(shell.mesh);
-  for (const w of shell.mesh.userData.wheels) w.visible = false;
+  shell.hideWheels();
   shell.mesh.position.y -= 0.24;
   await cut(g, () => {
     place(g, spot(chop, 1.5, 0.5), NORTH);
