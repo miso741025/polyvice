@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { pushOut, groundAt, clamp, wrapAngle, NX, NZ } from './grid.js';
+import { pushOut, groundAt, clamp, wrapAngle, near, NX, NZ } from './grid.js';
 import { makeLook, makeHuman, randomPedLook, roam, driveAI, nearestNode } from './entities.js';
 
 // Fists, a pistol, health, the people who get hurt and the police who turn up.
@@ -17,8 +17,45 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   Object.assign(p, { health: 100, weapon: 'fist', weapons: { fist: true, pistol: true }, hitAt: -9, dying: false });
   g.npcs = []; g.wanted = 0;
   const pickups = [], effects = [], cops = { cars: [], officers: [] };
-  let swing = 0, lastShot = -9, lastHit = -9, calm = 0;
+  let swing = 0, lastShot = -9, lastHit = -9, calm = 0, lastAttack = -9;
   const tmp = new THREE.Vector3();
+
+  // ----- Lock-on -----
+  // Hold the right mouse button (or tap Q / Tab) to lock onto the best target in front of the camera:
+  // Tony faces them, the camera swings round, and shots and punches go their way. Q / Tab cycles.
+  const ringTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d');
+    x.strokeStyle = '#ff3b4a'; x.lineWidth = 5; x.beginPath(); x.arc(32, 32, 22, 0, Math.PI * 2); x.stroke();
+    x.fillStyle = '#ff3b4a'; x.beginPath(); x.moveTo(32, 2); x.lineTo(40, 14); x.lineTo(24, 14); x.fill();
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: ringTex, depthTest: false, transparent: true }));
+  ring.scale.set(0.55, 0.55, 1); ring.visible = false; ring.renderOrder = 5;
+  scene.add(ring);
+  let lock = null, lockAt = -9;
+  const lockRange = () => (p.weapon === 'pistol' ? 55 : 7);
+  const candidates = () => {
+    const fx = Math.sin(g.cam.yaw), fz = Math.cos(g.cam.yaw), range = lockRange(), list = [];
+    for (const t of targets()) {
+      if (t.dead || t.human === p.human) continue;
+      const dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z, d = Math.hypot(dx, dz);
+      if (d > range || d < 0.3) continue;
+      const ahead = (dx * fx + dz * fz) / d;
+      if (ahead < -0.2) continue;
+      list.push({ t, score: d + (1 - ahead) * 12 });
+    }
+    return list.sort((a, b) => a.score - b.score).map(c => c.t);
+  };
+  g.lockOn = (cycle = false) => {
+    if (p.car || p.locked || p.hidden) return;
+    const list = candidates();
+    if (!list.length) { lock = null; return; }
+    const i = cycle && lock ? (list.indexOf(lock) + 1) % list.length : 0;
+    lock = list[i]; lockAt = g.time;
+  };
+  const faceLock = () => { if (lock) p.heading = Math.atan2(lock.pos.x - p.pos.x, lock.pos.z - p.pos.z); };
+  Object.defineProperty(g, 'lockTarget', { get: () => lock });
 
   // ----- Things that can be hit -----
   // A mission character who can be hurt. `ai` is 'brawler' (comes at you with fists) or 'shooter', or none.
@@ -118,19 +155,27 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   };
   g.attack = () => {
     if (p.car || p.locked || p.dying || p.human.busy && p.weapon === 'fist') return;
+    lastAttack = g.time;
+    if (!lock) g.lockOn();
+    if (lock && (lock.dead || !near(lock.pos, p.pos, lockRange() * 1.2))) lock = null;
+    faceLock();
     if (p.weapon === 'pistol') {
       if (g.time - lastShot < PISTOL.rate) return;
       lastShot = g.time;
       p.human.play('shoot', 'aim');
       g.scare = g.time;
       const from = muzzleOf(p.human, tmp).clone();
-      const hit = fire(from, p.heading, p.human);
+      const hit = lock ? (tracer(from, tmp.set(lock.pos.x, from.y, lock.pos.z)), lock) : fire(from, p.heading, p.human);
       if (hit) { hit.hurt(PISTOL.dmg, p.pos); if (hit.dead) g.heat(2); else g.heat(1); } else g.heat(0.5);
       for (const ped of peds) if (!ped.dead && Math.hypot(ped.pos.x - p.pos.x, ped.pos.z - p.pos.z) < 26) ped.flee(p.pos, 7);
     } else {
       if (g.time - lastHit < FIST.rate) return;
       lastHit = g.time;
       p.human.play(swing++ % 2 ? 'cross' : 'jab', 'idle', 1.4);
+      if (lock) { // step in to reach them
+        const dx = lock.pos.x - p.pos.x, dz = lock.pos.z - p.pos.z, d = Math.hypot(dx, dz);
+        if (d > 1.5 && d < 4.2) { p.pos.x += dx / d * Math.min(d - 1.4, 1.6); p.pos.z += dz / d * Math.min(d - 1.4, 1.6); pushOut(p.pos, 0.45); }
+      }
       const fx = Math.sin(p.heading), fz = Math.cos(p.heading);
       let victim = null, best = FIST.reach;
       for (const t of targets()) {
@@ -262,8 +307,23 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     // Weapons and the aim stance.
     if (g.consume('Digit1')) g.setWeapon('fist');
     if (g.consume('Digit2')) g.setWeapon('pistol');
+    if (g.consume('Mouse2') || g.consume('KeyQ') || g.consume('Tab')) g.lockOn(!!lock);
     if (g.consume('Mouse0') || g.consume('KeyE')) g.attack();
-    hud.aim(p.weapon === 'pistol' && !p.car && !p.locked && !p.hidden);
+    if (lock) {
+      const far = !near(lock.pos, p.pos, lockRange() * 1.3);
+      const idle = !keys.Mouse2 && g.time - lastAttack > 3 && g.time - lockAt > 3;
+      if (lock.dead || far || idle || p.car || p.locked || p.hidden) { lock = null; if (keys.Mouse2 && !p.car) g.lockOn(); }
+    }
+    if (lock) {
+      faceLock();
+      g.cam.yaw += wrapAngle(p.heading - g.cam.yaw) * (1 - Math.exp(-5 * dt));
+      ring.visible = true;
+      ring.position.set(lock.pos.x, lock.pos.y + 2, lock.pos.z);
+      const s = 0.4 + Math.hypot(lock.pos.x - p.pos.x, lock.pos.z - p.pos.z) * 0.03;
+      ring.scale.set(s, s, 1);
+      ring.material.color.setHSL(0, 1, 0.45 + 0.45 * Math.max(0, lock.health) / 100);
+    } else ring.visible = false;
+    hud.aim(p.weapon === 'pistol' && !lock && !p.car && !p.locked && !p.hidden);
     if (p.health < 100 && g.time - p.hitAt > 8) { p.health = Math.min(100, p.health + dt * 4); hud.health(p.health); }
 
     // Who is afraid of whom.
@@ -302,6 +362,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   };
   // Forget the police and everyone in a fight: for a respawn.
   const reset = () => {
+    lock = null; ring.visible = false;
     g.wanted = 0; hud.wanted(0); callOff();
     for (const n of g.npcs) scene.remove(n.human.group);
     g.npcs.length = 0;

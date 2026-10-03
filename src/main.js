@@ -205,7 +205,7 @@ async function boot() {
 
   // ----- Input -----
   addEventListener('keydown', e => {
-    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
     keys[e.code] = true;
     if (!e.repeat) pressed.add(e.code);
   });
@@ -215,9 +215,11 @@ async function boot() {
   canvas.addEventListener('mousedown', e => {
     dragging = true;
     if (e.button === 0 && g.started) pressed.add('Mouse0');
+    if (e.button === 2 && g.started) { pressed.add('Mouse2'); keys.Mouse2 = true; }
     if (g.started) try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* pointer lock unavailable: dragging still works */ }
   });
-  addEventListener('mouseup', () => { dragging = false; });
+  addEventListener('mouseup', e => { dragging = false; if (e.button === 2) keys.Mouse2 = false; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
   addEventListener('mousemove', e => {
     if (document.pointerLockElement !== canvas && !dragging) return;
     g.cam.yaw -= e.movementX * 0.0026;
@@ -292,10 +294,10 @@ async function boot() {
       const n = Math.hypot(vx, vz), speed = keys.ShiftLeft || keys.ShiftRight ? 7.6 : 3.7;
       vx /= n; vz /= n;
       p.pos.x += vx * speed * dt; p.pos.z += vz * speed * dt;
-      if (p.weapon !== 'pistol') p.heading += wrapAngle(Math.atan2(vx, vz) - p.heading) * (1 - Math.exp(-12 * dt));
+      if (p.weapon !== 'pistol' && !g.lockTarget) p.heading += wrapAngle(Math.atan2(vx, vz) - p.heading) * (1 - Math.exp(-12 * dt));
       p.motion = speed > 5 ? 'sprint' : 'run';
     }
-    if (p.weapon === 'pistol' && !p.locked) p.heading = g.cam.yaw; // armed, Tony faces where the camera looks
+    if (p.weapon === 'pistol' && !p.locked && !g.lockTarget) p.heading = g.cam.yaw; // armed and free-aiming, Tony faces where the camera looks
     pushOut(p.pos, 0.45);
     for (const o of cars) {
       if (Math.abs(o.pos.x - p.pos.x) > 5 || Math.abs(o.pos.z - p.pos.z) > 5) continue;
