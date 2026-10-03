@@ -521,11 +521,15 @@ export function driveAI(car, dt, obstacles, onHonk) {
   let blocked = false;
   if (nav.ignore > 0) nav.ignore -= dt;
   else {
+    // Whoever is inside the intersection has it: a car about to enter one waits while someone else is crossing.
+    const nx = nodeX(nav.ni), nz = nodeZ(nav.nj), inBox = (x, z) => Math.abs(x - nx) < 7 && Math.abs(z - nz) < 7;
+    const entering = nav.phase === 'entry' && Math.hypot(dx, dz) < 10 && !inBox(car.pos.x, car.pos.z);
     for (const o of obstacles) {
       if (o === car.pos) continue;
       const vx = o.x - car.pos.x, vz = o.z - car.pos.z;
       const ahead = vx * fx + vz * fz;
       if (ahead > 0.5 && ahead < 9 && Math.abs(vx * fz - vz * fx) < 2) { blocked = true; break; }
+      if (entering && ahead > 0 && inBox(o.x, o.z)) { blocked = true; break; }
     }
     // Gridlock breaker: after waiting a while, nudge through.
     if (blocked) { nav.stuck += dt; if (nav.stuck > 2 && !nav.honked) { nav.honked = true; onHonk?.(car); } if (nav.stuck > 6) { nav.ignore = 2; nav.stuck = 0; } } else { nav.stuck = 0; nav.honked = false; }

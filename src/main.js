@@ -52,7 +52,7 @@ async function boot() {
   // ----- Cars: Tony's SUV, parked cars at the kerb, traffic -----
   const g_scenery = [];
   const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, 0x7a1626, 'suv');
-  const cars = [tonyCar, ...spawnTraffic(scene, 38, rand)];
+  const cars = [tonyCar, ...spawnTraffic(scene, 46, rand)];
   const parkedColors = [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0xd9342b, 0x8ecbff, 0xf08a3c, 0x7d5cff, 0x1d1d24];
   const parkedKinds = ['sedan', 'coupe', 'sedan', 'suv', 'coupe', 'van', 'pickup'];
   for (let n = 0; n < 44; n++) {
@@ -87,7 +87,7 @@ async function boot() {
     return blockCenter(i, j);
   };
   const peds = [];
-  for (let n = 0; n < 68; n++) peds.push(new Ped(scene, blockNear(places.home.spawn, 260), rand));
+  for (let n = 0; n < 90; n++) peds.push(new Ped(scene, blockNear(places.home.spawn, 220), rand));
 
   const tony = makeTony();
   scene.add(tony.group);
@@ -433,10 +433,10 @@ async function boot() {
     });
     // The crowd and the traffic keep to the part of the city the player is in: whoever is left far
     // behind turns up again on a block or a road ahead, out of sight.
-    const far = p.car ? 420 : 300;
+    const far = p.car ? 380 : 260;
     if (!p.inside) for (let k = 0; k < 2; k++) {
       const ped = peds[(streamIndex++) % peds.length];
-      if (!ped.dead && !ped.npc && ped.flight <= 0 && Math.hypot(ped.pos.x - p.pos.x, ped.pos.z - p.pos.z) > far) ped.relocate(blockNear(p.pos, 240), rand);
+      if (!ped.dead && !ped.npc && ped.flight <= 0 && Math.hypot(ped.pos.x - p.pos.x, ped.pos.z - p.pos.z) > far) ped.relocate(blockNear(p.pos, 210), rand);
       const car = cars[(streamIndex * 7) % cars.length];
       if (car.nav && !car.mission && !car.ai && car !== p.car && !car.nav.goal && Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) > far + 60) {
         const c = blockNear(p.pos, 260), i = Math.round((c.x - CELL / 2 - nodeX(0)) / CELL), j = Math.round((c.z - CELL / 2 - nodeZ(0)) / CELL);

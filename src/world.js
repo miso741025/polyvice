@@ -501,6 +501,19 @@ export function buildWorld(scene) {
       sign(name.split(''), x + 0.58, sy, fzz, Math.PI / 2, { w: 1.5, h: name.length * 1.5, color: neon, bg: '#1a1024', size: 0.82, also: [[x - 0.58, sy, fzz, -Math.PI / 2]] });
       halo(x, fy + fh - 2, fzz + fz * 1.4, hexOf(neon), 10);
     }
+    if (!office && floors >= 3 && rand() < 0.4) { // a fire escape zig-zagging down a side wall
+      const side = fx ? -fx : (rand() < 0.5 ? -1 : 1), onX = !!fx || rand() < 0.5;
+      const ex = onX ? x + side * (w / 2 + 0.6) : x + (rand() - 0.5) * (w - 8), ez = onX ? z + (rand() - 0.5) * (d - 8) : z + (fz ? -fz : side) * (d / 2 + 0.6);
+      const dir = onX ? side : (fz ? -fz : side);
+      for (let f = 1; f <= floors; f++) {
+        const py = CURB + base + f * FLOOR - 0.6;
+        slab(0x2a2a30, onX ? 1.1 : 4.4, 0.08, onX ? 4.4 : 1.1, ex, py, ez);                                   // platform
+        slab(0x2a2a30, onX ? 0.05 : 4.4, 0.9, onX ? 4.4 : 0.05, ex + (onX ? dir * 0.5 : 0), py + 0.08, ez + (onX ? 0 : dir * 0.5)); // rail
+        for (let k = 0; k < 7; k++) post(0x2a2a30, 0.02, 0.9, ex + (onX ? dir * 0.5 : -2 + k * 0.7), py + 0.08, ez + (onX ? -2 + k * 0.7 : dir * 0.5), 4);
+        if (f < floors) put(M.plain, new THREE.BoxGeometry(onX ? 0.7 : 3.6, 0.06, onX ? 3.6 : 0.7).rotateX(onX ? (f % 2 ? 0.75 : -0.75) : 0).rotateZ(onX ? 0 : (f % 2 ? 0.75 : -0.75)).translate(ex, py + FLOOR / 2, ez), 0x2a2a30); // stair
+      }
+      for (const s of [-1, 1]) post(0x2a2a30, 0.03, floors * FLOOR - 0.6, ex + (onX ? dir * 0.5 : s * 2.1), CURB + base + FLOOR - 0.6, ez + (onX ? s * 2.1 : dir * 0.5), 4);
+    }
     if (top > 30 && rand() < 0.3) { // rooftop billboard
       const ad = pick([['FLASH FM', '80s HITS ALL NIGHT'], ['VICE COLA', 'ICE COLD'], ['OCEAN VIEW', 'CONDOS FROM $49,000'], ['SUNSHINE AUTOS', 'DRIVE IT HOME TODAY'], ['PIZZA BY THE SLICE', 'OPEN LATE']]);
       const bz = z + (fz || 1) * (d / 2 - 1), turn = facing(0, fz || 1);

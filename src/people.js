@@ -900,7 +900,7 @@ export const LOOKS = {
     face: { jaw: 0.3, cheeks: 1.4, chin: 1.6, neck: 0.35, nose: 0.3, jowls: 1.2, width: 0.05 }, age: 0.45, stubble: 0.35, skin: [1, 0.94, 0.86],
   },
   tony: { // a bull: thick neck, heavy brow and jowls, the hairline going at the temples, a bowling shirt over slacks
-    pattern: 'blocks', shirt: 0x171c44, pants: 0x15151b, hair: 0x2a1c14, hairStyle: 'receding', hairMesh: 'buzzed', hairScale: [1.02, 1.0, 0.94], hairShift: [0, 0.004, -0.012],
+    pattern: 'blocks', shirt: 0x171c44, open: 0xf4f4f4, chain: true, pants: 0x15151b, hair: 0x2a1c14, hairStyle: 'receding', hairMesh: 'buzzed', hairScale: [1.02, 1.0, 0.94], hairShift: [0, 0.004, -0.012],
     bulk: 1.4, belly: 0.01, height: 1.05, head: 1.12, watch: true,
     face: { jaw: 0.26, cheeks: 1.1, chin: 1.3, neck: 0.32, nose: 0.5, jowls: 1, brow: 0.6, width: 0.04 }, age: 0.55, stubble: 0.4, skin: [1, 0.95, 0.88],
   },
