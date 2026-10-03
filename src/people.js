@@ -898,6 +898,16 @@ export const LOOKS = {
   eddie: { shirt: 0xf2c230, tee: true, pants: 0x2b2b3a, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'buzzed', dark: true, bulk: 0.95, goatee: 0x141110 },
   perrilyn: { body: 'female', dark: true, shirt: 0x8fe0d4, pants: 0xf5f0e6, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'long', age: 0.3 },
   fanny: { body: 'female', jacket: 0xf7a8c4, shirt: 0xf5f0e6, pants: 0x6f6f7a, tucked: true, hair: 0xdcdad4, hairMesh: 'parted', hairShift: [0, -0.045, 0.004], hairScale: [1.04, 1.02, 1.06], bulk: 1.05, height: 0.9, age: 1, glasses: 'clear', brows: 0xb9b6b0 },
+  // Episode three.
+  shlomo: { jacket: 0x16161c, shirt: 0xf4f4f4, tucked: true, pants: 0x16161c, hair: 0x9a9690, hairStyle: 'balding', beard: 0xd6d3cc, beardMesh: true, glasses: 'clear', brows: 0x9a9690, bulk: 1.1, age: 0.9, face: { nose: 0.7, cheeks: -0.2 } },
+  ariel: { jacket: 0x16161c, shirt: 0xf4f4f4, tucked: true, pants: 0x16161c, hair: 0x1c1410, hairMesh: 'parted', beard: 0x2a1c14, beardMesh: true, glasses: 'clear', bulk: 0.9, face: { cheeks: -0.5, nose: 0.6 } },
+  mikey: { jacket: 0x2a2a34, shirt: 0xf4f4f4, tie: 0x6a1c2c, tucked: true, pants: 0x2a2a34, hair: 0x120e0c, hairMesh: 'parted', hairScale: [1.02, 0.94, 1.04], bulk: 0.95, face: { cheeks: -0.4, nose: 0.3, jaw: 0.04 }, age: 0.3 },
+  rosalie: { body: 'female', jacket: 0x3d2a3a, shirt: 0xf1ede4, pants: 0x3d2a3a, tucked: true, hair: 0x2a1a14, hairMesh: 'long', age: 0.5 },
+  charmaine: { body: 'female', shirt: 0xffffff, sleeves: 'long', tucked: true, pants: 0x23232b, hair: 0x1c1410, hairMesh: 'long', hairScale: [1, 0.9, 1], age: 0.3 },
+  hunter: { body: 'female', shirt: 0xff8a5c, tee: true, pants: 0x3b6ea8, shoes: 0xf2efe8, hair: 0xd9b25a, hairMesh: 'long', height: 0.94 },
+  dealer: { shirt: 0x2b2b3a, tee: true, jacket: 0x8a1c1c, pants: 0x23232b, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'buzzed', dark: true, glasses: 'shades', bulk: 1.05, goatee: 0x141110 },
+  priest: { shirt: 0x16161c, sleeves: 'long', tucked: true, pants: 0x16161c, hair: 0x3a2a1c, hairStyle: 'receding', bulk: 1.05, age: 0.4, face: { cheeks: 0.4 } },
+  dancer: { body: 'female', shirt: 0xff5fd2, tee: true, pants: 0xffffff, shoes: 0xf2efe8, hair: 0xd9b25a, hairMesh: 'long' },
   cop: { shirt: 0x24324c, sleeves: 'long', tucked: true, badge: true, pants: 0x1c2740, hair: 0x2b1b12, hairMesh: 'buzzed', glasses: 'shades', bulk: 1.08, stubble: 0.3 },
   mahaffey: { jacket: 0x8d8a8e, shirt: 0xf4f4f4, tie: 0xa3201c, tucked: true, pants: 0x8d8a8e, hair: 0x7a3b1a, hairStyle: 'receding', glasses: 'clear', bulk: 1.12, age: 0.5, face: { cheeks: 0.6, chin: 0.7 } },
 };

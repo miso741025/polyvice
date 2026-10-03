@@ -9,6 +9,7 @@ import { makeLook, makeHuman, randomPedLook, Car, roam } from './entities.js';
 const TONY = 'Tony', MELFI = 'Dr. Melfi', CHRIS = 'Christopher', DEBTOR = 'Mahaffey', CARMELA = 'Carmela', AJ = 'AJ';
 const JUNIOR = 'Uncle Junior', LIVIA = 'Livia', ARTIE = 'Artie', SILVIO = 'Silvio', PUSSY = 'Big Pussy', HESH = 'Hesh', KOLAR = 'Emil Kolar';
 const PAULIE = 'Paulie', BRENDAN = 'Brendan', JACKIE = 'Jackie Aprile', GEORGIE = 'Georgie', MILLER = 'Mr. Miller';
+const ROSALIE = 'Rosalie', MEADOW = 'Meadow', HUNTER = 'Hunter', MIKEY = 'Mikey Palmice', SHLOMO = 'Shlomo', ARIEL = 'Ariel', PHIL = 'Father Phil', CHARMAINE = 'Charmaine';
 const NORTH = Math.PI, SOUTH = 0, EAST = Math.PI / 2, WEST = -Math.PI / 2;
 
 // ---------- Saving: the number of the next mission, and the money ----------
@@ -333,6 +334,31 @@ async function bingRoom(g, cam, arrange, play) {
   g.setNight(night);
 }
 
+// A scene in a room other than the Bing (the hospital ward): the room gives its own camera.
+async function roomScene(g, room, arrange, play) {
+  const p = g.player, night = g.night;
+  p.locked = true;
+  await fade(g, 1, 1);
+  if (p.car) p.car.speed = 0;
+  p.hidden = true;
+  g.setNight(0);
+  const cast = arrange(room);
+  g.cam.fixed = room.cam;
+  await fade(g, 0, 1);
+  await play(cast);
+  await fade(g, 1, 1);
+  dismiss(g, ...Object.values(cast));
+  g.cam.fixed = null;
+  p.hidden = false;
+  g.setNight(night);
+}
+// Someone lying in a bed: the fall of the death clip, played through to its last frame.
+function lying(g, look, at, heading) {
+  const a = actor(g, look, at, heading, 'down');
+  a.mixer.update(4);
+  return a;
+}
+
 // Put Tony back at home in his own body, by day, with his car in the drive. The screen should be black.
 function homeAsTony(g, tony) {
   const { home } = g.places, p = g.player;
@@ -349,6 +375,7 @@ function homeAsTony(g, tony) {
 const EPISODES = [
   { name: 'Episode One', missions: [theDucks, collections, familyBusiness, greenGrove, garbage, insurance, secondOpinion, theParty] },
   { name: 'Episode Two', title: '46 Long', missions: [backRoom, hijack, sitDown, millersCar, kitchenFire, fortySixLong, closingTime] },
+  { name: 'Episode Three', title: 'Denial, Anger, Acceptance', missions: [visitingHours, studyAid, patience, theMotel, denial, theBenefit, acceptance] },
 ];
 
 export async function runStory(g) {
@@ -1767,4 +1794,541 @@ async function closingTime(g) {
   await fade(g, 0, 1.2);
   p.locked = false;
   await passed(g, 'Episode two complete', 3000);
+}
+
+// ==================== Episode three: Denial, Anger, Acceptance ====================
+
+// ---------- 1. Visiting Hours ----------
+// Jackie Aprile is in Vice General. He asks for one thing: to be made to laugh.
+
+async function visitingHours(g) {
+  const { hospital, bing, wardRoom } = g.places, p = g.player;
+
+  g.hud.card('Visiting Hours', 'Vice General Hospital');
+  await phone(g, SILVIO, "Tone. Jackie's back in Vice General. He's asking for you.");
+  g.hud.card();
+  await reach(g, hospital.kerb, 'Drive to the <b>hospital</b>.');
+
+  await roomScene(g, wardRoom, room => ({
+    jackie: lying(g, 'jackie', room.bed, EAST),
+    rosalie: actor(g, 'rosalie', room.chair, NORTH, 'sit'),
+    tony: actor(g, 'tony', spot(room.bed, 0.4, 1.6), NORTH),
+  }), async cast => {
+    await talk(g, [
+      [ROSALIE, "He's been asking since this morning. Twenty minutes, the nurse says. Then he sleeps.", cast.rosalie],
+      [JACKIE, 'Tony. Look at this. Tubes. I got a tube for everything.'],
+      [TONY, 'You look good. Better than Silvio.', cast.tony],
+      [JACKIE, "Don't. ...They talk about me like I'm a photograph already. Junior's out there measuring the chair."],
+      [TONY, "Nobody's measuring anything. You get well.", cast.tony],
+      [JACKIE, 'Do me a favour. Make me laugh. One time, before this is over.'],
+    ]);
+  });
+  place(g, spot(hospital.door, 0, -2), SOUTH, hospital.kerb);
+  await fade(g, 0, 1);
+  await say(g, TONY, "Make him laugh. ...Sil's got a girl at the Bing who could make a bishop laugh.");
+  p.locked = false;
+  await reach(g, bing.door, 'Go to the <b>Bada Bing</b>.', { r: 4 });
+
+  p.locked = true;
+  let sil, girl;
+  await cut(g, () => {
+    place(g, bing.door, NORTH, bing.park);
+    sil = actor(g, 'silvio', spot(bing.door, -1.6, -2.4), SOUTH);
+    girl = actor(g, 'dancer', spot(bing.door, 1.2, -2.6), SOUTH);
+    frame(g, p.pos, spot(bing.door, 0, -2.5), { dist: 4.8 });
+  });
+  await talk(g, [
+    [TONY, "Sil. Jackie wants a laugh. Lend me Tiffany for an hour. We'll get her a nurse's outfit.", p],
+    [SILVIO, "A nurse. In a cancer ward. Tone, I love it.", sil],
+    ['Tiffany', "Do I have to touch anything medical?", girl],
+    [TONY, 'Only the chart.', p],
+  ]);
+  g.cam.fixed = null;
+  dismiss(g, sil);
+  const nurse = follower(g, girl);
+  p.locked = false;
+  g.hud.objective('Get in the <b>car</b> with Tiffany.');
+  await g.until(() => p.car);
+  await reach(g, hospital.kerb, 'Drive her to the <b>hospital</b>.', { how: 'car' });
+  await reach(g, spot(hospital.door, 0, -2), "Take her in to <b>Jackie's room</b>.", { r: 2, how: 'foot' });
+  nurse.on = false;
+  dismiss(g, girl);
+
+  await roomScene(g, wardRoom, room => ({
+    jackie: lying(g, 'jackie', room.bed, EAST),
+    tiffany: actor(g, 'dancer', spot(room.bed, 0, 1.1), NORTH),
+    paulie: actor(g, 'paulie', spot(room.bed, 2.6, 1.4), WEST),
+    silvio: actor(g, 'silvio', spot(room.bed, 3.4, 0.2), WEST),
+    tony: actor(g, 'tony', spot(room.bed, 1.4, 2.4), NORTH),
+  }), async cast => {
+    await say(g, '', "The 'nurse' took Jackie's temperature. Paulie read the chart upside down.");
+    await talk(g, [
+      [PAULIE, 'Nurse, I think the patient needs a sponge bath. Says so right here.', cast.paulie],
+      ['Tiffany', 'It says nothing of the kind.', cast.tiffany],
+      [JACKIE, 'Get out. Get out, all of you, before Ro comes back and kills me herself.'],
+      [SILVIO, "He's laughing. Look at him. He's laughing.", cast.silvio],
+    ]);
+    await say(g, '', 'For four minutes, nobody in the room was dying.');
+  });
+  place(g, spot(hospital.door, 0, -2), SOUTH);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 2. Study Aid ----------
+// Played as Christopher. Meadow and Hunter need to stay awake for the SATs, and he knows a man on the beach.
+
+async function studyAid(g) {
+  const { bing, pier, school } = g.places, p = g.player, tony = p.human;
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'Meadow and her friend Hunter had the SATs on Saturday and three days to learn a year of chemistry.');
+  if (p.car) g.leaveCar();
+  const chris = makeLook('christopher');
+  g.setPlayer(chris);
+  const ride = g.spawnCar(bing.park.x, bing.park.z, bing.park.h, 0x1d1d24, 'coupe');
+  place(g, bing.door, SOUTH);
+  const meadow = actor(g, 'meadow', spot(bing.door, -1, 2.6), NORTH), hunter = actor(g, 'hunter', spot(bing.door, 0.8, 2.8), NORTH);
+  frame(g, p.pos, spot(bing.door, 0, 2.7), { dist: 4.6 });
+  g.hud.fade(0, 1.2);
+  await titleCard(g, 'Study Aid', 'The Bada Bing, after school');
+  await talk(g, [
+    [MEADOW, "Christopher. We need something to stay awake. Not coffee. You know what I mean.", meadow],
+    [CHRIS, 'Are you out of your mind? Your father would bury me under the pool.', p],
+    [HUNTER, "Fine. We get it from some guy on the beach instead. He'd like that better?", hunter],
+    [CHRIS, '...Go home. Both of you. Study.', p],
+  ]);
+  await cut(g, () => { dismiss(g, meadow, hunter); g.cam.fixed = null; });
+  await say(g, '', 'He went to the beach instead.');
+  p.locked = false;
+  await reach(g, pier.start, 'Drive to the <b>pier</b>; the man is called Rico.', { r: 7 });
+
+  p.locked = true;
+  let rico;
+  const thug = (at, h) => { const a = makeHuman(randomPedLook()); a.group.position.set(at.x, groundAt(at.x, at.z), at.z); a.group.rotation.y = h; g.track(a.group); return a; };
+  const muscle = [thug(spot(pier.start, -5, -5), SOUTH), thug(spot(pier.start, -4, 6), NORTH)];
+  await cut(g, () => {
+    place(g, spot(pier.start, -2, 0), WEST, { x: pier.start.x - 10, z: pier.start.z + 6, h: EAST });
+    rico = actor(g, 'dealer', spot(pier.start, -6, 0), EAST);
+    frame(g, p.pos, rico.group.position, { dist: 4.6 });
+  });
+  await talk(g, [
+    ['Rico', "The Bing guy. Crank's eighty a bag, and the bag's small.", rico],
+    [CHRIS, "Here's forty. It's for kids with a test.", p],
+    ['Rico', "Here's nothing. And for forty, my boys take the forty.", rico],
+  ]);
+  const crew = [g.makeEnemy(rico, { health: 90, damage: 9, cash: 150 }), ...muscle.map(m => g.makeEnemy(m, { health: 50, damage: 6, cash: 30 }))];
+  fistsOnly(g, true);
+  g.cam.fixed = null;
+  p.locked = false;
+  g.hud.objective("<b>Rico and his boys</b> want your money. Change their minds.");
+  await allDown(g, crew);
+  g.hud.objective();
+  fistsOnly(g, false);
+  await reach(g, rico.group.position, 'Take the <b>bag</b> off Rico.', { r: 1.4, how: 'foot' });
+  p.locked = true;
+  p.human.play('pickup', 'idle');
+  await g.wait(1);
+  g.pardon();
+  p.locked = false;
+  await reach(g, school.gate, 'Bring it to <b>Verbum Dei</b>. Meadow is waiting in the lot.', { r: 6 });
+
+  p.locked = true;
+  let m2, h2;
+  await cut(g, () => {
+    dismiss(g, rico, ...muscle);
+    place(g, spot(school.lot, -2, 2), WEST, school.gate);
+    m2 = actor(g, 'meadow', spot(school.lot, -4.6, 1.6), EAST); h2 = actor(g, 'hunter', spot(school.lot, -5, 3.2), EAST);
+    frame(g, p.pos, m2.group.position, { dist: 4.4 });
+  });
+  await talk(g, [
+    [CHRIS, "One each. One. You feel funny, you call me. You never, ever tell your father.", p],
+    [MEADOW, 'Thanks, Chris. Really.', m2],
+    [HUNTER, "What's it like? Does it make you smart?", h2],
+    [CHRIS, "It makes you awake. Smart you have to bring yourself.", p],
+  ]);
+  await fade(g, 1, 1);
+  await say(g, '', 'They scored 1,230 and 1,210. Tony framed the letter. Nobody told him how.');
+  dismiss(g, m2, h2);
+  homeAsTony(g, tony);
+  g.removeCar(ride);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 3. Patience ----------
+// Junior has run out of it. In the park, Tony trades Brendan's life for Christopher's.
+
+async function patience(g) {
+  const { park, bing } = g.places, p = g.player;
+  let junior, mikey, chris, brendan;
+
+  await g.wait(1);
+  g.hud.card('Patience', 'The park');
+  await phone(g, JUNIOR, 'The park. Now. Bring nobody.');
+  g.hud.card();
+  await reach(g, park.kerb, 'Meet Uncle Junior in the <b>park</b>.');
+
+  p.locked = true;
+  await cut(g, () => {
+    place(g, spot(park.bench, 2.2, 1.4), WEST, park.kerb);
+    junior = actor(g, 'junior', spot(park.bench, 0, 0.2), SOUTH, 'sit');
+    mikey = actor(g, 'mikey', spot(park.bench, -2.4, 1.2), EAST);
+    shot(g, spot(park.bench, 0.6, 5.2), spot(park.bench, 0, 0.6), 1.6, 1.1);
+  });
+  await talk(g, [
+    [JUNIOR, 'Your nephew and his friend. Comley, again. After the sit-down. After Jackie ruled on it.'],
+    [TONY, "I'll handle Christopher.", p],
+    [JUNIOR, 'You handled him last time. Mikey handles things so they stay handled.'],
+    [MIKEY, 'Both of them, Junior says.', mikey],
+    [TONY, "Not Christopher. You want an example, make it Filone. Christopher I'll make understand myself.", p],
+    [JUNIOR, '...Filone, then. And your nephew gets a lesson he remembers.'],
+    [TONY, "He'll remember.", p],
+  ]);
+  await say(g, '', 'Tony drove away knowing exactly what he had agreed to.');
+  await cut(g, () => { dismiss(g, junior, mikey); g.cam.fixed = null; });
+  p.locked = false;
+  await reach(g, bing.door, 'Find Christopher and Brendan at the <b>Bada Bing</b>.', { r: 4 });
+
+  p.locked = true;
+  await cut(g, () => {
+    place(g, bing.door, NORTH, bing.park);
+    chris = actor(g, 'christopher', spot(bing.door, -1, -2.2), SOUTH);
+    brendan = actor(g, 'brendan', spot(bing.door, 1.4, -2.4), SOUTH, 'talk');
+    frame(g, p.pos, spot(bing.door, 0, -2.3), { dist: 5 });
+  });
+  await talk(g, [
+    [TONY, "Lay low. Both of you. Nobody goes near Comley, nobody goes near my uncle's people. You don't exist for a month.", p],
+    [BRENDAN, "Junior's an old man with a hat. What's he gonna—", brendan],
+  ]);
+  await punch(g, p, brendan);
+  await talk(g, [
+    [TONY, "You've been warned. That's more than you'll get from them.", p],
+    [CHRIS, 'T. What did he say? What did Junior say?', chris],
+    [TONY, 'Lay low.', p],
+  ]);
+  await cut(g, () => { dismiss(g, chris, brendan); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 4. The Motel ----------
+// Shlomo Teittleman's son-in-law will not grant a divorce without half the motel. Tony takes the job.
+
+async function theMotel(g) {
+  const { satriale, motel } = g.places, p = g.player, t = satriale.table;
+  let shlomo, ariel, paulie, silvio;
+
+  await g.wait(1);
+  g.hud.card('The Motel', "Satriale's");
+  await phone(g, SILVIO, "There's a man here with a hat and a problem. Says Hesh sent him. Says he pays.");
+  g.hud.card();
+  await reach(g, satriale.kerb, "Meet the man at <b>Satriale's</b>.");
+
+  p.locked = true;
+  await cut(g, () => {
+    place(g, spot(t, -1.5, 2.1), NORTH, satriale.kerb);
+    p.heading = toward(p.pos, t);
+    shlomo = actor(g, 'shlomo', spot(t, 0.95, 0), WEST, 'sit');
+    shot(g, spot(t, 2.8, 4.6), spot(t, -0.3, 0.5), 1.6, 1.1);
+  });
+  await talk(g, [
+    [SHLOMO, 'My daughter wants a divorce. In our faith the husband must grant it, and he will not. He says: half the motel, or she stays married.', shlomo],
+    [TONY, "And you'd like someone to explain the situation to him.", p],
+    [SHLOMO, "Twenty-five thousand. He is at the motel every evening, he counts the towels.", shlomo],
+    [TONY, "Twenty-five. Done. Go home, Mr. Teittleman.", p],
+  ]);
+  await cut(g, () => {
+    dismiss(g, shlomo);
+    paulie = actor(g, 'paulie', spot(t, -3, 3.4), EAST); silvio = actor(g, 'silvio', spot(t, 3, 3.6), WEST);
+    g.cam.fixed = null;
+  });
+  const a = follower(g, paulie), b = follower(g, silvio, { lead: a });
+  p.locked = false;
+  g.hud.objective('Get in the <b>car</b> with Paulie and Silvio.');
+  await g.until(() => p.car);
+  await reach(g, motel.kerb, 'Drive to the <b>Teittleman Motor Lodge</b>.', { how: 'car' });
+  await reach(g, motel.office, 'Find Ariel at the <b>office</b>.', { r: 2.2, how: 'foot' });
+
+  p.locked = true;
+  const thug = (at, h) => { const m = makeHuman(randomPedLook()); m.group.position.set(at.x, groundAt(at.x, at.z), at.z); m.group.rotation.y = h; g.track(m.group); return m; };
+  const helpers = [thug(spot(motel.court, 4, -4), SOUTH), thug(spot(motel.court, 6, 3), WEST)];
+  await cut(g, () => {
+    place(g, spot(motel.office, 2.2, 0), WEST);
+    ariel = actor(g, 'ariel', motel.office, EAST);
+    a.stay = b.stay = true;
+    frame(g, p.pos, ariel.group.position, { dist: 4.4 });
+  });
+  await talk(g, [
+    [ARIEL, "You're the ones Shlomo sent. I know what you are.", ariel],
+    [TONY, 'Then you know how this ends. Sign the paper.', p],
+    [ARIEL, "At Masada, nine hundred Jews held off the Roman army for two years and chose death over surrender. You're the Romans.", ariel],
+    [TONY, "Then we'll do this the Roman way.", p],
+  ]);
+  const fight = [g.makeEnemy(ariel, { health: 140, damage: 9, cash: 0 }), ...helpers.map(h => g.makeEnemy(h, { health: 50, damage: 6, cash: 25 }))];
+  fight[0].die = () => { fight[0].health = 1; fight[0].human.after = null; fight[0].human.set('down'); fight[0].ai = null; fight[0].stays = true; };
+  fistsOnly(g, true);
+  g.cam.fixed = null; a.stay = b.stay = false;
+  p.locked = false;
+  g.hud.objective('<b>Beat it into him.</b> He has help.');
+  await g.until(() => fight[0].ai === null && fight.slice(1).every(n => n.dead));
+  g.hud.objective();
+  fistsOnly(g, false);
+  g.removeNpc(ariel);
+  p.locked = true;
+  approach(g, ariel, 1.6);
+  frame(g, p.pos, ariel.group.position, { dist: 4.2, height: 1.4, lift: 0.7 });
+  await talk(g, [
+    [ARIEL, "Do what you want. I don't sign. I don't sign!", ariel],
+    [TONY, "Sil. Call Hesh. Ask him what they take off a man who won't give his wife a divorce.", p],
+  ]);
+  await phone(g, HESH, 'In my experience, Anthony? Everything below the belt. The paper starts to look reasonable after that.');
+  await talk(g, [
+    [TONY, 'Paulie. The bolt cutters are in the trunk.', p],
+    [ARIEL, '...Wait. Wait! Give me the paper. Give me the paper.', ariel],
+  ]);
+  await fade(g, 1, 1);
+  await say(g, '', 'Ariel signed. Shlomo got his daughter back. Tony, who had been promised twenty-five thousand, took twenty-five per cent of the motel instead.');
+  await phone(g, SHLOMO, 'A golem I made. A Frankenstein.');
+  await say(g, TONY, 'Enjoy the seventy-five per cent, Mr. Teittleman.');
+  a.on = b.on = false;
+  dismiss(g, ariel, paulie, silvio, ...helpers);
+  g.pardon();
+  g.cam.fixed = null;
+  place(g, spot(motel.court, 0, 6), SOUTH);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, '25% of a motel', 6000);
+}
+
+// ---------- 5. Denial ----------
+// Dr. Melfi names the stages. Jackie is worse. On the way to the car, a stranger finds out which stage Tony is in.
+
+async function denial(g) {
+  const { melfi, hospital, wardRoom } = g.places, p = g.player;
+
+  await g.wait(1);
+  await therapy(g, [
+    [MELFI, 'Your friend is dying.'],
+    [TONY, "He's got the best doctors in the state. He's a strong guy."],
+    [MELFI, 'When someone we care about is dying, we pass through stages. Denial. Anger. Bargaining. Depression. And then, if we are lucky, acceptance.'],
+    [TONY, "I'm not on a stage. I'm in a chair."],
+    [MELFI, 'Which one would you say you are in?'],
+    [TONY, "...Same time next week."],
+  ]);
+  place(g, melfi.door, 0);
+  g.tonyCar.pos.set(melfi.kerb.x, 0, melfi.kerb.z); g.tonyCar.heading = melfi.kerb.h; g.tonyCar.speed = 0;
+  g.cam.yaw = Math.PI * 0.75;
+  await fade(g, 0, 1);
+  g.hud.card('Denial', 'Vice General Hospital');
+  p.locked = false;
+  await g.wait(2.5);
+  g.hud.card();
+  await reach(g, hospital.kerb, 'Drive to the <b>hospital</b>.');
+
+  await roomScene(g, wardRoom, room => ({
+    jackie: lying(g, 'jackie', room.bed, EAST),
+    rosalie: actor(g, 'rosalie', room.chair, NORTH, 'sit'),
+    tony: actor(g, 'tony', spot(room.bed, 0.4, 1.6), NORTH),
+  }), async cast => {
+    await talk(g, [
+      [JACKIE, 'Tony. You hear what Junior is doing. With your nephew.'],
+      [TONY, 'I hear everything, Jackie. Rest.', cast.tony],
+      [JACKIE, "When I'm gone. Don't let it be a war. Promise me that."],
+      [TONY, "You're not going anywhere.", cast.tony],
+      [ROSALIE, 'He needs to sleep now, Tony.', cast.rosalie],
+      [JACKIE, 'Promise me.'],
+    ]);
+    await say(g, '', 'Tony did not promise. He straightened the blanket and left.');
+  });
+  place(g, spot(hospital.door, 0, -2), SOUTH, hospital.kerb);
+  const stranger = makeHuman(randomPedLook());
+  stranger.group.position.set(hospital.door.x + 1.2, groundAt(hospital.door.x, hospital.door.z + 4), hospital.door.z + 4); stranger.group.rotation.y = NORTH;
+  g.track(stranger.group);
+  await fade(g, 0, 1);
+  await say(g, '', 'On the way to the car, a stranger told Tony to watch where he was walking.');
+  await talk(g, [['Stranger', "Hey. Watch it, fat man. You own the sidewalk?", stranger]]);
+  const mark = g.makeEnemy(stranger, { health: 80, damage: 8, cash: 60 });
+  fistsOnly(g, true);
+  p.locked = false;
+  g.hud.objective('<b>Anger.</b>');
+  await allDown(g, [mark]);
+  g.hud.objective();
+  fistsOnly(g, false);
+  g.pardon();
+  await say(g, TONY, "...Sorry. Sorry about that. Here, that's for the dry cleaning.");
+  await passed(g, 'Respect +');
+}
+
+// ---------- 6. The Benefit ----------
+// Carmela's fundraiser. Father Phil, the Buccos doing the food, and a thing Charmaine has carried for years.
+
+async function theBenefit(g) {
+  const { home } = g.places, p = g.player;
+  const cast = {};
+
+  await g.wait(1);
+  g.hud.card('The Benefit', 'The Soprano house');
+  await phone(g, CARMELA, "The benefit is tonight. The Buccos are doing the food, Father Phil is coming, and you are coming, Anthony. In a jacket.");
+  g.hud.card();
+  await reach(g, home.road, 'Drive <b>home</b>.');
+
+  p.locked = true;
+  await cut(g, () => {
+    place(g, home.drive, EAST, home.car);
+    const at = (dx, dz) => spot(home.patio, dx, dz);
+    cast.carmela = actor(g, 'carmela', at(2.2, 2.8), WEST);
+    cast.charmaine = actor(g, 'charmaine', at(4.2, 1.4), WEST);
+    cast.phil = actor(g, 'priest', at(-3, 4), EAST, 'talk');
+    cast.meadow = actor(g, 'meadow', at(-4.5, 5), WEST);
+    cast.aj = actor(g, 'aj', spot(home.pool, -1.4, 3.5), NORTH);
+    cast.artie = actor(g, 'artie', spot(home.drive, 3, -3), SOUTH);
+    cast.g1 = actor(g, 'hesh', at(-1, 7), EAST); cast.g2 = actor(g, 'rosalie', at(1, 7.4), WEST, 'talk');
+    g.cam.fixed = null;
+  });
+  p.locked = false;
+
+  await reach(g, cast.phil.group.position, 'Say hello to <b>Father Phil</b>.', { r: 1.7, how: 'foot' });
+  p.locked = true;
+  approach(g, cast.phil);
+  frame(g, p.pos, cast.phil.group.position, { dist: 4 });
+  await talk(g, [
+    [PHIL, "Tony. Carmela tells me you've been under a strain.", cast.phil],
+    [TONY, 'Carmela tells you a lot, Father.', p],
+    [PHIL, 'Only what she needs to. The ziti, by the way, is a religious experience.', cast.phil],
+    [TONY, "That's Artie's. Charmaine's. Enjoy it, Father.", p],
+  ]);
+  g.cam.fixed = null;
+  p.locked = false;
+
+  await reach(g, cast.artie.group.position, 'Give Artie a hand with the <b>wine</b>.', { r: 1.8, how: 'foot' });
+  p.locked = true;
+  approach(g, cast.artie);
+  p.human.play('pickup', 'idle');
+  await g.wait(1);
+  await talk(g, [
+    [ARTIE, "Charmaine's doing the whole thing with two cooks. We lost the staff when we lost the restaurant.", cast.artie],
+    [TONY, "You'll have a new place by spring. I'm telling you.", p],
+    [ARTIE, "From your mouth. Take that one to the patio, it's the good stuff.", cast.artie],
+  ]);
+  p.locked = false;
+  await reach(g, home.patio, 'Carry the case to the <b>patio</b>.', { r: 2, how: 'foot' });
+  p.locked = true;
+  p.human.play('pickup', 'idle');
+  await g.wait(0.8);
+
+  // Across the patio, Charmaine has had enough of being pointed at.
+  await cut(g, () => {
+    cast.carmela.group.position.set(home.patio.x + 1, groundAt(home.patio.x, home.patio.z), home.patio.z + 2.2); cast.carmela.group.rotation.y = EAST;
+    cast.charmaine.group.position.set(home.patio.x + 3.2, groundAt(home.patio.x, home.patio.z), home.patio.z + 2.2); cast.charmaine.group.rotation.y = WEST;
+    shot(g, spot(home.patio, 2.1, 5.8), spot(home.patio, 2.1, 2.2), 1.6, 1.3);
+  }, 0.5);
+  await talk(g, [
+    [CARMELA, 'Charmaine, the glasses go on the left, and could you tell your girl the ice—', cast.carmela],
+    [CHARMAINE, "You can stop pointing, Carmela. I know where the kitchen is. I've been in it.", cast.charmaine],
+    [CARMELA, "I didn't mean anything by—", cast.carmela],
+    [CHARMAINE, 'When you two were engaged, and you went to Florida with your mother? Tony and I spent a weekend. It was nothing. I just want you to stop looking at me like the help.', cast.charmaine],
+  ]);
+  await say(g, '', 'Carmela said nothing. She moved the glasses to the left herself.');
+  await cut(g, () => { g.cam.fixed = null; p.pos.set(home.drive.x, 0, home.drive.z); p.heading = EAST; g.cam.yaw = EAST; });
+  await phone(g, SILVIO, "Tone. It's tonight. Mikey's people picked up the kid an hour ago.");
+  await say(g, TONY, 'Both of them?');
+  await phone(g, SILVIO, 'Both.');
+  await say(g, TONY, "...I'm at a benefit for the pediatric wing. I don't know anything.");
+  await cut(g, () => { dismiss(g, ...Object.values(cast)); });
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 7. Acceptance ----------
+// Played as Christopher. Brendan does not come to the Bing. Mikey Palmice does. Then Meadow sings.
+
+async function acceptance(g) {
+  const { bing, marsh, school } = g.places, p = g.player, tony = p.human;
+  let mikey, goon;
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'That night Christopher waited for Brendan at the Bing. Brendan never came.');
+  if (p.car) g.leaveCar();
+  g.setNight(1);
+  const chris = makeLook('christopher');
+  g.setPlayer(chris);
+  place(g, bing.door, SOUTH);
+  mikey = actor(g, 'mikey', spot(bing.door, -1.2, 3.4), NORTH);
+  goon = actor(g, 'trucker', spot(bing.door, 1.6, 3.6), NORTH);
+  frame(g, p.pos, spot(bing.door, 0, 3.5), { dist: 4.6 });
+  g.hud.fade(0, 1.2);
+  await titleCard(g, 'Acceptance', 'The Bada Bing, late');
+  await talk(g, [
+    [MIKEY, "Christopher Moltisanti. Junior wants a word. Get in the car.", mikey],
+    [CHRIS, "Where's Brendan?", p],
+    [MIKEY, "Brendan's in the bath. Get in the car, or we do the word here.", mikey],
+  ]);
+  await fade(g, 1, 1.2);
+  await say(g, '', 'They drove west, out past the last road, where the city stops and the reeds start.');
+
+  // On his knees in the marsh.
+  dismiss(g, mikey, goon);
+  place(g, spot(marsh, 2, 0), WEST);
+  p.pose = 'crouch';
+  mikey = actor(g, 'mikey', spot(marsh, 3.8, 0.4), WEST); mikey.arm(true); mikey.set('aim');
+  goon = actor(g, 'trucker', spot(marsh, 0, -2.6), SOUTH);
+  shot(g, spot(marsh, -3, 3.4), spot(marsh, 2.6, 0.2), 1.5, 0.9);
+  await fade(g, 0, 1.2);
+  await talk(g, [
+    [MIKEY, "Brendan Filone is in his bathtub with a hole where his eye was. You're the lucky one, Moltisanti.", mikey],
+    [CHRIS, 'Please. Mikey. Please.', p],
+    [MIKEY, 'Junior says you get to live. Say thank you.', mikey],
+    [CHRIS, 'Thank you. Thank you.', p],
+  ]);
+  mikey.play('shoot', 'aim');
+  g.hud.flash('#ffffff', 0.15);
+  g.cam.sway = 1.2;
+  await g.wait(0.6);
+  g.cam.sway = 0;
+  await talk(g, [
+    [MIKEY, "That one was empty. The next one won't be. Comley is finished. You are finished. Walk home.", mikey],
+  ]);
+  await fade(g, 1, 1);
+  dismiss(g, mikey, goon);
+  p.pose = null;
+  g.cam.fixed = null; g.cam.yaw = EAST; p.heading = EAST;
+  await fade(g, 0, 1);
+  await say(g, CHRIS, "...Walk home. From here.");
+  p.locked = false;
+  await reach(g, bing.door, 'Get back to the <b>Bada Bing</b>. Find a car.', { r: 4 });
+
+  p.locked = true;
+  let tonyActor;
+  await cut(g, () => {
+    place(g, bing.door, NORTH, bing.park);
+    tonyActor = actor(g, 'tony', spot(bing.door, 0.8, -2.4), SOUTH);
+    frame(g, p.pos, tonyActor.group.position, { dist: 4.4 });
+  });
+  await talk(g, [
+    [TONY, "Brendan's dead. You're alive because I asked an old man for a favour, and I'll be paying for it the rest of my life.", tonyActor],
+    [CHRIS, "T. I didn't... they put a gun...", p],
+    [TONY, "Don't. ...Get inside. Have a drink. Tomorrow you start being somebody I can use.", tonyActor],
+  ]);
+  await fade(g, 1, 1.2);
+  dismiss(g, tonyActor);
+  homeAsTony(g, tony);
+  g.setNight(1);
+  await say(g, '', "Across town, at Verbum Dei, the choir was already on its second song.");
+  const choir = [spot(school.lot, -4, -3), spot(school.lot, -2, -3), spot(school.lot, 0, -3), spot(school.lot, 2, -3), spot(school.lot, 4, -3)].map((at, n) => actor(g, n === 2 ? 'meadow' : n % 2 ? 'hunter' : 'dancer', at, SOUTH, 'talk'));
+  place(g, spot(school.lot, 0, 6), NORTH);
+  shot(g, spot(school.lot, 3, 9), spot(school.lot, 0, -1), 1.7, 1.3);
+  await fade(g, 0, 1.2);
+  await say(g, '', "Meadow sang. Tony sat in the third row and did not hear a note.");
+  await say(g, '', 'Denial. Anger. Acceptance.');
+  await fade(g, 1, 1.5);
+  dismiss(g, ...choir);
+  homeAsTony(g, tony);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Episode three complete', 4000);
 }

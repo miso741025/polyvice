@@ -38,7 +38,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   const candidates = () => {
     const fx = Math.sin(g.cam.yaw), fz = Math.cos(g.cam.yaw), range = lockRange(), list = [];
     for (const t of targets()) {
-      if (t.dead || t.human === p.human) continue;
+      if (t.dead || t.human === p.human || t.human.state === 'down') continue;
       const dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z, d = Math.hypot(dx, dz);
       if (d > range || d < 0.3) continue;
       const ahead = (dx * fx + dz * fz) / d;
@@ -108,6 +108,8 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     if (!p.car && !p.dying) g.enterCar(car);
   };
   const targets = () => [...peds, ...g.npcs];
+  // Bystanders: hurting them is what the police mind. Enemies and scripted victims are the mission's business.
+  const innocent = t => !t.ai && !t.stays;
 
   // ----- Money on the ground -----
   g.dropCash = (x, z, amount) => {
@@ -121,7 +123,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
 
   // ----- Damage to the player -----
   g.damagePlayer = (dmg, from) => {
-    if (p.locked || p.hidden || p.dying || p.car) return;
+    if (p.locked || p.hidden || p.dying || p.car || g.time - p.hitAt < 0.35) return; // blows do not stack within a beat
     p.health = Math.max(0, p.health - dmg);
     p.hitAt = g.time;
     hud.flash('#ff2a3c', 0.35);
@@ -166,7 +168,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       g.scare = g.time;
       const from = muzzleOf(p.human, tmp).clone();
       const hit = lock ? (tracer(from, tmp.set(lock.pos.x, from.y, lock.pos.z)), lock) : fire(from, p.heading, p.human);
-      if (hit) { hit.hurt(PISTOL.dmg, p.pos); if (hit.dead) g.heat(2); else g.heat(1); } else g.heat(0.5);
+      if (hit) { hit.hurt(PISTOL.dmg, p.pos); if (innocent(hit)) g.heat(hit.dead ? 2 : 1); } else g.heat(0.5);
       for (const ped of peds) if (!ped.dead && Math.hypot(ped.pos.x - p.pos.x, ped.pos.z - p.pos.z) < 26) ped.flee(p.pos, 7);
     } else {
       if (g.time - lastHit < FIST.rate) return;
@@ -179,11 +181,11 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       const fx = Math.sin(p.heading), fz = Math.cos(p.heading);
       let victim = null, best = FIST.reach;
       for (const t of targets()) {
-        if (t.dead) continue;
+        if (t.dead || (t.human.state === 'down' && t !== lock)) continue;
         const dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z, d = Math.hypot(dx, dz);
         if (d < best && (dx * fx + dz * fz) / (d || 1) > 0.5) { best = d; victim = t; }
       }
-      if (victim) { victim.hurt(FIST.dmg, p.pos); g.heat(victim.dead ? 1.5 : 0.35); }
+      if (victim) { victim.hurt(FIST.dmg, p.pos); if (innocent(victim)) g.heat(victim.dead ? 1.5 : 0.35); }
     }
   };
   g.setWeapon = w => { if (!p.weapons[w]) return; p.weapon = w; p.human.arm(w === 'pistol'); hud.weapon(w); };
@@ -277,7 +279,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       else {
         face(); h.set('idle');
         if (g.time > npc.nextHit) {
-          npc.nextHit = g.time + 1.3;
+          npc.nextHit = g.time + 1.7 + Math.random() * 0.5;
           h.play(Math.random() < 0.5 ? 'jab' : 'cross', 'idle', 1.2);
           g.wait(0.22).then(() => { if (!npc.dead && Math.hypot(p.pos.x - npc.pos.x, p.pos.z - npc.pos.z) < 2.2) g.damagePlayer(npc.damage, npc.pos); }).catch(() => {});
         }
@@ -312,7 +314,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     if (lock) {
       const far = !near(lock.pos, p.pos, lockRange() * 1.3);
       const idle = !keys.Mouse2 && g.time - lastAttack > 3 && g.time - lockAt > 3;
-      if (lock.dead || far || idle || p.car || p.locked || p.hidden) { lock = null; if (keys.Mouse2 && !p.car) g.lockOn(); }
+      if (lock.dead || lock.human.state === 'down' || far || idle || p.car || p.locked || p.hidden) { lock = null; if (keys.Mouse2 && !p.car) g.lockOn(); }
     }
     if (lock) {
       faceLock();

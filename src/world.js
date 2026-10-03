@@ -12,7 +12,7 @@ const HOTELS = ['HOTEL', 'OCEAN', 'PALMS', 'DECO', 'VICE', 'CORAL', 'MIAMI'];
 const CURB = 0.14;                       // sidewalk height
 const FLOOR = 3.4, GROUND = 4.2, BAY = 4; // storey height, shopfront height, width of one window bay
 const SPECIAL = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
-  '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park' };
+  '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel' };
 const SUN = new THREE.Vector3(1250, 190, 420).normalize();
 
 // ---------- Textures, all drawn in code ----------
@@ -559,6 +559,8 @@ export function buildWorld(scene) {
     else if (kind === 'kolar') buildKolar(c);
     else if (kind === 'comley') buildComley(c);
     else if (kind === 'park') buildPark(c);
+    else if (kind === 'hospital') buildHospital(c);
+    else if (kind === 'motel') { buildMotel(c); lots(c, i, [1, 1]); }
     else if (kind === 'school') buildSchool(c);
     else if (kind === 'bodyshop') { buildBodyshop(c); lots(c, i, [1, -1]); }
     else if (kind === 'cafe') { buildCafe(c); lots(c, i, [-1, 1]); }
@@ -990,6 +992,51 @@ export function buildWorld(scene) {
     for (const [ox, oz] of [[-22, -20], [22, -22], [-20, 22], [20, 24], [0, -24], [-24, 0], [4, 22]]) palms.push({ x: c.x + ox, z: c.z + oz });
     for (const [ox, oz, hex] of [[-8, -16, 0xff5fd2], [8, 16, 0xffe066], [-16, 8, 0xff8a5c]]) { slab(0x5a3d2b, 5, 0.25, 2.4, c.x + ox, y, c.z + oz); for (let n = 0; n < 9; n++) ball(n % 3 ? hex : 0x2f7d46, 0.3, c.x + ox - 2 + (n % 5) * 1, y + 0.45, c.z + oz - 0.5 + (n % 2) * 1); }
     post(STEEL, 0.07, 2.4, c.x, y, c.z + 1.8, 6); slab(0x1f6b4a, 1.2, 0.8, 0.06, c.x, y + 1.6, c.z + 1.8); // the park notice
+    places.park ??= { bench: { x: c.x + 12, z: c.z + 10 }, kerb: { x: c.x + 34, z: c.z + 10, h: 0 }, pond: { x: px, z: pz } };
+  }
+
+  // ----- Vice General Hospital: a white block over a drive-through entrance -----
+  function buildHospital(c) {
+    const y = CURB, WHITE = 0xf4f4f0, top = y + FLOOR * 4;
+    flat(M.paint, 0xd8d0c4, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z);
+    put(M.office, walls(46, FLOOR * 4, 22, c.x, y, c.z - 14, 4), 0xe6fff8);
+    collide(c.x, c.z - 14, 46, 22, top);
+    roofKit(c.x, c.z - 14, 46, 22, top, WHITE, false);
+    for (let f = 1; f <= 4; f++) slab(WHITE, 46.8, 0.5, 22.8, c.x, y + f * FLOOR - 0.3, c.z - 14);
+    slab(WHITE, 18, 0.5, 10, c.x, y + 4.2, c.z + 2); for (const s of [-1, 1]) for (const pz of [-1.6, 5.4]) post(0xc9cbd2, 0.22, 4.2, c.x + s * 8, y, c.z + pz, 10); // the canopy
+    slab(0x1a242c, 6, 3.4, 0.2, c.x, y, c.z - 2.95); slab(0xc9cbd2, 0.08, 3.4, 0.24, c.x, y, c.z - 2.93);
+    sign(['VICE GENERAL', 'HOSPITAL'], c.x, y + 6.4, c.z - 2.8, 0, { w: 12, h: 2.6, color: '#2f56c8', bg: '#f4f4f0', size: 0.72, glow: false });
+    slab(0xd8342c, 2.6, 0.6, 0.1, c.x - 18, y + 7.8, c.z - 2.9); slab(0xf4f4f0, 0.6, 2.6, 0.1, c.x - 18, y + 6.8, c.z - 2.9); // the red cross
+    slab(0xd8342c, 0.6, 2.6, 0.12, c.x - 18, y + 6.8, c.z - 2.92); slab(0xf4f4f0, 2.6, 0.6, 0.14, c.x - 18, y + 7.8, c.z - 2.94);
+    flat(M.asphalt, 0xffffff, 40, 20, c.x, y + 0.07, c.z + 16, 5);
+    for (let k = -5; k <= 5; k++) flat(M.paint, 0xe9e6ee, 0.14, 5, c.x + k * 3.2, y + 0.1, c.z + 24);
+    sign('EMERGENCY', c.x + 14, y + 3.9, c.z + 7.1, 0, { w: 5, h: 1, color: '#f4f4f0', bg: '#d8342c', size: 0.8, glow: false });
+    const amb = new Car(scene, c.x - 14, c.z + 10, Math.PI / 2, 0xf4f4f0, 'suv'); collide(c.x - 14, c.z + 10, 5.2, 2.2, 2); void amb;
+    for (const [px, pz] of [[-24, 20], [24, 20], [-24, 4], [24, 4]]) palms.push({ x: c.x + px, z: c.z + pz });
+    places.hospital = { door: { x: c.x, z: c.z + 2 }, kerb: { x: c.x, z: c.z + 34, h: 0 } };
+  }
+
+  // ----- The Teittleman motel (south-east lot of its block): two floors of rooms round a forecourt -----
+  function buildMotel(c) {
+    const x = c.x + 13, z = c.z + 13, y = CURB, PINK = 0xffd3a1, TEAL = 0x1f9c8f;
+    flat(M.asphalt, 0xffffff, 26, 24, x, y + 0.05, z, 5);
+    // The L: a long wing along the back (north) and a short one down the west side.
+    slab(PINK, 24, 6.6, 6, x, y, z - 9, M.gravel, 3); collide(x, z - 9, 24, 6, y + 6.6);
+    slab(PINK, 6, 6.6, 12, x - 9, y, z, M.gravel, 3); collide(x - 9, z, 6, 12, y + 6.6);
+    slab(0x55525a, 24.6, 0.3, 6.6, x, y + 6.6, z - 9); slab(0x55525a, 6.6, 0.3, 12.6, x - 9, y + 6.6, z);
+    slab(TEAL, 24, 0.2, 1.6, x, y + 3.3, z - 5.2); for (let n = 0; n < 7; n++) post(0xc9cbd2, 0.05, 3.3, x - 11 + n * 3.6, y, z - 4.5, 6); // the walkway and its posts
+    slab(0xc9cbd2, 24, 0.05, 0.05, x, y + 4.3, z - 4.45);
+    for (let n = 0; n < 5; n++) for (const f of [0, 1]) { slab(0x3a2418, 1, 2.2, 0.12, x - 8 + n * 4, y + f * 3.3, z - 5.95); windowAt(x - 6.2 + n * 4, y + 1.4 + f * 3.3, z - 6, 1.2, 1.1, 0, 1, n % 2 === f); } // doors and windows
+    slab(0x3a2418, 1.2, 2.4, 0.12, x - 5.95, y, z + 3); sign('OFFICE', x - 5.9, y + 2.9, z + 3, Math.PI / 2, { w: 2, h: 0.6, color: '#16161c', bg: '#f4f4f0', size: 0.8, glow: false });
+    for (const s of [-1, 1]) post(0x1c1c22, 0.12, 7, x + 10 + s * 1.2, y, z + 10, 8);
+    slab(0x14080f, 4.2, 2.2, 0.4, x + 10, y + 7, z + 10);
+    sign(['TEITTLEMAN', 'MOTOR LODGE'], x + 10, y + 8.1, z + 10.22, 0, { w: 4, h: 2, color: '#ffe066', bg: '#14080f', size: 0.7, also: [[x + 10, y + 8.1, z + 9.78, Math.PI]] });
+    sign('VACANCY', x + 10, y + 6.2, z + 10.2, 0, { w: 3, h: 0.7, color: '#49e0d0', bg: '#14080f', size: 0.8, also: [[x + 10, y + 6.2, z + 9.8, Math.PI]] });
+    halo(x + 10, y + 7.5, z + 11, 0xffe066, 10);
+    put(M.plain, new THREE.CylinderGeometry(2.6, 2.6, 0.4, 16).translate(x + 4, y + 0.2, z + 4), 0xd8d0c4); put(M.glow, new THREE.CylinderGeometry(2.3, 2.3, 0.06, 16).translate(x + 4, y + 0.42, z + 4), 0x4fc4dc); collide(x + 4, z + 4, 5, 5, 0.6); // a small pool
+    for (const [lx, lz] of [[-1, 8], [9, -1]]) { slab(0xffffff, 0.75, 0.3, 2, x + lx, y + 0.05, z + lz); put(M.plain, new THREE.BoxGeometry(0.75, 0.08, 0.8).rotateX(-0.7).translate(x + lx, y + 0.62, z + lz - 1), 0xff8a5c); }
+    lamp(x, y + 3, z - 4.5, 0xffe2a6, 30, 16);
+    places.motel = { kerb: { x: x + 4, z: c.z + 34, h: Math.PI / 2 }, office: { x: x - 4.6, z: z + 3 }, court: { x: x + 1, z: z - 1 } };
   }
 
   // ----- Comley Trucking: a warehouse with loading docks over a yard -----
@@ -1182,6 +1229,26 @@ export function buildWorld(scene) {
   }
   buildHouseRoom();
 
+  // ----- A hospital room: the bed, the drip, the monitor, a chair by the window -----
+  function buildWardRoom() {
+    const X = 2920, Y = -0.1, Z = 0, WHITE = 0xf4f4f0;
+    interiors.push({ minX: X - 5.7, maxX: X + 5.7, minZ: Z - 4.7, maxZ: Z + 4.7 });
+    slab(0xd8e2e6, 12, 0.2, 10, X, Y - 0.2, Z, M.paver, 2);
+    slab(WHITE, 12, 0.2, 10, X, Y + 3.2, Z);
+    for (const s of [-1, 1]) { slab(0xc9d8dc, 12, 3.4, 0.3, X, Y, Z + s * 5.15); slab(0xc9d8dc, 0.3, 3.4, 10, X + s * 6.15, Y, Z); }
+    slab(0xc9cbd2, 2.1, 0.55, 0.9, X - 2.5, Y, Z - 2.6); slab(0xf4f4f0, 2.2, 0.35, 1, X - 2.5, Y + 0.55, Z - 2.6); // the bed
+    slab(0x9fd0f5, 2.1, 0.12, 0.98, X - 2.5, Y + 0.9, Z - 2.6); slab(0xffffff, 0.5, 0.14, 0.5, X - 3.2, Y + 0.9, Z - 2.6); // the blanket, the pillow
+    slab(0xc9cbd2, 0.08, 0.9, 1, X - 3.58, Y + 0.35, Z - 2.6); collide(X - 2.5, Z - 2.6, 2.2, 1, 1.2);
+    post(0xc9cbd2, 0.03, 1.9, X - 1, Y, Z - 3.6, 6); slab(0xd6ecf5, 0.18, 0.3, 0.1, X - 1, Y + 1.7, Z - 3.6, M.glow); // the drip
+    slab(0x1c1c22, 0.6, 0.5, 0.4, X - 4.4, Y + 1.1, Z - 3.6); slab(0x4fc4dc, 0.5, 0.35, 0.03, X - 4.4, Y + 1.18, Z - 3.38, M.glow); post(0xc9cbd2, 0.04, 1.1, X - 4.4, Y, Z - 3.6, 6); // the monitor
+    slab(0xb9a58a, 0.6, 0.5, 0.6, X + 1.4, Y, Z - 3.4); slab(0xb9a58a, 0.6, 0.6, 0.08, X + 1.4, Y + 0.5, Z - 3.68); // a chair by the bed
+    slab(0xffe8c0, 3, 1.6, 0.04, X + 2.5, Y + 1.4, Z - 5, M.glow); slab(0xffe8c0, 0.04, 1.6, 3, X + 6, Y + 1.4, Z - 1, M.glow); // windows
+    slab(0x3a2418, 1.4, 2.6, 0.1, X + 2, Y, Z + 5.02);
+    lamp(X - 1, Y + 3, Z - 1.5, 0xf0f6ff, 16, 12);
+    places.wardRoom = { inside: { x: X + 2, z: Z + 3.2, h: Math.PI }, bed: { x: X - 2.5, y: Y + 0.95, z: Z - 2.6 }, chair: { x: X + 1.4, y: Y, z: Z - 3.3 }, cam: { pos: new THREE.Vector3(X + 1.2, Y + 1.9, Z + 1.6), look: new THREE.Vector3(X - 2, Y + 1.1, Z - 2.6) } };
+  }
+  buildWardRoom();
+
   places.chop = { x: SHORE + 18, z: bounds.minZ + 16 }; // the north end of the beach, where stolen cars get stripped
 
   // ----- Beach: boardwalk, palms along Ocean Drive, umbrellas and lifeguard huts on the sand -----
@@ -1271,6 +1338,7 @@ export function buildWorld(scene) {
     { name: 'the Bada Bing', outside: { x: places.bing.door.x, z: places.bing.door.z - 6.4, h: 0 }, inside: places.bingRoom.inside },
     { name: 'home', outside: { x: places.home.spawn.x, z: places.home.spawn.z - 2.6, h: 0 }, inside: places.houseRoom.inside },
     { name: "Dr. Melfi's office", outside: { x: places.melfi.door.x, z: places.melfi.door.z - 2.6, h: 0 }, inside: places.office.inside, hide: [places.office.cast.tony] },
+    { name: 'the hospital', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: places.wardRoom.inside },
   ];
   places.sky = buildSky(scene, updaters);
   places.update = time => { for (const fn of updaters) fn(time); };
