@@ -423,6 +423,7 @@ async function boot() {
     combat.update(dt);
     sideJobs.update();
     const scare = g.time - g.scare < 1 && !p.hidden ? p.pos : null;
+    Ped.eye = camera.position;
     peds.forEach((ped, i) => {
       ped.update(dt, cars, scare);
       if (ped.dead && ped.diedAt > 20) { // the dead are replaced by someone new on another block

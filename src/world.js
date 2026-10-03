@@ -559,10 +559,24 @@ export function buildWorld(scene) {
     streetLight(c.x + e, c.z + 4, 1, 0); streetLight(c.x - e, c.z - 4, -1, 0);
     streetLight(c.x + 4, c.z + e, 0, 1); streetLight(c.x - 4, c.z - e, 0, -1);
     trafficLight(c.x - e - 0.4, c.z - e - 0.4, (i + j) % 2 === 0); trafficLight(c.x + e + 0.4, c.z + e + 0.4, (i + j) % 2 === 1);
-    for (let n = 0; n < 4; n++) { // small things along the kerb
+    for (let n = 0; n < 5; n++) { // small things along the kerb
       const side = Math.floor(rand() * 4), t = (rand() - 0.5) * 40, x = c.x + (side < 2 ? t : (side === 2 ? e : -e)), z = c.z + (side < 2 ? (side ? e : -e) : t);
-      const kind = n % 4;
-      if (kind === 0) { // fire hydrant
+      const kind = n < 4 ? n : 4 + Math.floor(rand() * 2), turn = [Math.PI, 0, Math.PI / 2, -Math.PI / 2][side]; // heading from the kerb toward the road
+      if (kind === 4) { // a phone booth, glass in an aluminium frame
+        slab(0xc9cbd2, 1, 0.1, 1, x, CURB, z); slab(0xc9cbd2, 1, 0.14, 1, x, CURB + 2.2, z); slab(0x2f56c8, 1.02, 0.3, 1.02, x, CURB + 2.34, z);
+        put(M.glow, new THREE.BoxGeometry(0.92, 2.1, 0.92).translate(x, CURB + 1.15, z), 0xcfe8ff);
+        for (const [ox, oz] of [[-0.46, -0.46], [0.46, -0.46], [-0.46, 0.46], [0.46, 0.46]]) post(0xc9cbd2, 0.04, 2.2, x + ox, CURB, z + oz, 4);
+        slab(0x1c1c22, 0.3, 0.4, 0.14, x, CURB + 1.2, z - 0.3); collide(x, z, 1, 1, 2.5);
+      } else if (kind === 5) { // a bus shelter: two posts, a glass back, a roof and a bench
+        const dx = Math.sin(turn), dz = Math.cos(turn), w = 3.2; // (dx, dz) points at the road
+        for (const sgn of [-1, 1]) post(0x3a3a44, 0.06, 2.4, x - dz * sgn * w / 2 - dx * 0.5, CURB, z + dx * sgn * w / 2 - dz * 0.5, 4);
+        put(M.plain, new THREE.BoxGeometry(dz ? w : 1.6, 0.08, dx ? w : 1.6).translate(x, CURB + 2.4, z), 0x3a3a44);
+        put(M.glow, new THREE.BoxGeometry(dz ? w : 0.06, 2, dx ? w : 0.06).translate(x - dx * 0.75, CURB + 1.3, z - dz * 0.75), 0xd6ecf5);
+        bench(x - dx * 0.4, z - dz * 0.4, turn);
+        post(0x3a3a44, 0.04, 2.6, x + dz * w / 2 + dx * 0.2, CURB, z - dx * w / 2 + dz * 0.2, 4);
+        sign('BUS', x + dz * w / 2 + dx * 0.2, CURB + 2.5, z - dx * w / 2 + dz * 0.2, turn, { w: 0.5, h: 0.5, color: '#ffffff', bg: '#2f56c8', size: 0.8, glow: false, also: [[x + dz * w / 2 + dx * 0.2, CURB + 2.5, z - dx * w / 2 + dz * 0.2, turn + Math.PI]] });
+        collide(x - dx * 0.75, z - dz * 0.75, dz ? w : 0.3, dx ? w : 0.3, 2.4);
+      } else if (kind === 0) { // fire hydrant
         post(0xd8342c, 0.13, 0.6, x, CURB, z, 8); ball(0xd8342c, 0.15, x, CURB + 0.62, z); slab(0xd8342c, 0.42, 0.12, 0.12, x, CURB + 0.36, z);
       } else if (kind === 1) { // litter bin
         post(0x2f6b5c, 0.3, 0.9, x, CURB, z, 9); post(0x1d1d24, 0.32, 0.06, x, CURB + 0.9, z, 9);

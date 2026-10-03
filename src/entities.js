@@ -69,6 +69,7 @@ export class Ped {
     this.u = rand() * 8 * this.s;
     this.dir = rand() < 0.5 ? 1 : -1;
     this.speed = 1.2 + rand() * 0.6;
+    this.loiter = rand() < 0.2 ? 20 + rand() * 60 : 0; // some stand about talking for a while before moving on
     this.human = makeHuman({ ...pick(PED_LOOKS, rand), bulk: 0.9 + Math.floor(rand() * 4) * 0.1 });
     this.pos = new THREE.Vector3();
     this.down = 0; this.health = 100; this.dead = false; this.flight = 0; this.threat = new THREE.Vector3(); this.returning = false;
@@ -97,7 +98,7 @@ export class Ped {
   // Start a fresh lap around another block (the crowd follows the player around the city).
   relocate(center, rand) {
     this.c = center; this.u = rand() * 8 * this.s; this.dir = rand() < 0.5 ? 1 : -1;
-    this.flight = 0; this.returning = false; this.down = 0;
+    this.flight = 0; this.returning = false; this.down = 0; this.loiter = rand() < 0.2 ? 20 + rand() * 60 : 0;
     this.human.group.rotation.y = this.pathPoint(this.pos);
     this.human.group.position.set(this.pos.x, groundAt(this.pos.x, this.pos.z), this.pos.z);
   }
@@ -123,6 +124,7 @@ export class Ped {
 
   update(dt, cars, threat) {
     const g = this.human.group, h = this.human;
+    if (Ped.eye) g.visible = Math.hypot(this.pos.x - Ped.eye.x, this.pos.z - Ped.eye.z) < 135; // beyond that they are a few pixels in the fog
     if (this.dead) { this.diedAt += dt; return; }
     if (this.down > 0) {
       this.down -= dt;
@@ -147,6 +149,11 @@ export class Ped {
         h.set('walk', 1.6);
         g.rotation.y = Math.atan2(tx, tz);
       }
+    } else if (this.loiter > 0) { // standing at the kerb, talking to nobody in particular
+      this.loiter -= dt;
+      this.pathPoint(this.pos);
+      g.rotation.y = this.pathPoint(this.pos) + Math.PI / 2 * this.dir;
+      h.set(Math.floor(this.loiter / 6) % 2 ? 'talk' : 'idle');
     } else {
       const L = 8 * this.s;
       this.u = ((this.u + this.dir * this.speed * dt) % L + L) % L;
@@ -165,6 +172,7 @@ export class Ped {
     }
   }
 }
+Ped.eye = null; // where the camera is, for culling the far crowd; set by main.js each frame
 const tmpPed = new THREE.Vector3();
 
 // ---------- Cars ----------
