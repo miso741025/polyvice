@@ -55,7 +55,7 @@ export class Hud {
   }
 
   // North-up radar centred on the player.
-  radar(focus, heading, blips) {
+  radar(focus, heading, blips, landmarks = []) {
     const c = this.ctx, S = 200, R = S / 2, k = 0.4;
     const X = x => (x - focus.x) * k + R, Z = z => (z - focus.z) * k + R;
     const rect = (x0, z0, x1, z1, color) => { c.fillStyle = color; c.fillRect(X(x0), Z(z0), (x1 - x0) * k, (z1 - z0) * k); };
@@ -68,6 +68,14 @@ export class Hud {
     for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
       const x = nodeX(i) + ROAD / 2, z = nodeZ(j) + ROAD / 2;
       rect(x, z, x + CELL - ROAD, z + CELL - ROAD, '#3f3a57');
+    }
+    c.font = 'bold 9px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (const l of landmarks) { // places worth knowing, shown when they are within the radar's reach
+      const lx = X(l.x), lz = Z(l.z);
+      if (Math.hypot(lx - R, lz - R) > R - 8) continue;
+      c.fillStyle = l.color; c.strokeStyle = '#000'; c.lineWidth = 1.5;
+      c.beginPath(); c.arc(lx, lz, 6, 0, Math.PI * 2); c.fill(); c.stroke();
+      c.fillStyle = '#fff'; c.fillText(l.label, lx, lz + 0.5);
     }
     for (const b of blips) {
       let bx = X(b.x) - R, bz = Z(b.z) - R;

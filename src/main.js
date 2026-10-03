@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { NX, NZ, ROAD, CELL, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
+import { NX, NZ, ROAD, CELL, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
 import { makeTony, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
 import { runStory, savedMission, clearSave } from './missions.js';
 import { installCombat } from './combat.js';
+import { sfx } from './audio.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -124,7 +125,7 @@ async function boot() {
       g.markers.splice(g.markers.indexOf(m), 1);
     },
 
-    enterCar(car) { p.car = car; car.nav = null; },
+    enterCar(car) { p.car = car; car.nav = null; sfx.carDoor(); },
     spawnCar(x, z, heading, color, kind) {
       const car = new Car(scene, x, z, heading, color, kind);
       car.mission = g.missionActive;
@@ -153,6 +154,7 @@ async function boot() {
     // The player is dead: every mission wait fails, and the mission (or free roam) respawns them.
     wasted() {
       if (p.dying) return;
+      sfx.wasted();
       p.dying = true; p.down = 1; p.car = null;
       const waiting = g.waiters;
       g.waiters = [];
@@ -187,6 +189,7 @@ async function boot() {
     async useDoor(door) {
       if (p.locked || p.car) return;
       p.locked = true;
+      sfx.door();
       try {
         await fade(1, 0.45);
         const going = p.inside ? null : door, to = going ? door.inside : door.outside;
@@ -202,6 +205,7 @@ async function boot() {
       const car = p.car;
       if (!car) return;
       p.car = null;
+      sfx.carDoor();
       if (at) p.pos.set(at.x, 0, at.z);
       else {
         const lx = Math.cos(car.heading), lz = -Math.sin(car.heading);
@@ -213,8 +217,17 @@ async function boot() {
   };
   const p = g.player, tmpColor = new THREE.Color();
   let streamIndex = 0;
+  // The radar's landmarks: home, the family's places, and whatever is useful.
+  const landmarks = [
+    { ...places.home.spawn, label: 'H', color: '#2f9c5a' }, { ...places.bing.door, label: 'B', color: '#ff5fd2' }, { ...places.satriale.door, label: 'S', color: '#d8342c' },
+    { ...places.melfi.door, label: 'M', color: '#1f9c8f' }, { ...places.vesuvio.door, label: 'V', color: '#e0a12c' }, { ...places.hesh.door, label: 'F', color: '#49a0d0' },
+    { ...places.hospital.door, label: '+', color: '#2f56c8' }, { ...places.bodyshop.door, label: 'A', color: '#8a1c1c' }, { ...places.cafe.door, label: 'C', color: '#1f6b4a' },
+    { ...places.livia.porch, label: 'L', color: '#8a6f8f' }, { ...places.grove.gate, label: 'G', color: '#5f8a84' }, { ...places.motel.office, label: 'T', color: '#f08a3c' },
+    { ...places.church?.door, label: '†', color: '#f4f2ee' }, { ...places.gas?.pumps, label: '⛽', color: '#d8342c' }, { ...places.carlot?.lot, label: '$', color: '#2f56c8' },
+  ].filter(l => l.x !== undefined);
   const fade = (to, seconds) => { hud.fade(to, seconds); return g.wait(seconds + 0.05); };
   const combat = installCombat(g, { scene, hud, peds, cars, keys });
+  g.sfx = sfx;
   window.game = g; // handy in the console
   g.renderer = renderer;
 
@@ -255,6 +268,7 @@ async function boot() {
   startBtn.textContent = 'Start';
   const begin = () => {
     if (g.started) return;
+    sfx.unlock();
     g.started = true;
     document.getElementById('title').classList.add('off');
     hud.fade(1, 0.6);
@@ -281,7 +295,10 @@ async function boot() {
     if (car) {
       if (p.locked) car.drive(dt, 0, 0, true);
       else car.drive(dt, (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), keys.Space);
+      const wasGoing = car.speed;
       car.collide();
+      if (Math.abs(wasGoing - car.speed) > 2.5) sfx.crash(Math.abs(wasGoing - car.speed) / 12);
+      if (!p.locked && g.consume('KeyH')) sfx.horn();
       // Shove other cars out of the way.
       for (const o of cars) {
         if (o === car || Math.hypot(o.pos.x - car.pos.x, o.pos.z - car.pos.z) > 6) continue;
@@ -294,7 +311,7 @@ async function boot() {
           o.pos.x -= dx * push * 0.4; o.pos.z -= dz * push * 0.4;
           hit = true;
         }
-        if (hit) { car.speed *= 0.93; if (!o.nav) o.collide(); }
+        if (hit) { if (Math.abs(car.speed) > 6 && g.time - (car.bumpAt || -9) > 0.6) { car.bumpAt = g.time; sfx.crash(Math.abs(car.speed) / 25); } car.speed *= 0.93; if (!o.nav) o.collide(); }
       }
       p.pos.copy(car.pos);
       if (!p.locked && g.consume('KeyF') && Math.abs(car.speed) < 4) g.leaveCar();
@@ -314,6 +331,11 @@ async function boot() {
     }
     if (p.weapon === 'pistol' && !p.locked && !g.lockTarget) p.heading = g.cam.yaw; // armed and free-aiming, Tony faces where the camera looks
     pushOut(p.pos, 0.45);
+    for (const ped of peds) { // the crowd is solid; sprinting into someone knocks them aside
+      if (ped.dead || Math.abs(ped.pos.x - p.pos.x) > 2 || Math.abs(ped.pos.z - p.pos.z) > 2) continue;
+      const dx = p.pos.x - ped.pos.x, dz = p.pos.z - ped.pos.z, d = Math.hypot(dx, dz);
+      if (d < 0.75 && d > 1e-4) { p.pos.x = ped.pos.x + dx / d * 0.75; p.pos.z = ped.pos.z + dz / d * 0.75; if (p.motion === 'sprint') ped.shove(p.pos); }
+    }
     for (const o of cars) {
       if (Math.abs(o.pos.x - p.pos.x) > 5 || Math.abs(o.pos.z - p.pos.z) > 5) continue;
       for (const [cx, cz] of circlesOf(o)) {
@@ -337,12 +359,13 @@ async function boot() {
     if (nearest && g.consume('KeyF')) { hud.prompt(''); if (nearest.nav || nearest.ai) g.carjack(nearest); else g.enterCar(nearest); }
   }
 
+  const honk = car => { if (Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) < 45 && !p.inside) sfx.horn(0.6 + Math.random() * 0.6); };
   function updateCars(dt) {
     const obstacles = cars.map(c => c.pos);
     if (!p.car && !p.hidden) obstacles.push(p.pos);
     for (const car of cars) {
       if (car.ai) { car.spinWheels(dt); continue; } // driven by combat.js
-      if (car.nav) driveAI(car, dt, obstacles);
+      if (car.nav) driveAI(car, dt, obstacles, honk);
       else if (car !== p.car && Math.abs(car.speed) > 0.01) { car.drive(dt, 0, 0, true); car.collide(); }
       car.spinWheels(dt);
       car.sync();
@@ -442,8 +465,13 @@ async function boot() {
     places.sky.position.copy(camera.position);
     places.update(g.time);
 
+    sfx.ambience({
+      inCar: !!p.car, speed: p.car ? p.car.speed : 0, throttle: p.car && !p.locked ? (keys.KeyW ? 1 : keys.KeyS ? 0.5 : 0) : 0,
+      sliding: p.car && !p.locked ? (keys.Space && Math.abs(p.car.speed) > 5 ? 1 : (keys.KeyA || keys.KeyD) && Math.abs(p.car.speed) > 17 ? 0.5 : 0) : 0,
+      shore: clamp(1 - (SHORE - p.pos.x) / 140, 0, 1), police: g.sirenLevel || 0, inside: !!p.inside, night: g.night,
+    });
     hud.clock(g.time);
-    hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips]);
+    hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips], landmarks);
 
     if (!g.skipRender) renderer.render(scene, camera);
     pressed.clear();

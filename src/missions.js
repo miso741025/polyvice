@@ -38,7 +38,7 @@ async function talk(g, lines) {
     if (a === p) p.pose = null; else if (was === 'idle') a.set('idle');
   }
 }
-const phone = (g, who, text) => say(g, who + ' (phone)', text);
+const phone = (g, who, text) => { if (!g.ringing) { g.ringing = true; g.sfx?.phone(); g.wait(1.5).then(() => { g.ringing = false; }).catch(() => {}); } return say(g, who + ' (phone)', text); };
 
 async function fade(g, to, seconds) {
   g.hud.fade(to, seconds);
@@ -60,6 +60,7 @@ async function titleCard(g, title, sub) {
 
 async function passed(g, reward, money = 0) {
   g.hud.passed(reward);
+  g.sfx?.passed();
   if (money) g.addMoney(money);
   await g.wait(4);
   g.hud.passed();
@@ -199,6 +200,7 @@ function panic(g) {
 
 // A fireball, flying debris and a column of smoke, then a fire that burns until stop() is called.
 function explode(g, at) {
+  g.sfx?.explosion();
   const group = new THREE.Group(), t0 = g.time, rnd = (a, b) => a + Math.random() * (b - a);
   group.position.set(at.x, groundAt(at.x, at.z), at.z);
   g.track(group);

@@ -88,6 +88,12 @@ export class Ped {
     return this.dir > 0 ? h : h + Math.PI;
   }
 
+  // Shoved by someone running through: a flinch, and a few steps out of the way.
+  shove(from) {
+    if (this.dead || this.down > 0) return;
+    this.human.play('hitChest', 'idle');
+    this.flee(from, 2.5);
+  }
   // Start a fresh lap around another block (the crowd follows the player around the city).
   relocate(center, rand) {
     this.c = center; this.u = rand() * 8 * this.s; this.dir = rand() < 0.5 ? 1 : -1;
@@ -440,7 +446,7 @@ const entryPoint = (i, j, d) => { const r = rightOf(d); return { x: nodeX(i) + r
 const exitPoint = (i, j, d) => { const r = rightOf(d); return { x: nodeX(i) + r.x * LANE + d.x * edge, z: nodeZ(j) + r.z * LANE + d.z * edge }; };
 
 const TRAFFIC_COLORS = [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0x1d1d24, 0xd9342b, 0x8ecbff, 0xf08a3c, 0x7d5cff];
-const TRAFFIC_KINDS = ['sedan', 'sedan', 'sedan', 'coupe', 'coupe', 'suv', 'taxi', 'taxi', 'van', 'pickup'];
+const TRAFFIC_KINDS = ['sedan', 'sedan', 'sedan', 'coupe', 'coupe', 'suv', 'taxi', 'taxi', 'van', 'pickup', 'police'];
 
 export function spawnTraffic(scene, count, rand) {
   const cars = [], used = new Set();
@@ -453,7 +459,7 @@ export function spawnTraffic(scene, count, rand) {
     const r = rightOf(d);
     const x = (nodeX(i) + nodeX(i + d.x)) / 2 + r.x * LANE, z = (nodeZ(j) + nodeZ(j + d.z)) / 2 + r.z * LANE;
     const kind = pick(TRAFFIC_KINDS, rand);
-    const car = new Car(scene, x, z, Math.atan2(d.x, d.z), kind === 'taxi' ? 0xf5c518 : pick(TRAFFIC_COLORS, rand), kind);
+    const car = new Car(scene, x, z, Math.atan2(d.x, d.z), kind === 'taxi' ? 0xf5c518 : kind === 'police' ? 0xf4f4f4 : pick(TRAFFIC_COLORS, rand), kind);
     car.nav = { ni: i + d.x, nj: j + d.z, dir: di, phase: 'entry', target: entryPoint(i + d.x, j + d.z, d), cruise: 8 + rand() * 4, stuck: 0, ignore: 0 };
     cars.push(car);
   }
@@ -492,8 +498,8 @@ function advance(nav) {
   }
 }
 
-// obstacles: positions ({x, z}) of everything this car should brake for.
-export function driveAI(car, dt, obstacles) {
+// obstacles: positions ({x, z}) of everything this car should brake for. onHonk is called when the driver loses patience.
+export function driveAI(car, dt, obstacles, onHonk) {
   const nav = car.nav;
   let dx = nav.target.x - car.pos.x, dz = nav.target.z - car.pos.z;
   if (Math.hypot(dx, dz) < 3.5) {
@@ -514,7 +520,7 @@ export function driveAI(car, dt, obstacles) {
       if (ahead > 0.5 && ahead < 9 && Math.abs(vx * fz - vz * fx) < 2) { blocked = true; break; }
     }
     // Gridlock breaker: after waiting a while, nudge through.
-    if (blocked) { nav.stuck += dt; if (nav.stuck > 6) { nav.ignore = 2; nav.stuck = 0; } } else nav.stuck = 0;
+    if (blocked) { nav.stuck += dt; if (nav.stuck > 2 && !nav.honked) { nav.honked = true; onHonk?.(car); } if (nav.stuck > 6) { nav.ignore = 2; nav.stuck = 0; } } else { nav.stuck = 0; nav.honked = false; }
   }
   const want = blocked ? 0 : Math.abs(diff) > 0.4 ? 5 : nav.cruise;
   car.speed += clamp(want - car.speed, -20 * dt, 6 * dt);

@@ -126,6 +126,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     if (p.locked || p.hidden || p.dying || p.car || g.time - p.hitAt < 0.35) return; // blows do not stack within a beat
     p.health = Math.max(0, p.health - dmg);
     p.hitAt = g.time;
+    g.sfx?.hurt();
     hud.flash('#ff2a3c', 0.35);
     hud.health(p.health);
     if (from && !p.human.busy) p.human.play('hitChest', 'idle');
@@ -165,6 +166,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       if (g.time - lastShot < PISTOL.rate) return;
       lastShot = g.time;
       p.human.play('shoot', 'aim');
+      g.sfx?.shot(); if (Math.random() < 0.4) g.sfx?.scream();
       g.scare = g.time;
       const from = muzzleOf(p.human, tmp).clone();
       const hit = lock ? (tracer(from, tmp.set(lock.pos.x, from.y, lock.pos.z)), lock) : fire(from, p.heading, p.human);
@@ -185,6 +187,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
         const dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z, d = Math.hypot(dx, dz);
         if (d < best && (dx * fx + dz * fz) / (d || 1) > 0.5) { best = d; victim = t; }
       }
+      g.sfx?.punch(!!victim);
       if (victim) { victim.hurt(FIST.dmg, p.pos); if (innocent(victim)) g.heat(victim.dead ? 1.5 : 0.35); }
     }
   };
@@ -328,6 +331,11 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     hud.aim(p.weapon === 'pistol' && !lock && !p.car && !p.locked && !p.hidden);
     if (p.health < 100 && g.time - p.hitAt > 8) { p.health = Math.min(100, p.health + dt * 4); hud.health(p.health); }
 
+    // The sirens, as near as the nearest police car.
+    let nearestCop = 1e9;
+    for (const car of cops.cars) nearestCop = Math.min(nearestCop, Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z));
+    g.sirenLevel = cops.cars.length ? clamp(1 - nearestCop / 180, 0.15, 1) : 0;
+
     // Who is afraid of whom.
     for (const npc of g.npcs) npcAi(npc, dt);
     for (let i = g.npcs.length - 1; i >= 0; i--) { // the dead, and passers-by, are cleared away after a while
@@ -342,7 +350,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       k.mesh.rotation.y += dt * 2;
       const d = Math.hypot(k.mesh.position.x - p.pos.x, k.mesh.position.z - p.pos.z);
       if ((d < 1.3 && !p.hidden) || g.time - k.born > 60) {
-        if (d < 1.3) { g.addMoney(k.amount); hud.flash('#4fd36a', 0.25); }
+        if (d < 1.3) { g.addMoney(k.amount); hud.flash('#4fd36a', 0.25); g.sfx?.cash(); }
         scene.remove(k.mesh); pickups.splice(i, 1);
       }
     }
