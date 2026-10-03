@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { NX, NZ, ROAD, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, clamp, wrapAngle, mulberry32 } from './grid.js';
+import { NX, NZ, ROAD, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
 import { makeTony, Car, Ped, spawnTraffic, driveAI, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
 import { runStory, savedMission, clearSave } from './missions.js';
+import { installCombat } from './combat.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -48,10 +49,10 @@ async function boot() {
 
   // ----- Cars: Tony's SUV, parked cars at the kerb, traffic -----
   const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, 0x7a1626, 'suv');
-  const cars = [tonyCar, ...spawnTraffic(scene, 16, rand)];
+  const cars = [tonyCar, ...spawnTraffic(scene, 30, rand)];
   const parkedColors = [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0xd9342b, 0x8ecbff];
   const parkedKinds = ['sedan', 'coupe', 'sedan', 'suv', 'coupe'];
-  for (let n = 0; n < 14; n++) {
+  for (let n = 0; n < 26; n++) {
     const off = (rand() - 0.5) * 36, far = ROAD / 2 - 1.2, color = parkedColors[n % parkedColors.length];
     if (rand() < 0.5) { // on a north-south road, facing south on the west kerb
       const i = Math.floor(rand() * (NX + 1)), j = Math.floor(rand() * NZ);
@@ -66,7 +67,7 @@ async function boot() {
 
   // ----- Pedestrians -----
   const peds = [];
-  for (let n = 0; n < 30; n++) {
+  for (let n = 0; n < 54; n++) {
     let i, j;
     do { i = Math.floor(rand() * NX); j = Math.floor(rand() * NZ); } while (i === 0 && j === 0);
     peds.push(new Ped(scene, blockCenter(i, j), rand));
@@ -79,12 +80,16 @@ async function boot() {
   const pressed = new Set(), keys = {};
   const g = {
     scene, camera, hud, places, cars, peds,
-    time: 0, cash: 0, started: false, night: 0, tonyCar,
-    waiters: [], updaters: [], markers: [], blips: [],
+    time: 0, cash: 0, started: false, night: 0, tonyCar, scare: -9,
+    waiters: [], updaters: [], markers: [], blips: [], tracked: new Set(), missionActive: false,
+    WASTED: Symbol('wasted'),
     player: { pos: new THREE.Vector3(places.home.spawn.x, 0, places.home.spawn.z), heading: 0, human: tony, car: null, locked: true, hidden: false, down: 0, motion: 'idle' },
     cam: { yaw: 0, pitch: 0.25, fixed: null, sway: 0, lastMouse: -10 },
 
-    until(fn) { return new Promise(resolve => g.waiters.push({ fn, resolve })); },
+    until(fn) { return new Promise((resolve, reject) => g.waiters.push({ fn, resolve, reject })); },
+    // Everything a mission puts in the world goes through track(), so a failed mission can be cleared away.
+    track(obj) { scene.add(obj); g.tracked.add(obj); return obj; },
+    untrack(obj) { scene.remove(obj); g.tracked.delete(obj); },
     wait(seconds) { const t0 = g.time; return g.until(() => g.time - t0 >= seconds); },
     consume(code) { return pressed.delete(code); },
     addMoney(n) { g.cash += n; hud.money(g.cash); },
@@ -108,6 +113,7 @@ async function boot() {
     enterCar(car) { p.car = car; car.nav = null; },
     spawnCar(x, z, heading, color, kind) {
       const car = new Car(scene, x, z, heading, color, kind);
+      car.mission = g.missionActive;
       cars.push(car);
       return car;
     },
@@ -130,6 +136,53 @@ async function boot() {
       scene.fog.color.set(0xf2a0b4).lerp(tmpColor.set(0x120f26), k);
       places.setNight(k);
     },
+    // The player is dead: every mission wait fails, and the mission (or free roam) respawns them.
+    wasted() {
+      if (p.dying) return;
+      p.dying = true; p.down = 1; p.car = null;
+      const waiting = g.waiters;
+      g.waiters = [];
+      for (const w of waiting) w.reject(g.WASTED);
+      if (!g.missionActive) g.respawn();
+    },
+    // Back at home, with everything a mission left behind cleared away.
+    async respawn() {
+      await g.wait(2.4);
+      hud.wasted(true);
+      await fade(1, 1.2);
+      await g.wait(0.8);
+      hud.wasted(false);
+      for (const obj of g.tracked) scene.remove(obj);
+      g.tracked.clear();
+      for (const car of [...cars]) if (car.mission) g.removeCar(car);
+      g.updaters = []; g.blips = [];
+      for (const m of [...g.markers]) g.removeMarker(m);
+      if (p.human !== tony) { const other = p.human; g.setPlayer(tony); scene.remove(other.group); }
+      if (p.inside) { for (const h of p.inside.hide || []) h.group.visible = true; p.inside = null; }
+      Object.assign(p, { car: null, hidden: false, locked: false, down: 0, pose: null, dying: false });
+      g.cam.fixed = null; g.cam.sway = 0; g.cam.yaw = p.heading = 0;
+      hud.panic(0); hud.objective(); hud.subtitle(); hud.prompt(''); hud.card(); hud.passed();
+      g.setNight(0);
+      combat.reset();
+      g.addMoney(-Math.min(g.cash, 500));
+      p.pos.set(places.home.wake.x, 0, places.home.wake.z);
+      tonyCar.pos.set(places.home.car.x, 0, places.home.car.z); tonyCar.heading = places.home.car.h; tonyCar.speed = 0;
+      await fade(0, 1.2);
+    },
+    // Through a door, in or out. The rooms are built far out over the water.
+    async useDoor(door) {
+      if (p.locked || p.car) return;
+      p.locked = true;
+      try {
+        await fade(1, 0.45);
+        const going = p.inside ? null : door, to = going ? door.inside : door.outside;
+        for (const h of door.hide || []) h.group.visible = !going;
+        p.inside = going;
+        p.pos.set(to.x, 0, to.z); p.heading = g.cam.yaw = to.h;
+        await fade(0, 0.45);
+      } catch { return; }
+      p.locked = false;
+    },
     // Step out on the driver's side (or at an explicit spot for cutscenes).
     leaveCar(at) {
       const car = p.car;
@@ -145,6 +198,8 @@ async function boot() {
     },
   };
   const p = g.player, tmpColor = new THREE.Color();
+  const fade = (to, seconds) => { hud.fade(to, seconds); return g.wait(seconds + 0.05); };
+  const combat = installCombat(g, { scene, hud, peds, cars, keys });
   window.game = g; // handy in the console
   g.renderer = renderer;
 
@@ -157,8 +212,9 @@ async function boot() {
   addEventListener('keyup', e => { keys[e.code] = false; });
   addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
   let dragging = false;
-  canvas.addEventListener('mousedown', () => {
+  canvas.addEventListener('mousedown', e => {
     dragging = true;
+    if (e.button === 0 && g.started) pressed.add('Mouse0');
     if (g.started) try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* pointer lock unavailable: dragging still works */ }
   });
   addEventListener('mouseup', () => { dragging = false; });
@@ -173,7 +229,7 @@ async function boot() {
   g.cam.fixed = { pos: new THREE.Vector3(), look: new THREE.Vector3(60, 10, 40) };
   g.updaters.push(() => {
     if (g.started) return false;
-    g.cam.fixed.pos.set(60 + Math.sin(g.time * 0.05) * 330, 95, 40 + Math.cos(g.time * 0.05) * 330);
+    g.cam.fixed.pos.set(60 + Math.sin(g.time * 0.05) * 430, 120, 40 + Math.cos(g.time * 0.05) * 430);
     return true;
   });
   hud.fade(0, 1.2);
@@ -236,9 +292,10 @@ async function boot() {
       const n = Math.hypot(vx, vz), speed = keys.ShiftLeft || keys.ShiftRight ? 7.6 : 3.7;
       vx /= n; vz /= n;
       p.pos.x += vx * speed * dt; p.pos.z += vz * speed * dt;
-      p.heading += wrapAngle(Math.atan2(vx, vz) - p.heading) * (1 - Math.exp(-12 * dt));
+      if (p.weapon !== 'pistol') p.heading += wrapAngle(Math.atan2(vx, vz) - p.heading) * (1 - Math.exp(-12 * dt));
       p.motion = speed > 5 ? 'sprint' : 'run';
     }
+    if (p.weapon === 'pistol' && !p.locked) p.heading = g.cam.yaw; // armed, Tony faces where the camera looks
     pushOut(p.pos, 0.45);
     for (const o of cars) {
       if (Math.abs(o.pos.x - p.pos.x) > 5 || Math.abs(o.pos.z - p.pos.z) > 5) continue;
@@ -248,19 +305,26 @@ async function boot() {
       }
     }
 
+    const door = !p.locked && places.doors.find(d => (p.inside ? d === p.inside && near(p.pos, d.inside, 1.8) : near(p.pos, d.outside, 1.8)));
+    if (door) {
+      hud.prompt(p.inside ? 'F  ·  Leave' : `F  ·  Enter ${door.name}`);
+      if (g.consume('KeyF')) g.useDoor(door);
+      return;
+    }
     let nearest = null, best = 4.2;
-    if (!p.locked) for (const o of cars) {
+    if (!p.locked && !p.inside) for (const o of cars) {
       const d = Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z);
       if (d < best) { best = d; nearest = o; }
     }
-    hud.prompt(nearest ? 'F  ·  Enter vehicle' : '');
-    if (nearest && g.consume('KeyF')) { g.enterCar(nearest); hud.prompt(''); }
+    hud.prompt(nearest ? (nearest.nav || nearest.ai ? 'F  ·  Take vehicle' : 'F  ·  Enter vehicle') : '');
+    if (nearest && g.consume('KeyF')) { hud.prompt(''); if (nearest.nav || nearest.ai) g.carjack(nearest); else g.enterCar(nearest); }
   }
 
   function updateCars(dt) {
     const obstacles = cars.map(c => c.pos);
     if (!p.car && !p.hidden) obstacles.push(p.pos);
     for (const car of cars) {
+      if (car.ai) { car.spinWheels(dt); continue; } // driven by combat.js
       if (car.nav) driveAI(car, dt, obstacles);
       else if (car !== p.car && Math.abs(car.speed) > 0.01) { car.drive(dt, 0, 0, true); car.collide(); }
       car.spinWheels(dt);
@@ -273,7 +337,7 @@ async function boot() {
     for (let i = 1; i <= 12; i++) {
       const t = i / 12, x = from.x + (to.x - from.x) * t, y = from.y + (to.y - from.y) * t, z = from.z + (to.z - from.z) * t;
       for (const c of colliders) {
-        if (!c.thin && y < c.h && x > c.minX - 0.4 && x < c.maxX + 0.4 && z > c.minZ - 0.4 && z < c.maxZ + 0.4) return Math.max(0.12, (i - 1) / 12);
+        if (!c.thin && y < c.h && x > c.minX - 0.4 && x < c.maxX + 0.4 && z > c.minZ - 0.4 && z < c.maxZ + 0.4) return Math.max(0.25, (i - 1) / 12);
       }
     }
     return 1;
@@ -314,7 +378,22 @@ async function boot() {
 
     updatePlayer(dt);
     updateCars(dt);
-    for (const ped of peds) ped.update(dt, cars);
+    combat.update(dt);
+    const scare = g.time - g.scare < 1 && !p.hidden ? p.pos : null;
+    peds.forEach((ped, i) => {
+      ped.update(dt, cars, scare);
+      if (ped.dead && ped.diedAt > 20) { // the dead are replaced by someone new on another block
+        scene.remove(ped.human.group);
+        let bi, bj;
+        do { bi = Math.floor(rand() * NX); bj = Math.floor(rand() * NZ); } while (bi === 0 && bj === 0);
+        peds[i] = new Ped(scene, blockCenter(bi, bj), rand);
+      }
+    });
+    if (p.health <= 0 && !p.dying) g.wasted();
+    if (p.inside && Math.hypot(p.pos.x - p.inside.inside.x, p.pos.z - p.inside.inside.z) > 40) { // a mission moved Tony outside
+      for (const h of p.inside.hide || []) h.group.visible = true;
+      p.inside = null;
+    }
 
     g.updaters = g.updaters.filter(fn => fn(dt));
     g.waiters = g.waiters.filter(w => { if (!w.fn()) return true; w.resolve(); return false; });
@@ -323,7 +402,8 @@ async function boot() {
     me.group.visible = !p.car && !p.hidden;
     me.group.position.set(p.pos.x, groundAt(p.pos.x, p.pos.z), p.pos.z);
     me.group.rotation.y = p.heading;
-    me.set(p.down ? 'down' : p.pose || (p.car || p.locked ? 'idle' : p.motion));
+    if (p.down) me.set('down');
+    else if (!me.busy) me.set(p.pose || (p.car || p.locked ? 'idle' : p.motion === 'idle' && p.weapon === 'pistol' ? 'aim' : p.motion));
 
     for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
 

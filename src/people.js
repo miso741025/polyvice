@@ -42,8 +42,12 @@ const groupOf = bone =>
 // The clips each character can play, by state name.
 const CLIPS = {
   talk: 'Idle_Talking_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop', sprint: 'Sprint_Loop',
-  down: 'Death01',
+  down: 'Death01', jab: 'Punch_Jab', cross: 'Punch_Cross', hitHead: 'Hit_Head', hitChest: 'Hit_Chest',
+  aim: 'Pistol_Idle_Loop', shoot: 'Pistol_Shoot', kneel: 'Fixing_Kneeling', interact: 'Interact', pickup: 'PickUp_Table',
+  crouch: 'Crouch_Idle_Loop', dance: 'Dance_Loop',
 };
+// Clips that play once and hold their last frame.
+const ONCE = new Set(['down', 'jab', 'cross', 'hitHead', 'hitChest', 'shoot', 'kneel', 'interact', 'pickup']);
 
 // ---------- Loading ----------
 
@@ -706,6 +710,7 @@ function glassesGeo(B) {
   return glassesGeos[key] = { frame: mergeGeometries(parts.map(p => p.toNonIndexed())), lens: mergeGeometries(lens) };
 }
 const frameMat = new THREE.MeshLambertMaterial({ color: 0x1a1512 });
+const pistolMat = new THREE.MeshPhongMaterial({ color: 0x1c1c22, shininess: 60, specular: 0x666666 });
 const shadeMat = new THREE.MeshBasicMaterial({ color: 0x0b0b10 });
 const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true, opacity: 0.22, depthWrite: false });
 
@@ -777,21 +782,47 @@ export function makeHuman(opts = {}) {
   }
   headBone.scale.setScalar(o.head);
 
+  // A pistol in the right hand, shown only while armed.
+  let handBone;
+  root.traverse(n => { if (n.isBone && n.name === 'hand_r') handBone = n; });
+  const pistol = new THREE.Group();
+  for (const [w, h, d, x, y, z, rx] of [[0.024, 0.034, 0.17, 0, 0.02, 0.05, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3]]) {
+    const part = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pistolMat);
+    part.position.set(x, y, z); part.rotation.x = rx;
+    pistol.add(part);
+  }
+  pistol.position.set(0.02, -0.04, 0.06); pistol.rotation.set(-1.4, 0.2, -1.55);
+  pistol.visible = false;
+  handBone?.add(pistol);
+
   const mixer = new THREE.AnimationMixer(root), actions = {};
   const person = {
-    group, mixer, state: null,
-    // Switch animation: 'idle' | 'talk' | 'walk' | 'run' | 'sprint' | 'sit' | 'down'.
+    group, mixer, state: null, after: null, pistol,
+    // Switch animation: 'idle' | 'talk' | 'walk' | 'run' | 'sprint' | 'sit' | 'down' | 'aim' | ... (see CLIPS).
     set(state, speed = 1) {
       if (this.state !== state) {
         const next = actions[state] ??= mixer.clipAction(B.clips[state]);
-        if (state === 'down') { next.setLoop(THREE.LoopOnce); next.clampWhenFinished = true; }
-        next.reset().fadeIn(this.state ? 0.2 : 0).play();
-        if (this.state) actions[this.state].fadeOut(0.2);
+        if (ONCE.has(state)) { next.setLoop(THREE.LoopOnce); next.clampWhenFinished = true; }
+        next.reset().fadeIn(this.state ? 0.15 : 0).play();
+        if (this.state) actions[this.state].fadeOut(0.15);
         this.state = state;
       }
       actions[state].timeScale = speed;
     },
+    // Play a one-shot clip (a punch, a flinch), then go back to `then`. `busy` is true meanwhile.
+    play(state, then = 'idle', speed = 1) {
+      const prev = this.state;
+      this.after = then;
+      this.state = null; // so the same clip can be played again at once
+      this.set(state, speed);
+      if (prev && prev !== state) actions[prev].fadeOut(0.15);
+    },
+    get busy() { return this.after !== null; },
+    arm(on) { pistol.visible = on; },
   };
+  mixer.addEventListener('finished', e => {
+    if (person.after !== null && e.action === actions[person.state]) { const then = person.after; person.after = null; person.set(then); }
+  });
   person.set('idle');
   mixer.update(Math.random() * 2); // so a crowd does not move in unison
   people.push(person);
@@ -867,6 +898,7 @@ export const LOOKS = {
   eddie: { shirt: 0xf2c230, tee: true, pants: 0x2b2b3a, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'buzzed', dark: true, bulk: 0.95, goatee: 0x141110 },
   perrilyn: { body: 'female', dark: true, shirt: 0x8fe0d4, pants: 0xf5f0e6, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'long', age: 0.3 },
   fanny: { body: 'female', jacket: 0xf7a8c4, shirt: 0xf5f0e6, pants: 0x6f6f7a, tucked: true, hair: 0xdcdad4, hairMesh: 'parted', hairShift: [0, -0.045, 0.004], hairScale: [1.04, 1.02, 1.06], bulk: 1.05, height: 0.9, age: 1, glasses: 'clear', brows: 0xb9b6b0 },
+  cop: { shirt: 0x24324c, sleeves: 'long', tucked: true, badge: true, pants: 0x1c2740, hair: 0x2b1b12, hairMesh: 'buzzed', glasses: 'shades', bulk: 1.08, stubble: 0.3 },
   mahaffey: { jacket: 0x8d8a8e, shirt: 0xf4f4f4, tie: 0xa3201c, tucked: true, pants: 0x8d8a8e, hair: 0x7a3b1a, hairStyle: 'receding', glasses: 'clear', bulk: 1.12, age: 0.5, face: { cheeks: 0.6, chin: 0.7 } },
 };
 export const makeLook = name => makeHuman(LOOKS[name]);

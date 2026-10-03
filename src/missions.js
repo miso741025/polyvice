@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { near, clamp, bounds, SHORE, groundAt, pushOut, colliders } from './grid.js';
-import { makeLook, Car, roam } from './entities.js';
+import { makeLook, makeHuman, randomPedLook, Car, roam } from './entities.js';
 
 // The story is written as plain async functions: each `await` waits on the game loop
 // (a line of dialogue, the player reaching a marker, a fade), so a mission reads top to bottom.
@@ -70,10 +70,10 @@ function actor(g, look, at, heading = 0, state = 'idle') {
   a.group.position.set(at.x, at.y ?? groundAt(at.x, at.z), at.z); // interior sets give their own height
   a.group.rotation.y = heading;
   a.set(state);
-  g.scene.add(a.group);
+  g.track(a.group);
   return a;
 }
-const dismiss = (g, ...actors) => { for (const a of actors) g.scene.remove(a.group); };
+const dismiss = (g, ...actors) => { for (const a of actors) { g.untrack(a.group); g.removeNpc?.(a); } };
 const spot = (at, dx = 0, dz = 0) => ({ x: at.x + dx, z: at.z + dz });
 const toward = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
 
@@ -151,6 +151,22 @@ function follower(g, human, { lead, gap = 1.6, pace = 3.6, runs = true } = {}) {
   return f;
 }
 
+// One character hits another, for a scene: a swing, a flinch, and the wait for both to settle.
+async function punch(g, from, to, down = false) {
+  const swing = from === g.player ? from.human : from;
+  swing.play(Math.random() < 0.5 ? 'cross' : 'jab', 'idle', 1.3);
+  await g.wait(0.3);
+  if (down) { to.after = null; to.set('down'); } else to.play('hitHead', 'idle');
+  await g.wait(0.9);
+}
+// Only fists for a while: for beatings that must not end in a shooting.
+function fistsOnly(g, on) {
+  const p = g.player;
+  if (on) { g.setWeapon('fist'); p.weapons.pistol = false; } else p.weapons.pistol = true;
+}
+// Wait until every one of these fighters is down.
+const allDown = (g, npcs) => g.until(() => npcs.every(n => n.dead || n.human.state === 'down'));
+
 // A session with Dr. Melfi in the interior set. Leaves the screen black; the caller sets up what follows.
 async function therapy(g, lines) {
   const { office } = g.places, p = g.player, night = g.night;
@@ -184,7 +200,7 @@ function panic(g) {
 function explode(g, at) {
   const group = new THREE.Group(), t0 = g.time, rnd = (a, b) => a + Math.random() * (b - a);
   group.position.set(at.x, groundAt(at.x, at.z), at.z);
-  g.scene.add(group);
+  g.track(group);
   const ballGeo = new THREE.SphereGeometry(1, 10, 8), boxGeo = new THREE.BoxGeometry(1, 1, 1), parts = [];
   const add = (geo, mat, kind, life) => {
     const m = new THREE.Mesh(geo, mat);
@@ -237,14 +253,14 @@ function explode(g, at) {
     }
     return true;
   });
-  return { stop() { on = false; g.cam.sway = 0; g.scene.remove(group); } };
+  return { stop() { on = false; g.cam.sway = 0; g.untrack(group); } };
 }
 
 // A column of smoke from a spot, until stop() is called.
 function smoke(g, at, height = 4) {
   const group = new THREE.Group(), geo = new THREE.SphereGeometry(1, 8, 6), puffs = [];
   group.position.set(at.x, groundAt(at.x, at.z) + height, at.z);
-  g.scene.add(group);
+  g.track(group);
   for (let i = 0; i < 9; i++) {
     const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x3a3438, transparent: true, opacity: 0.5, depthWrite: false }));
     m.userData = { phase: i * 1.1, drift: Math.random() - 0.5 };
@@ -259,7 +275,7 @@ function smoke(g, at, height = 4) {
     }
     return true;
   });
-  return { stop() { on = false; g.scene.remove(group); } };
+  return { stop() { on = false; g.untrack(group); } };
 }
 
 // Driving something that must arrive in one piece: three hard crashes and `reset` puts things back.
@@ -305,10 +321,11 @@ async function bingRoom(g, cam, arrange, play) {
   if (p.car) p.car.speed = 0;
   p.hidden = true;
   g.setNight(1);
+  for (const a of room.ambient) a.group.visible = false;
   const cast = arrange(room);
   g.cam.fixed = room[cam];
   await fade(g, 0, 1);
-  await play(cast);
+  try { await play(cast); } finally { for (const a of room.ambient) a.group.visible = true; }
   await fade(g, 1, 1);
   dismiss(g, ...Object.values(cast));
   g.cam.fixed = null;
@@ -353,7 +370,12 @@ export async function runStory(g) {
     for (const [k, mission] of episode.missions.entries()) {
       if (n++ < from) continue;
       if (k === 0 && e > 0) { await g.wait(1.5); await titleCard(g, episode.title, episode.name); }
-      await mission(g);
+      for (;;) { // a mission is played again from the start if Tony is killed during it
+        g.missionActive = true;
+        try { await mission(g); break; } catch (err) { if (err !== g.WASTED) throw err; }
+        finally { g.missionActive = false; }
+        await g.respawn();
+      }
       save(n, g.cash);
       await g.wait(1.5);
       if (k === episode.missions.length - 1) {
@@ -473,6 +495,9 @@ async function collections(g) {
   const chris = actor(g, 'christopher', ocean.chris, WEST);
   const debtor = actor(g, 'mahaffey', ocean.debtor, EAST);
   const d = { pos: new THREE.Vector3(ocean.debtor.x, 0, ocean.debtor.z), side: -1, caught: false };
+  const alex = g.addNpc(debtor, { health: 90, cash: 0, stays: true }); // he can be hit, and he goes down rather than dies
+  alex.die = () => { alex.health = 1; d.caught = true; };
+  fistsOnly(g, true);
 
   g.hud.objective('Meet Christopher on <b>Ocean Drive</b>.');
   const m = g.addMarker(ocean.marker.x, ocean.marker.z, 7);
@@ -483,9 +508,10 @@ async function collections(g) {
   g.blips.push(blip);
   g.updaters.push(dt => {
     if (d.caught) return false;
+    if (debtor.busy) { d.pos.copy(debtor.group.position); return true; }
     let ax = d.pos.x - p.pos.x, az = d.pos.z - p.pos.z;
     const dist = Math.hypot(ax, az) || 1;
-    if (p.car ? dist < 2.6 && Math.abs(p.car.speed) > 3 : dist < 1.3) { d.caught = true; return false; }
+    if ((p.car && dist < 2.6 && Math.abs(p.car.speed) > 3) || alex.health < 40) { d.caught = true; return false; }
     if (dist < 70) {
       ax /= dist; az /= dist;
       // Keep him running along the beach rather than pinned against the water.
@@ -501,7 +527,7 @@ async function collections(g) {
     blip.x = d.pos.x; blip.z = d.pos.z;
     return true;
   });
-  g.hud.objective('Chase down <b>Mahaffey</b>. Run him over or tackle him.');
+  g.hud.objective('Chase down <b>Mahaffey</b>. Run him over, or catch him and beat it out of him.');
   say(g, CHRIS, "That's him by the water. He's seen us, he's running!", 3);
   await g.until(() => d.caught);
 
@@ -509,7 +535,9 @@ async function collections(g) {
   g.hud.objective();
   p.locked = true;
   if (p.car) p.car.speed = 0;
-  debtor.set('down');
+  g.removeNpc(debtor);
+  debtor.after = null; debtor.set('down');
+  fistsOnly(g, false);
   await g.wait(0.8);
   await talk(g, [
     [DEBTOR, "My leg! Tony, please, I'll have it Friday, I swear on my mother!"],
@@ -722,19 +750,26 @@ async function garbage(g) {
     [KOLAR, 'In the old country, this is how business is done. At night, between men.', emil],
     [CHRIS, 'Yeah? Here too.', p],
   ]);
+  // Emil turns to look at the door. Christopher has the gun.
+  emil.group.rotation.y = NORTH;
+  const mark = g.addNpc(emil, { health: 60, cash: 0, stays: true });
+  g.cam.fixed = null;
+  g.setWeapon('pistol');
+  p.locked = false;
+  g.hud.objective('Emil has his back to you. <b>Do it.</b>');
+  await g.until(() => mark.dead);
+  g.hud.objective();
+  g.pardon(); // nobody saw
+  p.locked = true;
   // The camera looks away, up at the pig on the roof.
   await cut(g, () => {
-    dismiss(g, emil);
+    g.removeNpc(emil); dismiss(g, emil);
     const pig = satriale.pig;
     g.cam.fixed = { pos: new THREE.Vector3(pig.x + 7, pig.y - 3, pig.z + 10), look: new THREE.Vector3(pig.x, pig.y, pig.z) };
   }, 0.4);
-  await g.wait(1.4);
-  g.hud.flash('#ffffff', 0.5);
-  g.cam.sway = 1;
-  await g.wait(0.5);
-  g.cam.sway = 0;
-  await g.wait(1.2);
+  await g.wait(1.6);
   await say(g, '', 'Emil Kolar would not be bidding on any more contracts.');
+  g.setWeapon('fist');
 
   await cut(g, () => {
     pussy = actor(g, 'pussy', spot(satriale.back, 2.6, 0.3), WEST);
@@ -870,11 +905,24 @@ async function insurance(g) {
   await g.until(() => p.car);
   await reach(g, v.kerb, 'Drive Silvio to <b>Vesuvio</b>.', { how: 'car' });
 
+  let bomb = null;
   for (;;) {
+    if (bomb) g.untrack(bomb);
     await reach(g, v.back, 'Carry the charge to the <b>kitchen door</b> round the back.', { r: 1.8, how: 'foot' });
     p.locked = true;
+    p.pos.set(v.back.x, 0, v.back.z); p.heading = SOUTH; // the kitchen door is behind the spot
     g.hud.objective('Setting the charge…');
-    await g.wait(3.5);
+    p.human.play('kneel', 'idle');
+    bomb = new THREE.Group();
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff2a3c }));
+    bomb.add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, 0.28), new THREE.MeshLambertMaterial({ color: 0x2a2422 })), lamp);
+    lamp.position.set(0.12, 0.13, 0.1);
+    bomb.position.set(v.back.x, groundAt(v.back.x, v.back.z) + 0.11, v.back.z + 0.8);
+    g.track(bomb);
+    const tb = g.time;
+    g.updaters.push(() => { lamp.visible = Math.floor((g.time - tb) * 4) % 2 === 0; return bomb.parent !== null; });
+    await g.wait(5);
+    p.human.after = null; p.human.set('idle');
     p.locked = false;
     say(g, SILVIO, 'Fifteen seconds. Move!', 2.5);
     const t0 = g.time, far = () => Math.hypot(p.pos.x - v.centre.x, p.pos.z - v.centre.z);
@@ -897,6 +945,7 @@ async function insurance(g) {
     p.locked = false;
   }
   v.burn();
+  g.untrack(bomb);
   const fire = explode(g, v.centre);
   p.locked = true;
   if (p.car) p.car.speed = 0;
@@ -989,6 +1038,25 @@ async function secondOpinion(g) {
   await talk(g, [
     [DEBTOR, "Guys. Come on. I can't swim. You know I can't swim.", alex],
     [PUSSY, "Nobody's swimming. Long way down, though, when the tide's out.", pussy],
+    [DEBTOR, "I'm not signing anything! You can't make me!", alex],
+    [PUSSY, 'Tony. Explain it to him.', pussy],
+  ]);
+  const soft = g.addNpc(alex, { health: 100, cash: 0, stays: true });
+  soft.die = () => { soft.health = 1; };
+  fistsOnly(g, true);
+  g.cam.fixed = null;
+  p.locked = false;
+  g.hud.objective('<b>Rough him up</b> until he listens.');
+  await g.until(() => soft.health < 40);
+  g.hud.objective();
+  g.removeNpc(alex);
+  fistsOnly(g, false);
+  p.locked = true;
+  p.heading = toward(p.pos, alex.group.position);
+  alex.group.rotation.y = toward(alex.group.position, p.pos);
+  frame(g, p.pos, alex.group.position, { dist: 4.2 });
+  await talk(g, [
+    [DEBTOR, 'Okay! Okay. Jesus. I was listening.', alex],
     [HESH, "Alex. You have a sickness, the gambling. We're your friends, so we found a way for you to pay that costs you nothing.", hesh],
     [DEBTOR, "Phony claims? That's fraud. I could go to prison!", alex],
     [TONY, 'Look down. Now look at me. Which one scares you more?', p],
@@ -1068,6 +1136,9 @@ async function theParty(g) {
     [TONY, "You're right. I should've said something. That's my mother in me, I don't know how.", p],
     [CHRIS, "My cousin's girl works for a guy in Hollywood. She says I could sell my life story. Mob stuff, they eat it up.", cast.chris],
     [TONY, 'You want to write a movie? About this? Are you out of your mind?', p],
+  ]);
+  await punch(g, p, cast.chris);
+  await talk(g, [
     [CHRIS, "No! I'm just saying. I'm frustrated, T.", cast.chris],
     [TONY, 'You did good on Triborough. You are going to move up. But the Hollywood talk, you bury it deeper than Kolar.', p],
   ]);
@@ -1183,6 +1254,7 @@ async function hijack(g) {
 
   // The truck is out on its round. Ram it three times, or sit in its way until the driver gives up.
   const truck = g.spawnCar(0, 0, 0, 0xf2f0ea, 'truck');
+  truck.driverless = true; // the driver is dealt with in the scene that follows
   roam(truck, 8, 4, 3, 11);
   const blip = { x: truck.pos.x, z: truck.pos.z, color: '#ffe066' };
   g.blips.push(blip);
@@ -1221,8 +1293,17 @@ async function hijack(g) {
     [CHRIS, "You're asking me to hit you.", p],
     ['Driver', 'Not the teeth.', driver],
   ]);
-  g.hud.flash('#ffffff', 0.4);
-  driver.set('down');
+  const poor = g.addNpc(driver, { health: 100, cash: 0, stays: true });
+  poor.die = () => { poor.health = 1; };
+  fistsOnly(g, true);
+  g.cam.fixed = null;
+  p.locked = false;
+  g.hud.objective('<b>Hit the driver</b>, like he asked.');
+  await g.until(() => poor.health < 100);
+  g.hud.objective();
+  g.removeNpc(driver);
+  fistsOnly(g, false);
+  driver.after = null; driver.set('down');
   await g.wait(1.2);
   await say(g, '', 'Christopher obliged him. It seemed only polite.');
   g.cam.fixed = null;
@@ -1291,6 +1372,9 @@ async function sitDown(g) {
   await talk(g, [
     [TONY, 'Fifteen grand to my uncle. By Friday.', p],
     [BRENDAN, 'Fifteen? For what? We did the work, we took the risk...', brendan],
+  ]);
+  await punch(g, p, brendan);
+  await talk(g, [
     [TONY, 'Was I talking to you? Comley is off the menu. For both of you. Say it back.', p],
     [CHRIS, "Comley's off the menu.", chris],
     [TONY, "And my end comes off the top of those DVD players. That's the tax for making me sit through that.", p],
@@ -1359,6 +1443,7 @@ async function millersCar(g) {
   // Too late: the car is already in pieces.
   p.locked = true;
   const shell = new Car(g.scene, chop.x + 5, chop.z - 3, 0.6, 0xd9c7a0, 'sedan');
+  g.track(shell.mesh);
   for (const w of shell.mesh.userData.wheels) w.visible = false;
   shell.mesh.position.y -= 0.24;
   await cut(g, () => {
@@ -1366,14 +1451,31 @@ async function millersCar(g) {
     eddie = actor(g, 'eddie', spot(chop, 2.6, -1.8), SOUTH);
     frame(g, p.pos, eddie.group.position, { dist: 4.6, side: -1 });
   });
+  const thug = (at, h) => { const a = makeHuman(randomPedLook()); a.group.position.set(at.x, groundAt(at.x, at.z), at.z); a.group.rotation.y = h; g.track(a.group); return a; };
+  const thugs = [thug(spot(chop, 6, 3), WEST), thug(spot(chop, -4, -5), SOUTH)];
   await talk(g, [
     ['Eddie', "The teacher's car? Aw, man. It's parts already. I didn't know he was a friend of yours.", eddie],
     [PAULIE, 'So put it back together.'],
+    ['Eddie', "Hey, you don't come down here and talk to me like that. Boys!", eddie],
+  ]);
+  const crew = thugs.map(t => g.makeEnemy(t, { health: 70, damage: 9, cash: 40 }));
+  fistsOnly(g, true);
+  g.cam.fixed = null;
+  p.locked = false;
+  g.hud.objective("<b>Deal with Eddie's crew.</b>");
+  await allDown(g, crew);
+  g.hud.objective();
+  fistsOnly(g, false);
+  p.locked = true;
+  approach(g, eddie, 2);
+  frame(g, p.pos, eddie.group.position, { dist: 4.2 });
+  await talk(g, [
+    ['Eddie', "Okay! Okay. It's gone, man, I can't un-sell a car.", eddie],
     [PUSSY, 'Forget it. We get him another one, same model. Nobody counts the bolts.', p],
   ]);
   const target = g.spawnCar(melfi.park.x - 14, melfi.park.z - 3, EAST, 0x29c7c0, 'sedan');
   const blip = { x: target.pos.x, z: target.pos.z, color: '#ffe066' };
-  await cut(g, () => { dismiss(g, eddie); g.cam.fixed = null; });
+  await cut(g, () => { dismiss(g, eddie, ...thugs); g.cam.fixed = null; });
   g.blips.push(blip);
   p.locked = false;
   g.hud.objective('Take the <b>sedan</b> parked by the glass office block.');
@@ -1420,7 +1522,7 @@ async function millersCar(g) {
   await say(g, '', 'AJ finished the term with a B in science. Nobody could say exactly why.');
   pal.on = false;
   dismiss(g, paulie, miller, aj);
-  g.scene.remove(shell.mesh);
+  g.untrack(shell.mesh);
   homeAsTony(g, tony);
   g.removeCar(ride);
   await fade(g, 0, 1.2);
@@ -1552,6 +1654,10 @@ async function fortySixLong(g) {
   await talk(g, [
     [TONY, 'A man is dead over a load of suits. A working man, driving a truck that pays my uncle.', p],
     [BRENDAN, 'It was an accident, Tony, the gun just...', cast.brendan],
+  ]);
+  await punch(g, p, cast.brendan);
+  await punch(g, p, cast.brendan, true);
+  await talk(g, [
     [TONY, "You don't talk. You are finished talking. The truck goes back to Comley tonight. Every stitch.", p],
     [PAULIE, "Every stitch? Tone. It's Italian wool. Where's the harm in a taste?", cast.paulie],
     [SILVIO, 'What are you, a 44?', cast.silvio],
@@ -1647,10 +1753,10 @@ async function closingTime(g) {
       [TONY, 'Push nine.', cast.tony],
       [GEORGIE, "I pushed nine. Now it's beeping. Is it supposed to beep?", cast.georgie],
     ]);
+    await punch(g, cast.tony, cast.georgie);
     g.hud.flash('#ffffff', 0.4);
     g.cam.sway = 1;
-    cast.georgie.set('down');
-    await g.wait(0.6);
+    await punch(g, cast.tony, cast.georgie, true);
     g.cam.sway = 0;
     await say(g, '', "Tony took the receiver out of Georgie's hand and showed him how it worked. Several times.");
     await talk(g, [[SILVIO, "He's fine. Georgie, you're fine. Put some ice on it.", cast.silvio]]);

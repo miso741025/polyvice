@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { NX, NZ, BLOCK, ROAD, CELL, OX, nodeX, blockCenter, SHORE, bounds, colliders, lowGround, piers, mulberry32 } from './grid.js';
+import { NX, NZ, BLOCK, ROAD, CELL, OX, nodeX, blockCenter, SHORE, bounds, colliders, lowGround, piers, interiors, mulberry32 } from './grid.js';
+import { makeHuman } from './people.js';
 import { box, makeLook, makeTony, makeDuck, Car } from './entities.js';
 
 const PASTELS = [0xf7a8c4, 0x8fe0d4, 0xffd3a1, 0xc9b6f2, 0xfff1c9, 0x9fd0f5, 0xf5f5f0, 0xff9e8a];
@@ -11,7 +12,7 @@ const HOTELS = ['HOTEL', 'OCEAN', 'PALMS', 'DECO', 'VICE', 'CORAL', 'MIAMI'];
 const CURB = 0.14;                       // sidewalk height
 const FLOOR = 3.4, GROUND = 4.2, BAY = 4; // storey height, shopfront height, width of one window bay
 const SPECIAL = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
-  '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe' };
+  '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park' };
 const SUN = new THREE.Vector3(1250, 190, 420).normalize();
 
 // ---------- Textures, all drawn in code ----------
@@ -557,6 +558,7 @@ export function buildWorld(scene) {
     else if (kind === 'grove') buildGrove(c);
     else if (kind === 'kolar') buildKolar(c);
     else if (kind === 'comley') buildComley(c);
+    else if (kind === 'park') buildPark(c);
     else if (kind === 'school') buildSchool(c);
     else if (kind === 'bodyshop') { buildBodyshop(c); lots(c, i, [1, -1]); }
     else if (kind === 'cafe') { buildCafe(c); lots(c, i, [-1, 1]); }
@@ -969,6 +971,27 @@ export function buildWorld(scene) {
     places.kolar = { gate: { x: c.x + 34, z: c.z, h: 0 }, bins };
   }
 
+  // ----- A park: lawns, a pond, paths, palms and a bandstand -----
+  function buildPark(c) {
+    const y = CURB, STONE = 0xd8d0c4;
+    flat(M.grass, 0xffffff, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z, 6);
+    flat(M.paint, STONE, 3, BLOCK - 4, c.x, y + 0.09, c.z); flat(M.paint, STONE, BLOCK - 4, 3, c.x, y + 0.09, c.z);
+    const px = c.x + 12, pz = c.z - 10;
+    put(M.gravel, new THREE.CylinderGeometry(9.5, 9.5, 0.3, 28).translate(px, y + 0.15, pz), STONE);
+    put(M.glow, new THREE.CylinderGeometry(8.8, 8.8, 0.06, 28).translate(px, y + 0.3, pz), 0x3fb8d4);
+    collide(px, pz, 17, 17, 0.5);
+    for (let n = 0; n < 5; n++) ball(0x2f7d46, 0.7, px + Math.cos(n * 1.3) * 9.6, y + 0.5, pz + Math.sin(n * 1.3) * 9.6); // reeds and shrubs
+    const bx = c.x - 12, bz = c.z + 12;
+    put(M.wood, new THREE.CylinderGeometry(4.2, 4.2, 0.4, 8).translate(bx, y + 0.2, bz), 0xd9b48a);
+    for (let n = 0; n < 8; n++) post(0xffffff, 0.1, 3, bx + Math.cos(n * Math.PI / 4 + 0.39) * 3.8, y + 0.4, bz + Math.sin(n * Math.PI / 4 + 0.39) * 3.8, 6);
+    put(M.shingle, new THREE.ConeGeometry(4.8, 2, 8).rotateY(Math.PI / 8).translate(bx, y + 4.4, bz), 0x1f6b4a);
+    collide(bx, bz, 2, 2, 1, true);
+    for (const [ox, oz, turn] of [[-12, -8, Math.PI], [12, 10, 0], [-4, 3, Math.PI / 2], [6, -3, -Math.PI / 2]]) bench(c.x + ox, c.z + oz, turn);
+    for (const [ox, oz] of [[-22, -20], [22, -22], [-20, 22], [20, 24], [0, -24], [-24, 0], [4, 22]]) palms.push({ x: c.x + ox, z: c.z + oz });
+    for (const [ox, oz, hex] of [[-8, -16, 0xff5fd2], [8, 16, 0xffe066], [-16, 8, 0xff8a5c]]) { slab(0x5a3d2b, 5, 0.25, 2.4, c.x + ox, y, c.z + oz); for (let n = 0; n < 9; n++) ball(n % 3 ? hex : 0x2f7d46, 0.3, c.x + ox - 2 + (n % 5) * 1, y + 0.45, c.z + oz - 0.5 + (n % 2) * 1); }
+    post(STEEL, 0.07, 2.4, c.x, y, c.z + 1.8, 6); slab(0x1f6b4a, 1.2, 0.8, 0.06, c.x, y + 1.6, c.z + 1.8); // the park notice
+  }
+
   // ----- Comley Trucking: a warehouse with loading docks over a yard -----
   function buildComley(c) {
     const y = CURB, BLUE = 0x9fb0c4;
@@ -1048,7 +1071,8 @@ export function buildWorld(scene) {
 
   // ----- Inside the Bada Bing: an interior set far below the city, like the therapy office -----
   function buildBingRoom() {
-    const X = 80, Y = -200, Z = 0, WOOD = 0x3a2418, PINK = 0xff3fe0;
+    const X = 2680, Y = -0.1, Z = 0, WOOD = 0x3a2418, PINK = 0xff3fe0;
+    interiors.push({ minX: X - 9.7, maxX: X + 9.7, minZ: Z - 6.7, maxZ: Z + 6.7 });
     slab(0x3a2440, 20, 0.2, 14, X, Y - 0.2, Z, M.gravel, 4);                                    // carpet
     slab(0x16101c, 20, 0.2, 14, X, Y + 4.2, Z);
     for (const s of [-1, 1]) { slab(0x5a3450, 20, 4.4, 0.3, X, Y, Z + s * 7.15, M.wood, 3); slab(0x5a3450, 0.3, 4.4, 14, X + s * 10.15, Y, Z, M.wood, 3); }
@@ -1077,7 +1101,14 @@ export function buildWorld(scene) {
     slab(WOOD, 2.6, 0.8, 1.4, X + 6.4, Y, Z + 3.4, M.wood, 2); slab(0x1f6b4a, 2.4, 0.04, 1.2, X + 6.4, Y + 0.8, Z + 3.4);
     slab(0x1c1c22, 0.12, 1, 1.5, X - 9.9, Y + 2.2, Z + 2.6); slab(0x9fd0f5, 0.04, 0.8, 1.3, X - 9.8, Y + 2.3, Z + 2.6, M.glow);
     lamp(tx, Y + 3.1, tz, 0xffd9a8, 70, 16); lamp(X - 5.5, Y + 3.4, Z - 2.6, 0xff5fd2, 60, 20); lamp(X + 4, Y + 2.9, Z - 3.6, 0xffb060, 34, 12);
+    // The way in, on the east wall; what you bump into; and who is always here.
+    slab(0x2a1218, 0.1, 3, 1.6, X + 10.02, Y, Z + 4);
+    for (const [x, z, w, d] of [[4, -5.2, 9, 1], [tx - X, tz - Z, 2.8, 2.8], [-6.4, -3.6, 5, 5], [6.4, 3.4, 2.8, 1.6]]) collide(X + x, Z + z, w, d, 1.5);
+    const georgie = makeLook('georgie'), dancer = makeHuman({ body: 'female', shirt: 0xff5fd2, tee: true, pants: 0xffffff, shoes: 0xf2efe8, hair: 0xd9b25a, hairMesh: 'long' });
+    georgie.group.position.set(X + 1.9, Y, Z - 6.1); georgie.group.rotation.y = 0; scene.add(georgie.group);
+    dancer.group.position.set(X - 6.4, Y + 0.5, Z - 3.6); dancer.group.rotation.y = Math.PI / 2; dancer.set('dance'); scene.add(dancer.group);
     places.bingRoom = {
+      ambient: [georgie, dancer], inside: { x: X + 7, z: Z + 4, h: -Math.PI / 2 },
       y: Y, seats, table: { x: tx, y: Y, z: tz },
       bar: { x: X + 1.3, y: Y, z: Z - 4.0 }, tender: { x: X + 1.9, y: Y, z: Z - 6.1 }, stool: { x: X + 3.4, y: Y, z: Z - 3.6 },
       tableCam: { pos: new THREE.Vector3(X + 3.8, Y + 2.1, Z + 6.2), look: new THREE.Vector3(tx, Y + 0.95, tz) },
@@ -1085,6 +1116,72 @@ export function buildWorld(scene) {
     };
   }
   buildBingRoom();
+
+  // ----- Inside Satriale's: the counter and the meat case, and the back table -----
+  function buildShopRoom() {
+    const X = 2760, Y = -0.1, Z = 0, TILE = 0xf3efe6;
+    interiors.push({ minX: X - 6.7, maxX: X + 6.7, minZ: Z - 5.7, maxZ: Z + 5.7 });
+    slab(0xd8d2c8, 14, 0.2, 12, X, Y - 0.2, Z, M.paver, 2);
+    slab(0xf6f1e6, 14, 0.2, 12, X, Y + 3.6, Z);
+    for (const s of [-1, 1]) { slab(TILE, 14, 3.8, 0.3, X, Y, Z + s * 6.15, M.gravel, 3); slab(TILE, 0.3, 3.8, 12, X + s * 7.15, Y, Z, M.gravel, 3); }
+    for (const s of [-1, 1]) { slab(0x8a1c1c, 14, 0.12, 0.32, X, Y + 1.2, Z + s * 6.14); slab(0x8a1c1c, 0.32, 0.12, 12, X + s * 7.14, Y + 1.2, Z); } // a red stripe round the room
+    // The counter with its glass case, along the north side.
+    slab(0xe9e2d2, 10, 0.95, 1.1, X, Y, Z - 3.2, M.paver, 1.2); slab(0xc9cbd2, 10.2, 0.05, 1.2, X, Y + 0.95, Z - 3.2);
+    slab(0xd6ecf5, 10, 0.7, 1, X, Y + 1, Z - 3.2, M.glow); slab(0xc9cbd2, 10.2, 0.04, 1.1, X, Y + 1.7, Z - 3.2);
+    for (let n = 0; n < 9; n++) slab([0xc8312a, 0xf2a3b4, 0xa3201c, 0xe88aa0][n % 4], 0.7, 0.14, 0.5, X - 4.2 + n * 1.05, Y + 1.02, Z - 3.2 + (n % 2) * 0.2);
+    collide(X, Z - 3.2, 10, 1.1, 1.7);
+    slab(0xe9e2d2, 14, 2.4, 0.9, X, Y + 1.2, Z - 5.7, M.gravel, 2); // shelves behind
+    for (let n = 0; n < 14; n++) { const r = 0.07 + (n % 3) * 0.02; put(M.plain, new THREE.CylinderGeometry(r, r, 0.22 + (n % 2) * 0.1, 8).translate(X - 6 + n * 0.9, Y + 1.5 + Math.floor(n / 7) * 1.1, Z - 5.3), [0x8a1c1c, 0xd9a520, 0x2f7d46][n % 3]); }
+    for (let n = 0; n < 8; n++) put(M.plain, new THREE.CylinderGeometry(0.06, 0.07, 0.6, 8).translate(X - 3.5 + n * 1, Y + 3.0, Z - 4.6), n % 2 ? 0x8a3a2a : 0x6a2a24); // hanging salami
+    put(M.plain, new THREE.CylinderGeometry(0.2, 0.2, 0.3, 10).translate(X + 3.8, Y + 1.85, Z - 3.2), 0xc9cbd2); // the scale
+    sign(["SATRIALE'S", 'PORK STORE'], X, Y + 2.9, Z - 5.24, 0, { w: 4.4, h: 1, color: '#a3201c', bg: '#f6f1e4', size: 0.74, glow: false });
+    // Tables by the window, and the door.
+    for (const tx of [-4.2, 4.2]) { post(0xc9cbd2, 0.05, 0.75, X + tx, Y, Z + 2.8); post(0xffffff, 0.5, 0.05, X + tx, Y + 0.75, Z + 2.8, 12); for (const s of [-1, 1]) { slab(0xd8342c, 0.42, 0.06, 0.42, X + tx + s * 0.9, Y + 0.45, Z + 2.8); post(0xc9cbd2, 0.03, 0.45, X + tx + s * 0.9, Y, Z + 2.8, 4); } collide(X + tx, Z + 2.8, 1.2, 1.2, 1); }
+    slab(0x3a2418, 1.4, 2.8, 0.1, X, Y, Z + 6.02); slab(0xf0bf78, 1, 1.3, 0.04, X, Y + 1.3, Z + 5.98, M.glow);
+    for (const wx of [-4, 4]) slab(0xffe8c0, 3.6, 2, 0.04, X + wx, Y + 1.1, Z + 5.98, M.glow); // the street, through the glass
+    lamp(X, Y + 3.3, Z - 1, 0xfff0d0, 50, 14); lamp(X, Y + 3.3, Z + 3.5, 0xfff0d0, 30, 12);
+    const butcher = makeHuman({ shirt: 0xf4f4f4, sleeves: 'long', pants: 0xf4f4f4, hair: 0x2b1b12, hairStyle: 'balding', bulk: 1.2, mustache: 0x2b1b12, age: 0.5 });
+    butcher.group.position.set(X - 1.5, Y, Z - 4.4); butcher.group.rotation.y = 0; scene.add(butcher.group);
+    places.shopRoom = { ambient: [butcher], inside: { x: X, z: Z + 3.2, h: Math.PI } };
+  }
+  buildShopRoom();
+
+  // ----- Inside the Soprano house: the kitchen, the table, and the den -----
+  function buildHouseRoom() {
+    const X = 2840, Y = -0.1, Z = 0, CREAM = 0xf3e9d8, WOOD = 0x8a5a44;
+    interiors.push({ minX: X - 7.7, maxX: X + 7.7, minZ: Z - 5.7, maxZ: Z + 5.7 });
+    slab(0xd9b48a, 16, 0.2, 12, X, Y - 0.2, Z, M.wood, 2);
+    slab(0xf6f1e6, 16, 0.2, 12, X, Y + 3.4, Z);
+    for (const s of [-1, 1]) { slab(CREAM, 16, 3.6, 0.3, X, Y, Z + s * 6.15, M.gravel, 3); slab(CREAM, 0.3, 3.6, 12, X + s * 8.15, Y, Z, M.gravel, 3); }
+    // Kitchen along the west wall: counters, the island, the fridge and stove.
+    slab(WOOD, 1, 0.9, 9, X - 7.4, Y, Z - 1, M.wood, 1); slab(0x2a2a30, 1.1, 0.05, 9.1, X - 7.4, Y + 0.9, Z - 1); collide(X - 7.4, Z - 1, 1, 9, 1);
+    slab(WOOD, 7, 0.9, 1, X - 3.5, Y, Z - 5.4, M.wood, 1); slab(0x2a2a30, 7.1, 0.05, 1.1, X - 3.5, Y + 0.9, Z - 5.4); collide(X - 3.5, Z - 5.4, 7, 1, 1);
+    slab(0xe9e2d2, 1.1, 2, 1, X - 7.35, Y, Z + 4.5); slab(0xc9cbd2, 0.04, 0.6, 0.1, X - 6.78, Y + 1.1, Z + 4.5); collide(X - 7.35, Z + 4.5, 1.1, 1, 2); // fridge
+    slab(0xc9cbd2, 1, 0.9, 1, X - 1.2, Y, Z - 5.4); for (let n = 0; n < 4; n++) slab(0x1c1c22, 0.26, 0.02, 0.26, X - 1.5 + (n % 2) * 0.5, Y + 0.9, Z - 5.6 + Math.floor(n / 2) * 0.4, M.plain); // stove
+    slab(WOOD, 3, 0.9, 1.4, X - 4, Y, Z - 1.5, M.wood, 1); slab(0x2a2a30, 3.1, 0.05, 1.5, X - 4, Y + 0.9, Z - 1.5); collide(X - 4, Z - 1.5, 3, 1.4, 1); // island
+    for (const [bx, bz, hex] of [[-5, -1.5, 0xd8342c], [-3.2, -1.5, 0x2f7d46], [-6.9, -4, 0xf2c230]]) ball(hex, 0.16, X + bx, Y + 1.1, Z + bz); // fruit
+    // The table, with its chairs.
+    slab(WOOD, 2.8, 0.08, 1.4, X + 0.5, Y + 0.72, Z + 1.5, M.wood, 1); for (const [cx, cz] of [[-1, -0.5], [1, -0.5], [-1, 0.5], [1, 0.5]]) post(WOOD, 0.04, 0.72, X + 0.5 + cx, Y, Z + 1.5 + cz, 4);
+    for (const [cx, cz, h] of [[-0.7, 1.4, Math.PI], [0.7, 1.4, Math.PI], [-0.7, -1.4, 0], [0.7, -1.4, 0]]) {
+      slab(0x5a3320, 0.46, 0.06, 0.46, X + 0.5 + cx, Y + 0.46, Z + 1.5 + cz); put(M.plain, new THREE.BoxGeometry(0.46, 0.5, 0.06).translate(0, 0.75, -0.23).rotateY(h).translate(X + 0.5 + cx, Y, Z + 1.5 + cz), 0x5a3320);
+    }
+    collide(X + 0.5, Z + 1.5, 2.8, 1.4, 1);
+    // The den: sofa, coffee table, television, lamp, a rug, and the stairs going up.
+    slab(0x8a2f3a, 5, 0.04, 3.4, X + 5, Y, Z - 2.5, M.gravel, 3);
+    slab(0x2f4a44, 3.2, 0.55, 1.1, X + 5.2, Y, Z - 4.4); slab(0x2f4a44, 3.2, 0.5, 0.3, X + 5.2, Y + 0.55, Z - 4.8); for (const s of [-1, 1]) slab(0x27403b, 0.3, 0.3, 1.1, X + 5.2 + s * 1.45, Y + 0.55, Z - 4.4); collide(X + 5.2, Z - 4.4, 3.2, 1.1, 1);
+    slab(0x3a2418, 1.4, 0.4, 0.7, X + 5.2, Y, Z - 2.6, M.wood, 1);
+    slab(0x1c1c22, 1.3, 0.9, 0.5, X + 5.2, Y + 0.4, Z - 0.3); slab(0x9fd0f5, 1.1, 0.7, 0.04, X + 5.2, Y + 0.5, Z - 0.56, M.glow); collide(X + 5.2, Z - 0.3, 1.3, 0.5, 1.3); // television
+    post(0x1c1c22, 0.03, 1.5, X + 7.2, Y, Z - 4.8, 6); put(M.glow, new THREE.ConeGeometry(0.32, 0.4, 12, 1, true).translate(X + 7.2, Y + 1.7, Z - 4.8), 0xffe2a6);
+    for (let n = 0; n < 7; n++) slab(0xd9b48a, 1.2, 0.2, 0.32, X + 7.3, Y + n * 0.3, Z + 1.6 + n * 0.32, M.wood, 1); collide(X + 7.3, Z + 2.6, 1.2, 2.4, 2);
+    slab(0xe9e2cf, 1.6, 1.2, 0.05, X + 4, Y + 1.5, Z - 6, M.glow);                                 // a window on the garden
+    slab(0x3a2418, 1.4, 2.8, 0.1, X + 2, Y, Z + 6.02);                                           // the front door
+    lamp(X - 3, Y + 3.1, Z - 2, 0xfff0d0, 45, 14); lamp(X + 4.5, Y + 3, Z - 2, 0xffd9a8, 30, 12);
+    const carmela = makeLook('carmela');
+    carmela.group.position.set(X - 4, Y, Z - 3.6); carmela.group.rotation.y = Math.PI; scene.add(carmela.group);
+    places.houseRoom = { ambient: [carmela], inside: { x: X + 2, z: Z + 3.2, h: Math.PI } };
+  }
+  buildHouseRoom();
+
   places.chop = { x: SHORE + 18, z: bounds.minZ + 16 }; // the north end of the beach, where stolen cars get stripped
 
   // ----- Beach: boardwalk, palms along Ocean Drive, umbrellas and lifeguard huts on the sand -----
@@ -1163,7 +1260,18 @@ export function buildWorld(scene) {
     scene.add(points);
   }
 
-  places.office = buildOffice(scene, T);
+  places.office = buildOffice(scene, T, 2600, 0);
+  for (const q of interiors) { // the walls, for the camera's sake
+    collide((q.minX + q.maxX) / 2, q.minZ - 0.6, q.maxX - q.minX + 2, 1.2, 4); collide((q.minX + q.maxX) / 2, q.maxZ + 0.6, q.maxX - q.minX + 2, 1.2, 4);
+    collide(q.minX - 0.6, (q.minZ + q.maxZ) / 2, 1.2, q.maxZ - q.minZ, 4); collide(q.maxX + 0.6, (q.minZ + q.maxZ) / 2, 1.2, q.maxZ - q.minZ, 4);
+  }
+  // Doors between the street and the rooms: stand at `outside` and press F.
+  places.doors = [
+    { name: "Satriale's", outside: { x: places.satriale.door.x, z: places.satriale.door.z - 2.3, h: 0 }, inside: places.shopRoom.inside },
+    { name: 'the Bada Bing', outside: { x: places.bing.door.x, z: places.bing.door.z - 6.4, h: 0 }, inside: places.bingRoom.inside },
+    { name: 'home', outside: { x: places.home.spawn.x, z: places.home.spawn.z - 2.6, h: 0 }, inside: places.houseRoom.inside },
+    { name: "Dr. Melfi's office", outside: { x: places.melfi.door.x, z: places.melfi.door.z - 2.6, h: 0 }, inside: places.office.inside, hide: [places.office.cast.tony] },
+  ];
   places.sky = buildSky(scene, updaters);
   places.update = time => { for (const fn of updaters) fn(time); };
   // k: 0 = the usual sunset, 1 = night.
@@ -1224,9 +1332,9 @@ function buildPalms(scene, list, rand) {
 }
 
 // A small interior set for the therapy scenes, hidden far below the city.
-function buildOffice(scene, T) {
-  const base = -200;
-  const add = (m, x, y, z) => { m.position.set(x, base + y, z); scene.add(m); return m; };
+function buildOffice(scene, T, X, Z) {
+  const base = -0.1;
+  const add = (m, x, y, z) => { m.position.set(X + x, base + y, Z + z); scene.add(m); return m; };
   const panel = T.wood.clone(); panel.repeat.set(5, 1); panel.needsUpdate = true;
   const room = new THREE.Mesh(new THREE.BoxGeometry(12, 4.6, 10), new THREE.MeshLambertMaterial({ color: 0x9a6a50, map: panel, side: THREE.BackSide }));
   add(room, 0, 2.3, 0);
@@ -1264,7 +1372,13 @@ function buildOffice(scene, T) {
 
   const lamp = new THREE.PointLight(0xffd9a8, 45, 30);
   add(lamp, 0, 3.9, 1);
-  return { cam: new THREE.Vector3(0, base + 1.45, 3.9), look: new THREE.Vector3(0, base + 0.95, 0) };
+  interiors.push({ minX: X - 5.6, maxX: X + 5.6, minZ: Z - 4.6, maxZ: Z + 4.6 });
+  for (const [x, z, w, d] of [[-2.2, 0, 1.2, 1.2], [2.2, 0, 1.2, 1.2], [0, 1.4, 0.8, 0.8], [-2.5, -4.6, 3.4, 0.8]]) colliders.push({ minX: X + x - w / 2, maxX: X + x + w / 2, minZ: Z + z - d / 2, maxZ: Z + z + d / 2, h: 1.5 });
+  add(box(1.2, 2.4, 0.08, 0x3a2418), -3.6, 1.2, 4.95);           // the door out
+  return {
+    cam: new THREE.Vector3(X, base + 1.45, Z + 3.9), look: new THREE.Vector3(X, base + 0.95, Z), cast: { tony, melfi },
+    inside: { x: X - 3.6, z: Z + 2.3, h: Math.PI },
+  };
 }
 
 // Sunset sky dome: gradient, the sun's glow over the ocean, and bands of lit cloud.

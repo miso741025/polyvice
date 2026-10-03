@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { NX, NZ, ROAD, LANE, nodeX, nodeZ, clamp, wrapAngle, pushOut, groundAt } from './grid.js';
+import { NX, NZ, ROAD, LANE, CELL, nodeX, nodeZ, clamp, wrapAngle, pushOut, groundAt } from './grid.js';
 import { makeHuman, makeLook, makeTony, LOOKS, loadPeople, updatePeople } from './people.js';
 
 // Headings: an angle h means "facing (sin h, cos h)" in (x, z); local +z of a mesh is its front.
@@ -54,8 +54,9 @@ const PED_LOOKS = [
   { body: 'female', pattern: 'palms', shirt: 0xe0563f, pants: 0xffe066, shoes: 0xf2efe8, hair: 0xd9b25a, hairMesh: 'long', glasses: 'shades' },
 ];
 const pick = (arr, rand) => arr[Math.floor(rand() * arr.length)];
+export const randomPedLook = (rand = Math.random) => ({ ...pick(PED_LOOKS, rand), bulk: 0.9 + Math.floor(rand() * 4) * 0.1 });
 
-// A pedestrian who walks laps around the sidewalk of one block.
+// A pedestrian who walks laps around the sidewalk of one block, runs from trouble, and can be hurt.
 export class Ped {
   constructor(scene, center, rand) {
     this.c = center; this.s = 27.6;
@@ -64,38 +65,88 @@ export class Ped {
     this.speed = 1.2 + rand() * 0.6;
     this.human = makeHuman({ ...pick(PED_LOOKS, rand), bulk: 0.9 + Math.floor(rand() * 4) * 0.1 });
     this.pos = new THREE.Vector3();
-    this.down = 0;
+    this.down = 0; this.health = 100; this.dead = false; this.flight = 0; this.threat = new THREE.Vector3(); this.returning = false;
+    this.pathPoint(this.pos);
     scene.add(this.human.group);
   }
 
-  update(dt, cars) {
-    const g = this.human.group;
-    if (this.down > 0) {
-      this.down -= dt;
-      return;
-    }
-    const s = this.s, L = 8 * s;
-    this.u = ((this.u + this.dir * this.speed * dt) % L + L) % L;
-    const side = Math.floor(this.u / (2 * s)), t = this.u - side * 2 * s - s;
+  // Where on the block's sidewalk the lap parameter `u` puts this pedestrian; also the heading along it.
+  pathPoint(out) {
+    const s = this.s, side = Math.floor(this.u / (2 * s)), t = this.u - side * 2 * s - s;
     let x, z, h;
     if (side === 0) { x = t; z = -s; h = Math.PI / 2; }
     else if (side === 1) { x = s; z = t; h = 0; }
     else if (side === 2) { x = -t; z = s; h = -Math.PI / 2; }
     else { x = -s; z = -t; h = Math.PI; }
-    this.pos.set(this.c.x + x, 0, this.c.z + z);
-    this.human.set('walk', this.speed / 1.4);
-    g.position.set(this.pos.x, 0.14, this.pos.z);
-    g.rotation.y = this.dir > 0 ? h : h + Math.PI;
+    out.set(this.c.x + x, 0, this.c.z + z);
+    return this.dir > 0 ? h : h + Math.PI;
+  }
+
+  // Run from `from` for a while.
+  flee(from, seconds = 8) {
+    if (this.dead) return;
+    this.threat.copy(from); this.flight = seconds; this.returning = true;
+  }
+  hurt(dmg, from) {
+    if (this.dead) return;
+    this.health -= dmg;
+    if (this.health <= 0) { this.die(); return; }
+    this.down = 0;
+    this.human.play(Math.random() < 0.5 ? 'hitHead' : 'hitChest', 'idle');
+    this.flee(from, 9);
+  }
+  die() {
+    if (this.dead) return;
+    this.dead = true; this.diedAt = 0;
+    this.human.after = null;
+    this.human.set('down');
+  }
+
+  update(dt, cars, threat) {
+    const g = this.human.group, h = this.human;
+    if (this.dead) { this.diedAt += dt; return; }
+    if (this.down > 0) {
+      this.down -= dt;
+      if (this.down <= 0) h.set('idle');
+      return;
+    }
+    if (h.busy) return;
+    if (this.flight > 0) { // run away from the trouble
+      this.flight -= dt;
+      const dx = this.pos.x - this.threat.x, dz = this.pos.z - this.threat.z, d = Math.hypot(dx, dz) || 1;
+      this.pos.x += dx / d * 6.4 * dt; this.pos.z += dz / d * 6.4 * dt;
+      pushOut(this.pos, 0.4);
+      h.set('sprint');
+      g.rotation.y = Math.atan2(dx, dz);
+    } else if (this.returning) { // walk back to the sidewalk
+      const target = tmpPed, back = this.pathPoint(target);
+      const tx = target.x - this.pos.x, tz = target.z - this.pos.z, d = Math.hypot(tx, tz);
+      if (d < 0.6) { this.returning = false; g.rotation.y = back; }
+      else {
+        this.pos.x += tx / d * 2.4 * dt; this.pos.z += tz / d * 2.4 * dt;
+        pushOut(this.pos, 0.4);
+        h.set('walk', 1.6);
+        g.rotation.y = Math.atan2(tx, tz);
+      }
+    } else {
+      const L = 8 * this.s;
+      this.u = ((this.u + this.dir * this.speed * dt) % L + L) % L;
+      g.rotation.y = this.pathPoint(this.pos);
+      h.set('walk', this.speed / 1.4);
+    }
+    g.position.set(this.pos.x, groundAt(this.pos.x, this.pos.z), this.pos.z);
+    if (threat && Math.hypot(threat.x - this.pos.x, threat.z - this.pos.z) < 22) this.flee(threat, 7);
 
     for (const car of cars) {
       if (Math.abs(car.speed) > 3 && Math.hypot(car.pos.x - this.pos.x, car.pos.z - this.pos.z) < 1.8) {
-        this.down = 9;
-        this.human.set('down');
+        if (Math.abs(car.speed) > 9) this.die();
+        else { this.down = 9; h.after = null; h.set('down'); }
         break;
       }
     }
   }
 }
+const tmpPed = new THREE.Vector3();
 
 // ---------- Cars ----------
 
@@ -107,6 +158,7 @@ const CAR_KINDS = {
   coupe: { L: 4.5, W: 1.94, clear: 0.2, R: 0.33, axle: 1.34, nose: 0.55, cowl: [0.52, 0.8], roofF: -0.22, roofR: -0.9, roof: 1.15, deck: [-1.62, 0.85], tail: 0.84, pillars: [], wing: true, strakes: true },
   suv: { L: 5.1, W: 2.02, clear: 0.36, R: 0.4, axle: 1.62, nose: 1.0, cowl: [1.08, 1.12], roofF: 0.72, roofR: -2.32, roof: 1.84, deck: [-2.46, 1.12], tail: 1.1, pillars: [-0.2, -1.32], rack: true },
   taxi: { base: 'sedan', sign: true },
+  police: { base: 'sedan', lightbar: true },
   // A box truck: the profile is the cab and chassis, `cargo` the box behind it (from z0 to z1, up to height h).
   truck: { L: 7.6, W: 2.4, clear: 0.5, R: 0.46, axle: 2.5, nose: 1.35, cowl: [2.75, 1.55], roofF: 2.3, roofR: 1.3, roof: 2.55, deck: [1.2, 1.55], tail: 1.2, pillars: [], cargo: { z0: -3.75, z1: 1.05, h: 3.35 } },
 };
@@ -215,6 +267,11 @@ function buildCar(kind) {
     trim.push(slab(W + 0.1, h - k.tail, len, 0, (h + k.tail) / 2, mid, 0xf2f0ea));
     trim.push(slab(W + 0.14, 0.45, len - 0.3, 0, k.tail + 1.25, mid, 0x2f56c8), slab(W + 0.14, 0.12, len - 0.3, 0, k.tail + 0.85, mid, 0xd8342c)); // the line's colours
     trim.push(slab(0.05, h - k.tail - 0.3, 0.03, 0, (h + k.tail) / 2, z0 - 0.01, BLACK), slab(W - 0.2, 0.1, 0.5, 0, k.tail - 0.1, z0 - 0.2, RUBBER));
+  }
+  if (k.lightbar) { // a light bar on the roof and black doors
+    lights.push(slab(0.5, 0.14, 0.3, -0.4, ry + 0.11, (k.roofF + k.roofR) / 2, 0xff2a3c), slab(0.5, 0.14, 0.3, 0.4, ry + 0.11, (k.roofF + k.roofR) / 2, 0x2f7bff));
+    trim.push(slab(0.2, 0.08, 1.2, 0, ry + 0.06, (k.roofF + k.roofR) / 2, BLACK));
+    for (const s of [-1, 1]) trim.push(slab(0.01, k.cowl[1] - 0.6, 2.5, s * (W / 2 + 0.006), yb + 0.3 + (k.cowl[1] - 0.6) / 2, k.pillars[0] + 0.3, BLACK));
   }
   if (k.sign) {
     lights.push(slab(0.7, 0.2, 0.26, 0, ry + 0.15, (k.roofF + k.roofR) / 2, 0xfff6c8));
@@ -348,7 +405,9 @@ export function spawnTraffic(scene, count, rand) {
 }
 
 // Send a car out as traffic: it starts halfway along the road leaving intersection (i, j) in direction `dir` (an index into DIRS).
+export const nearestNode = pos => ({ i: Math.max(0, Math.min(NX, Math.round((pos.x - nodeX(0)) / CELL))), j: Math.max(0, Math.min(NZ, Math.round((pos.z - nodeZ(0)) / CELL))) });
 export function roam(car, i, j, dir, cruise = 10) {
+  if (!validNode(i + DIRS[dir].x, j + DIRS[dir].z)) dir = [0, 1, 2, 3].find(k => validNode(i + DIRS[k].x, j + DIRS[k].z));
   const d = DIRS[dir], r = rightOf(d);
   car.pos.set((nodeX(i) + nodeX(i + d.x)) / 2 + r.x * LANE, 0, (nodeZ(j) + nodeZ(j + d.z)) / 2 + r.z * LANE);
   car.heading = Math.atan2(d.x, d.z); car.speed = cruise;
@@ -360,8 +419,13 @@ function advance(nav) {
     const back = (nav.dir + 2) % 4;
     let options = [0, 1, 2, 3].filter(k => k !== back && validNode(nav.ni + DIRS[k].x, nav.nj + DIRS[k].z));
     if (!options.length) options = [back];
+    if (nav.goal) { // head for the goal: the way that brings the next intersection closest to it
+      const dist = k => Math.hypot(nodeX(nav.ni + DIRS[k].x) - nav.goal.x, nodeZ(nav.nj + DIRS[k].z) - nav.goal.z);
+      options.sort((a, b) => dist(a) - dist(b));
+      nav.next = Math.random() < 0.85 ? options[0] : options[Math.floor(Math.random() * options.length)];
+    }
     // Prefer going straight so traffic flows instead of circling a block.
-    nav.next = options.includes(nav.dir) && Math.random() < 0.55 ? nav.dir : options[Math.floor(Math.random() * options.length)];
+    else nav.next = options.includes(nav.dir) && Math.random() < 0.55 ? nav.dir : options[Math.floor(Math.random() * options.length)];
     nav.target = exitPoint(nav.ni, nav.nj, DIRS[nav.next]);
     nav.phase = 'exit';
   } else {

@@ -8,6 +8,11 @@ export class Hud {
   }
 
   show(on) { $('hud').classList.toggle('on', on); }
+  health(h) { $('healthFill').style.width = Math.max(0, h) + '%'; $('healthFill').classList.toggle('low', h < 30); }
+  wanted(n) { $('wanted').innerHTML = '★'.repeat(n) + `<span class="dim">${'★'.repeat(3 - n)}</span>`; $('wanted').classList.toggle('on', n > 0); }
+  weapon(w) { $('weapon').textContent = w === 'pistol' ? 'Pistol' : 'Fists'; }
+  aim(on) { $('aim').classList.toggle('on', on); }
+  wasted(on) { $('wasted').classList.toggle('on', on); }
   money(n) { $('money').textContent = '$' + String(n).padStart(8, '0'); }
   clock(seconds) {
     const m = (18 * 60 + 30 + Math.floor(seconds)) % 1440;
