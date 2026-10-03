@@ -16,7 +16,7 @@ Then open http://localhost:8137.
 
 ## Controls
 
-WASD move / drive · Mouse look · Shift run · F enter / take car, use doors · Right click or Q lock on · Click or E attack · 1 / 2 weapon · Space handbrake · Enter skip dialogue
+WASD move / drive · Mouse look · Shift run · F enter / take car, use doors · G shake down a register · H horn · Right click or Q lock on · Click or E attack · 1 / 2 weapon · Space handbrake · Enter skip dialogue
 
 ## Layout
 
@@ -25,6 +25,9 @@ WASD move / drive · Mouse look · Shift run · F enter / take car, use doors ·
 - `src/people.js`: characters and the crew's outfits
 - `src/entities.js`: cars, traffic, pedestrians
 - `src/missions.js`: the story (episodes one to three, twenty-two missions), written as async scripts
+- `src/combat.js`: fists, the pistol, lock-on, health, the wanted level and the police
+- `src/sidejobs.js`: shakedowns, food, armour, confession and the motel, between missions
+- `src/audio.js`: all the sound, synthesised
 - `assets/models/`: character model and animations
 
 ## Credits

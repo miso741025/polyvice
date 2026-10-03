@@ -9,6 +9,7 @@ export class Hud {
 
   show(on) { $('hud').classList.toggle('on', on); }
   health(h) { $('healthFill').style.width = Math.max(0, h) + '%'; $('healthFill').classList.toggle('low', h < 30); }
+  armour(a) { $('armourFill').style.width = Math.max(0, a) + '%'; $('armour').classList.toggle('on', a > 0); }
   wanted(n) { $('wanted').innerHTML = '★'.repeat(n) + `<span class="dim">${'★'.repeat(3 - n)}</span>`; $('wanted').classList.toggle('on', n > 0); }
   weapon(w) { $('weapon').textContent = w === 'pistol' ? 'Pistol' : 'Fists'; }
   aim(on) { $('aim').classList.toggle('on', on); }

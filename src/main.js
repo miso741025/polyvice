@@ -6,6 +6,7 @@ import { Hud } from './hud.js';
 import { runStory, savedMission, clearSave } from './missions.js';
 import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
+import { installSideJobs } from './sidejobs.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -227,6 +228,7 @@ async function boot() {
   ].filter(l => l.x !== undefined);
   const fade = (to, seconds) => { hud.fade(to, seconds); return g.wait(seconds + 0.05); };
   const combat = installCombat(g, { scene, hud, peds, cars, keys });
+  const sideJobs = installSideJobs(g);
   g.sfx = sfx;
   window.game = g; // handy in the console
   g.renderer = renderer;
@@ -272,7 +274,7 @@ async function boot() {
     g.started = true;
     document.getElementById('title').classList.add('off');
     hud.fade(1, 0.6);
-    g.wait(0.7).then(() => runStory(g)).catch(err => console.error(err));
+    g.wait(0.7).then(() => runStory(g)).then(() => { g.storyDone = true; }).catch(err => console.error(err));
   };
   startBtn.addEventListener('click', begin);
   // A saved game continues from its last mission; "New game" forgets it.
@@ -419,6 +421,7 @@ async function boot() {
     updatePlayer(dt);
     updateCars(dt);
     combat.update(dt);
+    sideJobs.update();
     const scare = g.time - g.scare < 1 && !p.hidden ? p.pos : null;
     peds.forEach((ped, i) => {
       ped.update(dt, cars, scare);
@@ -465,12 +468,18 @@ async function boot() {
     places.sky.position.copy(camera.position);
     places.update(g.time);
 
+    // Once the story is told, the days turn on their own: dark from a quarter past eight until a quarter to six.
+    if (g.storyDone && !g.missionActive) {
+      const minute = (18 * 60 + 30 + g.time + (g.clockOffset || 0)) % 1440, dusk = 20 * 60 + 15, dawn = 5 * 60 + 45;
+      const want = minute > dusk ? Math.min(1, (minute - dusk) / 30) : minute < dawn ? 1 : Math.max(0, 1 - (minute - dawn) / 30);
+      if (Math.abs(want - g.night) > 0.003) g.setNight(g.night + (want - g.night) * (1 - Math.exp(-dt * 0.6)));
+    }
     sfx.ambience({
       inCar: !!p.car, speed: p.car ? p.car.speed : 0, throttle: p.car && !p.locked ? (keys.KeyW ? 1 : keys.KeyS ? 0.5 : 0) : 0,
       sliding: p.car && !p.locked ? (keys.Space && Math.abs(p.car.speed) > 5 ? 1 : (keys.KeyA || keys.KeyD) && Math.abs(p.car.speed) > 17 ? 0.5 : 0) : 0,
       shore: clamp(1 - (SHORE - p.pos.x) / 140, 0, 1), police: g.sirenLevel || 0, inside: !!p.inside, night: g.night,
     });
-    hud.clock(g.time);
+    hud.clock(g.time + (g.clockOffset || 0));
     hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips], landmarks);
 
     if (!g.skipRender) renderer.render(scene, camera);

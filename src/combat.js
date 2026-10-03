@@ -14,7 +14,7 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xffd080, transparent: tru
 
 export function installCombat(g, { scene, hud, peds, cars, keys }) {
   const p = g.player;
-  Object.assign(p, { health: 100, weapon: 'fist', weapons: { fist: true, pistol: true }, hitAt: -9, dying: false });
+  Object.assign(p, { health: 100, armour: 0, weapon: 'fist', weapons: { fist: true, pistol: true }, hitAt: -9, dying: false });
   g.npcs = []; g.wanted = 0;
   const pickups = [], effects = [], cops = { cars: [], officers: [] };
   let swing = 0, lastShot = -9, lastHit = -9, calm = 0, lastAttack = -9;
@@ -124,6 +124,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   // ----- Damage to the player -----
   g.damagePlayer = (dmg, from) => {
     if (p.locked || p.hidden || p.dying || p.car || g.time - p.hitAt < 0.35) return; // blows do not stack within a beat
+    if (p.armour > 0) { const a = Math.min(p.armour, dmg * 0.75); p.armour -= a; dmg -= a; hud.armour(p.armour); } // the vest takes most of it
     p.health = Math.max(0, p.health - dmg);
     p.hitAt = g.time;
     g.sfx?.hurt();
@@ -378,7 +379,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     g.npcs.length = 0;
     for (const k of pickups) scene.remove(k.mesh);
     pickups.length = 0;
-    p.health = 100; hud.health(100); p.dying = false;
+    p.health = 100; hud.health(100); p.armour = 0; hud.armour(0); p.dying = false;
     g.setWeapon('fist');
   };
   hud.health(100); hud.wanted(0); hud.weapon('fist');
