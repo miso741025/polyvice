@@ -21,12 +21,15 @@ export const colliders = [];
 
 // Height of the ground under (x, z): sidewalks are raised, the beach lies a little lower.
 // lowGround lists squares inside blocks that stay at road level (car parks): { x, z, half }.
-// piers run east out over the water: { minZ, maxZ, ramp (x where it leaves the sand), deck (x where it is level), maxX, y }.
+// piers (and the bridge) run out over the water: { minZ, maxZ, ramp (x where it leaves the land), deck (x where it is level), maxX (its far end), y, dir (1 east, -1 west) }.
 // interiors are rooms built far out over the water; a player inside one is kept inside it. Each lists its `lights`.
 export const lowGround = [], piers = [], interiors = [];
 export const roomAt = (x, z, margin = 1) => interiors.find(q => x > q.minX - margin && x < q.maxX + margin && z > q.minZ - margin && z < q.maxZ + margin);
 export function groundAt(x, z) {
-  for (const p of piers) if (z > p.minZ && z < p.maxZ && x > p.ramp) return x < p.deck ? -0.1 + (p.y + 0.1) * (x - p.ramp) / (p.deck - p.ramp) : p.y;
+  for (const p of piers) { // a pier or a bridge: up a ramp, then level; `dir` -1 runs west instead of east
+    const s = p.dir || 1;
+    if (z > p.minZ && z < p.maxZ && (x - p.ramp) * s > 0) return (x - p.deck) * s < 0 ? -0.1 + (p.y + 0.1) * (x - p.ramp) / (p.deck - p.ramp) : p.y;
+  }
   if (x > SHORE) return x < SHORE + 4.6 ? 0.04 : -0.1;
   if (x < OX - ROAD / 2 || z < OZ - ROAD / 2 || z > OZ + NZ * CELL + ROAD / 2) return -0.1;
   const u = ((x - OX) % CELL + CELL) % CELL, v = ((z - OZ) % CELL + CELL) % CELL;
@@ -75,9 +78,10 @@ export function pushOut(pos, r) {
     return hit;
   }
   // The island's edge, except along a pier, which carries on over the water between its rails.
-  const pier = piers.find(p => pos.z > p.minZ && pos.z < p.maxZ && pos.x > p.deck);
-  const out = pier && pos.x > bounds.maxX - r;
-  const x = clamp(pos.x, bounds.minX + r, (pier ? pier.maxX : bounds.maxX) - r);
+  const pier = piers.find(p => pos.z > p.minZ && pos.z < p.maxZ && (pos.x - p.deck) * (p.dir || 1) > 0);
+  const west = pier && pier.dir === -1;
+  const out = pier && (west ? pos.x < bounds.minX + r : pos.x > bounds.maxX - r);
+  const x = clamp(pos.x, (west ? pier.maxX : bounds.minX) + r, (pier && !west ? pier.maxX : bounds.maxX) - r);
   const z = out ? clamp(pos.z, pier.minZ + r, pier.maxZ - r) : clamp(pos.z, bounds.minZ + r, bounds.maxZ - r);
   if (x !== pos.x || z !== pos.z) { pos.x = x; pos.z = z; hit = true; }
   return hit;

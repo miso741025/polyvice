@@ -392,7 +392,7 @@ const probe = new THREE.Vector3();
 export class Car {
   constructor(scene, x, z, heading, color, kind = 'sedan') {
     this.pos = new THREE.Vector3(x, 0, z);
-    this.heading = heading; this.speed = 0; this.kind = kind;
+    this.heading = heading; this.speed = 0; this.kind = kind; this.color = color;
     this.nav = null; // set for traffic cars driven by the AI
     this.mesh = makeCarMesh(color, kind);
     this.reach = this.mesh.userData.reach;

@@ -449,11 +449,11 @@ export async function runStory(g) {
   const saved = readSave(), from = clamp(saved.mission || 0, 0, total);
   if (from > 0) { // pick up a saved game at home
     const { home, vesuvio } = g.places, p = g.player;
-    if (saved.cash) g.addMoney(saved.cash);
+    if (saved.cash && !g.arrived) g.addMoney(saved.cash); // over the bridge, the money in hand is the money
     if (from > 5) vesuvio?.burn();
     for (const d of home.ducks) d.group.visible = false;
-    p.pos.set(home.wake.x, 0, home.wake.z);
-    g.cam.fixed = null; g.cam.yaw = p.heading = 0; g.cam.pitch = 0.22;
+    if (!g.arrived) { p.pos.set(home.wake.x, 0, home.wake.z); g.cam.yaw = p.heading = 0; g.cam.pitch = 0.22; }
+    g.cam.fixed = null;
     p.locked = false;
     g.hud.show(true);
     await fade(g, 0, 1.2);

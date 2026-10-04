@@ -353,7 +353,8 @@ export function buildWorld(scene) {
 
   // Signs share one texture; each gets a slot in it.
   const atlas = document.createElement('canvas');
-  atlas.width = atlas.height = 2048;
+  const AH = 4096; // tall enough for every sign in either city
+  atlas.width = 2048; atlas.height = AH;
   const ag = atlas.getContext('2d'), shelves = [0, 0, 0, 0];
   M.sign = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(atlas) });
   M.sign.map.colorSpace = THREE.SRGBColorSpace; M.sign.map.anisotropy = 8;
@@ -366,7 +367,7 @@ export function buildWorld(scene) {
     if (!slot) {
       const pw = w >= h ? 512 : Math.max(48, Math.round(256 * w / h)), ph = w >= h ? Math.max(48, Math.round(512 * h / w)) : 256;
       const col = shelves.indexOf(Math.min(...shelves)), px = col * 512, py = shelves[col];
-      if (py + ph > 2048) return; // out of room: the city simply has one sign fewer
+      if (py + ph > AH) return; // out of room: the city simply has one sign fewer
       shelves[col] += ph + 4;
       slots.set(key, slot = { px, py, pw, ph });
       ag.save();
@@ -387,7 +388,7 @@ export function buildWorld(scene) {
     }
     for (const [sx, sy, sz, st] of [[x, y, z, turn], ...also]) {
       const geo = new THREE.PlaneGeometry(w, h), uv = geo.attributes.uv;
-      for (let i = 0; i < 4; i++) uv.setXY(i, (slot.px + uv.getX(i) * slot.pw) / 2048, 1 - (slot.py + (1 - uv.getY(i)) * slot.ph) / 2048);
+      for (let i = 0; i < 4; i++) uv.setXY(i, (slot.px + uv.getX(i) * slot.pw) / 2048, 1 - (slot.py + (1 - uv.getY(i)) * slot.ph) / AH);
       put(M.sign, geo.rotateY(st).translate(sx, sy, sz));
     }
   }
@@ -2142,6 +2143,46 @@ export function buildWorld(scene) {
     else if (Math.hypot(x - marsh.x, z - marsh.z) > 4) for (let k = 0; k < 4; k++) put(M.plain, new THREE.ConeGeometry(0.07, 1.5 + rand(), 4).translate(x + rand() - 0.5, 0.6, z + rand() - 0.5), k % 2 ? 0x6f8a4a : 0x4f6f3a);
   }
   places.marsh = marsh;
+
+  // ----- The bridge to the other island: a long deck out over the water, two towers, cables, lamps -----
+  // Vice City's leaves from the west shore; Los Angeles's arrives on the east. Driving off the far end crosses over.
+  {
+    const dir = LA ? 1 : -1, z = nodeZ(9), Y = 7, W = 14, GREY = 0x9a968e, STEEL_B = 0x8a2f2a;
+    const x0 = LA ? SHORE : OX - ROAD / 2, ramp = x0 + dir * 2, deck = x0 + dir * 56, end = (LA ? bounds.maxX : bounds.minX) + dir * 460;
+    piers.push({ minZ: z - W / 2 + 0.5, maxZ: z + W / 2 - 0.5, ramp, deck, maxX: end, y: Y, dir });
+    const len = Math.abs(end - deck), mid = (deck + end) / 2, rl = Math.abs(deck - ramp);
+    put(M.gravel, tiled(new THREE.BoxGeometry(rl + 0.4, 0.8, W), rl, 0.8, W, 6).rotateZ(dir * Math.atan2(Y + 0.1, rl)).translate((ramp + deck) / 2, (Y - 0.1) / 2 - 0.4, z), GREY);
+    slab(GREY, len, 1, W, mid, Y - 1, z, M.gravel, 6);
+    flat(M.asphalt, 0xffffff, len, W - 1.2, mid, Y + 0.02, z, 5);
+    for (let k = 0; k < len / 12; k++) flat(M.paint, 0xe8c64a, 5, 0.18, deck + dir * (6 + k * 12), Y + 0.04, z);
+    for (const s of [-1, 1]) {
+      slab(0xb9b3ba, len, 1.1, 0.4, mid, Y, z + s * (W / 2 - 0.2));
+      // rails over the beach, so nobody steps off the side of the ramp
+      collide((x0 + (LA ? bounds.maxX : bounds.minX)) / 2, z + s * (W / 2 + 0.2), Math.abs((LA ? bounds.maxX : bounds.minX) - x0) + 8, 0.5, Y + 2);
+    }
+    for (let k = 0; k <= len / 46; k++) { // piles into the sea, lamps above them
+      const px = deck + dir * k * 46;
+      slab(GREY, 2.2, Y + 4, W - 3, px, -4, z, M.gravel, 4);
+      for (const s of [-1, 1]) { post(STEEL, 0.09, 6, px, Y, z + s * (W / 2 - 0.5)); ball(0xffe2a6, 0.26, px, Y + 6.1, z + s * (W / 2 - 0.5), M.glow); halo(px, Y + 6.1, z + s * (W / 2 - 0.5), 0xffb860, 4); }
+    }
+    for (const t of [0.3, 0.72]) { // the towers and their cables
+      const tx = deck + dir * len * t, H = 44;
+      for (const s of [-1, 1]) slab(STEEL_B, 2.2, H + 8, 2.2, tx, -6, z + s * (W / 2 + 1.2));
+      for (const hy of [Y + 12, Y + 26, H]) slab(STEEL_B, 1.6, 2.4, W + 2.4, tx, hy, z);
+      ball(0xff3b3b, 0.4, tx, H + 3.2, z, M.glow); halo(tx, H + 3.2, z, 0xff3030, 10);
+      for (const s of [-1, 1]) for (let n = 1; n <= 7; n++) for (const side of [-1, 1]) {
+        const reach = n * 14, dx = side * reach, drop = H - Y - 1, l = Math.hypot(reach, drop);
+        put(M.plain, new THREE.BoxGeometry(l, 0.18, 0.18).rotateZ(-side * Math.atan2(drop, reach)).translate(tx + dx / 2, Y + 1 + drop / 2, z + s * (W / 2 + 1.2)), 0xd8d0c4);
+      }
+    }
+    // The sign over the on-ramp.
+    const there = LA ? 'VICE CITY' : 'LOS ANGELES', sx = x0 + dir * 10;
+    for (const s of [-1, 1]) post(0x55525a, 0.2, 8, sx, 0, z + s * (W / 2 + 0.6), 8);
+    slab(0x55525a, 0.4, 3.2, W + 1.2, sx, 6.6, z);
+    sign([there, 'BRIDGE  ·  2 MILES'], sx - dir * 0.24, 8.2, z, dir > 0 ? -Math.PI / 2 : Math.PI / 2, { w: 11, h: 2.8, color: '#f4f4f0', bg: '#1f6b4a', size: 0.62, glow: false });
+    places.bridge = { dir, there, start: { x: x0 - dir * 6, z }, far: { x: end - dir * 30, z }, arrive: { x: end - dir * 90, z: z + dir * 3, h: dir > 0 ? -Math.PI / 2 : Math.PI / 2 } };
+    for (let n = palms.length - 1; n >= 0; n--) if (Math.abs(palms[n].z - z) < W / 2 + 3 && (palms[n].x - x0) * dir > -4) palms.splice(n, 1); // no palms growing through the deck
+  }
 
   buildPalms(scene, palms, rand);
 

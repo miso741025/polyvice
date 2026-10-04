@@ -102,7 +102,13 @@ async function boot() {
   const crowdLimit = () => { peds.forEach((ped, i) => { ped.parked = i >= CROWD[settings.crowd]; if (ped.parked) ped.human.group.visible = false; }); };
   crowdLimit();
 
-  const tony = makeLook(LA ? 'neil' : 'tony'); // the player: Tony Soprano in Vice City, Neil McCauley in Los Angeles
+  // Whoever drives over the bridge arrives as themselves, with what they were carrying.
+  const arrived = new URLSearchParams(location.search).get('from') === 'bridge';
+  let carry = null;
+  try { carry = arrived ? JSON.parse(sessionStorage.getItem('crossing')) : null; } catch { /* nothing carried */ }
+  sessionStorage.removeItem('crossing');
+  const local = LA ? 'neil' : 'tony', who = carry?.who || local;
+  const tony = makeLook(who); // the player: Tony Soprano in Vice City, Neil McCauley in Los Angeles, or a visitor from across the water
   scene.add(tony.group);
 
   // ----- Game state shared with the mission scripts -----
@@ -244,12 +250,31 @@ async function boot() {
     { ...places.hospital.door, label: '+', name: 'Hospital', color: '#2f56c8' }, { ...places.bodyshop.door, label: 'A', name: 'Auto body', color: '#8a1c1c' }, { ...places.cafe.door, label: 'C', name: 'Bean Scene', color: '#1f6b4a' },
     { ...places.livia.porch, label: 'L', name: "Livia's house", color: '#8a6f8f' }, { ...places.grove.gate, label: 'G', name: 'Green Grove', color: '#5f8a84' }, { ...places.motel.office, label: 'T', name: 'Motel', color: '#f08a3c' },
     { ...places.church?.door, label: '†', name: 'Church', color: '#f4f2ee' }, { ...places.gas?.pumps, label: 'P', name: 'Gas station', color: '#d8342c' }, { ...places.carlot?.lot, label: '$', name: 'Sunshine Autos', color: '#2f56c8' },
+    { ...places.bridge.start, label: '⇄', name: `Bridge to ${LA ? 'Vice City' : 'Los Angeles'}`, color: '#8a2f2a' },
   ]).filter(l => l.x !== undefined);
   for (const d of places.gunShops || []) landmarks.push({ x: d.x, z: d.z, label: 'W', name: 'Guns', color: '#5c6157' });
   const fade = (to, seconds) => { hud.fade(to, seconds); return g.wait(seconds + 0.05); };
   const combat = installCombat(g, { scene, hud, peds, cars, keys });
   const sideJobs = installSideJobs(g);
   applySettings();
+  g.who = who; g.visitor = who !== local; g.arrived = arrived;
+  if (carry) { // the money, the guns and the bruises came too
+    g.cash = carry.cash || 0; hud.money(g.cash);
+    Object.assign(p.weapons, carry.weapons); Object.assign(p.mag, carry.mag); Object.assign(p.ammo, carry.ammo);
+    p.armour = carry.armour || 0; hud.armour(p.armour); p.health = carry.health || 100; hud.health(p.health);
+  }
+  // Off the far end of the bridge: fade, and load the other island with everything in hand.
+  const crossBridge = () => {
+    if (g.crossing) return;
+    g.crossing = true; p.locked = true;
+    if (p.car) p.car.speed = Math.min(p.car.speed, 12);
+    try {
+      sessionStorage.setItem('crossing', JSON.stringify({ who: g.who, cash: g.cash, weapons: p.weapons, mag: p.mag, ammo: p.ammo, armour: p.armour, health: Math.max(20, p.health), car: p.car ? { kind: p.car.kind, color: p.car.color } : null }));
+    } catch { /* cross with empty hands */ }
+    hud.card(places.bridge.there, 'Across the bridge');
+    hud.fade(1, 1.4);
+    setTimeout(() => { location.search = LA ? '?from=bridge' : '?city=la&from=bridge'; }, 1700);
+  };
   g.sfx = sfx;
   window.game = g; // handy in the console
   g.renderer = renderer;
@@ -307,6 +332,20 @@ async function boot() {
     g.wait(0.7).then(() => runStory(g)).then(() => { g.storyDone = true; }).catch(err => console.error(err));
   };
   startBtn.addEventListener('click', begin);
+  // Arriving over the bridge there is no title: the far end of the deck, the car you came in, and the island ahead.
+  if (arrived) {
+    g.started = true;
+    document.getElementById('title').classList.add('off');
+    hud.show(true);
+    g.cam.fixed = null;
+    const at = places.bridge.arrive, ride = carry?.car ? g.spawnCar(at.x, at.z, at.h, carry.car.color ?? 0x1d1d24, carry.car.kind) : null;
+    p.pos.set(at.x, 0, at.z); p.heading = g.cam.yaw = at.h; p.locked = false;
+    if (ride) { ride.mission = false; g.enterCar(ride); ride.speed = 12; }
+    hud.fade(1, 0); hud.fade(0, 1.6);
+    hud.card(LA ? 'Los Angeles' : 'Vice City', g.visitor ? 'You are a long way from home' : 'Home');
+    g.wait(3.5).then(() => { hud.card(); return g.visitor ? null : runStory(g); }).then(() => { g.storyDone = true; }).catch(err => console.error(err));
+    addEventListener('pointerdown', () => sfx.unlock(), { once: true }); addEventListener('keydown', () => sfx.unlock(), { once: true });
+  }
   // A saved game continues from its last mission; "New game" forgets it.
   const freshBtn = document.getElementById('fresh');
   if (savedMission() > 0) {
@@ -499,6 +538,7 @@ async function boot() {
     if (g.paused) { if (!g.skipRender) renderer.render(scene, camera); pressed.clear(); return; }
     if (g.started && g.consume('Escape')) { openSettings(); pressed.clear(); return; }
     if (g.started && g.consume('KeyM')) g.mapOpen = !g.mapOpen;
+    if (g.started && !p.locked && !p.inside && (p.pos.x - places.bridge.far.x) * places.bridge.dir > 0 && Math.abs(p.pos.z - places.bridge.far.z) < 12) crossBridge();
     g.time += dt;
 
     updatePlayer(dt);
