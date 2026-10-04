@@ -47,6 +47,16 @@ async function boot() {
 
   const rand = mulberry32(77);
   const hud = new Hud();
+  // Settings, kept in the browser: volume, mouse, the crowd, shadows.
+  const SETTINGS = 'sopranos-vice.settings';
+  const settings = { volume: 0.7, sens: 1, invert: false, crowd: 1, shadows: true };
+  try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS)) || {}); } catch { /* defaults */ }
+  const applySettings = () => {
+    sfx.setVolume(settings.volume);
+    renderer.shadowMap.enabled = settings.shadows; sun.castShadow = settings.shadows;
+    scene.traverse(o => { if (o.material) { for (const m of [].concat(o.material)) m.needsUpdate = true; } });
+    try { localStorage.setItem(SETTINGS, JSON.stringify(settings)); } catch { /* play on */ }
+  };
   const places = buildWorld(scene);
 
   // ----- Cars: Tony's SUV, parked cars at the kerb, traffic -----
@@ -86,8 +96,10 @@ async function boot() {
     do { i = Math.floor(rand() * NX); j = Math.floor(rand() * NZ); } while (i === 0 && j === 0);
     return blockCenter(i, j);
   };
-  const peds = [];
-  for (let n = 0; n < 90; n++) peds.push(new Ped(scene, blockNear(places.home.spawn, 220), rand));
+  const peds = [], CROWD = [45, 90, 130];
+  for (let n = 0; n < 130; n++) peds.push(new Ped(scene, blockNear(places.home.spawn, 220), rand));
+  const crowdLimit = () => { peds.forEach((ped, i) => { ped.parked = i >= CROWD[settings.crowd]; if (ped.parked) ped.human.group.visible = false; }); };
+  crowdLimit();
 
   const tony = makeTony();
   scene.add(tony.group);
@@ -224,11 +236,12 @@ async function boot() {
     { ...places.melfi.door, label: 'M', color: '#1f9c8f' }, { ...places.vesuvio.door, label: 'V', color: '#e0a12c' }, { ...places.hesh.door, label: 'F', color: '#49a0d0' },
     { ...places.hospital.door, label: '+', color: '#2f56c8' }, { ...places.bodyshop.door, label: 'A', color: '#8a1c1c' }, { ...places.cafe.door, label: 'C', color: '#1f6b4a' },
     { ...places.livia.porch, label: 'L', color: '#8a6f8f' }, { ...places.grove.gate, label: 'G', color: '#5f8a84' }, { ...places.motel.office, label: 'T', color: '#f08a3c' },
-    { ...places.church?.door, label: '†', color: '#f4f2ee' }, { ...places.gas?.pumps, label: '⛽', color: '#d8342c' }, { ...places.carlot?.lot, label: '$', color: '#2f56c8' },
+    { ...places.church?.door, label: '†', color: '#f4f2ee' }, { ...places.gas?.pumps, label: 'P', color: '#d8342c' }, { ...places.carlot?.lot, label: '$', color: '#2f56c8' },
   ].filter(l => l.x !== undefined);
   const fade = (to, seconds) => { hud.fade(to, seconds); return g.wait(seconds + 0.05); };
   const combat = installCombat(g, { scene, hud, peds, cars, keys });
   const sideJobs = installSideJobs(g);
+  applySettings();
   g.sfx = sfx;
   window.game = g; // handy in the console
   g.renderer = renderer;
@@ -236,6 +249,7 @@ async function boot() {
   // ----- Input -----
   addEventListener('keydown', e => {
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
+    if (hud.onMenu) { if (!e.repeat) hud.onMenu(e.code); return; } // a menu is open: it gets the keys
     keys[e.code] = true;
     if (!e.repeat) pressed.add(e.code);
   });
@@ -244,16 +258,17 @@ async function boot() {
   let dragging = false;
   canvas.addEventListener('mousedown', e => {
     dragging = true;
-    if (e.button === 0 && g.started) pressed.add('Mouse0');
+    if (e.button === 0 && g.started) { pressed.add('Mouse0'); keys.Mouse0 = true; }
     if (e.button === 2 && g.started) { pressed.add('Mouse2'); keys.Mouse2 = true; }
     if (g.started) try { canvas.requestPointerLock()?.catch?.(() => {}); } catch { /* pointer lock unavailable: dragging still works */ }
   });
-  addEventListener('mouseup', e => { dragging = false; if (e.button === 2) keys.Mouse2 = false; });
+  addEventListener('mouseup', e => { dragging = false; if (e.button === 2) keys.Mouse2 = false; if (e.button === 0) keys.Mouse0 = false; });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   addEventListener('mousemove', e => {
     if (document.pointerLockElement !== canvas && !dragging) return;
-    g.cam.yaw -= e.movementX * 0.0026;
-    g.cam.pitch = clamp(g.cam.pitch + e.movementY * 0.002, -0.05, 1.1);
+    if (g.paused) return;
+    g.cam.yaw -= e.movementX * 0.0026 * settings.sens;
+    g.cam.pitch = clamp(g.cam.pitch + e.movementY * 0.002 * settings.sens * (settings.invert ? -1 : 1), -0.05, 1.1);
     g.cam.lastMouse = g.time;
   });
 
@@ -323,6 +338,12 @@ async function boot() {
 
     const mx = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), mz = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
     p.motion = 'idle';
+    // A jump: up, over, and down again, the legs tucked.
+    if (!p.locked && !p.jumping && g.consume('Space')) { p.jumping = true; p.jumpV = 4.4; p.jumpY = 0; p.human.play('jumpStart', 'jumpLoop', 1.6); }
+    if (p.jumping) {
+      p.jumpY += p.jumpV * dt; p.jumpV -= 12.5 * dt;
+      if (p.jumpY <= 0) { p.jumpY = 0; p.jumping = false; p.human.play('jumpLand', 'idle', 1.6); }
+    }
     if (!p.locked && (mx || mz)) {
       const s = Math.sin(g.cam.yaw), c = Math.cos(g.cam.yaw);
       let vx = s * mz - c * mx, vz = c * mz + s * mx;
@@ -332,7 +353,7 @@ async function boot() {
       if (p.weapon !== 'pistol' && !g.lockTarget) p.heading += wrapAngle(Math.atan2(vx, vz) - p.heading) * (1 - Math.exp(-12 * dt));
       p.motion = speed > 5 ? 'sprint' : 'run';
     }
-    if (p.weapon === 'pistol' && !p.locked && !g.lockTarget) p.heading = g.cam.yaw; // armed and free-aiming, Tony faces where the camera looks
+    if (p.aiming) p.heading = g.cam.yaw; // armed and free-aiming, Tony faces where the camera looks
     pushOut(p.pos, 0.45);
     for (const ped of peds) { // the crowd is solid; sprinting into someone knocks them aside
       if (ped.dead || Math.abs(ped.pos.x - p.pos.x) > 2 || Math.abs(ped.pos.z - p.pos.z) > 2) continue;
@@ -399,8 +420,10 @@ async function boot() {
     const car = p.car;
     // Behind a moving car, drift back to the chase view once the mouse is left alone.
     if (car && car.speed > 3 && g.time - cam.lastMouse > 1.2) cam.yaw += wrapAngle(car.heading - cam.yaw) * (1 - Math.exp(-3 * dt));
-    const dist = car ? 6.2 + car.reach * 2.5 : 5.2, cp = Math.cos(cam.pitch);
-    focus.set(p.pos.x, (car ? 1.9 : 1.6) + groundAt(p.pos.x, p.pos.z), p.pos.z);
+    const aiming = p.aiming && !car;
+    const dist = car ? 6.2 + car.reach * 2.5 : aiming ? 2.6 : 5.2, cp = Math.cos(cam.pitch);
+    focus.set(p.pos.x, (car ? 1.9 : aiming ? 1.5 : 1.6) + groundAt(p.pos.x, p.pos.z), p.pos.z);
+    if (aiming) { focus.x -= Math.cos(cam.yaw) * 0.75; focus.z += Math.sin(cam.yaw) * 0.75; } // over the right shoulder
     tmp.set(-Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp);
     want.copy(focus).addScaledVector(tmp, dist);
     const clear = clearRatio(focus, want);
@@ -411,12 +434,44 @@ async function boot() {
       camera.position.x += Math.sin(g.time * 2.3) * 0.25 * cam.sway;
       camera.position.y += Math.sin(g.time * 3.1) * 0.15 * cam.sway;
     }
-    camera.lookAt(focus);
+    if (aiming) { tmp.set(Math.sin(cam.yaw) * cp, -Math.sin(cam.pitch) * 0.6, Math.cos(cam.yaw) * cp); camera.lookAt(tmp.multiplyScalar(12).add(focus)); } // the crosshair is where the gun points
+    else camera.lookAt(focus);
     if (cam.sway) camera.rotation.z += Math.sin(g.time * 1.7) * 0.08 * cam.sway;
   }
 
   // Advance the simulation by dt seconds and draw. Exposed as game.step for debugging.
+  // The settings, as a menu; the game waits while it is open.
+  const openSettings = () => {
+    g.paused = true;
+    const show = () => hud.menu('Settings', [
+      { key: 'Digit1', label: 'Volume', hint: `${Math.round(settings.volume * 100)}%  (1 lower, 2 higher)` }, { key: 'Digit2', label: '' },
+      { key: 'Digit3', label: 'Mouse sensitivity', hint: `${settings.sens.toFixed(1)}  (3 lower, 4 higher)` }, { key: 'Digit4', label: '' },
+      { key: 'Digit5', label: 'Invert mouse Y', hint: settings.invert ? 'on' : 'off' },
+      { key: 'Digit6', label: 'Crowd', hint: ['light', 'normal', 'heavy'][settings.crowd] },
+      { key: 'Digit7', label: 'Shadows', hint: settings.shadows ? 'on' : 'off' },
+      { key: 'Escape', label: 'Resume' },
+      { key: 'Digit0', label: 'Quit to the title screen', hint: 'progress is saved after each mission' },
+    ].filter(i => i.label), code => {
+      if (code === 'Digit1') settings.volume = Math.max(0, +(settings.volume - 0.1).toFixed(1));
+      else if (code === 'Digit2') settings.volume = Math.min(1, +(settings.volume + 0.1).toFixed(1));
+      else if (code === 'Digit3') settings.sens = Math.max(0.3, +(settings.sens - 0.1).toFixed(1));
+      else if (code === 'Digit4') settings.sens = Math.min(3, +(settings.sens + 0.1).toFixed(1));
+      else if (code === 'Digit5') settings.invert = !settings.invert;
+      else if (code === 'Digit6') { settings.crowd = (settings.crowd + 1) % 3; crowdLimit(); }
+      else if (code === 'Digit7') settings.shadows = !settings.shadows;
+      else if (code === 'Digit0') { applySettings(); location.reload(); return; }
+      else if (code === 'Escape' || code === 'Enter') { applySettings(); hud.menu(); g.paused = false; for (const k in keys) keys[k] = false; return; }
+      else return;
+      applySettings(); show();
+    });
+    show();
+  };
+  g.openSettings = openSettings;
+
   function step(dt) {
+    if (g.paused) { if (!g.skipRender) renderer.render(scene, camera); pressed.clear(); return; }
+    if (g.started && g.consume('Escape')) { openSettings(); pressed.clear(); return; }
+    if (g.started && g.consume('KeyM')) g.mapOpen = !g.mapOpen;
     g.time += dt;
 
     updatePlayer(dt);
@@ -426,6 +481,7 @@ async function boot() {
     const scare = g.time - g.scare < 1 && !p.hidden ? p.pos : null;
     Ped.eye = camera.position;
     peds.forEach((ped, i) => {
+      if (ped.parked) return;
       ped.update(dt, cars, scare);
       if (ped.dead && ped.diedAt > 20) { // the dead are replaced by someone new on another block
         scene.remove(ped.human.group);
@@ -455,10 +511,11 @@ async function boot() {
 
     const me = p.human;
     me.group.visible = !p.car && !p.hidden;
-    me.group.position.set(p.pos.x, groundAt(p.pos.x, p.pos.z), p.pos.z);
+    me.group.position.set(p.pos.x, groundAt(p.pos.x, p.pos.z) + (p.jumpY || 0), p.pos.z);
     me.group.rotation.y = p.heading;
     if (p.down) me.set('down');
-    else if (!me.busy) me.set(p.pose || (p.car || p.locked ? 'idle' : p.motion === 'idle' && p.weapon === 'pistol' ? 'aim' : p.motion));
+    else if (p.jumping) { if (!me.busy) me.set('jumpLoop'); }
+    else if (!me.busy) me.set(p.pose || (p.car || p.locked ? 'idle' : p.motion === 'idle' ? (p.aiming || (g.lockTarget && p.weapon !== 'fist') ? 'aim' : p.fighting ? 'stance' : 'idle') : p.motion));
 
     for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
 
@@ -483,6 +540,7 @@ async function boot() {
     });
     hud.clock(g.time + (g.clockOffset || 0));
     hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips], landmarks);
+    hud.map(g.mapOpen, { focus: p.pos, heading: p.car ? p.car.heading : p.heading, blips: [...g.markers, ...g.blips], landmarks });
 
     if (!g.skipRender) renderer.render(scene, camera);
     pressed.clear();

@@ -31,13 +31,36 @@ async function say(g, who, text, dur = Math.max(2.4, text.length * 0.065)) {
 }
 
 // A run of dialogue: [speaker, text, who gestures]. The third entry is an actor, or g.player for the player.
+// The speaker gestures (talking, pointing, calming hands, or talking from a chair), the others turn to face
+// them, and a fixed camera eases toward whoever is speaking.
 async function talk(g, lines) {
+  const p = g.player, cast = [...new Set(lines.map(l => l[2]).filter(a => a && a !== p))];
+  const fixed = g.cam.fixed, look0 = fixed && fixed.look.clone();
+  let target = null, talking = true;
+  if (fixed) g.updaters.push(dt => { if (!talking || g.cam.fixed !== fixed) return false; if (target) fixed.look.lerp(target, 1 - Math.exp(-2.5 * dt)); return true; });
+  const posOf = a => (a === p ? p.pos : a.group.position);
+  const standing = a => ['idle', 'talk', 'stance', 'calm'].includes(a.state) && !a.busy;
   for (const [who, text, a] of lines) {
-    const p = g.player, was = a && a !== p ? a.state : null;
-    if (a === p) p.pose = 'talk'; else if (was === 'idle') a.set('talk');
+    const was = a && a !== p ? a.state : null;
+    const loud = /!/.test(text), ask = /\?/.test(text), r = Math.random();
+    if (a) {
+      const at = posOf(a);
+      if (fixed) target = look0.clone().lerp(new THREE.Vector3(at.x, (at.y ?? groundAt(at.x, at.z)) + 1.45, at.z), 0.55);
+      for (const o of cast) if (o !== a && standing(o) && near(o.group.position, at, 7)) o.group.rotation.y = toward(o.group.position, at);
+      if (a !== p && !p.car && p.locked && near(p.pos, at, 6) && !p.pose) p.heading = toward(p.pos, at);
+    }
+    if (a === p) { p.pose = 'talk'; if (loud && r < 0.25) p.human.play('point', 'talk'); }
+    else if (was === 'sit') { /* seated: the library only talks sitting on the ground */ }
+    else if (was && standing(a)) {
+      if ((loud && r < 0.3) || (ask && r < 0.18)) a.play('point', 'talk');
+      else if (!loud && r < 0.18) a.set('calm');
+      else a.set('talk');
+    }
     await say(g, who, text);
-    if (a === p) p.pose = null; else if (was === 'idle') a.set('idle');
+    if (a === p) p.pose = null;
+    else if (was && ['idle', 'talk', 'stance', 'calm'].includes(was)) { if (a.busy) a.after = was; else a.set(was === 'talk' ? 'idle' : was); }
   }
+  talking = false;
 }
 const phone = (g, who, text) => { if (!g.ringing) { g.ringing = true; g.sfx?.phone(); g.wait(1.5).then(() => { g.ringing = false; }).catch(() => {}); } return say(g, who + ' (phone)', text); };
 
@@ -409,7 +432,7 @@ export async function runStory(g) {
       if (n++ < from) continue;
       if (k === 0 && e > 0) { await g.wait(1.5); await titleCard(g, episode.title, episode.name); }
       for (;;) { // a mission is played again from the start if Tony is killed during it
-        g.missionActive = true;
+        g.missionActive = true; g.topUp?.();
         try { await mission(g); break; } catch (err) { if (err !== g.WASTED) throw err; }
         finally { g.missionActive = false; }
         await g.respawn();

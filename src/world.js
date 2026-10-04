@@ -248,9 +248,10 @@ export function buildWorld(scene) {
   const lam = opts => new THREE.MeshLambertMaterial({ vertexColors: true, ...opts });
   const lit = f => lam({ map: f.map, emissiveMap: f.glow, emissive: 0xffffff, emissiveIntensity: 0.85 });
   const decal = opts => lam({ polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, ...opts });
+  const under = opts => lam({ polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, ...opts });
   const M = {
     plain: lam(), glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
-    paver: lam({ map: T.paver }), asphalt: lam({ map: T.asphalt }), grass: decal({ map: T.grass }), paint: decal(),
+    paver: lam({ map: T.paver }), asphalt: lam({ map: T.asphalt }), tarmac: under({ map: T.asphalt }), grass: decal({ map: T.grass }), paint: decal(),
     brick: lam({ map: T.brick }), siding: lam({ map: T.siding }), shingle: lam({ map: T.shingle }), gravel: lam({ map: T.gravel }),
     wood: lam({ map: T.wood }), sand: lam({ map: T.sand }),
     shop: lit(shopfronts(rand)),
@@ -325,7 +326,7 @@ export function buildWorld(scene) {
         const mixed = part.some(g => !g.index);
         const mesh = new THREE.Mesh(mergeGeometries(mixed ? part.map(g => (g.index ? g.toNonIndexed() : g)) : part), mat);
         const solid = mat !== M.glow && mat !== M.sign && mat !== M.pool;
-        mesh.castShadow = solid && mat !== M.grass && mat !== M.paint; mesh.receiveShadow = solid;
+        mesh.castShadow = solid && mat !== M.grass && mat !== M.paint && mat !== M.tarmac; mesh.receiveShadow = solid;
         if (mat === M.pool) mesh.renderOrder = 2;
         group.add(mesh);
       }
@@ -990,7 +991,7 @@ export function buildWorld(scene) {
   // ----- An industrial yard: a steel shed with roller doors, a fenced lot of containers and pallets, and a water tower -----
   function buildYard(c) {
     const y = CURB, firm = pick(FIRMS), WALL = pick([0x9fb0c4, 0xb9b3ba, 0xcfc8ba, 0x8fa39a]), e = 26;
-    flat(M.asphalt, 0xffffff, BLOCK - 6, BLOCK - 6, c.x, y + 0.05, c.z, 5);
+    flat(M.tarmac, 0xffffff, BLOCK - 6, BLOCK - 6, c.x, y + 0.015, c.z, 5);
     const sx = c.x - 4, sz = c.z - 16, sw = 40, sd = 20, sh = 7 + Math.floor(rand() * 2) * 2;
     slab(WALL, sw, sh, sd, sx, y, sz, M.siding, 1.6); collide(sx, sz, sw, sd, y + sh);
     gable(0x55525a, sd + 1, 1.8, sw + 1, sx, y + sh, sz, Math.PI / 2, M.plain);
@@ -1190,7 +1191,7 @@ export function buildWorld(scene) {
   // ----- Kolar Bros. Sanitation: a fenced yard with a hut, trucks and bins -----
   function buildKolar(c) {
     const y = CURB, GREEN = 0x2f6b4a, e = 26;
-    flat(M.asphalt, 0xffffff, BLOCK - 6, BLOCK - 6, c.x, y + 0.05, c.z, 5);
+    flat(M.tarmac, 0xffffff, BLOCK - 6, BLOCK - 6, c.x, y + 0.015, c.z, 5);
     for (let t = -e; t <= e; t += 4) { // chain-link fence, open on the east side for the gate
       for (const s of [-1, 1]) { post(0x8a8d96, 0.06, 2.4, c.x + t, y, c.z + s * e, 5); if (s < 0 || Math.abs(t) > 5) post(0x8a8d96, 0.06, 2.4, c.x + s * e, y, c.z + t, 5); }
     }
@@ -1256,7 +1257,7 @@ export function buildWorld(scene) {
     sign(['VICE GENERAL', 'HOSPITAL'], c.x, y + 6.4, c.z - 2.8, 0, { w: 12, h: 2.6, color: '#2f56c8', bg: '#f4f4f0', size: 0.72, glow: false });
     slab(0xd8342c, 2.6, 0.6, 0.1, c.x - 18, y + 7.8, c.z - 2.9); slab(0xf4f4f0, 0.6, 2.6, 0.1, c.x - 18, y + 6.8, c.z - 2.9); // the red cross
     slab(0xd8342c, 0.6, 2.6, 0.12, c.x - 18, y + 6.8, c.z - 2.92); slab(0xf4f4f0, 2.6, 0.6, 0.14, c.x - 18, y + 7.8, c.z - 2.94);
-    flat(M.asphalt, 0xffffff, 40, 20, c.x, y + 0.07, c.z + 16, 5);
+    flat(M.tarmac, 0xffffff, 40, 20, c.x, y + 0.015, c.z + 16, 5);
     for (let k = -5; k <= 5; k++) flat(M.paint, 0xe9e6ee, 0.14, 5, c.x + k * 3.2, y + 0.1, c.z + 24);
     sign('EMERGENCY', c.x + 14, y + 3.9, c.z + 7.1, 0, { w: 5, h: 1, color: '#f4f4f0', bg: '#d8342c', size: 0.8, glow: false });
     const amb = new Car(scene, c.x - 14, c.z + 10, Math.PI / 2, 0xf4f4f0, 'suv'); collide(c.x - 14, c.z + 10, 5.2, 2.2, 2); void amb;
@@ -1267,7 +1268,7 @@ export function buildWorld(scene) {
   // ----- The Teittleman motel (south-east lot of its block): two floors of rooms round a forecourt -----
   function buildMotel(c) {
     const x = c.x + 13, z = c.z + 13, y = CURB, PINK = 0xffd3a1, TEAL = 0x1f9c8f;
-    flat(M.asphalt, 0xffffff, 26, 24, x, y + 0.05, z, 5);
+    flat(M.tarmac, 0xffffff, 26, 24, x, y + 0.015, z, 5);
     // The L: a long wing along the back (north) and a short one down the west side.
     slab(PINK, 24, 6.6, 6, x, y, z - 9, M.gravel, 3); collide(x, z - 9, 24, 6, y + 6.6);
     slab(PINK, 6, 6.6, 12, x - 9, y, z, M.gravel, 3); collide(x - 9, z, 6, 12, y + 6.6);
@@ -1290,7 +1291,7 @@ export function buildWorld(scene) {
   // ----- Comley Trucking: a warehouse with loading docks over a yard -----
   function buildComley(c) {
     const y = CURB, BLUE = 0x9fb0c4;
-    flat(M.asphalt, 0xffffff, BLOCK - 6, BLOCK - 6, c.x, y + 0.05, c.z, 5);
+    flat(M.tarmac, 0xffffff, BLOCK - 6, BLOCK - 6, c.x, y + 0.015, c.z, 5);
     slab(BLUE, 46, 8, 16, c.x, y, c.z - 18, M.siding, 1.6);
     collide(c.x, c.z - 18, 46, 16, y + 8);
     slab(0x55525a, 46.6, 0.4, 16.6, c.x, y + 8, c.z - 18); flat(M.gravel, 0x8d868c, 45, 15, c.x, y + 8.42, c.z - 18, 5);
@@ -1340,7 +1341,7 @@ export function buildWorld(scene) {
     sign('VERBUM DEI SCHOOL', c.x, y + 4.5, c.z - 6.38, 0, { w: 9.6, h: 1.1, color: '#f6e7b4', bg: '#2c3a5a', size: 0.74, glow: false });
     post(0xc9cbd2, 0.07, 9, c.x - 14, y, c.z - 5);                                              // flag
     [0xd8342c, 0xf4f4f4, 0x2f56c8].forEach((hex, n) => slab(hex, 2.2, 0.42, 0.04, c.x - 12.85, y + 8.5 - n * 0.42, c.z - 5));
-    flat(M.asphalt, 0xffffff, BLOCK - 8, 28, c.x, y + 0.05, c.z + 13, 5);
+    flat(M.tarmac, 0xffffff, BLOCK - 8, 28, c.x, y + 0.015, c.z + 13, 5);
     for (let k = -7; k <= 7; k++) flat(M.paint, 0xe9e6ee, 0.14, 5.2, c.x + k * 3, y + 0.09, c.z + 22);
     post(STEEL, 0.09, 3.2, c.x + 20, y, c.z + 6); slab(0xf4f4f4, 1.8, 1.1, 0.06, c.x + 20, y + 2.7, c.z + 6.5);
     put(M.plain, new THREE.TorusGeometry(0.24, 0.025, 6, 14).rotateX(Math.PI / 2).translate(c.x + 20, y + 2.9, c.z + 6.85), 0xff8a5c);

@@ -107,10 +107,16 @@ export class Ped {
     if (this.dead) return;
     this.threat.copy(from); this.flight = seconds; this.returning = true;
   }
-  hurt(dmg, from) {
+  hurt(dmg, from, { knock = 0, down = false } = {}) {
     if (this.dead) return;
     this.health -= dmg;
     if (this.health <= 0) { this.die(); return; }
+    if (knock && from) { // staggered back by the blow
+      const dx = this.pos.x - from.x, dz = this.pos.z - from.z, d = Math.hypot(dx, dz) || 1;
+      this.pos.x += dx / d * knock; this.pos.z += dz / d * knock; pushOut(this.pos, 0.4);
+      this.human.group.position.set(this.pos.x, groundAt(this.pos.x, this.pos.z), this.pos.z);
+    }
+    if (down) { this.down = 3; this.human.after = null; this.human.set('down'); this.flight = 0; this.returning = true; return; }
     this.down = 0;
     this.human.play(Math.random() < 0.5 ? 'hitHead' : 'hitChest', 'idle');
     this.flee(from, 9);
@@ -125,6 +131,17 @@ export class Ped {
   update(dt, cars, threat) {
     const g = this.human.group, h = this.human;
     if (Ped.eye) g.visible = Math.hypot(this.pos.x - Ped.eye.x, this.pos.z - Ped.eye.z) < 135; // beyond that they are a few pixels in the fog
+    if (this.fly) { // thrown by a car: an arc through the air, then the ground
+      const f = this.fly;
+      this.pos.x += f.vx * dt; this.pos.z += f.vz * dt; f.y += f.vy * dt; f.vy -= 14 * dt;
+      f.vx *= 0.98; f.vz *= 0.98;
+      pushOut(this.pos, 0.4);
+      g.rotation.y += f.spin * dt;
+      if (f.y <= 0) { f.y = 0; this.fly = null; }
+      g.position.set(this.pos.x, groundAt(this.pos.x, this.pos.z) + f.y, this.pos.z);
+      if (this.dead) this.diedAt += dt;
+      return;
+    }
     if (this.dead) { this.diedAt += dt; return; }
     if (this.down > 0) {
       this.down -= dt;
@@ -164,8 +181,12 @@ export class Ped {
     if (threat && Math.hypot(threat.x - this.pos.x, threat.z - this.pos.z) < 22) this.flee(threat, 7);
 
     for (const car of cars) {
-      if (Math.abs(car.speed) > 3 && Math.hypot(car.pos.x - this.pos.x, car.pos.z - this.pos.z) < 1.8) {
-        if (Math.abs(car.speed) > 9) this.die();
+      if (Math.abs(car.speed) > 3 && Math.hypot(car.pos.x - this.pos.x, car.pos.z - this.pos.z) < 1.8 + car.reach * 0.5) {
+        // Thrown the way the car is going, harder the faster it was, with a little sideways from where it hit.
+        const s = Math.abs(car.speed), fx = Math.sin(car.heading) * Math.sign(car.speed), fz = Math.cos(car.heading) * Math.sign(car.speed);
+        const sx = this.pos.x - car.pos.x, sz = this.pos.z - car.pos.z, side = sx * fz - sz * fx;
+        this.fly = { vx: fx * s * 0.8 + fz * Math.sign(side) * s * 0.25, vz: fz * s * 0.8 - fx * Math.sign(side) * s * 0.25, vy: 2.8 + s * 0.22, y: 0.05, spin: (Math.random() - 0.5) * 6 };
+        if (s > 9) this.die();
         else { this.down = 9; h.after = null; h.set('down'); }
         break;
       }

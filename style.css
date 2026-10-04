@@ -110,3 +110,14 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
   #subtitle { font-size: 18px; } #objective { font-size: 17px; bottom: 100px; }
   #money { font-size: 32px; } #clock { font-size: 26px; }
 }
+
+#ammo { position: absolute; right: 32px; top: 206px; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; color: #f4f1e6; text-shadow: 2px 2px 0 #000; }
+#map { position: fixed; left: 50%; top: 50%; width: min(90vw, 900px); height: auto; aspect-ratio: 900 / 760; transform: translate(-50%, -50%); border: 3px solid #ff5fd2; box-shadow: 0 0 0 3px #000, 0 0 40px rgba(0,0,0,.6); display: none; z-index: 20; }
+#map.on { display: block; }
+#menu { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 520px; padding: 22px 28px; background: rgba(8, 10, 24, .92); border: 3px solid #ff5fd2; box-shadow: 0 0 0 3px #000; color: #f4f1e6; font-family: 'Poppins', sans-serif; display: none; z-index: 21; }
+#menu.on { display: block; }
+#menu h2 { margin: 0 0 14px; font-family: 'Bebas Neue', sans-serif; font-size: 34px; letter-spacing: 3px; color: #ff5fd2; }
+#menu .item { padding: 8px 10px; margin: 4px 0; background: rgba(255,255,255,.06); border-left: 4px solid #49e0d0; cursor: pointer; font-size: 16px; }
+#menu .item:hover { background: rgba(255,255,255,.14); }
+#menu .item b { display: inline-block; width: 52px; color: #ffe066; }
+#menu .item .hint { float: right; color: #9ff3ff; }

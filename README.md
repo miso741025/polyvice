@@ -16,7 +16,7 @@ Then open http://localhost:8137.
 
 ## Controls
 
-WASD move / drive · Mouse look · Shift run · F enter / take car, use doors · G shake down a register · H horn · Right click or Q lock on · Click or E attack · 1 / 2 weapon · Space handbrake · Enter skip dialogue
+WASD move / drive · Mouse look · Shift run · Space jump / handbrake · F enter / take car, use doors · G shake down a register · H horn · Right click or Q lock on · Click or E attack (hold for the SMG) · 1–4 weapon · R reload · M map · Esc settings · Enter skip dialogue
 
 ## Layout
 

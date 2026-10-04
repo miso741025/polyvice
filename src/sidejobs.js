@@ -2,6 +2,7 @@
 // confess, sleep. Each room with a clerk has a `till`, the spot in front of the counter.
 
 import { near } from './grid.js';
+import { WEAPONS } from './combat.js';
 
 const SHAKEDOWN = new Set(['BAR', 'DINER', 'LIQUOR', 'PAWN', 'STORE', 'KIOSK', 'SHOWROOM', 'MOTEL', 'BEAN', 'OFFICE']);
 const FOOD = { DINER: ['Eat', 15], KIOSK: ['Buy a hot dog', 8], BEAN: ['Coffee and a cannoli', 6], BAR: ['A drink', 10], VESUVIO: ['Dinner', 40] };
@@ -40,6 +41,29 @@ export function installSideJobs(g) {
     p.locked = false; busy = false;
   }
 
+  // The pawn shop's other business: guns, bullets and a vest, from a menu.
+  function gunCounter() {
+    const show = () => {
+      const items = [];
+      let n = 1;
+      for (const w of ['pistol', 'smg', 'shotgun']) {
+        const W = WEAPONS[w];
+        if (!p.weapons[w]) items.push({ key: 'Digit' + n++, label: `${W.name}, with ${W.mag * 2} rounds`, hint: `$${W.price}`, buy: () => { if (g.cash < W.price) return false; g.addMoney(-W.price); g.giveWeapon(w); return true; } });
+        else items.push({ key: 'Digit' + n++, label: `${W.name} ammunition, ${W.pack} rounds`, hint: `$${W.ammoPrice}`, buy: () => { if (g.cash < W.ammoPrice) return false; g.addMoney(-W.ammoPrice); g.giveAmmo(w, W.pack); return true; } });
+      }
+      items.push({ key: 'Digit' + n++, label: 'Kevlar vest', hint: p.armour >= 100 ? 'wearing one' : '$400', buy: () => { if (g.cash < 400 || p.armour >= 100) return false; g.addMoney(-400); p.armour = 100; hud.armour(100); return true; } });
+      items.push({ key: 'Escape', label: 'Leave', hint: `$${g.cash}` });
+      hud.menu('Under the counter', items, code => {
+        const it = items.find(i => i.key === code);
+        if (!it) return;
+        if (code === 'Escape') { hud.menu(); g.paused = false; return; }
+        if (it.buy()) { g.sfx?.cash(); show(); } else g.sfx?.click();
+      });
+    };
+    g.paused = true;
+    show();
+  }
+
   const update = () => {
     if (busy || g.missionActive || !p.inside || p.locked) return;
     const q = Object.values(rooms).find(r => p.pos.x > r.minX && p.pos.x < r.maxX && p.pos.z > r.minZ && p.pos.z < r.maxZ);
@@ -49,7 +73,7 @@ export function installSideJobs(g) {
     const lines = [];
     const food = FOOD[key];
     if (food && p.health < 100 && g.cash >= food[1]) lines.push(`F  ·  ${food[0]} ($${food[1]})`);
-    if (key === 'PAWN' && !p.armour && g.cash >= 400) lines.push('F  ·  Buy a vest ($400)');
+    if (key === 'PAWN') lines.push('F  ·  See what is under the counter');
     if (key === 'CHURCH' && g.wanted > 0 && g.cash >= 100) lines.push('F  ·  Confess ($100)');
     if (key === 'MOTEL' && (p.health < 100 || g.wanted > 0) && g.cash >= 40) lines.push('F  ·  Sleep it off ($40)');
     const canShake = SHAKEDOWN.has(key) && !q.clerkNpc && g.time - (cooldown.get(q) ?? -999) > 240;
@@ -58,7 +82,7 @@ export function installSideJobs(g) {
     if (!lines.length) return;
     if (g.consume('KeyF')) {
       if (food && p.health < 100 && g.cash >= food[1]) { g.addMoney(-food[1]); p.health = Math.min(100, p.health + 50); hud.health(p.health); g.sfx?.cash(); say('', 'That hit the spot.', 2); }
-      else if (key === 'PAWN' && !p.armour && g.cash >= 400) { g.addMoney(-400); p.armour = 100; hud.armour?.(p.armour); g.sfx?.cash(); say('Clerk', "Kevlar. Don't tell me what it's for.", 2.5); }
+      else if (key === 'PAWN') gunCounter();
       else if (key === 'CHURCH' && g.wanted > 0 && g.cash >= 100) { g.addMoney(-100); g.pardon(); g.sfx?.passed(); say('Father Phil', 'Go in peace, Anthony. And perhaps drive slower.', 3); }
       else if (key === 'MOTEL' && g.cash >= 40) { g.addMoney(-40); p.health = 100; hud.health(100); g.pardon(); g.clockOffset = (g.clockOffset || 0) + 60 * 8; hud.fade(1, 0.4); g.wait(1).then(() => hud.fade(0, 0.8)).catch(() => {}); say('', 'Eight hours, no questions.', 3); }
     } else if (canShake && g.consume('KeyG')) shakedown(q);

@@ -45,9 +45,12 @@ const CLIPS = {
   down: 'Death01', jab: 'Punch_Jab', cross: 'Punch_Cross', hitHead: 'Hit_Head', hitChest: 'Hit_Chest',
   aim: 'Pistol_Idle_Loop', shoot: 'Pistol_Shoot', kneel: 'Fixing_Kneeling', interact: 'Interact', pickup: 'PickUp_Table',
   crouch: 'Crouch_Idle_Loop', dance: 'Dance_Loop',
+  reload: 'Pistol_Reload', shove: 'Spell_Simple_Shoot', haymaker: 'Sword_Attack', stance: 'Idle_Loop',
+  jumpStart: 'Jump_Start', jumpLoop: 'Jump_Loop', jumpLand: 'Jump_Land',
+  point: 'Pistol_Aim_Neutral', calm: 'Push_Loop', sitTalk: 'Sitting_Talking_Loop', sitEnter: 'Sitting_Enter', stroll: 'Walk_Formal_Loop',
 };
 // Clips that play once and hold their last frame.
-const ONCE = new Set(['down', 'jab', 'cross', 'hitHead', 'hitChest', 'shoot', 'kneel', 'interact', 'pickup']);
+const ONCE = new Set(['down', 'jab', 'cross', 'hitHead', 'hitChest', 'shoot', 'kneel', 'interact', 'pickup', 'reload', 'shove', 'haymaker', 'jumpStart', 'jumpLand', 'point', 'sitEnter']);
 
 // ---------- Loading ----------
 
@@ -754,6 +757,7 @@ const hatMat = color => hatMats.get(color) ?? hatMats.set(color, new THREE.MeshL
 
 const frameMat = new THREE.MeshLambertMaterial({ color: 0x1a1512 });
 const pistolMat = new THREE.MeshPhongMaterial({ color: 0x1c1c22, shininess: 60, specular: 0x666666 });
+const woodMat = new THREE.MeshLambertMaterial({ color: 0x6a4a34 });
 const shadeMat = new THREE.MeshBasicMaterial({ color: 0x0b0b10 });
 const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true, opacity: 0.22, depthWrite: false });
 
@@ -833,18 +837,22 @@ export function makeHuman(opts = {}) {
   }
   headBone.scale.setScalar(o.head);
 
-  // A pistol in the right hand, shown only while armed.
+  // Guns in the right hand, shown only while armed: a pistol, a submachine gun, a shotgun.
   let handBone;
   root.traverse(n => { if (n.isBone && n.name === 'hand_r') handBone = n; });
-  const pistol = new THREE.Group();
-  for (const [w, h, d, x, y, z, rx] of [[0.024, 0.034, 0.17, 0, 0.02, 0.05, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3]]) {
-    const part = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pistolMat);
-    part.position.set(x, y, z); part.rotation.x = rx;
-    pistol.add(part);
-  }
-  pistol.position.set(0.02, -0.04, 0.06); pistol.rotation.set(-1.4, 0.2, -1.55);
-  pistol.visible = false;
-  handBone?.add(pistol);
+  const guns = {};
+  const gun = (kind, parts) => {
+    const grp = new THREE.Group();
+    for (const [w, h, d, x, y, z, rx, mat] of parts) { const part = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat || pistolMat); part.position.set(x, y, z); part.rotation.x = rx; grp.add(part); }
+    grp.position.set(0.02, -0.04, 0.06); grp.rotation.set(-1.4, 0.2, -1.55);
+    grp.visible = false;
+    handBone?.add(grp);
+    guns[kind] = grp;
+  };
+  gun('pistol', [[0.024, 0.034, 0.17, 0, 0.02, 0.05, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3]]);
+  gun('smg', [[0.03, 0.05, 0.3, 0, 0.02, 0.1, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3], [0.024, 0.13, 0.03, 0, -0.05, 0.1, 0], [0.018, 0.018, 0.1, 0, 0.03, 0.3, 0], [0.03, 0.03, 0.12, 0, 0.02, -0.1, 0, woodMat]]);
+  gun('shotgun', [[0.028, 0.028, 0.5, 0, 0.03, 0.22, 0], [0.034, 0.034, 0.22, 0, 0.0, 0.2, 0, woodMat], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3, woodMat], [0.03, 0.07, 0.18, 0, -0.01, -0.12, 0.15, woodMat]]);
+  const pistol = guns.pistol;
 
   const mixer = new THREE.AnimationMixer(root), actions = {};
   const person = {
@@ -869,7 +877,7 @@ export function makeHuman(opts = {}) {
       if (prev && prev !== state) actions[prev].fadeOut(0.15);
     },
     get busy() { return this.after !== null; },
-    arm(on) { pistol.visible = on; },
+    arm(on) { for (const k in guns) guns[k].visible = on === true ? k === 'pistol' : on === k; },
   };
   mixer.addEventListener('finished', e => {
     if (person.after !== null && e.action === actions[person.state]) { const then = person.after; person.after = null; person.set(then); }
