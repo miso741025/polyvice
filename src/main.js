@@ -169,7 +169,8 @@ async function boot() {
       k = LA ? 0.42 + k * 0.58 : k; // Los Angeles is lit like its film: blue dusk at its brightest
       hemi.intensity = 1.5 - k * 0.95; hemi.color.set(0xffd9ea).lerp(tmpColor.set(0x6f7fd0), k); hemi.groundColor.set(0x5d4c7c).lerp(tmpColor.set(0x1a1830), k);
       sun.intensity = 2.3 - k * 1.75; sun.color.set(0xffcf9e).lerp(tmpColor.set(0x9db4ff), k);
-      scene.fog.color.set(0xf2a0b4).lerp(tmpColor.set(0x120f26), k);
+      scene.fog.color.set(LA ? 0xa8b4d6 : 0xf2a0b4).lerp(tmpColor.set(0x120f26), k);
+      if (LA) { hemi.color.lerp(tmpColor.set(0xc8d6ff), 0.5); sun.color.lerp(tmpColor.set(0xffe6c8), 0.4); }
       places.setNight(k);
     },
     // The player is dead: every mission wait fails, and the mission (or free roam) respawns them.

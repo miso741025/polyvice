@@ -4,11 +4,13 @@ import { CITY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHO
 import { makeHuman } from './people.js';
 import { box, makeLook, makeTony, makeDuck, Car } from './entities.js';
 
-const PASTELS = [0xf7a8c4, 0x8fe0d4, 0xffd3a1, 0xc9b6f2, 0xfff1c9, 0x9fd0f5, 0xf5f5f0, 0xff9e8a];
-const GLASS_TINTS = [0xffffff, 0xcfe8ff, 0xffd9e8, 0xd6fff4];
-const NEONS = ['#ff5fd2', '#49e0d0', '#ffe066', '#ff8a5c', '#8f7bff', '#7dffb0'];
-const SHOPS = ['CAFE', 'PAWN', 'LIQUOR', 'DELI', 'VIDEO', 'SURF', 'PIZZA', 'RECORDS', 'BAR', 'TAILOR', 'CIGARS', 'DINER', 'GUNS'];
 const LA = CITY === 'la';
+// Vice City is pastel deco under a pink sky. Los Angeles is concrete, stucco and glass: beige, bone, grey, terracotta.
+const PASTELS = LA ? [0xe9e2d2, 0xd9c7a0, 0xf4f2ee, 0xc9b79c, 0xb9b3ba, 0xd08a6c, 0xdfe5ea, 0xa9b4c0] : [0xf7a8c4, 0x8fe0d4, 0xffd3a1, 0xc9b6f2, 0xfff1c9, 0x9fd0f5, 0xf5f5f0, 0xff9e8a];
+const GLASS_TINTS = LA ? [0x9fb8d0, 0xb8c8d8, 0x8fa6c4, 0xcfe0ee] : [0xffffff, 0xcfe8ff, 0xffd9e8, 0xd6fff4];
+const NEONS = LA ? ['#ff5a4a', '#ffe066', '#6fb0ff', '#ffffff', '#ff8a5c', '#7dffb0'] : ['#ff5fd2', '#49e0d0', '#ffe066', '#ff8a5c', '#8f7bff', '#7dffb0'];
+const SHOPS = LA ? ['TACOS', 'DONUTS', 'LIQUOR', 'PAWN', 'DINER', 'BAR', 'GUNS', 'AUTO PARTS', 'LAUNDRY', 'CHECKS CASHED', 'BURGERS', 'VIDEO', 'RECORDS']
+  : ['CAFE', 'PAWN', 'LIQUOR', 'DELI', 'VIDEO', 'SURF', 'PIZZA', 'RECORDS', 'BAR', 'TAILOR', 'CIGARS', 'DINER', 'GUNS'];
 const HOTELS = LA ? ['HOTEL', 'PALMS', 'SUNSET', 'PACIFIC', 'WILSHIRE', 'ROOSEVELT'] : ['HOTEL', 'OCEAN', 'PALMS', 'DECO', 'VICE', 'CORAL', 'MIAMI'];
 const CURB = 0.14;                       // sidewalk height
 const FLOOR = 3.4, GROUND = 4.2, BAY = 4; // storey height, shopfront height, width of one window bay
@@ -17,7 +19,7 @@ const SPECIAL_LA = { '15,1': 'neil', '8,6': 'bank', '2,9': 'drivein', '6,9': 'ka
 const SPECIAL_VICE = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
   '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel' };
 const SUN = new THREE.Vector3(1250, 190, 420).normalize();
-const HOUSE_WALLS = [0xcfe8ff, 0xfff1c9, 0xffd9e8, 0xe9e2d2, 0xd6fff4, 0xf7a8c4, 0xf4f2ee, 0xc9b6f2];
+const HOUSE_WALLS = LA ? [0xe9e2d2, 0xf4f2ee, 0xd9c7a0, 0xc9b79c, 0xe6d2b4, 0xdfe5ea] : [0xcfe8ff, 0xfff1c9, 0xffd9e8, 0xe9e2d2, 0xd6fff4, 0xf7a8c4, 0xf4f2ee, 0xc9b6f2];
 const FIRMS = [['VICE FREIGHT', 'INTERSTATE HAULAGE'], ['ATLANTIC SALVAGE', 'SCRAP · PARTS · TOWING'], ['GULF SEAFOOD', 'WHOLESALE'], ['SUNSHINE CEMENT', 'READY MIX'], ['BAYSIDE PLUMBING', 'SUPPLY CO.'], ['MARINA ICE', 'BLOCK & CRUSHED']];
 
 // ---------- Textures, all drawn in code ----------
@@ -223,7 +225,7 @@ function shopfronts(rand) {
 // ---------- The city ----------
 
 export function buildWorld(scene) {
-  const rand = mulberry32(1999);
+  const rand = mulberry32(LA ? 4127 : 1999); // each city is dealt its own hand
   const pick = list => list[Math.floor(rand() * list.length)];
   const places = {}, updaters = [];
   const W = NX * CELL + ROAD, D = NZ * CELL + ROAD;
@@ -397,9 +399,9 @@ export function buildWorld(scene) {
 
   // ----- Ground: sea, sand island, roads -----
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({
-    uniforms: { time: { value: 0 }, sun: { value: SUN }, night: { value: 0 } },
+    uniforms: { time: { value: 0 }, sun: { value: SUN }, night: { value: 0 }, haze: { value: LA ? new THREE.Vector3(0.58, 0.64, 0.80) : new THREE.Vector3(0.949, 0.627, 0.706) } },
     vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
-    fragmentShader: `varying vec3 vW; uniform float time; uniform float night; uniform vec3 sun;
+    fragmentShader: `varying vec3 vW; uniform float time; uniform float night; uniform vec3 sun; uniform vec3 haze;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
@@ -411,7 +413,7 @@ export function buildWorld(scene) {
         float s = pow(max(dot(reflect(v, vec3(0.0, 1.0, 0.0)), sun), 0.0), 26.0);
         c += vec3(1.0, 0.72, 0.5) * s * (0.35 + 1.4 * step(0.62, noise(p * 0.9 + vec2(time * 0.9, time * 0.4))));
         c = mix(c, c * vec3(0.10, 0.16, 0.30) + vec3(0.5, 0.6, 0.9) * s * 0.25, night);
-        c = mix(c, mix(vec3(0.949, 0.627, 0.706), vec3(0.07, 0.06, 0.15), night), smoothstep(140.0, 800.0, distance(vW, cameraPosition)));
+        c = mix(c, mix(haze, vec3(0.07, 0.06, 0.15), night), smoothstep(140.0, 800.0, distance(vW, cameraPosition)));
         gl_FragColor = vec4(c, 1.0);
       }`,
   }));
@@ -466,7 +468,8 @@ export function buildWorld(scene) {
   };
   // fx, fz: which sides of the building face a street (-1, 0 or 1).
   function building(x, z, w, d, h, { style, tint, fx = 0, fz = 1 } = {}) {
-    style ??= h >= 30 ? pick(['office', 'office', 'deco', 'balcony']) : h <= 12 ? pick(['stucco', 'deco']) : pick(['deco', 'balcony', 'stucco', 'balcony']);
+    style ??= LA ? (h >= 24 ? 'office' : h <= 12 ? 'stucco' : pick(['stucco', 'office', 'balcony', 'stucco']))
+      : h >= 30 ? pick(['office', 'office', 'deco', 'balcony']) : h <= 12 ? pick(['stucco', 'deco']) : pick(['deco', 'balcony', 'stucco', 'balcony']);
     const office = style === 'office', base = office ? 0 : GROUND;
     tint ??= office ? pick(GLASS_TINTS) : pick(PASTELS);
     const floors = Math.max(1, Math.round((h - base) / FLOOR)), top = CURB + base + floors * FLOOR;
@@ -621,15 +624,19 @@ export function buildWorld(scene) {
     return 'city';
   };
   for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
-    const c = blockCenter(i, j), kind = (LA ? SPECIAL_LA : SPECIAL_VICE)[`${i},${j}`] ?? pickBlock(district(i, j), i, j);
+    const c = blockCenter(i, j), core = LA && Math.abs(i - 8) <= 2 && Math.abs(j - 6) <= 1; // the downtown core: nothing but towers
+    const kind = (LA ? SPECIAL_LA : SPECIAL_VICE)[`${i},${j}`] ?? (LA && i === 11 ? 'river' : core ? 'tower' : pickBlock(district(i, j), i, j));
     if (kind === 'bing') { // a ring of sidewalk around a car park at road level
       for (const s of [-1, 1]) {
         slab(0xffffff, BLOCK, CURB, 5, c.x, 0, c.z + s * (BLOCK / 2 - 2.5), M.paver, 6);
         slab(0xffffff, 5, CURB, BLOCK - 10, c.x + s * (BLOCK / 2 - 2.5), 0, c.z, M.paver, 6);
       }
-    } else slab(0xffffff, BLOCK, CURB, BLOCK, c.x, 0, c.z, M.paver, 6);
-    for (const sx of [-1, 1]) for (const sz of [-14, 14]) palms.push({ x: c.x + sx * 28.8, z: c.z + sz });
-    furniture(c, i, j);
+    } else if (kind !== 'river') slab(LA ? 0xcfcfd2 : 0xffffff, BLOCK, CURB, BLOCK, c.x, 0, c.z, M.paver, 6);
+    if (kind !== 'river') {
+      for (const sx of [-1, 1]) for (const sz of LA ? [0] : [-14, 14]) palms.push({ x: c.x + sx * 28.8, z: c.z + sz }); // one tall palm a side in Los Angeles, two in Vice City
+      furniture(c, i, j);
+    }
+    if (kind === 'river') { buildRiver(c, j); continue; }
 
     if (kind === 'neil') buildNeil(c);
     else if (kind === 'bank') buildBank(c);
@@ -658,7 +665,7 @@ export function buildWorld(scene) {
     else if (kind === 'cafe') { buildCafe(c); lots(c, i, [-1, 1]); }
     else if (kind === 'tower') {
       const downtown = 1 - Math.hypot(c.x, c.z) / maxDist;
-      building(c.x, c.z, 36 + Math.floor(rand() * 3) * 4, 36 + Math.floor(rand() * 3) * 4, i === NX - 1 ? 12 : 16 + Math.floor(rand() * 4 + downtown * (LA ? 16 : 9)) * 4, { fx: rand() < 0.5 ? 1 : -1, fz: rand() < 0.5 ? 1 : -1 });
+      building(c.x, c.z, 36 + Math.floor(rand() * 3) * 4, 36 + Math.floor(rand() * 3) * 4, core ? 64 + Math.floor(rand() * 8) * 8 : i === NX - 1 ? 12 : 16 + Math.floor(rand() * 4 + downtown * (LA ? 12 : 9)) * 4, { fx: rand() < 0.5 ? 1 : -1, fz: rand() < 0.5 ? 1 : -1 });
     }
     else if (kind === 'houses') buildHouses(c);
     else if (kind === 'yard') buildYard(c);
@@ -964,10 +971,10 @@ export function buildWorld(scene) {
   function house(x, z, fz, wall, roofTint, storeys = 1, room = 'HOUSE') {
     const h = storeys * 3.3 + 0.4, y = CURB, front = z + fz * 5.5;
     shopDoors.push({ shop: room, outside: { x, z: front + fz * 2.2, h: fz > 0 ? 0 : Math.PI } });
-    slab(wall, 13, h, 11, x, y, z, M.siding, 1);
+    slab(wall, 13, h, 11, x, y, z, LA ? M.gravel : M.siding, LA ? 3 : 1); // stucco in Los Angeles, clapboard in Vice City
     collide(x, z, 13, 11, y + h);
     slab(0xffffff, 13.5, 0.25, 11.5, x, y + h - 0.1, z);
-    gable(roofTint, 12.2, 2.7, 14.2, x, y + h + 0.15, z, Math.PI / 2);
+    if (LA) hip(0xc65a36, 14.2, 12.2, 1.9, x, y + h + 0.15, z, 0.35); else gable(roofTint, 12.2, 2.7, 14.2, x, y + h + 0.15, z, Math.PI / 2);
     slab(0xd8d0c4, 6, 0.3, 2.6, x, y, front + fz * 1.3); slab(0xd8d0c4, 2.4, 0.15, 1, x, y, front + fz * 3);
     for (const s of [-1, 1]) post(0xffffff, 0.1, 2.5, x + s * 2.8, y + 0.3, front + fz * 2.4, 6);
     put(M.shingle, new THREE.BoxGeometry(6.6, 0.18, 3).rotateX(fz * 0.22).translate(x, y + 3, front + fz * 1.4), roofTint);
@@ -1031,7 +1038,14 @@ export function buildWorld(scene) {
       if (rand() < 0.4) slab(pick([0xd8342c, 0x2f56c8, 0x1f6b4a]), 6, 2.6, 2.5, cx, y + 2.6, cz, M.siding, 0.6);
     }
     for (const [px, pz] of [[20, 2], [23, 2], [20, 5]]) { slab(0xc79a6a, 2.4, 1.6, 2.4, c.x + px, y, c.z + pz, M.wood, 1); collide(c.x + px, c.z + pz, 2.4, 2.4, 1.8); }
-    if (rand() < 0.5) { // a water tower on steel legs
+    if (LA) { // the basin's oil: a storage tank and a pumpjack nodding at nothing
+      const tx = c.x + 18, tz = c.z - 19;
+      put(M.siding, new THREE.CylinderGeometry(5, 5, 7, 20).translate(tx, y + 3.5, tz), 0xe9e2d2); put(M.plain, new THREE.ConeGeometry(5.2, 1, 20).translate(tx, y + 7.5, tz), 0xb9b3ba); collide(tx, tz, 9, 9, 8);
+      const jx = c.x + 20, jz = c.z - 4;
+      for (const s of [-1, 1]) put(M.plain, new THREE.BoxGeometry(0.25, 4.2, 0.25).rotateZ(s * 0.22).translate(jx + s * 0.5, y + 2, jz), 0x23232b);
+      put(M.plain, new THREE.BoxGeometry(6.4, 0.4, 0.4).rotateZ(0.2).translate(jx, y + 4.1, jz), 0x8a1c1c); put(M.plain, new THREE.BoxGeometry(0.9, 1.8, 0.6).translate(jx + 3.1, y + 4.1, jz), 0x8a1c1c);
+      slab(0x23232b, 1.6, 1.2, 1.2, jx - 3, y, jz); post(0x8a8d96, 0.05, 3.6, jx + 3.2, y, jz, 5); collide(jx, jz, 7, 1.6, 4);
+    } else if (rand() < 0.5) { // a water tower on steel legs
       const tx = c.x + 20, tz = c.z - 20;
       for (const [lx, lz] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]]) post(0x8a8d96, 0.08, 10, tx + lx, y, tz + lz, 5);
       put(M.siding, new THREE.CylinderGeometry(2.4, 2.4, 3.6, 14).translate(tx, y + 11.8, tz), 0xe9e2d2);
@@ -1553,6 +1567,32 @@ export function buildWorld(scene) {
     }
   }
 
+  // ----- The river: a concrete channel down one column of blocks, a trickle of water in the middle of it -----
+  function buildRiver(c, j) {
+    lowGround.push({ x: c.x, z: c.z, half: BLOCK / 2 });
+    flat(M.gravel, 0xe2ddd4, BLOCK, BLOCK, c.x, 0.03, c.z, 9); // pale poured concrete
+    for (const s of [-1, 1]) { flat(M.paint, 0xb9b3ac, 9, BLOCK, c.x + s * 20.5, 0.05, c.z); flat(M.paint, 0x8d8a86, 0.4, BLOCK, c.x + s * 16, 0.06, c.z); } // the sloped banks, and where they meet the bed
+    put(M.glow, new THREE.PlaneGeometry(5, BLOCK).rotateX(-Math.PI / 2).translate(c.x + Math.sin(j * 1.7) * 3, 0.07, c.z), 0x2f6f7a);
+    for (let n = -2; n <= 2; n++) flat(M.paint, 0x9a968e, BLOCK, 0.25, c.x, 0.055, c.z + n * 12);            // expansion joints
+    for (const s of [-1, 1]) { // a fence along each bank, and a splash of paint on the concrete
+      for (let t = -28; t <= 28; t += 4) post(0x8a8d96, 0.05, 2.2, c.x + s * 29.6, 0.03, c.z + t, 5);
+      slab(0x8a8d96, 0.05, 0.05, BLOCK, c.x + s * 29.6, 2.2, c.z); collide(c.x + s * 29.6, c.z, 0.4, BLOCK, 2.4);
+      if ((j + (s > 0 ? 1 : 0)) % 2) flat(M.paint, [0xd8342c, 0x2f56c8, 0xf2c230, 0x7dffb0][(j + s + 4) % 4], 1.4, 7 + (j % 3) * 3, c.x + s * 22, 0.065, c.z + (j % 2 ? 9 : -11));
+    }
+    if (j === 6) places.river = { bed: { x: c.x, z: c.z }, north: { x: c.x, z: c.z - 30 } };
+  }
+
+  // ----- The hills to the north, across the water: dark ridges with a scatter of lights and the city's name in white letters -----
+  if (LA) {
+    const hz = OZ - 330;
+    for (let n = 0; n < 9; n++) {
+      const hx = OX + (n + 0.5) * (NX * CELL / 9) + (n % 2 ? 30 : -20), r = 150 + (n * 37 % 90);
+      put(M.plain, new THREE.SphereGeometry(r, 14, 8).scale(1.5, 0.55 + (n % 3) * 0.12, 0.9).translate(hx, -12, hz - (n % 2) * 60), [0x4a5a3c, 0x5a5a3a, 0x3f5238][n % 3]);
+      for (let k = 0; k < 14; k++) { const a = rand() * Math.PI, e = 0.25 + rand() * 0.5; halo(hx + Math.cos(a) * r * 1.3 * Math.cos(e), -12 + Math.sin(e) * r * 0.6, hz - (n % 2) * 60 + r * 0.82 * Math.cos(e) * Math.sin(a) * 0.5 + r * 0.2, [0xffd9a8, 0xffe2a6, 0xfff0d0][k % 3], 4); }
+    }
+    sign('LOS ANGELES', 0, 74, hz + 118, 0, { w: 190, h: 26, color: '#f4f4f0', bg: '#4a5a3c', size: 0.86, glow: false });
+  }
+
   // ----- The freeway: an elevated deck along one avenue, on columns, with its green signs -----
   function buildFreeway() {
     const x = nodeX(5), z0 = OZ - ROAD / 2, len = NZ * CELL + ROAD, DECK = 7.4, GREY = 0x9a968e;
@@ -1712,6 +1752,10 @@ export function buildWorld(scene) {
   function room(w, d, h, { floor = M.paver, floorTint = 0xd8d2c8, floorScale = 2, wall = M.gravel, wallTint = 0xf3efe6, wallScale = 3, ceil = 0xf6f1e6, door = 0x3a2418, doorX = 0, at = null } = {}) {
     const X = at ? at[0] : roomX, Y = -0.1, Z = at ? at[1] : 0;
     if (!at) roomX += 80;
+    if (LA) { // Los Angeles keeps its rooms cooler and plainer: pale walls, grey floors
+      wallTint = tintOf.set(wallTint).lerp(new THREE.Color(0xdfe2e6), 0.6).getHex();
+      floorTint = tintOf.set(floorTint).lerp(new THREE.Color(0x8d8f96), 0.55).getHex();
+    }
     const q = { minX: X - w / 2 + 0.3, maxX: X + w / 2 - 0.3, minZ: Z - d / 2 + 0.3, maxZ: Z + d / 2 - 0.3, lights: [], X, Y, Z, w, d, h, ambient: [] };
     interiors.push(q);
     slab(floorTint, w, 0.2, d, X, Y - 0.2, Z, floor, floorScale);
@@ -2076,8 +2120,8 @@ export function buildWorld(scene) {
     q.vault = q.at(9, -6); q.floor = q.at(0, 2);
   }
 
-  const SHOP_ROOM = { BAR: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
-  const SHOP_NAME = { BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
+  const SHOP_ROOM = { BAR: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'DINER', DONUTS: 'DINER', BURGERS: 'DINER', 'AUTO PARTS': 'STORE', LAUNDRY: 'STORE', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
+  const SHOP_NAME = { BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
     HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office' };
   places.rooms = rooms;
   places.parkedSpots = parkedSpots;
@@ -2184,7 +2228,7 @@ export function buildWorld(scene) {
     for (let n = palms.length - 1; n >= 0; n--) if (Math.abs(palms[n].z - z) < W / 2 + 3 && (palms[n].x - x0) * dir > -4) palms.splice(n, 1); // no palms growing through the deck
   }
 
-  buildPalms(scene, palms, rand);
+  buildPalms(scene, palms, rand, LA);
 
   const oz = blockCenter(NX - 1, 5).z;
   places.ocean = {
@@ -2261,7 +2305,7 @@ export function buildWorld(scene) {
 }
 
 // Palms: a leaning ringed trunk with coconuts, and a crown of drooping fronds.
-function buildPalms(scene, list, rand) {
+function buildPalms(scene, list, rand, tall = false) {
   const color = new THREE.Color();
   const shade = (geo, fn) => {
     const P = geo.attributes.position, a = new Float32Array(P.count * 3);
@@ -2294,7 +2338,7 @@ function buildPalms(scene, list, rand) {
   const o = new THREE.Object3D(), top = new THREE.Vector3();
   o.rotation.order = 'YXZ';
   list.forEach((p, n) => {
-    const s = 0.9 + rand() * 0.45, spin = rand() * 6;
+    const s = (tall ? 1.7 : 0.9) + rand() * (tall ? 0.7 : 0.45), spin = rand() * 6; // Los Angeles grows them tall and thin
     o.position.set(p.x, 0, p.z); o.rotation.set(0, spin, 0); o.scale.setScalar(s); o.updateMatrix();
     trunks.setMatrixAt(n, o.matrix);
     top.set(lean(H), H, 0).applyMatrix4(o.matrix);
@@ -2361,9 +2405,9 @@ function buildSky(scene, updaters) {
   const group = new THREE.Group();
   const dome = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { time: { value: 0 }, sun: { value: SUN }, night: { value: 0 } },
+    uniforms: { time: { value: 0 }, sun: { value: SUN }, night: { value: 0 }, tint: { value: LA ? new THREE.Vector3(0.62, 0.8, 1.22) : new THREE.Vector3(1, 1, 1) } },
     vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `varying vec3 vP; uniform float time; uniform float night; uniform vec3 sun;
+    fragmentShader: `varying vec3 vP; uniform float time; uniform float night; uniform vec3 sun; uniform vec3 tint;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
@@ -2382,7 +2426,7 @@ function buildSky(scene, updaters) {
         vec3 dark = mix(vec3(0.11, 0.08, 0.24), vec3(0.02, 0.02, 0.07), smoothstep(0.0, 0.55, h));
         dark += step(0.9972, hash(floor(d.xz / (abs(h) + 0.35) * 190.0))) * smoothstep(0.04, 0.3, h) * (1.0 - cloud);
         dark += cloud * vec3(0.05, 0.05, 0.1) + vec3(0.25, 0.3, 0.5) * pow(s, 40.0);
-        c = mix(c, dark, night);
+        c = mix(c * tint, dark, night); // Los Angeles: the same dusk, gone to blue
         gl_FragColor = vec4(c, 1.0);
       }`,
   }));
