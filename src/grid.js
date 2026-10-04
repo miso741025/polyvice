@@ -1,6 +1,8 @@
 // City layout constants and the shared collision list.
 // The city is a grid of NX x NZ blocks separated by roads; +x is east (the ocean), +z is south.
 
+// Two cities share the engine: Vice City (The Sopranos) and Los Angeles (Heat). The page's ?city= picks one.
+export const CITY = new URLSearchParams(location.search).get('city') === 'la' ? 'la' : 'vice';
 export const NX = 16, NZ = 13, BLOCK = 60, ROAD = 16, CELL = BLOCK + ROAD, LANE = 3.6;
 export const OX = -NX * CELL / 2, OZ = -NZ * CELL / 2;
 

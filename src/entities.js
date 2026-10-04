@@ -209,6 +209,9 @@ const CAR_KINDS = {
   police: { base: 'sedan', lightbar: true },
   // A panel van: a short nose and a tall box of a body, windowless behind the cab.
   van: { L: 5.0, W: 2.0, clear: 0.34, R: 0.36, axle: 1.55, nose: 0.95, cowl: [1.3, 1.05], roofF: 0.9, roofR: -2.25, roof: 2.05, deck: [-2.4, 1.05], tail: 1.05, pillars: [0.1], blind: true },
+  ambulance: { base: 'van', lightbar: true, medic: true },
+  // An armoured car: a van's shape, taller and wider, with slits for windows.
+  armored: { base: 'van', L: 5.6, W: 2.3, roof: 2.35, armor: true },
   // A pickup: a sedan's cab and a flat bed behind it.
   pickup: { L: 5.3, W: 1.96, clear: 0.4, R: 0.38, axle: 1.6, nose: 0.98, cowl: [0.95, 1.1], roofF: 0.35, roofR: -0.55, roof: 1.78, deck: [-0.72, 1.1], tail: 1.1, pillars: [], bed: -0.8 },
   // A box truck: the profile is the cab and chassis, `cargo` the box behind it (from z0 to z1, up to height h).
@@ -332,6 +335,8 @@ function buildCar(kind) {
     trim.push(slab(0.2, 0.08, 1.2, 0, ry + 0.06, (k.roofF + k.roofR) / 2, BLACK));
     for (const s of [-1, 1]) trim.push(slab(0.01, k.cowl[1] - 0.6, 2.5, s * (W / 2 + 0.006), yb + 0.3 + (k.cowl[1] - 0.6) / 2, k.pillars[0] + 0.3, BLACK));
   }
+  if (k.medic) for (const s of [-1, 1]) { trim.push(slab(0.012, 0.3, L - 1.2, s * (W / 2 + 0.006), 1.15, -0.3, 0xd8342c)); trim.push(slab(0.014, 0.5, 0.14, s * (W / 2 + 0.008), 1.6, -1, 0xd8342c), slab(0.014, 0.14, 0.5, s * (W / 2 + 0.008), 1.6, -1, 0xd8342c)); }
+  if (k.armor) for (const s of [-1, 1]) { trim.push(slab(0.014, 0.2, L - 1.6, s * (W / 2 + 0.008), 1.5, -0.4, 0x1c1c22)); for (let n = 0; n < 3; n++) trim.push(slab(0.016, 0.12, 0.3, s * (W / 2 + 0.01), 1.55, -1.6 + n * 0.9, 0x55525a)); }
   if (k.sign) {
     lights.push(slab(0.7, 0.2, 0.26, 0, ry + 0.15, (k.roofF + k.roofR) / 2, 0xfff6c8));
     for (const s of [-1, 1]) for (let n = -7; n <= 7; n++)
@@ -400,7 +405,7 @@ export class Car {
   }
 
   drive(dt, throttle, steer, handbrake) {
-    const top = { truck: 21, van: 25, suv: 29, pickup: 28 }[this.kind] ?? 32;
+    const top = { truck: 21, van: 25, ambulance: 27, armored: 19, suv: 29, pickup: 28 }[this.kind] ?? 32;
     if (throttle > 0) this.speed += (this.speed < 0 ? 30 : 15 * (1 - this.speed / top)) * dt;
     else if (throttle < 0) this.speed -= (this.speed > 0.5 ? 30 : 9 * (1 + this.speed / 11)) * dt;
     else this.speed -= Math.sign(this.speed) * Math.min(Math.abs(this.speed), 3.5 * dt);

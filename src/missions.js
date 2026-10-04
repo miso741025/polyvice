@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { near, clamp, bounds, SHORE, groundAt, pushOut, colliders } from './grid.js';
+import { CITY, near, clamp, bounds, SHORE, groundAt, pushOut, colliders } from './grid.js';
+import { HEAT } from './heat.js';
 import { makeLook, makeHuman, randomPedLook, Car, roam, nearestNode } from './entities.js';
 
 // The story is written as plain async functions: each `await` waits on the game loop
@@ -11,11 +12,11 @@ const JUNIOR = 'Uncle Junior', LIVIA = 'Livia', ARTIE = 'Artie', SILVIO = 'Silvi
 const PAULIE = 'Paulie', BRENDAN = 'Brendan', JACKIE = 'Jackie Aprile', GEORGIE = 'Georgie', MILLER = 'Mr. Miller';
 const ROSALIE = 'Rosalie', MEADOW = 'Meadow', HUNTER = 'Hunter', MIKEY = 'Mikey Palmice', SHLOMO = 'Shlomo', ARIEL = 'Ariel', PHIL = 'Father Phil', CHARMAINE = 'Charmaine';
 const MAKAZIAN = 'Vin Makazian', RANDALL = 'Randall', PRINCIPAL = 'Mrs. Gaetano', PIOCOSTA = 'Mr. Piocosta', JEREMY = 'Jeremy', ADRIANA = 'Adriana';
-const NORTH = Math.PI, SOUTH = 0, EAST = Math.PI / 2, WEST = -Math.PI / 2;
+export const NORTH = Math.PI, SOUTH = 0, EAST = Math.PI / 2, WEST = -Math.PI / 2;
 
 // ---------- Saving: the number of the next mission, and the money ----------
 
-const SAVE = 'sopranos-vice.save';
+const SAVE = CITY === 'la' ? 'heat-la.save' : 'sopranos-vice.save';
 const readSave = () => { try { return JSON.parse(localStorage.getItem(SAVE)) || {}; } catch { return {}; } };
 export const savedMission = () => readSave().mission || 0;
 export function clearSave() { try { localStorage.removeItem(SAVE); } catch { /* storage unavailable: nothing to clear */ } }
@@ -23,7 +24,7 @@ function save(mission, cash) { try { localStorage.setItem(SAVE, JSON.stringify({
 
 // ---------- Building blocks for scenes ----------
 
-async function say(g, who, text, dur = Math.max(2.4, text.length * 0.065)) {
+export async function say(g, who, text, dur = Math.max(2.4, text.length * 0.065)) {
   g.hud.subtitle(who, text);
   const t0 = g.time;
   await g.until(() => g.time - t0 >= dur || (g.time - t0 > 0.3 && g.consume('Enter')));
@@ -33,7 +34,7 @@ async function say(g, who, text, dur = Math.max(2.4, text.length * 0.065)) {
 // A run of dialogue: [speaker, text, who gestures]. The third entry is an actor, or g.player for the player.
 // The speaker gestures (talking, pointing, calming hands, or talking from a chair), the others turn to face
 // them, and a fixed camera eases toward whoever is speaking.
-async function talk(g, lines) {
+export async function talk(g, lines) {
   const p = g.player, cast = [...new Set(lines.map(l => l[2]).filter(a => a && a !== p))];
   const fixed = g.cam.fixed, look0 = fixed && fixed.look.clone();
   let target = null, talking = true;
@@ -65,27 +66,27 @@ async function talk(g, lines) {
   }
   talking = false;
 }
-const phone = (g, who, text) => { if (!g.ringing) { g.ringing = true; g.sfx?.phone(); g.wait(1.5).then(() => { g.ringing = false; }).catch(() => {}); } return say(g, who + ' (phone)', text); };
+export const phone = (g, who, text) => { if (!g.ringing) { g.ringing = true; g.sfx?.phone(); g.wait(1.5).then(() => { g.ringing = false; }).catch(() => {}); } return say(g, who + ' (phone)', text); };
 
-async function fade(g, to, seconds) {
+export async function fade(g, to, seconds) {
   g.hud.fade(to, seconds);
   await g.wait(seconds + 0.05);
 }
 
 // Fade out, rearrange the world, fade back in.
-async function cut(g, arrange, seconds = 0.8) {
+export async function cut(g, arrange, seconds = 0.8) {
   await fade(g, 1, seconds);
   await arrange();
   await fade(g, 0, seconds);
 }
 
-async function titleCard(g, title, sub) {
+export async function titleCard(g, title, sub) {
   g.hud.card(title, sub);
   await g.wait(3.2);
   g.hud.card();
 }
 
-async function passed(g, reward, money = 0) {
+export async function passed(g, reward, money = 0) {
   g.hud.passed(reward);
   g.sfx?.passed();
   if (money) g.addMoney(money);
@@ -94,7 +95,7 @@ async function passed(g, reward, money = 0) {
 }
 
 // Put a character in the world for the length of a scene.
-function actor(g, look, at, heading = 0, state = 'idle') {
+export function actor(g, look, at, heading = 0, state = 'idle') {
   const a = makeLook(look);
   a.group.position.set(at.x, at.y ?? groundAt(at.x, at.z), at.z); // interior sets give their own height
   a.group.rotation.y = heading;
@@ -102,12 +103,12 @@ function actor(g, look, at, heading = 0, state = 'idle') {
   g.track(a.group);
   return a;
 }
-const dismiss = (g, ...actors) => { for (const a of actors) { g.untrack(a.group); g.removeNpc?.(a); } };
-const spot = (at, dx = 0, dz = 0) => ({ x: at.x + dx, z: at.z + dz });
-const toward = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
+export const dismiss = (g, ...actors) => { for (const a of actors) { g.untrack(a.group); g.removeNpc?.(a); } };
+export const spot = (at, dx = 0, dz = 0) => ({ x: at.x + dx, z: at.z + dz });
+export const toward = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
 
 // Stand the player somewhere, out of any car. The car, if `park` is given, is left there.
-function place(g, at, heading, park) {
+export function place(g, at, heading, park) {
   const p = g.player, car = p.car;
   if (car) {
     g.leaveCar(at);
@@ -120,7 +121,7 @@ function place(g, at, heading, park) {
 }
 
 // Stand the player a couple of steps from someone, facing them, so a conversation can be framed.
-function approach(g, who, gap = 1.7) {
+export function approach(g, who, gap = 1.7) {
   const p = g.player, a = who.group.position;
   let dx = p.pos.x - a.x, dz = p.pos.z - a.z;
   const d = Math.hypot(dx, dz);
@@ -130,13 +131,13 @@ function approach(g, who, gap = 1.7) {
   who.group.rotation.y = toward(a, p.pos);
 }
 // A fixed camera at `from`, looking at `to` (both { x, z }), at the given heights above the ground.
-function shot(g, from, to, height = 1.7, lift = 1.3) {
+export function shot(g, from, to, height = 1.7, lift = 1.3) {
   g.cam.fixed = { pos: new THREE.Vector3(from.x, groundAt(from.x, from.z) + height, from.z), look: new THREE.Vector3(to.x, groundAt(to.x, to.z) + lift, to.z) };
 }
 
-const blocked = (x, z) => colliders.some(c => !c.thin && x > c.minX - 0.6 && x < c.maxX + 0.6 && z > c.minZ - 0.6 && z < c.maxZ + 0.6);
+export const blocked = (x, z) => colliders.some(c => !c.thin && x > c.minX - 0.6 && x < c.maxX + 0.6 && z > c.minZ - 0.6 && z < c.maxZ + 0.6);
 // Hold the camera on two people (or points) from the side, on whichever side is clear of walls.
-function frame(g, a, b, { dist = 4.8, height = 1.7, lift = 1.3, side = 1 } = {}) {
+export function frame(g, a, b, { dist = 4.8, height = 1.7, lift = 1.3, side = 1 } = {}) {
   const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, dx = b.x - a.x, dz = b.z - a.z, l = Math.hypot(dx, dz) || 1;
   let px = mx - dz / l * dist * side, pz = mz + dx / l * dist * side;
   if (blocked(px, pz)) { px = mx + dz / l * dist * side; pz = mz - dx / l * dist * side; }
@@ -145,7 +146,7 @@ function frame(g, a, b, { dist = 4.8, height = 1.7, lift = 1.3, side = 1 } = {})
 }
 
 // Wait until the player reaches a spot. `how` may be 'car' (must drive there) or 'foot' (must walk).
-async function reach(g, at, text, { r = 6, how } = {}) {
+export async function reach(g, at, text, { r = 6, how } = {}) {
   g.hud.objective(text);
   const m = g.addMarker(at.x, at.z, r), p = g.player;
   await g.until(() => near(p.pos, m, r + 0.4) && (how === 'car' ? p.car && Math.abs(p.car.speed) < 6 : how === 'foot' ? !p.car : true));
@@ -154,7 +155,7 @@ async function reach(g, at, text, { r = 6, how } = {}) {
 }
 
 // Someone who walks with the player (or behind `lead`, another follower) and rides along in the car.
-function follower(g, human, { lead, gap = 1.6, pace = 3.6, runs = true } = {}) {
+export function follower(g, human, { lead, gap = 1.6, pace = 3.6, runs = true } = {}) {
   const f = { human, pos: human.group.position.clone(), on: true, stay: false, car: null };
   g.updaters.push(dt => {
     if (!f.on) return false;
@@ -182,7 +183,7 @@ function follower(g, human, { lead, gap = 1.6, pace = 3.6, runs = true } = {}) {
 }
 
 // One character hits another, for a scene: a swing, a flinch, and the wait for both to settle.
-async function punch(g, from, to, down = false) {
+export async function punch(g, from, to, down = false) {
   const swing = from === g.player ? from.human : from;
   swing.play(Math.random() < 0.5 ? 'cross' : 'jab', 'idle', 1.3);
   await g.wait(0.3);
@@ -190,15 +191,15 @@ async function punch(g, from, to, down = false) {
   await g.wait(0.9);
 }
 // Only fists for a while: for beatings that must not end in a shooting.
-function fistsOnly(g, on) {
+export function fistsOnly(g, on) {
   const p = g.player;
   if (on) { g.setWeapon('fist'); p.weapons.pistol = false; } else p.weapons.pistol = true;
 }
 // Wait until every one of these fighters is down.
-const allDown = (g, npcs) => g.until(() => npcs.every(n => n.dead || n.human.state === 'down'));
+export const allDown = (g, npcs) => g.until(() => npcs.every(n => n.dead || n.human.state === 'down'));
 
 // A session with Dr. Melfi in the interior set. Leaves the screen black; the caller sets up what follows.
-async function therapy(g, lines) {
+export async function therapy(g, lines) {
   const { office } = g.places, p = g.player, night = g.night;
   p.locked = true;
   await fade(g, 1, 1);
@@ -227,7 +228,7 @@ function panic(g) {
 }
 
 // A fireball, flying debris and a column of smoke, then a fire that burns until stop() is called.
-function explode(g, at) {
+export function explode(g, at) {
   g.sfx?.explosion();
   const group = new THREE.Group(), t0 = g.time, rnd = (a, b) => a + Math.random() * (b - a);
   group.position.set(at.x, groundAt(at.x, at.z), at.z);
@@ -288,7 +289,7 @@ function explode(g, at) {
 }
 
 // A column of smoke from a spot, until stop() is called.
-function smoke(g, at, height = 4) {
+export function smoke(g, at, height = 4) {
   const group = new THREE.Group(), geo = new THREE.SphereGeometry(1, 8, 6), puffs = [];
   group.position.set(at.x, groundAt(at.x, at.z) + height, at.z);
   g.track(group);
@@ -310,7 +311,7 @@ function smoke(g, at, height = 4) {
 }
 
 // Driving something that must arrive in one piece: three hard crashes and `reset` puts things back.
-function careful(g, label, failText, reset) {
+export function careful(g, label, failText, reset) {
   const p = g.player;
   let hits = 0, last = 0, on = true;
   g.updaters.push(() => {
@@ -387,7 +388,7 @@ async function bingRoom(g, cam, arrange, play) {
 }
 
 // A scene in a room other than the Bing (the hospital ward): the room gives its own camera.
-async function roomScene(g, room, arrange, play, { night: dark = 0 } = {}) {
+export async function roomScene(g, room, arrange, play, { night: dark = 0 } = {}) {
   const p = g.player, night = g.night;
   p.locked = true;
   await fade(g, 1, 1);
@@ -406,13 +407,13 @@ async function roomScene(g, room, arrange, play, { night: dark = 0 } = {}) {
   g.setNight(night);
 }
 // One of the rooms behind the shop doors, with a camera: `from` and `to` are [x, z] in room coordinates.
-function inRoom(q, from, to, height = 1.6, lift = 1.1) {
+export function inRoom(q, from, to, height = 1.6, lift = 1.1) {
   return { ...q, cam: { pos: new THREE.Vector3(q.X + from[0], q.Y + height, q.Z + from[1]), look: new THREE.Vector3(q.X + to[0], q.Y + lift, q.Z + to[1]) } };
 }
 // A spot inside such a room, with the room's floor height.
-const roomSpot = (q, x, z) => ({ x: q.X + x, y: q.Y, z: q.Z + z });
+export const roomSpot = (q, x, z) => ({ x: q.X + x, y: q.Y, z: q.Z + z });
 // Someone lying in a bed: the fall of the death clip, played through to its last frame.
-function lying(g, look, at, heading) {
+export function lying(g, look, at, heading) {
   const a = actor(g, look, at, heading, 'down');
   a.mixer.update(4);
   return a;
@@ -443,12 +444,13 @@ const EPISODES = [
 ];
 
 export async function runStory(g) {
-  const total = EPISODES.reduce((n, e) => n + e.missions.length, 0);
+  const STORY = CITY === 'la' ? HEAT : EPISODES; // each city tells its own
+  const total = STORY.reduce((n, e) => n + e.missions.length, 0);
   const saved = readSave(), from = clamp(saved.mission || 0, 0, total);
   if (from > 0) { // pick up a saved game at home
     const { home, vesuvio } = g.places, p = g.player;
     if (saved.cash) g.addMoney(saved.cash);
-    if (from > 5) vesuvio.burn();
+    if (from > 5) vesuvio?.burn();
     for (const d of home.ducks) d.group.visible = false;
     p.pos.set(home.wake.x, 0, home.wake.z);
     g.cam.fixed = null; g.cam.yaw = p.heading = 0; g.cam.pitch = 0.22;
@@ -457,7 +459,7 @@ export async function runStory(g) {
     await fade(g, 0, 1.2);
   }
   let n = 0;
-  for (const [e, episode] of EPISODES.entries()) {
+  for (const [e, episode] of STORY.entries()) {
     for (const [k, mission] of episode.missions.entries()) {
       if (n++ < from) continue;
       g.progress = { episode: episode.name, title: episode.title, mission: episode.titles[k], k: k + 1, of: episode.missions.length, n, total };
@@ -471,7 +473,7 @@ export async function runStory(g) {
       save(n, g.cash);
       await g.wait(1.5);
       if (k === episode.missions.length - 1) {
-        g.hud.card(`End of ${episode.name}`, e === EPISODES.length - 1 ? 'Vice City is yours until the next one.' : '');
+        g.hud.card(`End of ${episode.name}`, e === STORY.length - 1 ? (CITY === 'la' ? 'Los Angeles is yours until the next one.' : 'Vice City is yours until the next one.') : '');
         await g.wait(6);
         g.hud.card();
       }
@@ -2397,7 +2399,7 @@ async function acceptance(g) {
 
 // A car the player must follow at a distance: it drives the roads toward `goal` and stops there.
 // Resolves true when it arrives, false if the player falls too far behind for too long.
-async function tail(g, car, goal, text, { far = 95, close = 12 } = {}) {
+export async function tail(g, car, goal, text, { far = 95, close = 12 } = {}) {
   const p = g.player, blip = { x: car.pos.x, z: car.pos.z, color: '#ffffff' };
   g.blips.push(blip);
   g.hud.objective(text);
@@ -2416,7 +2418,7 @@ async function tail(g, car, goal, text, { far = 95, close = 12 } = {}) {
   return result;
 }
 // Send a car out as traffic from the node nearest `from`, heading for `goal`.
-function dispatch(g, car, from, goal, cruise = 8.5) {
+export function dispatch(g, car, from, goal, cruise = 8.5) {
   const n = nearestNode(from);
   roam(car, n.i, n.j, Math.floor(Math.random() * 4), cruise);
   car.nav.goal = goal;

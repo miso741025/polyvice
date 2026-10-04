@@ -269,6 +269,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   // ----- Wanted level and the police -----
   // n is how much attention an act draws; a star is a whole unit.
   g.heat = n => {
+    if (g.noHeat) return; // a mission has the street to itself for a while
     calm = 0;
     const before = Math.floor(g.wanted);
     g.wanted = Math.min(3.99, g.wanted + n);

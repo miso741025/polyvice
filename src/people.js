@@ -1085,5 +1085,23 @@ export const LOOKS = {
   agent: { jacket: 0x23232b, shirt: 0xf4f4f4, tie: 0x23232b, tucked: true, pants: 0x23232b, hair: 0x2b1b12, hairMesh: 'buzzed', glasses: 'shades', bulk: 1.05, stubble: 0.1 },
   adriana: { body: 'female', jacket: 0x1c1c22, shirt: 0xff5fd2, pants: 0x1c1c22, tucked: true, chain: true, hair: 0x1c1410, hairMesh: 'long', hairScale: [1.14, 1.12, 1.1], age: 0.1 },
 };
+// The people of Heat, in Los Angeles. As with the others, nobody's face is copied: build, hair and clothes carry it.
+Object.assign(LOOKS, {
+  neil: { jacket: 0x55585f, shirt: 0xf4f4f4, tucked: true, pants: 0x55585f, hair: 0x4a4038, hairSides: 0x8d8a8e, hairSidesWidth: 0.046, hairMesh: 'parted', hairScale: [1.0, 0.94, 1.02], goatee: 0x6f6a66, bulk: 1.02, age: 0.6, face: { nose: 0.5, cheeks: -0.2, brow: 0.3 } },
+  hanna: { jacket: 0x16161c, shirt: 0x23232b, tucked: true, pants: 0x16161c, hair: 0x120e0c, hairMesh: 'parted', hairScale: [1.04, 1.12, 1.06], bulk: 0.98, age: 0.6, stubble: 0.3, face: { nose: 0.6, cheeks: -0.3, brow: 0.35 } },
+  shiherlis: { jacket: 0x23232b, shirt: 0xf4f4f4, tee: true, pants: 0x23232b, hair: 0xd9b25a, hairMesh: 'long', hairScale: [1, 0.96, 1], bulk: 1.05, height: 1.03, stubble: 0.3, face: { jaw: 0.1 } },
+  cheritto: { jacket: 0x3a3a44, shirt: 0x8d93cc, tucked: true, pants: 0x2b2b3a, hair: 0x1c1410, hairMesh: 'parted', mustache: 0x1c1410, bulk: 1.34, age: 0.4, face: { jaw: 0.2, cheeks: 0.9, chin: 0.9, jowls: 0.6 } },
+  trejo: { shirt: 0x5c6157, sleeves: 'long', pants: 0x23232b, hair: 0x111111, hairMesh: 'long', hairScale: [1, 0.92, 1], mustache: 0x111111, dark: true, bulk: 1.08, age: 0.6, stubble: 0.4, face: { jaw: 0.12, brow: 0.4 } },
+  waingro: { shirt: 0x15141a, tank: true, open: 0x15141a, pants: 0x3b4a66, hair: 0x6a4a34, hairMesh: 'long', goatee: 0x4a3324, bulk: 1.1, stubble: 0.6, age: 0.3, face: { jaw: 0.1, brow: 0.5, cheeks: -0.3 } },
+  nate: { pattern: 'palms', shirt: 0xe0563f, pants: 0xb9a58a, shoes: 0x6a4a34, hair: 0xb9b6b0, hairMesh: 'long', hairScale: [1, 0.9, 1], beard: 0xb9b6b0, beardMesh: true, brows: 0x9a9690, bulk: 1.12, age: 0.9 },
+  eady: { body: 'female', shirt: 0xf5f0e6, sleeves: 'long', pants: 0x3b4a66, hair: 0x1c1410, hairMesh: 'long', hairScale: [1.12, 1.1, 1.1], age: 0.1 },
+  vanzant: { jacket: 0x2c3a5a, jacketPattern: 'pinstripe', shirt: 0xf4f4f4, tie: 0xd9a520, tucked: true, pants: 0x2c3a5a, hair: 0x7a5a3a, hairStyle: 'receding', glasses: 'clear', bulk: 1.05, age: 0.5 },
+  benny: { jacket: 0x23232b, shirt: 0x8a1c1c, tee: true, pants: 0x23232b, hair: 0x2b1b12, hairMesh: 'buzzed', bulk: 1.2, stubble: 0.5, face: { jaw: 0.2, brow: 0.4 } },
+  charlene: { body: 'female', shirt: 0x9fd0f5, pants: 0xf5f0e6, hair: 0xd9b25a, hairMesh: 'long', chain: true },
+  drucker: { jacket: 0x6f5a44, shirt: 0xf4f4f4, tie: 0x2c3a5a, tucked: true, pants: 0x4a3324, hair: 0x2b1b12, hairMesh: 'parted', mustache: 0x2b1b12, bulk: 1.15, age: 0.5 },
+  casals: { jacket: 0x3d4658, shirt: 0xcfe8ff, tucked: true, pants: 0x3d4658, hair: 0x111111, hairMesh: 'buzzed', dark: true, bulk: 1.05, age: 0.4 },
+  guard: { shirt: 0x9fb0c4, sleeves: 'long', tucked: true, badge: true, pants: 0x23232b, hair: 0x4a3324, hairMesh: 'buzzed', hat: 'cap', hatColor: 0x23232b, bulk: 1.1 },
+  snitch: { shirt: 0xffe066, tee: true, jacket: 0x5b53c9, pants: 0x23232b, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'buzzed', dark: true, chain: true, bulk: 0.95, goatee: 0x141110 },
+});
 export const makeLook = name => makeHuman(LOOKS[name]);
 export const makeTony = () => makeLook('tony');

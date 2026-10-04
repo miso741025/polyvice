@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { NX, NZ, ROAD, CELL, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
+import { CITY, NX, NZ, ROAD, CELL, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
-import { makeTony, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
+import { makeLook, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
 import { runStory, savedMission, clearSave } from './missions.js';
 import { installCombat } from './combat.js';
@@ -61,7 +61,8 @@ async function boot() {
 
   // ----- Cars: Tony's SUV, parked cars at the kerb, traffic -----
   const g_scenery = [];
-  const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, 0x7a1626, 'suv');
+  const LA = CITY === 'la';
+  const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, LA ? 0x1d1d24 : 0x7a1626, LA ? 'sedan' : 'suv'); // the player's own car
   const cars = [tonyCar, ...spawnTraffic(scene, 46, rand)];
   const parkedColors = [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0xd9342b, 0x8ecbff, 0xf08a3c, 0x7d5cff, 0x1d1d24];
   const parkedKinds = ['sedan', 'coupe', 'sedan', 'suv', 'coupe', 'van', 'pickup'];
@@ -76,8 +77,8 @@ async function boot() {
     }
   }
 
-  places.bing.parking.forEach((spot, n) => cars.push(new Car(scene, spot.x, spot.z, spot.h, parkedColors[(n + 2) % parkedColors.length], parkedKinds[(n + 1) % parkedKinds.length])));
-  places.parkedSpots.forEach((spot, n) => cars.push(new Car(scene, spot.x, spot.z, spot.h, spot.kind === 'truck' ? 0xf2f0ea : parkedColors[(n * 5 + 1) % parkedColors.length], spot.kind)));
+  (places.bing?.parking || []).forEach((spot, n) => cars.push(new Car(scene, spot.x, spot.z, spot.h, parkedColors[(n + 2) % parkedColors.length], parkedKinds[(n + 1) % parkedKinds.length])));
+  places.parkedSpots.forEach((spot, n) => cars.push(new Car(scene, spot.x, spot.z, spot.h, spot.kind === 'truck' || spot.kind === 'ambulance' || spot.kind === 'police' ? 0xf4f4f0 : parkedColors[(n * 5 + 1) % parkedColors.length], spot.kind)));
   { // the car on the showroom turntable and the one up on the body shop's lift are scenery
     const { SHOWROOM, BODYSHOP } = places.rooms;
     const show = new Car(scene, SHOWROOM.showcar.x, SHOWROOM.showcar.z, SHOWROOM.showcar.h, 0xd9342b, 'coupe'); show.mesh.position.y = SHOWROOM.Y + 0.3; show.placeWheels(); show.sync = () => {};
@@ -101,7 +102,7 @@ async function boot() {
   const crowdLimit = () => { peds.forEach((ped, i) => { ped.parked = i >= CROWD[settings.crowd]; if (ped.parked) ped.human.group.visible = false; }); };
   crowdLimit();
 
-  const tony = makeTony();
+  const tony = makeLook(LA ? 'neil' : 'tony'); // the player: Tony Soprano in Vice City, Neil McCauley in Los Angeles
   scene.add(tony.group);
 
   // ----- Game state shared with the mission scripts -----
@@ -159,6 +160,7 @@ async function boot() {
     // 0 = the usual sunset, 1 = night. Lights, fog, sky and sea follow.
     setNight(k) {
       g.night = k;
+      k = LA ? 0.42 + k * 0.58 : k; // Los Angeles is lit like its film: blue dusk at its brightest
       hemi.intensity = 1.5 - k * 0.95; hemi.color.set(0xffd9ea).lerp(tmpColor.set(0x6f7fd0), k); hemi.groundColor.set(0x5d4c7c).lerp(tmpColor.set(0x1a1830), k);
       sun.intensity = 2.3 - k * 1.75; sun.color.set(0xffcf9e).lerp(tmpColor.set(0x9db4ff), k);
       scene.fog.color.set(0xf2a0b4).lerp(tmpColor.set(0x120f26), k);
@@ -231,13 +233,19 @@ async function boot() {
   const p = g.player, tmpColor = new THREE.Color();
   let streamIndex = 0;
   // The radar's landmarks: home, the family's places, and whatever is useful.
-  const landmarks = [
-    { ...places.home.spawn, label: 'H', color: '#2f9c5a' }, { ...places.bing.door, label: 'B', color: '#ff5fd2' }, { ...places.satriale.door, label: 'S', color: '#d8342c' },
-    { ...places.melfi.door, label: 'M', color: '#1f9c8f' }, { ...places.vesuvio.door, label: 'V', color: '#e0a12c' }, { ...places.hesh.door, label: 'F', color: '#49a0d0' },
-    { ...places.hospital.door, label: '+', color: '#2f56c8' }, { ...places.bodyshop.door, label: 'A', color: '#8a1c1c' }, { ...places.cafe.door, label: 'C', color: '#1f6b4a' },
-    { ...places.livia.porch, label: 'L', color: '#8a6f8f' }, { ...places.grove.gate, label: 'G', color: '#5f8a84' }, { ...places.motel.office, label: 'T', color: '#f08a3c' },
-    { ...places.church?.door, label: '†', color: '#f4f2ee' }, { ...places.gas?.pumps, label: 'P', color: '#d8342c' }, { ...places.carlot?.lot, label: '$', color: '#2f56c8' },
-  ].filter(l => l.x !== undefined);
+  const landmarks = (LA ? [
+    { ...places.home.spawn, label: 'H', name: "Neil's house", color: '#2f9c5a' }, { ...places.bank.door, label: '$', name: 'Far East Pacific Bank', color: '#d9a520' }, { ...places.kates.door, label: 'K', name: "Kate's diner", color: '#ff5fd2' },
+    { ...places.truckstop.door, label: 'T', name: 'Truck stop', color: '#1f6b4a' }, { ...places.precinct.door, label: 'P', name: 'Major Crimes', color: '#2f56c8' }, { ...places.hospital.door, label: '+', name: 'Hospital', color: '#d8342c' },
+    { ...places.drivein.lot, label: 'D', name: 'Drive-in', color: '#49a0d0' }, { ...places.depository.gate, label: 'M', name: 'Metals depository', color: '#8d8a8e' }, { ...places.bookstore.door, label: 'B', name: 'Bookstore', color: '#8a6f8f' },
+    { ...places.airport.door, label: 'A', name: 'Airport', color: '#f4f2ee' }, { ...places.bar.door, label: 'N', name: "Nate's bar", color: '#e0a12c' },
+  ] : [
+    { ...places.home.spawn, label: 'H', name: 'Home', color: '#2f9c5a' }, { ...places.bing.door, label: 'B', name: 'Bada Bing', color: '#ff5fd2' }, { ...places.satriale.door, label: 'S', name: "Satriale's", color: '#d8342c' },
+    { ...places.melfi.door, label: 'M', name: 'Dr. Melfi', color: '#1f9c8f' }, { ...places.vesuvio.door, label: 'V', name: 'Vesuvio', color: '#e0a12c' }, { ...places.hesh.door, label: 'F', name: 'F-Note Records', color: '#49a0d0' },
+    { ...places.hospital.door, label: '+', name: 'Hospital', color: '#2f56c8' }, { ...places.bodyshop.door, label: 'A', name: 'Auto body', color: '#8a1c1c' }, { ...places.cafe.door, label: 'C', name: 'Bean Scene', color: '#1f6b4a' },
+    { ...places.livia.porch, label: 'L', name: "Livia's house", color: '#8a6f8f' }, { ...places.grove.gate, label: 'G', name: 'Green Grove', color: '#5f8a84' }, { ...places.motel.office, label: 'T', name: 'Motel', color: '#f08a3c' },
+    { ...places.church?.door, label: '†', name: 'Church', color: '#f4f2ee' }, { ...places.gas?.pumps, label: 'P', name: 'Gas station', color: '#d8342c' }, { ...places.carlot?.lot, label: '$', name: 'Sunshine Autos', color: '#2f56c8' },
+  ]).filter(l => l.x !== undefined);
+  for (const d of places.gunShops || []) landmarks.push({ x: d.x, z: d.z, label: 'W', name: 'Guns', color: '#5c6157' });
   const fade = (to, seconds) => { hud.fade(to, seconds); return g.wait(seconds + 0.05); };
   const combat = installCombat(g, { scene, hud, peds, cars, keys });
   const sideJobs = installSideJobs(g);
@@ -280,6 +288,11 @@ async function boot() {
     return true;
   });
   hud.fade(0, 1.2);
+  // Each city has its own title, and a way across to the other.
+  if (LA) { document.body.classList.add('la'); document.querySelector('.logo .sop').textContent = 'Heat'; document.querySelector('.logo .vc').textContent = 'Los Angeles'; document.title = 'Heat: Los Angeles'; g.setNight(0); }
+  const otherBtn = document.getElementById('other');
+  otherBtn.textContent = LA ? 'Vice City · The Sopranos' : 'Los Angeles · Heat';
+  otherBtn.addEventListener('click', () => { location.search = LA ? '' : '?city=la'; });
   const startBtn = document.getElementById('start');
   startBtn.disabled = false;
   startBtn.textContent = 'Start';
@@ -372,6 +385,16 @@ async function boot() {
     if (door) {
       hud.prompt(p.inside ? 'F  ·  Leave' : `F  ·  Enter ${door.name}`);
       if (g.consume('KeyF')) g.useDoor(door);
+      return;
+    }
+    const stair = !p.locked && p.inside && (places.stairs || []).find(s => near(p.pos, s.a, 1.4) || near(p.pos, s.b, 1.4));
+    if (stair) { // between the floors of a house
+      const up = near(p.pos, stair.a, 1.4);
+      hud.prompt(`F  ·  ${up ? stair.up : stair.down}`);
+      if (g.consume('KeyF')) {
+        p.locked = true; sfx.door();
+        fade(1, 0.35).then(() => { const to = up ? stair.b : stair.a; p.pos.set(to.x, 0, to.z); p.heading = g.cam.yaw = to.h; return fade(0, 0.35); }).then(() => { p.locked = false; }).catch(() => {});
+      }
       return;
     }
     let nearest = null, best = 4.2;

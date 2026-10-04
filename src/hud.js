@@ -1,4 +1,4 @@
-import { NX, NZ, ROAD, OX, OZ, CELL, nodeX, nodeZ, bounds, SHORE } from './grid.js';
+import { CITY, NX, NZ, ROAD, OX, OZ, CELL, nodeX, nodeZ, bounds, SHORE } from './grid.js';
 
 const $ = id => document.getElementById(id);
 
@@ -75,18 +75,20 @@ export class Hud {
     c.fillStyle = '#3f3a57';
     for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) c.fillRect(X(nodeX(i) + ROAD / 2), Z(nodeZ(j) + ROAD / 2), (CELL - ROAD) * k, (CELL - ROAD) * k);
     c.font = 'bold 11px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    for (const l of landmarks) {
+    for (const l of landmarks) { // a dot and the place's name beside it
       c.fillStyle = l.color; c.strokeStyle = '#000'; c.lineWidth = 1.5;
-      c.beginPath(); c.arc(X(l.x), Z(l.z), 8, 0, Math.PI * 2); c.fill(); c.stroke();
-      c.fillStyle = '#fff'; c.fillText(l.label, X(l.x), Z(l.z) + 0.5);
+      c.beginPath(); c.arc(X(l.x), Z(l.z), 6, 0, Math.PI * 2); c.fill(); c.stroke();
+      c.font = 'bold 13px sans-serif'; c.textAlign = 'left'; c.lineWidth = 3.5; c.strokeStyle = 'rgba(0,0,0,.85)';
+      c.strokeText(l.name || l.label, X(l.x) + 10, Z(l.z) + 0.5); c.fillStyle = '#fff'; c.fillText(l.name || l.label, X(l.x) + 10, Z(l.z) + 0.5);
     }
+    c.textAlign = 'center';
     for (const b of blips) { c.fillStyle = b.color; c.strokeStyle = '#000'; c.lineWidth = 2; c.beginPath(); c.rect(X(b.x) - 6, Z(b.z) - 6, 12, 12); c.fill(); c.stroke(); }
     c.save(); c.translate(X(focus.x), Z(focus.z)); c.rotate(Math.PI - heading);
     c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 2;
     c.beginPath(); c.moveTo(0, -11); c.lineTo(8, 9); c.lineTo(0, 4); c.lineTo(-8, 9); c.closePath(); c.fill(); c.stroke();
     c.restore();
     c.fillStyle = '#f4f1e6'; c.font = '20px "Bebas Neue", sans-serif'; c.textAlign = 'left';
-    c.fillText('VICE CITY', 24, 30); c.font = '13px sans-serif'; c.fillText('M to close', 24, 52);
+    c.fillText(CITY === 'la' ? 'LOS ANGELES' : 'VICE CITY', 24, 30); c.font = '13px sans-serif'; c.fillText('M to close', 24, 52);
   }
   // 0..1: the blurred, tunnel-vision look of a panic attack.
   panic(k) {

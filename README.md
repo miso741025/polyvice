@@ -12,7 +12,7 @@ Any static file server works:
 python3 -m http.server 8137
 ```
 
-Then open http://localhost:8137.
+Then open http://localhost:8137 for Vice City (The Sopranos), or http://localhost:8137/?city=la for Los Angeles (Heat). The title screen has a button to switch.
 
 ## Controls
 
@@ -25,6 +25,7 @@ WASD move / drive · Mouse look · Shift run · Space jump / handbrake · F ente
 - `src/people.js`: characters and the crew's outfits
 - `src/entities.js`: cars, traffic, pedestrians
 - `src/missions.js`: the story (episodes one to four, twenty-nine missions), written as async scripts
+- `src/heat.js`: the Los Angeles story (Heat, chapter one)
 - `src/combat.js`: fists, the pistol, lock-on, health, the wanted level and the police
 - `src/sidejobs.js`: shakedowns, food, armour, confession and the motel, between missions
 - `src/audio.js`: all the sound, synthesised

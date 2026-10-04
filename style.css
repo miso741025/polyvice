@@ -123,3 +123,7 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
 #menu .item .hint { float: right; color: #9ff3ff; }
 #menu .info { padding: 8px 10px; margin: 4px 0 10px; border-left: 4px solid #ff5fd2; font-size: 16px; }
 #menu .info .hint { float: right; color: #ffe066; }
+#other { margin-top: 10px; background: none; border: 2px solid #49e0d0; color: #49e0d0; font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 3px; padding: 6px 18px; cursor: pointer; }
+#other:hover { background: #49e0d0; color: #0b0b18; }
+body.la .logo .sop { letter-spacing: 12px; }
+body.la .logo .vc { color: #6fb0ff; text-shadow: 3px 3px 0 #10204a; }
