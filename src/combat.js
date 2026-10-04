@@ -8,7 +8,7 @@ import { makeLook, makeHuman, randomPedLook, roam, driveAI, nearestNode } from '
 
 const FIST = { reach: 1.9, rate: 0.42 };
 // The five blows of the combo, in order; the last one puts a man down. A running punch is its own thing.
-const COMBO = [['jab', 30], ['cross', 34], ['jab', 30], ['shove', 26], ['haymaker', 60]];
+const COMBO = [['jab', 30], ['cross', 34], ['jab', 30], ['uppercut', 40], ['kick', 55]];
 export const WEAPONS = {
   fist: { name: 'Fists' },
   pistol: { name: 'Pistol', dmg: 55, range: 70, rate: 0.38, mag: 12, spread: 0.015, price: 350, ammoPrice: 60, pack: 24 },
@@ -196,7 +196,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     if (p.reloading > g.time) return;
     lastShot = g.time;
     p.mag[p.weapon]--; showAmmo();
-    if (!p.car) p.human.play('shoot', p.motion !== 'idle' ? p.motion : 'aim', 1.8);
+    if (!p.car) p.human.layer('shoot', { once: true, speed: 1.5 }); // the arms fire; the legs keep doing what they were doing
     g.sfx?.shot(); if (Math.random() < 0.3) g.sfx?.scream();
     g.scare = g.time;
     const from = p.car ? tmp.set(p.car.pos.x, groundAt(p.car.pos.x, p.car.pos.z) + 1.1, p.car.pos.z).clone() : muzzleOf(p.human, tmp).clone();
@@ -213,7 +213,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     const w = WEAPONS[p.weapon];
     if (!w.mag || p.reloading > g.time || p.mag[p.weapon] >= w.mag || p.ammo[p.weapon] <= 0) return;
     p.reloading = g.time + 1.4;
-    if (!p.car) p.human.play('reload', p.motion !== 'idle' ? p.motion : 'aim', 1.2);
+    if (!p.car) p.human.layer('reload', { once: true, speed: 1.2 });
     g.sfx?.click();
     g.wait(1.3).then(() => {
       const take = Math.min(w.mag - p.mag[p.weapon], p.ammo[p.weapon]);
@@ -245,7 +245,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     const last = !running && swing % COMBO.length === COMBO.length - 1;
     swing = running ? 0 : swing + 1;
     lastHit = g.time;
-    p.human.play(clip, 'stance', clip === 'haymaker' ? 1.7 : running ? 1.3 : 1.4);
+    p.human.play(clip, 'guard', running ? 1.3 : clip === 'kick' || clip === 'uppercut' ? 1.15 : 1.4);
     if (lock) { // step in to reach them
       const dx = lock.pos.x - p.pos.x, dz = lock.pos.z - p.pos.z, d = Math.hypot(dx, dz);
       const lunge = running ? 2.4 : 1.6;
@@ -338,7 +338,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   const npcAi = (npc, dt) => {
     const h = npc.human;
     if (npc.dead || h.busy) return;
-    if (npc.stunned) { if (g.time < npc.stunned) return; npc.stunned = 0; h.set('idle'); }
+    if (npc.stunned) { if (g.time < npc.stunned) return; npc.stunned = 0; h.rise(npc.ai === 'brawler' ? 'guard' : 'idle'); return; }
     const dx = p.pos.x - npc.pos.x, dz = p.pos.z - npc.pos.z, d = Math.hypot(dx, dz) || 1;
     const face = () => { h.group.rotation.y = Math.atan2(dx, dz); };
     const move = (dir, speed) => {
@@ -354,10 +354,10 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       if (p.hidden || p.car) { h.set('idle'); return; }
       if (d > 1.7) { move(1, 5.5); h.set('run'); face(); }
       else {
-        face(); h.set('idle');
+        face(); h.set('guard');
         if (g.time > npc.nextHit) {
           npc.nextHit = g.time + 1.7 + Math.random() * 0.5;
-          h.play(['jab', 'cross', 'shove'][Math.floor(Math.random() * 3)], 'stance', 1.2);
+          h.play(['jab', 'cross', 'uppercut'][Math.floor(Math.random() * 3)], 'guard', 1.2);
           g.wait(0.22).then(() => { if (!npc.dead && Math.hypot(p.pos.x - npc.pos.x, p.pos.z - npc.pos.z) < 2.2) g.damagePlayer(npc.damage, npc.pos); }).catch(() => {});
         }
       }

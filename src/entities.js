@@ -145,7 +145,7 @@ export class Ped {
     if (this.dead) { this.diedAt += dt; return; }
     if (this.down > 0) {
       this.down -= dt;
-      if (this.down <= 0) h.set('idle');
+      if (this.down <= 0) h.rise('idle');
       return;
     }
     if (h.busy) return;

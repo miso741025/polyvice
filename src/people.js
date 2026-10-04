@@ -43,14 +43,16 @@ const groupOf = bone =>
 const CLIPS = {
   talk: 'Idle_Talking_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop', sprint: 'Sprint_Loop',
   down: 'Death01', jab: 'Punch_Jab', cross: 'Punch_Cross', hitHead: 'Hit_Head', hitChest: 'Hit_Chest',
-  aim: 'Pistol_Idle_Loop', shoot: 'Pistol_Shoot', kneel: 'Fixing_Kneeling', interact: 'Interact', pickup: 'PickUp_Table',
+  aim: 'Pistol_Aim_Neutral', ready: 'Pistol_Idle_Loop', shoot: 'Pistol_Shoot', kneel: 'Fixing_Kneeling', interact: 'Interact', pickup: 'PickUp_Table',
   crouch: 'Crouch_Idle_Loop', dance: 'Dance_Loop',
-  reload: 'Pistol_Reload', shove: 'Spell_Simple_Shoot', haymaker: 'Sword_Attack', stance: 'Idle_Loop',
-  jumpStart: 'Jump_Start', jumpLoop: 'Jump_Loop', jumpLand: 'Jump_Land',
-  point: 'Pistol_Aim_Neutral', calm: 'Push_Loop', sitTalk: 'Sitting_Talking_Loop', sitEnter: 'Sitting_Enter', stroll: 'Walk_Formal_Loop',
+  reload: 'Pistol_Reload', stance: 'Idle_Loop',
+  jumpStart: 'Jump_Start', jumpLoop: 'Jump_Loop', jumpLand: 'Jump_Land', stroll: 'Walk_Formal_Loop',
 };
-// Clips that play once and hold their last frame.
-const ONCE = new Set(['down', 'jab', 'cross', 'hitHead', 'hitChest', 'shoot', 'kneel', 'interact', 'pickup', 'reload', 'shove', 'haymaker', 'jumpStart', 'jumpLand', 'point', 'sitEnter']);
+// Clips that play once and hold their last frame. (uppercut, kick, and the gestures are built in prepareBody.)
+const ONCE = new Set(['down', 'jab', 'cross', 'hitHead', 'hitChest', 'shoot', 'kneel', 'interact', 'pickup', 'reload', 'jumpStart', 'jumpLand', 'uppercut', 'kick']);
+// Bones of the lower body: a clip can be split into its legs and everything above them, so the legs
+// can run while the arms aim, or stay seated while the hands talk.
+const LEGS = /^(root|pelvis|thigh|calf|foot|ball)/;
 
 // ---------- Loading ----------
 
@@ -169,6 +171,77 @@ function prepareBody(scene, skins, animations, sourcePelvis, female) {
     const b = bone(t.name.split('.')[0]);
     return t.name.endsWith('.position') ? new THREE.VectorKeyframeTrack(t.name, [0], b.position.toArray()) : new THREE.QuaternionKeyframeTrack(t.name, [0], b.quaternion.toArray());
   }));
+  // ----- Moves the library does not have, keyed by hand -----
+  // Each key rotates bones about the world's axes from a base pose: x negative swings a hanging limb forward,
+  // y twists, z positive swings toward the character's left. `top` clips hold only the upper body.
+  const Yax = new THREE.Vector3(0, 1, 0), Zax = new THREE.Vector3(0, 0, 1);
+  const poseFrom = (clip, time) => {
+    body.skeleton.pose();
+    for (const t of clip.tracks) {
+      const b = bone(t.name.split('.')[0]);
+      if (!b) continue;
+      const v = t.createInterpolant().evaluate(Math.min(time, clip.duration));
+      if (t.name.endsWith('.position')) b.position.fromArray(v); else b.quaternion.fromArray(v);
+    }
+  };
+  const author = (name, base, baseTime, keys, top = false, sink = 1) => {
+    poseFrom(base, baseTime);
+    const baseQ = new Map(bones.map(b => [b.name, b.quaternion.clone()])), hip = hips.position.clone().multiplyScalar(sink).toArray();
+    const names = bones.map(b => b.name).filter(n => !top || !LEGS.test(n)), values = new Map(names.map(n => [n, []]));
+    for (const k of keys) {
+      for (const b of bones) b.quaternion.copy(baseQ.get(b.name));
+      for (const b of bones) { // parents come before children
+        const r = k.rot?.[b.name];
+        if (!r) continue;
+        scene.updateMatrixWorld(true);
+        const pw = b.parent.getWorldQuaternion(new THREE.Quaternion());
+        const q = new THREE.Quaternion().setFromAxisAngle(Zax, r[2] || 0).multiply(new THREE.Quaternion().setFromAxisAngle(Yax, r[1] || 0)).multiply(new THREE.Quaternion().setFromAxisAngle(X, r[0] || 0));
+        b.quaternion.premultiply(pw.clone().invert().multiply(q).multiply(pw));
+      }
+      for (const n of names) values.get(n).push(...bone(n).quaternion.toArray());
+    }
+    const times = keys.map(k => k.t), tracks = names.map(n => new THREE.QuaternionKeyframeTrack(n + '.quaternion', times, values.get(n)));
+    if (!top) tracks.push(new THREE.VectorKeyframeTrack('pelvis.position', [0], hip));
+    B.clips[name] = new THREE.AnimationClip(name, times[times.length - 1], tracks);
+  };
+  const stand = B.clips.idle, R = 'upperarm_r', L = 'upperarm_l', r = 'lowerarm_r', l = 'lowerarm_l';
+  // Fists up, knees soft, left foot forward: the guard a fight is fought from, and the two blows that finish a combination.
+  const legs = { thigh_l: [-0.42], calf_l: [0.55], thigh_r: [0.16], calf_r: [0.38], spine_01: [0.12] };
+  const fists = { ...legs, [R]: [-0.55, 0, 0.18], [r]: [-1.8], [L]: [-0.7, 0, -0.18], [l]: [-1.7] };
+  const low = 0.955; // the hips sink as the knees bend
+  author('guard', stand, 0, [{ t: 0, rot: fists }, { t: 0.6, rot: { ...fists, spine_02: [0.05] } }, { t: 1.2, rot: fists }], false, low);
+  author('uppercut', stand, 0, [
+    { t: 0, rot: fists },
+    { t: 0.12, rot: { ...fists, spine_01: [0.36, -0.35], [R]: [0.35, 0, 0.1], [r]: [-1.3] } },                  // dip and load the right hand
+    { t: 0.24, rot: { ...fists, spine_01: [-0.1, 0.45], [R]: [-1.15, 0, 0.15], [r]: [-1.75] } },                 // drive it up through the chin
+    { t: 0.42, rot: { ...fists, spine_01: [-0.06, 0.3], [R]: [-1.3, 0, 0.15], [r]: [-1.8] } },
+    { t: 0.62, rot: fists },
+  ], false, low);
+  author('kick', stand, 0, [
+    { t: 0, rot: fists },
+    { t: 0.14, rot: { ...fists, spine_01: [-0.1], thigh_r: [-1.25], calf_r: [1.5] } },                          // knee up
+    { t: 0.26, rot: { ...fists, spine_01: [-0.3], thigh_r: [-1.5], calf_r: [0.12] } },                          // and out
+    { t: 0.4, rot: { ...fists, spine_01: [-0.2], thigh_r: [-1.2], calf_r: [1.35] } },
+    { t: 0.62, rot: fists },
+  ], false, low);
+  // Talking with the hands, over a standing or seated body.
+  author('say1', stand, 0, [ // the right hand keeps time
+    { t: 0, rot: {} }, { t: 0.3, rot: { [R]: [-0.5, 0, 0.1], [r]: [-1.35] } }, { t: 0.55, rot: { [R]: [-0.5, 0, 0.1], [r]: [-1.0] } },
+    { t: 0.8, rot: { [R]: [-0.55, 0, 0.1], [r]: [-1.35], Head: [0.06] } }, { t: 1.05, rot: { [R]: [-0.5, 0, 0.1], [r]: [-1.0] } }, { t: 1.4, rot: { [R]: [-0.45, 0, 0.1], [r]: [-1.25] } },
+    { t: 1.9, rot: {} },
+  ], true);
+  author('say2', stand, 0, [ // both palms open: what do you want from me
+    { t: 0, rot: {} }, { t: 0.35, rot: { [R]: [-0.3, 0, -0.22], [r]: [-0.95], [L]: [-0.3, 0, 0.22], [l]: [-0.95], Head: [0.05, 0, 0.06] } },
+    { t: 0.9, rot: { [R]: [-0.25, 0, -0.34], [r]: [-0.8], [L]: [-0.25, 0, 0.34], [l]: [-0.8], Head: [0.02, 0, -0.05] } },
+    { t: 1.4, rot: { [R]: [-0.3, 0, -0.22], [r]: [-0.95], [L]: [-0.3, 0, 0.22], [l]: [-0.95] } }, { t: 1.9, rot: {} },
+  ], true);
+  author('say3', stand, 0, [ // a finger at whoever needs to hear it
+    { t: 0, rot: {} }, { t: 0.25, rot: { [R]: [-1.25, 0, 0.12], [r]: [-0.25], spine_02: [0.06] } }, { t: 0.5, rot: { [R]: [-1.15, 0, 0.12], [r]: [-0.5], spine_02: [0.06] } },
+    { t: 0.75, rot: { [R]: [-1.25, 0, 0.12], [r]: [-0.2], spine_02: [0.06] } }, { t: 1.3, rot: { [R]: [-1.2, 0, 0.12], [r]: [-0.3] } }, { t: 1.8, rot: {} },
+  ], true);
+  author('nod', stand, 0, [{ t: 0, rot: {} }, { t: 0.18, rot: { Head: [0.22] } }, { t: 0.36, rot: { Head: [0.02] } }, { t: 0.54, rot: { Head: [0.18] } }, { t: 0.8, rot: {} }], true);
+  author('no', stand, 0, [{ t: 0, rot: {} }, { t: 0.18, rot: { Head: [0, 0.3] } }, { t: 0.42, rot: { Head: [0, -0.3] } }, { t: 0.66, rot: { Head: [0, 0.22] } }, { t: 0.9, rot: {} }], true);
+  B.parts = {};
   body.skeleton.pose();
   scene.updateMatrixWorld(true);
   return B;
@@ -855,32 +928,65 @@ export function makeHuman(opts = {}) {
   const pistol = guns.pistol;
 
   const mixer = new THREE.AnimationMixer(root), actions = {};
+  // 'run', or one half of it: 'run|legs', 'aim|top'.
+  const clipOf = key => {
+    const [state, part] = key.split('|');
+    if (!part) return B.clips[state];
+    return B.parts[key] ??= new THREE.AnimationClip(key, B.clips[state].duration, B.clips[state].tracks.filter(t => LEGS.test(t.name) === (part === 'legs')));
+  };
   const person = {
-    group, mixer, state: null, after: null, pistol,
+    group, mixer, state: null, after: null, pistol, base: null, upper: null, topKey: null, topOnce: null,
     // Switch animation: 'idle' | 'talk' | 'walk' | 'run' | 'sprint' | 'sit' | 'down' | 'aim' | ... (see CLIPS).
     set(state, speed = 1) {
-      if (this.state !== state) {
-        const next = actions[state] ??= mixer.clipAction(B.clips[state]);
+      const whole = ONCE.has(state) || !this.upper, key = whole ? state : state + '|legs'; // one-shots take the whole body
+      if (this.base !== key) {
+        const next = actions[key] ??= mixer.clipAction(clipOf(key));
         if (ONCE.has(state)) { next.setLoop(THREE.LoopOnce); next.clampWhenFinished = true; }
-        next.reset().fadeIn(this.state ? 0.15 : 0).play();
-        if (this.state) actions[this.state].fadeOut(0.15);
-        this.state = state;
+        next.reset().fadeIn(this.base ? 0.15 : 0).play();
+        if (this.base) actions[this.base].fadeOut(0.15);
+        this.base = key;
       }
-      actions[state].timeScale = speed;
+      this.state = state;
+      actions[key].timeScale = speed;
+      if (this.topKey) actions[this.topKey].setEffectiveWeight(whole ? 0 : 1);
     },
     // Play a one-shot clip (a punch, a flinch), then go back to `then`. `busy` is true meanwhile.
     play(state, then = 'idle', speed = 1) {
-      const prev = this.state;
+      const prev = this.base;
       this.after = then;
-      this.state = null; // so the same clip can be played again at once
+      this.base = null; // so the same clip can be played again at once
       this.set(state, speed);
-      if (prev && prev !== state) actions[prev].fadeOut(0.15);
+      if (prev && prev !== this.base) actions[prev].fadeOut(0.15);
+    },
+    // The upper body does something of its own while the legs carry on: aim, shoot, reload, a gesture.
+    // `once` plays it through and returns to the looping layer that was there (or to none).
+    layer(state, { once = false, speed = 1 } = {}) {
+      if (!once && this.topOnce) { this.topOnce.back = state; return; }
+      const key = state ? state + '|top' : null, back = this.topOnce ? this.topOnce.back : this.upper;
+      if (key === this.topKey && !once) return;
+      if (this.topKey && this.topKey !== key) actions[this.topKey].fadeOut(0.14);
+      if (key) {
+        const a = actions[key] ??= mixer.clipAction(clipOf(key));
+        a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat); a.clampWhenFinished = once;
+        a.reset().setEffectiveWeight(1).fadeIn(0.12).play(); a.timeScale = speed;
+        if (once) this.topOnce = { key, back };
+      }
+      this.upper = state; this.topKey = key;
+      if (this.state && !this.busy) { const st = this.state, sp = actions[this.base]?.timeScale ?? 1; this.set(st, sp); } // swap the base for its legs, or back
+    },
+    // Get up from the ground: the fall, run backwards.
+    rise(then = 'idle') {
+      const a = actions.down;
+      if (!a || this.base !== 'down') { this.set(then); return; }
+      this.after = then; this.state = 'rise';
+      a.paused = false; a.enabled = true; a.timeScale = -1.7; a.time = a.getClip().duration; a.play();
     },
     get busy() { return this.after !== null; },
     arm(on) { for (const k in guns) guns[k].visible = on === true ? k === 'pistol' : on === k; },
   };
   mixer.addEventListener('finished', e => {
-    if (person.after !== null && e.action === actions[person.state]) { const then = person.after; person.after = null; person.set(then); }
+    if (person.topOnce && e.action === actions[person.topOnce.key]) { const back = person.topOnce.back; person.topOnce = null; person.layer(back); return; }
+    if (person.after !== null && e.action === actions[person.base]) { const then = person.after; person.after = null; person.set(then); }
   });
   person.set('idle');
   mixer.update(Math.random() * 2); // so a crowd does not move in unison

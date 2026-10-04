@@ -443,7 +443,9 @@ async function boot() {
   // The settings, as a menu; the game waits while it is open.
   const openSettings = () => {
     g.paused = true;
+    const pr = g.progress, story = !pr ? 'Not started' : pr.done ? `All ${pr.total} missions complete` : `${pr.episode}: ${pr.title}  ·  mission ${pr.k} of ${pr.of}, "${pr.mission}"`;
     const show = () => hud.menu('Settings', [
+      { label: 'Story', hint: story }, ...(pr && !pr.done ? [{ label: 'Overall', hint: `${pr.n - 1} of ${pr.total} missions done` }] : []),
       { key: 'Digit1', label: 'Volume', hint: `${Math.round(settings.volume * 100)}%  (1 lower, 2 higher)` }, { key: 'Digit2', label: '' },
       { key: 'Digit3', label: 'Mouse sensitivity', hint: `${settings.sens.toFixed(1)}  (3 lower, 4 higher)` }, { key: 'Digit4', label: '' },
       { key: 'Digit5', label: 'Invert mouse Y', hint: settings.invert ? 'on' : 'off' },
@@ -515,7 +517,10 @@ async function boot() {
     me.group.rotation.y = p.heading;
     if (p.down) me.set('down');
     else if (p.jumping) { if (!me.busy) me.set('jumpLoop'); }
-    else if (!me.busy) me.set(p.pose || (p.car || p.locked ? 'idle' : p.motion === 'idle' ? (p.aiming || (g.lockTarget && p.weapon !== 'fist') ? 'aim' : p.fighting ? 'stance' : 'idle') : p.motion));
+    else if (!me.busy) me.set(p.pose || (p.car || p.locked ? 'idle' : p.motion === 'idle' ? (p.fighting && p.weapon === 'fist' ? 'guard' : 'idle') : p.motion));
+    // The arms: aiming while the legs stand or run, or a gesture in a scene.
+    const raised = !p.car && !p.locked && !p.hidden && !p.down && !p.jumping && (p.aiming || (g.lockTarget && p.weapon !== 'fist'));
+    me.layer(raised ? 'aim' : p.topPose || null);
 
     for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
 

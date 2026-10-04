@@ -39,26 +39,29 @@ async function talk(g, lines) {
   let target = null, talking = true;
   if (fixed) g.updaters.push(dt => { if (!talking || g.cam.fixed !== fixed) return false; if (target) fixed.look.lerp(target, 1 - Math.exp(-2.5 * dt)); return true; });
   const posOf = a => (a === p ? p.pos : a.group.position);
-  const standing = a => ['idle', 'talk', 'stance', 'calm'].includes(a.state) && !a.busy;
+  const standing = a => ['idle', 'talk', 'guard'].includes(a.state) && !a.busy;
+  const free = a => (standing(a) || a.state === 'sit') && !a.topOnce;
   for (const [who, text, a] of lines) {
     const was = a && a !== p ? a.state : null;
     const loud = /!/.test(text), ask = /\?/.test(text), r = Math.random();
+    // The hands: a finger for a raised voice, open palms for a question, a beating hand otherwise; sometimes just the mouth.
+    const gesture = text.length < 14 ? null : loud ? (r < 0.5 ? 'say3' : 'say1') : ask ? (r < 0.55 ? 'say2' : null) : r < 0.4 ? 'say1' : r < 0.6 ? 'say2' : null;
     if (a) {
       const at = posOf(a);
-      if (fixed) target = look0.clone().lerp(new THREE.Vector3(at.x, (at.y ?? groundAt(at.x, at.z)) + 1.45, at.z), 0.55);
+      if (fixed) target = look0.clone().lerp(new THREE.Vector3(at.x, (at.y ?? groundAt(at.x, at.z)) + 1.45, at.z), 0.4);
       for (const o of cast) if (o !== a && standing(o) && near(o.group.position, at, 7)) o.group.rotation.y = toward(o.group.position, at);
-      if (a !== p && !p.car && p.locked && near(p.pos, at, 6) && !p.pose) p.heading = toward(p.pos, at);
     }
-    if (a === p) { p.pose = 'talk'; if (loud && r < 0.25) p.human.play('point', 'talk'); }
-    else if (was === 'sit') { /* seated: the library only talks sitting on the ground */ }
-    else if (was && standing(a)) {
-      if ((loud && r < 0.3) || (ask && r < 0.18)) a.play('point', 'talk');
-      else if (!loud && r < 0.18) a.set('calm');
-      else a.set('talk');
+    let talked = false;
+    if (a === p) { if (gesture) p.topPose = gesture; else p.pose = 'talk'; }
+    else if (a && free(a)) {
+      if (gesture) a.layer(gesture);
+      else if (standing(a)) { a.set('talk'); talked = true; }
     }
     await say(g, who, text);
-    if (a === p) p.pose = null;
-    else if (was && ['idle', 'talk', 'stance', 'calm'].includes(was)) { if (a.busy) a.after = was; else a.set(was === 'talk' ? 'idle' : was); }
+    if (a === p) { p.pose = null; p.topPose = null; }
+    else if (a) { if (!a.topOnce) a.layer(null); if (talked && a.state === 'talk') a.set(was === 'talk' ? 'talk' : 'idle'); }
+    // Someone listening nods, now and then.
+    if (!ask && Math.random() < 0.3) { const others = cast.filter(c => c !== a && free(c)), o = others[Math.floor(Math.random() * others.length)]; if (o) o.layer(/^No\b|n't/.test(text) && Math.random() < 0.3 ? 'no' : 'nod', { once: true }); }
   }
   talking = false;
 }
@@ -164,6 +167,7 @@ function follower(g, human, { lead, gap = 1.6, pace = 3.6, runs = true } = {}) {
       f.car = null; group.visible = true;
     }
     const target = lead ? lead.pos : p.pos, dx = target.x - f.pos.x, dz = target.z - f.pos.z, d = Math.hypot(dx, dz);
+    if (d > 60) { f.pos.set(target.x - 1.2, 0, target.z - 1.2); pushOut(f.pos, 0.4); } // the player went through a door: so did they
     if (d > gap + 0.25) {
       const speed = runs && d > 6 ? 7.2 : pace, step = Math.min(speed * dt, d - gap);
       f.pos.x += dx / d * step; f.pos.z += dz / d * step;
@@ -340,6 +344,28 @@ function careful(g, label, failText, reset) {
   };
 }
 
+// Go into the Bing for a scene: the player reaches the car park, is taken through the door, and has to find
+// whoever is waiting inside. `setup(club)` places them (the screen is black); `club.door` is a spot on the
+// floor by the bar that stands in for the door the outdoor scenes were written around.
+async function intoBing(g, text, setup, find = 'They are <b>inside</b>, by the bar.') {
+  const { bing, bingRoom } = g.places, p = g.player;
+  await reach(g, bing.door, text, { r: 4 });
+  p.locked = true;
+  await fade(g, 1, 0.5);
+  if (p.car) { const car = p.car; g.leaveCar(); car.speed = 0; car.pos.set(bing.park.x, 0, bing.park.z); car.heading = bing.park.h; }
+  g.sfx?.door();
+  const club = { door: { x: bingRoom.inside.x - 4.2, y: bingRoom.y, z: bingRoom.inside.z - 5.4 }, park: bing.park };
+  p.inside = g.places.doors.find(d => d.inside === bingRoom.inside);
+  p.pos.set(bingRoom.inside.x, 0, bingRoom.inside.z); p.heading = g.cam.yaw = bingRoom.inside.h;
+  g.cam.fixed = null;
+  setup(club);
+  await fade(g, 0, 0.5);
+  p.locked = false;
+  await reach(g, club.door, find, { r: 2.6, how: 'foot' });
+  p.locked = true;
+  return club;
+}
+
 // A scene inside the Bada Bing. `arrange(room)` places the cast and returns them; `cam` names one of the room's cameras.
 async function bingRoom(g, cam, arrange, play) {
   const room = g.places.bingRoom, p = g.player, night = g.night;
@@ -406,10 +432,14 @@ function homeAsTony(g, tony) {
 // ---------- The episodes ----------
 
 const EPISODES = [
-  { name: 'Episode One', missions: [theDucks, collections, familyBusiness, greenGrove, garbage, insurance, secondOpinion, theParty] },
-  { name: 'Episode Two', title: '46 Long', missions: [backRoom, hijack, sitDown, millersCar, kitchenFire, fortySixLong, closingTime] },
-  { name: 'Episode Three', title: 'Denial, Anger, Acceptance', missions: [visitingHours, studyAid, patience, theMotel, denial, theBenefit, acceptance] },
-  { name: 'Episode Four', title: 'Meadowlands', missions: [theDream, messageJob, theTail, schoolyard, figurehead, theBoss, meadowlands] },
+  { name: 'Episode One', title: 'The Sopranos', missions: [theDucks, collections, familyBusiness, greenGrove, garbage, insurance, secondOpinion, theParty],
+    titles: ['The Ducks', 'Collections', 'Family Business', 'Green Grove', 'Garbage', 'Insurance', 'Second Opinion', 'The Party'] },
+  { name: 'Episode Two', title: '46 Long', missions: [backRoom, hijack, sitDown, millersCar, kitchenFire, fortySixLong, closingTime],
+    titles: ['The Back Room', 'Hijack', 'The Sit-Down', "Mr. Miller's Car", 'Kitchen Fire', '46 Long', 'Closing Time'] },
+  { name: 'Episode Three', title: 'Denial, Anger, Acceptance', missions: [visitingHours, studyAid, patience, theMotel, denial, theBenefit, acceptance],
+    titles: ['Visiting Hours', 'Study Aid', 'Patience', 'The Motel', 'Denial', 'The Benefit', 'Acceptance'] },
+  { name: 'Episode Four', title: 'Meadowlands', missions: [theDream, messageJob, theTail, schoolyard, figurehead, theBoss, meadowlands],
+    titles: ['The Dream', 'Message Job', 'The Tail', 'Schoolyard', 'Figurehead', 'The Boss', 'Meadowlands'] },
 ];
 
 export async function runStory(g) {
@@ -430,6 +460,7 @@ export async function runStory(g) {
   for (const [e, episode] of EPISODES.entries()) {
     for (const [k, mission] of episode.missions.entries()) {
       if (n++ < from) continue;
+      g.progress = { episode: episode.name, title: episode.title, mission: episode.titles[k], k: k + 1, of: episode.missions.length, n, total };
       if (k === 0 && e > 0) { await g.wait(1.5); await titleCard(g, episode.title, episode.name); }
       for (;;) { // a mission is played again from the start if Tony is killed during it
         g.missionActive = true; g.topUp?.();
@@ -446,6 +477,7 @@ export async function runStory(g) {
       }
     }
   }
+  g.progress = { done: true, total };
 }
 
 // ---------- 1. The Ducks ----------
@@ -944,15 +976,14 @@ async function insurance(g) {
   g.setNight(1);
   await fade(g, 0, 1);
   p.locked = false;
-  await reach(g, bing.door, 'Meet Silvio at the <b>Bada Bing</b>.', { r: 4 });
-
-  p.locked = true;
+  const club = await intoBing(g, 'Meet Silvio at the <b>Bada Bing</b>.', club => {
+    sil = actor(g, 'silvio', spot(club.door, 2.2, -1.2), WEST);
+  });
   await cut(g, () => {
-    place(g, bing.door, NORTH, bing.park);
-    sil = actor(g, 'silvio', spot(bing.door, 2.2, -1.2), WEST);
+    place(g, club.door, NORTH, bing.park);
     p.heading = toward(p.pos, sil.group.position);
     frame(g, p.pos, sil.group.position, { dist: 4.4 });
-  });
+  }, 0.4);
   await talk(g, [
     [SILVIO, "You sure about this? Artie's a friend.", sil],
     [TONY, "That's why. A fire, he gets the insurance money and a new kitchen. A hit in his dining room, he gets empty tables for life.", p],
@@ -1421,15 +1452,14 @@ async function sitDown(g) {
   ]);
   await cut(g, () => { dismiss(g, junior, jackie); g.cam.fixed = null; });
   p.locked = false;
-  await reach(g, bing.door, 'Find Christopher and Brendan at the <b>Bada Bing</b>.', { r: 4 });
-
-  p.locked = true;
-  await cut(g, () => {
-    place(g, bing.door, NORTH, bing.park);
-    chris = actor(g, 'christopher', spot(bing.door, -1, -2.2), SOUTH);
-    brendan = actor(g, 'brendan', spot(bing.door, 1.2, -2.4), SOUTH);
-    frame(g, p.pos, spot(bing.door, 0, -2.3), { dist: 5 });
+  const club = await intoBing(g, 'Find Christopher and Brendan at the <b>Bada Bing</b>.', club => {
+    chris = actor(g, 'christopher', spot(club.door, -1, -2.2), SOUTH);
+    brendan = actor(g, 'brendan', spot(club.door, 1.2, -2.4), SOUTH);
   });
+  await cut(g, () => {
+    place(g, club.door, NORTH, bing.park);
+    frame(g, p.pos, spot(club.door, 0, -2.3), { dist: 5 });
+  }, 0.4);
   await talk(g, [
     [TONY, 'Fifteen grand to my uncle. By Friday.', p],
     [BRENDAN, 'Fifteen? For what? We did the work, we took the risk...', brendan],
@@ -1699,19 +1729,18 @@ async function fortySixLong(g) {
   await phone(g, CHRIS, "I wasn't there! I stayed home, I swear. T... the driver's dead. One of them dropped his gun and it went off.");
   g.hud.card();
   const lot = spot(bing.door, -9, 2.5), truck = g.spawnCar(lot.x, lot.z, EAST, 0xf2f0ea, 'truck');
-  await reach(g, bing.door, 'Get to the <b>Bada Bing</b>.', { r: 4 });
-
-  p.locked = true;
-  await cut(g, () => {
+  const club = await intoBing(g, 'Get to the <b>Bada Bing</b>.', club => {
     g.setNight(1);
-    place(g, bing.door, WEST, bing.park);
-    cast.brendan = actor(g, 'brendan', spot(bing.door, -3, -0.8), EAST);
-    cast.chris = actor(g, 'christopher', spot(bing.door, -3.2, 1), EAST);
-    cast.paulie = actor(g, 'paulie', spot(bing.door, -1, -2.6), SOUTH);
-    cast.silvio = actor(g, 'silvio', spot(bing.door, 0.8, -2.8), SOUTH);
-    cast.pussy = actor(g, 'pussy', spot(bing.door, 2.4, -2.2), SOUTH);
-    shot(g, spot(bing.door, 2.5, 5.6), spot(bing.door, -1.4, -0.6), 1.9, 1.2);
+    cast.brendan = actor(g, 'brendan', spot(club.door, -3, -0.8), EAST);
+    cast.chris = actor(g, 'christopher', spot(club.door, -3.2, 1), EAST);
+    cast.paulie = actor(g, 'paulie', spot(club.door, -1, -2.6), SOUTH);
+    cast.silvio = actor(g, 'silvio', spot(club.door, 0.8, -2.8), SOUTH);
+    cast.pussy = actor(g, 'pussy', spot(club.door, 2.4, -2.2), SOUTH);
   });
+  await cut(g, () => {
+    place(g, club.door, WEST, bing.park);
+    shot(g, spot(club.door, 2.5, 5.6), spot(club.door, -1.4, -0.6), 1.9, 1.2);
+  }, 0.4);
   await talk(g, [
     [TONY, 'A man is dead over a load of suits. A working man, driving a truck that pays my uncle.', p],
     [BRENDAN, 'It was an accident, Tony, the gun just...', cast.brendan],
@@ -1861,16 +1890,15 @@ async function visitingHours(g) {
   await fade(g, 0, 1);
   await say(g, TONY, "Make him laugh. ...Sil's got a girl at the Bing who could make a bishop laugh.");
   p.locked = false;
-  await reach(g, bing.door, 'Go to the <b>Bada Bing</b>.', { r: 4 });
-
-  p.locked = true;
   let sil, girl;
-  await cut(g, () => {
-    place(g, bing.door, NORTH, bing.park);
-    sil = actor(g, 'silvio', spot(bing.door, -1.6, -2.4), SOUTH);
-    girl = actor(g, 'dancer', spot(bing.door, 1.2, -2.6), SOUTH);
-    frame(g, p.pos, spot(bing.door, 0, -2.5), { dist: 4.8 });
+  const club = await intoBing(g, 'Go to the <b>Bada Bing</b>.', club => {
+    sil = actor(g, 'silvio', spot(club.door, -1.6, -2.4), SOUTH);
+    girl = actor(g, 'dancer', spot(club.door, 1.2, -2.6), SOUTH);
   });
+  await cut(g, () => {
+    place(g, club.door, NORTH, bing.park);
+    frame(g, p.pos, spot(club.door, 0, -2.5), { dist: 4.8 });
+  }, 0.4);
   await talk(g, [
     [TONY, "Sil. Jackie wants a laugh. Lend me Tiffany for an hour. We'll get her a nurse's outfit.", p],
     [SILVIO, "A nurse. In a cancer ward. Tone, I love it.", sil],
@@ -2025,15 +2053,14 @@ async function patience(g) {
   await say(g, '', 'Tony drove away knowing exactly what he had agreed to.');
   await cut(g, () => { dismiss(g, junior, mikey); g.cam.fixed = null; });
   p.locked = false;
-  await reach(g, bing.door, 'Find Christopher and Brendan at the <b>Bada Bing</b>.', { r: 4 });
-
-  p.locked = true;
-  await cut(g, () => {
-    place(g, bing.door, NORTH, bing.park);
-    chris = actor(g, 'christopher', spot(bing.door, -1, -2.2), SOUTH);
-    brendan = actor(g, 'brendan', spot(bing.door, 1.4, -2.4), SOUTH, 'talk');
-    frame(g, p.pos, spot(bing.door, 0, -2.3), { dist: 5 });
+  const club = await intoBing(g, 'Find Christopher and Brendan at the <b>Bada Bing</b>.', club => {
+    chris = actor(g, 'christopher', spot(club.door, -1, -2.2), SOUTH);
+    brendan = actor(g, 'brendan', spot(club.door, 1.4, -2.4), SOUTH, 'talk');
   });
+  await cut(g, () => {
+    place(g, club.door, NORTH, bing.park);
+    frame(g, p.pos, spot(club.door, 0, -2.3), { dist: 5 });
+  }, 0.4);
   await talk(g, [
     [TONY, "Lay low. Both of you. Nobody goes near Comley, nobody goes near my uncle's people. You don't exist for a month.", p],
     [BRENDAN, "Junior's an old man with a hat. What's he gonna—", brendan],
@@ -2334,19 +2361,18 @@ async function acceptance(g) {
   await fade(g, 0, 1);
   await say(g, CHRIS, "...Walk home. From here.");
   p.locked = false;
-  await reach(g, bing.door, 'Get back to the <b>Bada Bing</b>. Find a car.', { r: 4 });
-
-  p.locked = true;
   let tonyActor;
-  await cut(g, () => {
-    place(g, bing.door, NORTH, bing.park);
-    tonyActor = actor(g, 'tony', spot(bing.door, 0.8, -2.4), SOUTH);
-    frame(g, p.pos, tonyActor.group.position, { dist: 4.4 });
+  const club = await intoBing(g, 'Get back to the <b>Bada Bing</b>. Find a car.', club => {
+    tonyActor = actor(g, 'tony', spot(club.door, 0.8, -2.4), SOUTH);
   });
+  await cut(g, () => {
+    place(g, club.door, NORTH, bing.park);
+    frame(g, p.pos, tonyActor.group.position, { dist: 4.4 });
+  }, 0.4);
   await talk(g, [
     [TONY, "Brendan's dead. You're alive because I asked an old man for a favour, and I'll be paying for it the rest of my life.", tonyActor],
     [CHRIS, "T. I didn't... they put a gun...", p],
-    [TONY, "Don't. ...Get inside. Have a drink. Tomorrow you start being somebody I can use.", tonyActor],
+    [TONY, "Don't. ...Sit down. Have a drink. Tomorrow you start being somebody I can use.", tonyActor],
   ]);
   await fade(g, 1, 1.2);
   dismiss(g, tonyActor);
@@ -2542,16 +2568,15 @@ async function messageJob(g) {
   fistsOnly(g, false);
   g.pardon();
   await say(g, CHRIS, '...Tell Mikey I got it.');
-  await reach(g, bing.door, 'Tell Tony. He is at the <b>Bada Bing</b>.', { r: 4 });
-
-  p.locked = true;
   let tonyActor;
-  await cut(g, () => {
+  const club = await intoBing(g, 'Tell Tony. He is at the <b>Bada Bing</b>.', club => {
     dismiss(g, ...goons);
-    place(g, bing.door, NORTH, bing.park);
-    tonyActor = actor(g, 'tony', spot(bing.door, 0.8, -2.4), SOUTH);
-    frame(g, p.pos, tonyActor.group.position, { dist: 4.4 });
+    tonyActor = actor(g, 'tony', spot(club.door, 0.8, -2.4), SOUTH);
   });
+  await cut(g, () => {
+    place(g, club.door, NORTH, bing.park);
+    frame(g, p.pos, tonyActor.group.position, { dist: 4.4 });
+  }, 0.4);
   await talk(g, [
     [CHRIS, "Brendan's dead. In his tub. Through the eye, T. Through the eye.", p],
     [TONY, 'I know. I knew before you did.', tonyActor],
@@ -2938,15 +2963,14 @@ async function theBoss(g) {
   await cut(g, () => { dismiss(g, junior, mikey); g.cam.fixed = null; });
   await phone(g, CHRIS, "T. I'm at the Bing. I got a thing. Come now.");
   p.locked = false;
-  await reach(g, bing.door, 'Christopher is at the <b>Bada Bing</b>.', { r: 4 });
-
-  p.locked = true;
   let chris;
-  await cut(g, () => {
-    place(g, bing.door, NORTH, bing.park);
-    chris = actor(g, 'christopher', spot(bing.door, 0.8, -2.4), SOUTH); chris.arm(true); chris.set('aim');
-    frame(g, p.pos, chris.group.position, { dist: 4.4 });
+  const club = await intoBing(g, 'Christopher is at the <b>Bada Bing</b>.', club => {
+    chris = actor(g, 'christopher', spot(club.door, 0.8, -2.4), SOUTH); chris.arm(true); chris.set('aim');
   });
+  await cut(g, () => {
+    place(g, club.door, NORTH, bing.park);
+    frame(g, p.pos, chris.group.position, { dist: 4.4 });
+  }, 0.4);
   await talk(g, [
     [CHRIS, "Mikey's at Satriale's. Alone. I go in, I come out. Done.", chris],
     [TONY, 'Give me the gun.', p],

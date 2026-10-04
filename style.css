@@ -121,3 +121,5 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
 #menu .item:hover { background: rgba(255,255,255,.14); }
 #menu .item b { display: inline-block; width: 52px; color: #ffe066; }
 #menu .item .hint { float: right; color: #9ff3ff; }
+#menu .info { padding: 8px 10px; margin: 4px 0 10px; border-left: 4px solid #ff5fd2; font-size: 16px; }
+#menu .info .hint { float: right; color: #ffe066; }

@@ -54,7 +54,7 @@ export class Hud {
   menu(title, items, pick) {
     const el = $('menu');
     if (!title) { el.classList.remove('on'); this.onMenu = null; return; }
-    el.innerHTML = `<h2>${title}</h2>` + items.map(i => `<div class="item" data-key="${i.key}"><b>${i.key.replace('Digit', '').replace('Key', '').replace('Escape', 'Esc')}</b> ${i.label}${i.hint ? `<span class="hint">${i.hint}</span>` : ''}</div>`).join('');
+    el.innerHTML = `<h2>${title}</h2>` + items.map(i => !i.key ? `<div class="info">${i.label}<span class="hint">${i.hint || ''}</span></div>` : `<div class="item" data-key="${i.key}"><b>${i.key.replace('Digit', '').replace('Key', '').replace('Escape', 'Esc')}</b> ${i.label}${i.hint ? `<span class="hint">${i.hint}</span>` : ''}</div>`).join('');
     el.classList.add('on');
     this.onMenu = pick;
     for (const d of el.querySelectorAll('.item')) d.onclick = () => pick(d.dataset.key);
