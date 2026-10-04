@@ -489,7 +489,7 @@ export function buildWorld(scene) {
           halo(x + ax * (w / 2 + 1), CURB + base + 1.3, z + az * (d / 2 + 1), hexOf(neon), 10);
           const dx = x + ax * (w / 2 + 0.08), dz = z + az * (d / 2 + 0.08);
           slab(0x20202a, ax ? 0.16 : 1.5, 2.7, az ? 0.16 : 1.5, dx, CURB, dz); slab(0xf6cf8a, ax ? 0.18 : 0.9, 1.6, az ? 0.18 : 0.9, dx, CURB + 0.7, dz, M.glow);
-          shopDoors.push({ shop: name, outside: { x: x + ax * (w / 2 + 1.6), z: z + az * (d / 2 + 1.6), h: Math.atan2(ax, az) } });
+          shopDoors.push({ shop: name, outside: { x: x + ax * (w / 2 + 1.6), z: z + az * (d / 2 + 1.6), h: Math.atan2(ax, az) }, kerb: { x: x + ax * (w / 2 + 9), z: z + az * (d / 2 + 9), h: ax ? 0 : Math.PI / 2 } });
         }
       }
     }
@@ -980,6 +980,7 @@ export function buildWorld(scene) {
         continue;
       }
       house(c.x + a * 14, c.z + b * 13, b, pick(HOUSE_WALLS), pick([0x6a5a56, 0x55525a, 0x6a3a30, 0x3f3c44]), rand() < 0.35 ? 2 : 1);
+      places.flat ??= { door: shopDoors[shopDoors.length - 1].outside, kerb: { x: c.x + a * 14 + 4.4, z: c.z + b * 34, h: b > 0 ? Math.PI / 2 : -Math.PI / 2 }, yard: { x: c.x + a * 14 - 5, z: c.z + b * 21 } }; // Brendan's place
       if (rand() < 0.3) parkedSpots.push({ x: c.x + a * 14 + 4.4, z: c.z + b * 24, h: b > 0 ? 0 : Math.PI, kind: pick(['sedan', 'pickup', 'suv', 'coupe']) });
     }
     for (const [px, pz] of [[0, -20], [0, 20], [-24, 0], [24, 2]]) if (rand() < 0.7) palms.push({ x: c.x + px, z: c.z + pz });
@@ -1109,7 +1110,23 @@ export function buildWorld(scene) {
     flat(M.paint, 0xd8d0c4, 3, 14, x, y + 0.09, c.z + 27);
     for (const [px, pz] of [[-20, 20], [20, 22], [-22, -10], [22, -8]]) palms.push({ x: c.x + px, z: c.z + pz });
     for (const [bx, bz] of [[-14, 8], [14, 8]]) bench(c.x + bx, c.z + bz, Math.PI);
-    places.church ??= { door: { x, z: front + 1.4 }, kerb: { x: x + 4, z: c.z + 34, h: Math.PI / 2 } };
+    // The churchyard: rows of headstones behind, a path between them, one grave freshly dug.
+    const gy = c.z - 26;
+    for (let r = 0; r < 2; r++) for (let n = 0; n < 9; n++) {
+      const sx = c.x - 24 + n * 3 + (n > 3 ? 6 : 0), sz = gy + 1 + r * 3.2;
+      if (n === 4) continue;
+      const kind = (n + r) % 3;
+      if (kind === 0) { slab(0xd8d0c4, 0.9, 1.1, 0.16, sx, y, sz, M.gravel, 1); ball(0xd8d0c4, 0.46, sx, y + 1.1, sz); }
+      else if (kind === 1) { slab(0xc9c2b8, 1.1, 0.3, 0.5, sx, y, sz, M.gravel, 1); slab(0xd8d0c4, 0.14, 1.4, 0.14, sx, y + 0.3, sz); slab(0xd8d0c4, 0.6, 0.14, 0.14, sx, y + 1.3, sz); }
+      else slab(0xb9b3ba, 0.7, 0.8, 0.14, sx, y, sz, M.gravel, 1);
+      collide(sx, sz, 1, 0.5, 1.2);
+    }
+    flat(M.paint, 0xd8d0c4, 2, 10, c.x - 10.5, y + 0.09, gy + 2.5);
+    const grave = { x: c.x + 14, z: gy + 1.6 };
+    flat(M.paint, 0x5a3d2b, 1.2, 2.4, grave.x, y + 0.1, grave.z); slab(0x5a3d2b, 2.2, 0.5, 1, grave.x + 1.9, y, grave.z, M.gravel, 1); // the hole and the heap beside it
+    for (let n = 0; n < 6; n++) ball([0x2f7d46, 0xd8342c, 0x2f7d46][n % 3], 0.2, grave.x - 1.2 + (n % 3) * 0.5, y + 0.22, grave.z - 1.6 + Math.floor(n / 3) * 0.5); // wreaths
+    slab(0x2f7d46, BLOCK - 5, 1, 0.8, c.x, y, c.z - 27.4, M.grass, 3); collide(c.x, c.z - 27.4, BLOCK - 5, 0.8, 1.2);
+    places.church ??= { door: { x, z: front + 1.4 }, kerb: { x: x + 4, z: c.z + 34, h: Math.PI / 2 }, grave, path: { x: c.x - 10.5, z: gy + 7 }, back: { x: c.x + 12, z: c.z - 22 }, lawn: { x: c.x - 12, z: c.z + 16 }, street: { x: c.x + 20, z: c.z + 34 } };
   }
 
   // ----- Green Grove, the retirement community: a long residence over gardens with a fountain and a gazebo. -----
@@ -1788,6 +1805,12 @@ export function buildWorld(scene) {
     HOUSE: 'the house', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office' };
   places.rooms = rooms;
   places.parkedSpots = parkedSpots;
+  // The story's diner is the one a short drive from Dr. Melfi's office; its bar is the one nearest the park.
+  const nearestShop = (kind, to, lo = 120, hi = 260) => shopDoors.filter(d => (SHOP_ROOM[d.shop] ?? d.shop) === kind && d.kerb)
+    .map(d => [Math.hypot(d.kerb.x - to.x, d.kerb.z - to.z), d]).sort((a, b) => Math.abs(a[0] - (lo + hi) / 2) - Math.abs(b[0] - (lo + hi) / 2))[0][1];
+  const dinerDoor = nearestShop('DINER', places.melfi.kerb), barDoor = nearestShop('BAR', places.park.kerb, 80, 200);
+  places.diner = { door: dinerDoor.outside, kerb: dinerDoor.kerb };
+  places.bar = { door: barDoor.outside, kerb: barDoor.kerb, room: rooms.BAR };
 
   places.chop = { x: SHORE + 18, z: bounds.minZ + 16 }; // the north end of the beach, where stolen cars get stripped
 

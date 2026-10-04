@@ -316,6 +316,7 @@ async function boot() {
         if (hit) { if (Math.abs(car.speed) > 6 && g.time - (car.bumpAt || -9) > 0.6) { car.bumpAt = g.time; sfx.crash(Math.abs(car.speed) / 25); } car.speed *= 0.93; if (!o.nav) o.collide(); }
       }
       p.pos.copy(car.pos);
+      hud.prompt('');
       if (!p.locked && g.consume('KeyF') && Math.abs(car.speed) < 4) g.leaveCar();
       return;
     }

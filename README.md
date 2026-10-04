@@ -24,7 +24,7 @@ WASD move / drive · Mouse look · Shift run · F enter / take car, use doors ·
 - `src/world.js`: the city and its landmarks
 - `src/people.js`: characters and the crew's outfits
 - `src/entities.js`: cars, traffic, pedestrians
-- `src/missions.js`: the story (episodes one to three, twenty-two missions), written as async scripts
+- `src/missions.js`: the story (episodes one to four, twenty-nine missions), written as async scripts
 - `src/combat.js`: fists, the pistol, lock-on, health, the wanted level and the police
 - `src/sidejobs.js`: shakedowns, food, armour, confession and the motel, between missions
 - `src/audio.js`: all the sound, synthesised

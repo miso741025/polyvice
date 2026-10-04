@@ -962,6 +962,14 @@ export const LOOKS = {
   dancer: { body: 'female', shirt: 0xff5fd2, tee: true, pants: 0xffffff, shoes: 0xf2efe8, hair: 0xd9b25a, hairMesh: 'long' },
   cop: { shirt: 0x24324c, sleeves: 'long', tucked: true, badge: true, pants: 0x1c2740, hair: 0x2b1b12, hairMesh: 'buzzed', glasses: 'shades', bulk: 1.08, stubble: 0.3 },
   mahaffey: { jacket: 0x8d8a8e, shirt: 0xf4f4f4, tie: 0xa3201c, tucked: true, pants: 0x8d8a8e, hair: 0x7a3b1a, hairStyle: 'receding', glasses: 'clear', bulk: 1.12, age: 0.5, face: { cheeks: 0.6, chin: 0.7 } },
+  // Episode four.
+  makazian: { jacket: 0x6f5a44, shirt: 0xd9c7a0, tucked: true, pants: 0x4a3324, hair: 0x2a1c14, hairMesh: 'parted', hairScale: [1.02, 1.04, 1.04], mustache: 0x2a1c14, stubble: 0.5, bulk: 1.15, age: 0.6, skin: [1, 0.92, 0.84], face: { nose: 0.5, cheeks: 0.3, jowls: 0.4, brow: 0.4 } },
+  randall: { jacket: 0x3d4658, shirt: 0xcfe8ff, tie: 0x6a1c2c, tucked: true, pants: 0x3d4658, hair: 0x9a9690, hairStyle: 'receding', glasses: 'clear', bulk: 1.0, age: 0.7, face: { cheeks: -0.2, nose: 0.3 } },
+  principal: { body: 'female', jacket: 0x5f8a84, shirt: 0xf1ede4, pants: 0x5f8a84, tucked: true, hair: 0x7a3b1a, hairMesh: 'parted', hairShift: [0, -0.04, 0.004], hairScale: [1.06, 1.04, 1.08], glasses: 'clear', age: 0.6 },
+  piocosta: { pattern: 'check', shirt: 0xf1ece2, tucked: true, pants: 0xb9a58a, shoes: 0x6a4a34, hair: 0x7a5a3a, hairStyle: 'balding', bulk: 1.15, age: 0.5, face: { cheeks: 0.5, chin: 0.4 } },
+  jeremy: { shirt: 0xd8342c, tee: true, pants: 0x3b6ea8, shoes: 0xf2efe8, hair: 0xc9a14a, hairMesh: 'buzzed', bulk: 1.0, height: 0.82, head: 1.2, face: { cheeks: 0.4 } },
+  agent: { jacket: 0x23232b, shirt: 0xf4f4f4, tie: 0x23232b, tucked: true, pants: 0x23232b, hair: 0x2b1b12, hairMesh: 'buzzed', glasses: 'shades', bulk: 1.05, stubble: 0.1 },
+  adriana: { body: 'female', jacket: 0x1c1c22, shirt: 0xff5fd2, pants: 0x1c1c22, tucked: true, chain: true, hair: 0x1c1410, hairMesh: 'long', hairScale: [1.14, 1.12, 1.1], age: 0.1 },
 };
 export const makeLook = name => makeHuman(LOOKS[name]);
 export const makeTony = () => makeLook('tony');
