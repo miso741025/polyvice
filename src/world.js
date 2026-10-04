@@ -1535,7 +1535,7 @@ export function buildWorld(scene) {
     for (const wx of [-4.6, 4.6]) windowAt(x + wx, y + 0.9, front, 5, 2.4, 0, 1, true);
     slab(0x3a2418, 1.8, 3, 0.2, x, y, front + 0.05); slab(0xf0bf78, 1.1, 1.5, 0.06, x, y + 1.3, front + 0.16, M.glow);
     sign(['HENNESSY BOOKS', 'ART · ARCHITECTURE · DESIGN'], x, y + 4.4, front + 0.17, 0, { w: 9, h: 1.5, color: '#f6e7b4', bg: '#2c3a5a', size: 0.62, glow: false });
-    shopDoors.push({ shop: 'STORE', outside: { x, z: front + 1.6, h: 0 } });
+    shopDoors.push({ shop: 'BOOKS', outside: { x, z: front + 1.6, h: 0 } });
     places.bookstore = { door: { x, z: front + 1.6, h: 0 }, kerb: { x, z: c.z + 34, h: Math.PI / 2 } };
   }
 
@@ -1752,10 +1752,6 @@ export function buildWorld(scene) {
   function room(w, d, h, { floor = M.paver, floorTint = 0xd8d2c8, floorScale = 2, wall = M.gravel, wallTint = 0xf3efe6, wallScale = 3, ceil = 0xf6f1e6, door = 0x3a2418, doorX = 0, at = null } = {}) {
     const X = at ? at[0] : roomX, Y = -0.1, Z = at ? at[1] : 0;
     if (!at) roomX += 80;
-    if (LA) { // Los Angeles keeps its rooms cooler and plainer: pale walls, grey floors
-      wallTint = tintOf.set(wallTint).lerp(new THREE.Color(0xdfe2e6), 0.6).getHex();
-      floorTint = tintOf.set(floorTint).lerp(new THREE.Color(0x8d8f96), 0.55).getHex();
-    }
     const q = { minX: X - w / 2 + 0.3, maxX: X + w / 2 - 0.3, minZ: Z - d / 2 + 0.3, maxZ: Z + d / 2 - 0.3, lights: [], X, Y, Z, w, d, h, ambient: [] };
     interiors.push(q);
     slab(floorTint, w, 0.2, d, X, Y - 0.2, Z, floor, floorScale);
@@ -1806,7 +1802,7 @@ export function buildWorld(scene) {
   };
   const rooms = {};
 
-  { // a neighbourhood bar: a long counter, the back bar lit, a jukebox, booths and a pool table
+  if (!LA) { // a neighbourhood bar: a long counter, the back bar lit, a jukebox, booths and a pool table
     const q = rooms.BAR = room(16, 12, 3.8, { floor: M.wood, floorTint: 0x6a4a34, wall: M.wood, wallTint: 0x5a3a2a, ceil: 0x2a2024 });
     counter(q, 0, -3.6, 11);
     q.block(0x14080f, 12, 2.6, 0.3, 0, -5.6); q.glowPanel(0x8a5a9a, 11, 0.9, 0, -5.42, 2.5);
@@ -1821,7 +1817,7 @@ export function buildWorld(scene) {
     clerk(q, -1, -4.6, 0, { shirt: 0xf4f4f4, open: 0x1c1c22 });
     q.person(pick(PED_ROOM_LOOKS), -3, -2.6, Math.PI, 'talk'); q.person(pick(PED_ROOM_LOOKS), 1.5, -2.6, Math.PI);
   }
-  { // a diner: the counter with stools, booths along the window, pie under glass
+  if (!LA) { // a diner: the counter with stools, booths along the window, pie under glass
     const q = rooms.DINER = room(16, 12, 3.6, { floor: M.paver, floorTint: 0xe9e4dc, wallTint: 0xd6fff4, ceil: 0xf6f1e6 });
     for (let k = 0; k < 8; k++) { slab(0xffffff, 16, 0.02, 0.2, q.X, q.Y + 0.01, q.Z - 6 + k * 1.5); } // checkered floor stripes
     counter(q, 1, -3.4, 11, 0xd8342c); slab(0xf4f4f0, 11.2, 0.08, 1, q.X + 1, q.Y + 1.05, q.Z - 3.4);
@@ -1838,7 +1834,7 @@ export function buildWorld(scene) {
     clerk(q, -1, -4.4, 0, { shirt: 0xf4f4f4, body: 'female', hair: 0xd9b25a, hairMesh: 'long', hat: undefined });
     q.person(pick(PED_ROOM_LOOKS), -4.4, 2.2, Math.PI, 'sit');
   }
-  { // a liquor store: aisles of bottles, beer in the cold case, the register behind glass
+  if (!LA) { // a liquor store: aisles of bottles, beer in the cold case, the register behind glass
     const q = rooms.LIQUOR = room(14, 12, 3.4, { floorTint: 0xc9c2b8, wallTint: 0xe9e2d2 });
     racks(q, -5.8, -1, 8, 3, BOTTLES, Math.PI / 2); racks(q, 5.8, -1, 8, 3, BOTTLES, Math.PI / 2); racks(q, 0, -1, 6, 3, BOTTLES, Math.PI / 2);
     q.block(0x1c1c22, 10, 2.4, 0.9, 0, -5.4); q.glowPanel(0xcfe8ff, 9.6, 1.6, 0, -4.94, 1.5); for (let n = 0; n < 12; n++) slab(GOODS[n % 6], 0.4, 0.5, 0.4, q.X - 4.5 + n * 0.8, q.Y + 0.7 + (n % 2) * 0.8, q.Z - 5.2); // the cold case
@@ -1848,7 +1844,7 @@ export function buildWorld(scene) {
     q.light(0, 3, 0, 0xfff6e0, 55, 14);
     clerk(q, 4, 4.9, Math.PI, { hat: 'cap', hatColor: 0x1f6b4a });
   }
-  { // a pawn shop: cages over the counter, guitars and televisions on the wall, a case of watches
+  if (!LA) { // a pawn shop: cages over the counter, guitars and televisions on the wall, a case of watches
     const q = rooms.PAWN = room(14, 10, 3.4, { floor: M.wood, floorTint: 0x8a6a4a, wall: M.brick, wallTint: 0xbdb4aa, wallScale: 2, ceil: 0x3a3a44 });
     counter(q, 0, -2.6, 9, 0x3a2418, 0); slab(0xd6ecf5, 9, 0.6, 0.8, q.X, q.Y + 1.1, q.Z - 2.6, M.glow); // the glass case
     for (let n = 0; n < 14; n++) slab(n % 2 ? 0xd9a520 : 0xc9cbd2, 0.12, 0.05, 0.12, q.X - 3.9 + n * 0.6, q.Y + 1.12, q.Z - 2.6 + (n % 3) * 0.2 - 0.2);
@@ -1861,7 +1857,7 @@ export function buildWorld(scene) {
     q.light(0, 3, -1, 0xfff0d0, 40, 14);
     clerk(q, 1, -3.8, 0, { glasses: 'clear', age: 0.6, hairStyle: 'balding', hairMesh: undefined });
   }
-  { // a gun shop: long guns on the wall, pistols under glass, boxes of shells, a paper target with a tight group in it
+  if (!LA) { // a gun shop: long guns on the wall, pistols under glass, boxes of shells, a paper target with a tight group in it
     const q = rooms.GUNS = room(14, 10, 3.4, { floor: M.wood, floorTint: 0x8a6a4a, wall: M.wood, wallTint: 0x6a5a44, ceil: 0x3a3a44 });
     counter(q, 0, -2.4, 10, 0x3a2418, 0); slab(0x55707c, 10, 0.06, 0.8, q.X, q.Y + 1.1, q.Z - 2.4, M.glow);
     for (let n = 0; n < 9; n++) { slab(0x1c1c22, 0.34, 0.06, 0.2, q.X - 4.2 + n * 1.05, q.Y + 1.17, q.Z - 2.4); slab(0x1c1c22, 0.1, 0.06, 0.16, q.X - 4.3 + n * 1.05, q.Y + 1.17, q.Z - 2.3); } // pistols on the glass
@@ -1875,7 +1871,7 @@ export function buildWorld(scene) {
     q.light(0, 3, -1.5, 0xfff0d0, 50, 14); q.light(0, 3, 2.5, 0xfff0d0, 26, 10);
     clerk(q, 0, -3.5, 0, { pattern: 'plaid', shirt: 0x8d93cc, sleeves: undefined, hat: 'cap', hatColor: 0x5c6157, bulk: 1.25, stubble: 0.6, age: 0.5 });
   }
-  { // a store: records, videos, surf gear, cigars or suits all sell from the same shelves
+  if (!LA) { // a store: records, videos, surf gear, cigars or suits all sell from the same shelves
     const q = rooms.STORE = room(14, 12, 3.4, { floorTint: 0xd8d2c8, wallTint: 0xfff1c9 });
     racks(q, -6.4, 0, 9, 3, GOODS, Math.PI / 2); racks(q, 6.4, 0, 9, 3, GOODS, Math.PI / 2);
     for (const z of [-3, 0, 3]) { q.block(0xe9e2d2, 5, 1, 1, 0, z, M.gravel, 2); for (let n = 0; n < 10; n++) slab(GOODS[(n + z) % 6], 0.4, 0.35, 0.25, q.X - 2.2 + (n % 5) * 1.1, q.Y + 1, q.Z + z - 0.3 + Math.floor(n / 5) * 0.6); }
@@ -1885,7 +1881,7 @@ export function buildWorld(scene) {
     q.light(0, 3, -2, 0xfff6e0, 50, 15); q.light(0, 3, 3, 0xfff6e0, 30, 12);
     clerk(q, 3, -5.3, 0, { body: 'female', hair: 0x7a3b1a, hairMesh: 'long' });
   }
-  { // somebody's house: a front room with a sofa, the television on, a kitchen through the arch
+  if (!LA) { // somebody's house: a front room with a sofa, the television on, a kitchen through the arch
     const q = rooms.HOUSE = room(14, 12, 3.4, { floor: M.gravel, floorTint: 0x8a6a5a, wallTint: 0xfff1c9 });
     q.block(0x2f4a44, 3.2, 0.55, 1.1, -3, -3.4); q.block(0x2f4a44, 3.2, 0.5, 0.3, -3, -3.9, M.plain, 0, 0.55); q.block(0x27403b, 1.1, 0.55, 1, -5.2, -1.2);
     q.block(0x3a2418, 1.4, 0.4, 0.7, -3, -1.4, M.wood, 1); slab(0xd8d0c4, 4, 0.03, 3, q.X - 3, q.Y + 0.01, q.Z - 2);
@@ -1962,7 +1958,7 @@ export function buildWorld(scene) {
     q.clerk = q.person('priest', 0.8, -9.3, Math.PI); q.till = q.at(0.8, -7.6);
     q.person(pick(PED_ROOM_LOOKS), -3.6, 1.6, Math.PI, 'sit');
   }
-  { // an office: desks, a filing cabinet, a water cooler, a calendar of the wrong year
+  if (!LA) { // an office: desks, a filing cabinet, a water cooler, a calendar of the wrong year
     const q = rooms.OFFICE = room(12, 10, 3.2, { floor: M.gravel, floorTint: 0x6f6a66, wallTint: 0xdfe5ea });
     q.block(0x3a2418, 2.2, 0.76, 1.1, -2.5, -2.5, M.wood, 1); q.block(0x1c1c22, 0.5, 0.4, 0.4, -2.2, -2.5, M.plain, 0, 0.76); slab(0xe9e2cf, 0.4, 0.03, 0.3, q.X - 3.2, q.Y + 0.77, q.Z - 2.5);
     q.block(0x3a2418, 2.2, 0.76, 1.1, 3, -2.5, M.wood, 1); q.block(0x8a8d96, 0.8, 1.4, 0.6, 5.3, -4.3); q.block(0xcfe8ff, 0.4, 0.8, 0.4, 5.3, 2, M.plain, 0, 1); post(0x8a8d96, 0.2, 1, q.X + 5.3, q.Y, q.Z + 2, 8);
@@ -2091,6 +2087,169 @@ export function buildWorld(scene) {
     places.beds = [{ x: q.X - 4.2, z: q.Z - 3.2, name: 'Sleep' }];
   }
 
+  // ----- Los Angeles has its own rooms: the same kinds of place, laid out and dressed differently -----
+  if (LA) {
+    const BOOKS = [0x8a1c1c, 0x1f3a2c, 0x2c3a5a, 0xd9c7a0, 0x5a3320, 0x16161c, 0xb5523b];
+    { // a cocktail lounge: long and narrow, the bar down the west wall, red booths down the east, a little stage at the far end
+      const q = rooms.BAR = room(12, 18, 3.6, { floor: M.gravel, floorTint: 0x3a2a34, floorScale: 4, wall: M.wood, wallTint: 0x2a2030, ceil: 0x14101a });
+      counter(q, -4.2, -2, 11, 0x1c1418, Math.PI / 2);
+      q.block(0x14080f, 0.3, 2.4, 11, -5.6, -2, M.plain, 0, 1); q.glowPanel(0x4a6fd0, 10.4, 0.8, -5.42, -2, 2.4, Math.PI / 2);
+      for (let n = 0; n < 20; n++) post([0xd9a520, 0x6fb0ff, 0xc8312a, 0xe9e2cf][n % 4], 0.05, 0.3 + (n % 3) * 0.05, q.X - 5.4, q.Y + 1.5 + (n % 2) * 0.7, q.Z - 7 + n * 0.52, 6);
+      for (let n = 0; n < 7; n++) { post(0xc9cbd2, 0.04, 0.75, q.X - 3.1, q.Y, q.Z - 6.6 + n * 1.5); post(0x1c1c22, 0.22, 0.08, q.X - 3.1, q.Y + 0.75, q.Z - 6.6 + n * 1.5, 10); }
+      for (let n = 0; n < 4; n++) { const z = -6 + n * 3.4; q.block(0x8a1c2a, 1, 1.2, 1.1, 5, z - 1); q.block(0x8a1c2a, 1, 1.2, 1.1, 5, z + 1); q.block(0x1c1418, 0.9, 0.75, 0.8, 5, z, M.plain, 0); ball(0xffb060, 0.07, q.X + 5, q.Y + 0.85, q.Z + z, M.glow); }
+      q.block(0x14080f, 5, 0.35, 2.6, 1.5, -7.3, M.plain, 0); post(0xc9cbd2, 0.02, 1.4, q.X + 1.5, q.Y + 0.35, q.Z - 7, 5); ball(0x1c1c22, 0.06, q.X + 1.5, q.Y + 1.8, q.Z - 7); // the stage and its microphone
+      q.glowPanel(0xff3b4a, 2.4, 0.5, 1.5, -8.82, 2.6); q.glowPanel(0x6fb0ff, 0.5, 0.9, 5.82, 5.5, 2.2, -Math.PI / 2);
+      sign(['COCKTAILS', 'LIVE JAZZ FRI · SAT'], q.X + 3.6, q.Y + 2.9, q.Z - 8.84, 0, { w: 3, h: 1, color: '#6fb0ff', bg: '#14101a', size: 0.6 });
+      q.block(0x8d8a8e, 0.8, 1.6, 0.6, -5, 7.6); // the cigarette machine
+      q.light(-3, 3.2, -2, 0x6f8fff, 40, 14); q.light(4, 3.2, 0, 0xff5a4a, 30, 12); q.light(1.5, 3.2, -6.5, 0xffe2a6, 26, 9);
+      clerk(q, -5, -2, Math.PI / 2, { shirt: 0x16161c, open: undefined, tie: 0x8a1c1c });
+      q.person(pick(PED_ROOM_LOOKS), -3.1, -5.1, -Math.PI / 2); q.person(pick(OLD_LOOKS), 5, 1.4, Math.PI, 'sit');
+    }
+    { // a coffee shop out of the fifties: an island counter with stools all round, booths under the windows, orange and teal
+      const q = rooms.DINER = room(22, 12, 3.6, { floor: M.paver, floorTint: 0xd9c7a0, wallTint: 0x8fd0c8, ceil: 0xfff1c9 });
+      for (const [x, z, w, d] of [[0, -3.4, 9, 0.8], [0, -0.2, 9, 0.8], [-4.1, -1.8, 0.8, 2.4], [4.1, -1.8, 0.8, 2.4]]) { q.block(0xf08a3c, w, 1.05, d, x, z, M.plain, 0); slab(0xf4f4f0, w + 0.2, 0.06, d + 0.2, q.X + x, q.Y + 1.05, q.Z + z); }
+      for (let n = 0; n < 6; n++) { post(0xc9cbd2, 0.04, 0.7, q.X - 3.3 + n * 1.32, q.Y, q.Z + 0.75); post(0x1f9c8f, 0.22, 0.1, q.X - 3.3 + n * 1.32, q.Y + 0.7, q.Z + 0.75, 10); }
+      q.block(0xc9cbd2, 1.2, 1.5, 0.7, -2, -1.8, M.plain, 0); q.block(0xc9cbd2, 0.7, 1.3, 0.6, 2, -1.8, M.plain, 0); q.glowPanel(0xffe066, 0.5, 0.4, 2, -1.48, 1); // the grill hood and the coffee urns inside the island
+      for (let n = 0; n < 4; n++) slab(0xf4f4f0, 0.5, 0.4, 0.5, q.X - 3 + n * 0.8, q.Y + 1.11, q.Z - 0.2, M.plain);
+      for (let n = 0; n < 5; n++) { const x = -8.4 + n * 4.2; // booths along the window wall
+        q.block(0x1f9c8f, 0.7, 1.1, 1.6, x - 0.95, 4.6); q.block(0x1f9c8f, 0.7, 1.1, 1.6, x + 0.95, 4.6); slab(0xf4f4f0, 1, 0.07, 1.5, q.X + x, q.Y + 0.72, q.Z + 4.6); post(0xc9cbd2, 0.05, 0.72, q.X + x, q.Y, q.Z + 4.6); collide(q.X + x, q.Z + 4.6, 1, 1.5, 0.8);
+        if (n !== 2) q.window(x, 5.72, 3.4, 1.8, 1.9, Math.PI, 0xcfe0ff); }
+      q.block(0xc9cbd2, 14, 2.2, 0.6, 0, -5.5, M.plain, 0); q.glowPanel(0xffb060, 8, 0.7, 0, -5.18, 1.6); // the kitchen pass
+      sign(['COFFEE SHOP', 'BREAKFAST ALL DAY'], q.X - 7.5, q.Y + 2.8, q.Z - 5.84, 0, { w: 4.4, h: 1.2, color: '#ff8a5c', bg: '#14080f', size: 0.6 });
+      q.block(0x8a1c1c, 0.9, 1.7, 0.8, 9.8, -4.8); q.glowPanel(0xfff0d0, 0.6, 0.9, 9.8, -4.38, 1); // the pie case
+      q.light(0, 3.2, -1.5, 0xfff0d0, 60, 16); q.light(-7, 3.2, 3, 0xffe2a6, 30, 12); q.light(7, 3.2, 3, 0xffe2a6, 30, 12);
+      clerk(q, 0, -1.8, 0, { body: 'female', shirt: 0x8fd0c8, sleeves: undefined, tee: true, hair: 0x7a3b1a, hairMesh: 'long' });
+      q.till = q.at(0, 1.5);
+      q.person(pick(PED_ROOM_LOOKS), 3.3, 0.9, Math.PI); q.person(pick(OLD_LOOKS), -9.35, 4.6, Math.PI / 2, 'sit');
+      q.counter = { x: 0, z: 1.1 }; q.booth = { x: -4.2, z: 4.6 }; // where a scene can stand at the counter, and the second booth
+    }
+    { // a walk-up place: a counter with the menu over it, a soda machine, plastic tables bolted to the floor
+      const q = rooms.FASTFOOD = room(12, 10, 3.2, { floor: M.paver, floorTint: 0xe6d2b4, wallTint: 0xffe066, ceil: 0xf6f1e6 });
+      counter(q, 0, -2.2, 9, 0xd8342c, 0); slab(0xc9cbd2, 9.2, 0.06, 1, q.X, q.Y + 1.05, q.Z - 2.2);
+      sign(['TACOS 3 FOR $2 · BURGER $1.49 · DONUTS DOZEN $3', 'COMBO NO. 1 · NO. 2 · NO. 3 · HORCHATA'], q.X, q.Y + 2.5, q.Z - 4.82, 0, { w: 9, h: 1.1, color: '#1c1c22', bg: '#fff1c9', size: 0.5, glow: false });
+      q.block(0xc9cbd2, 9, 1.4, 0.7, 0, -4.4, M.plain, 0); for (let n = 0; n < 3; n++) q.glowPanel(0xffb060, 1.6, 0.5, -3 + n * 3, -4.02, 1.0);
+      q.block(0x2f56c8, 1, 1.8, 0.8, 5.2, -1.8); q.glowPanel(0xd8342c, 0.7, 0.6, 4.78, -1.8, 1.3, -Math.PI / 2); slab(0x1c1c22, 0.5, 0.5, 0.5, q.X - 5.2, q.Y, q.Z - 1.4); // soda, and the bin
+      for (const [x, z] of [[-3.4, 1.6], [0, 2.4], [3.4, 1.6]]) { slab(0xf4f4f0, 1.2, 0.06, 0.8, q.X + x, q.Y + 0.72, q.Z + z); post(0xc9cbd2, 0.06, 0.72, q.X + x, q.Y, q.Z + z); for (const s of [-1, 1]) slab(0xf08a3c, 0.4, 0.45, 0.4, q.X + x + s * 0.9, q.Y, q.Z + z); collide(q.X + x, q.Z + z, 1.2, 0.8, 0.8); }
+      q.window(-3, 4.72, 3.4, 1.6, 1.8, Math.PI); q.window(3, 4.72, 3.4, 1.6, 1.8, Math.PI);
+      q.light(0, 2.9, -1, 0xfff6e0, 50, 13); q.light(0, 2.9, 2.5, 0xfff6e0, 24, 10);
+      clerk(q, 0, -3.2, 0, { shirt: 0xd8342c, sleeves: undefined, tee: true, hat: 'cap', hatColor: 0xd8342c });
+      q.person(pick(PED_ROOM_LOOKS), 2.5, 1.6, -Math.PI / 2, 'sit');
+    }
+    { // a corner liquor store: the clerk in a booth of thick glass by the door, coolers humming along the back
+      const q = rooms.LIQUOR = room(12, 12, 3.2, { floorTint: 0xb9b3ac, wallTint: 0xf4f2ee });
+      q.block(0x3a3a44, 3.4, 1.1, 2.4, 4.1, 4.4, M.plain, 0); q.glowPanel(0x9fd0f5, 3.4, 1.6, 4.1, 3.18, 1.9); q.glowPanel(0x9fd0f5, 2.4, 1.6, 2.38, 4.4, 1.9, -Math.PI / 2); // the cage
+      slab(0xc9cbd2, 0.5, 0.06, 0.3, q.X + 3, q.Y + 1.12, q.Z + 3.2); // the tray the money goes through
+      q.block(0x1c1c22, 11, 2.3, 0.9, 0, -5.4); for (let n = 0; n < 5; n++) { q.glowPanel(0xcfe8ff, 1.9, 1.7, -4.4 + n * 2.2, -4.94, 1.3); for (let k = 0; k < 4; k++) slab(BOTTLES[(n + k) % 6], 0.35, 0.4, 0.3, q.X - 5 + n * 2.2 + k * 0.42, q.Y + 0.6 + (k % 2) * 0.7, q.Z - 5.1); }
+      racks(q, -2.5, -0.6, 5, 3, BOTTLES, Math.PI / 2); racks(q, 0.8, -0.6, 5, 3, BOTTLES, Math.PI / 2); racks(q, -5.3, 0, 7, 3, GOODS, Math.PI / 2);
+      sign(['LOTTO · BEER · WINE', 'NO LOITERING · NO CHECKS'], q.X - 2, q.Y + 2.7, q.Z - 5.84, 0, { w: 5, h: 1, color: '#ff5a4a', bg: '#f4f2ee', size: 0.6, glow: false });
+      q.window(-2.5, 5.72, 4, 1.6, 1.8, Math.PI);
+      q.light(-1, 2.9, -1, 0xf0f6ff, 55, 14);
+      clerk(q, 4.3, 4.6, Math.PI, { hat: undefined, age: 0.6, glasses: 'clear' });
+      q.till = q.at(2.6, 2.4);
+    }
+    { // a gun store with a range behind glass: counters in an L, rifles on pegboard, lanes and paper men at the back
+      const q = rooms.GUNS = room(18, 12, 3.6, { floor: M.gravel, floorTint: 0x55585f, floorScale: 4, wallTint: 0xdfe2e6, ceil: 0x8d8f96 });
+      counter(q, -2, -1, 9, 0x23232b, 0); counter(q, 2.9, 1.6, 4.4, 0x23232b, Math.PI / 2);
+      slab(0x55707c, 9, 0.05, 0.8, q.X - 2, q.Y + 1.1, q.Z - 1, M.glow); for (let n = 0; n < 8; n++) slab(0x1c1c22, 0.34, 0.06, 0.2, q.X - 5.6 + n * 1.02, q.Y + 1.16, q.Z - 1);
+      slab(0xb9a58a, 12, 2, 0.1, q.X - 2.6, q.Y + 1.1, q.Z - 5.8, M.wood, 1); // pegboard
+      for (let n = 0; n < 10; n++) { slab(n % 3 ? 0x1c1c22 : 0x6a4a34, 1.05, 0.09, 0.07, q.X - 7.8 + n * 1.15, q.Y + 2.7 - (n % 2) * 0.75, q.Z - 5.7); slab(0x6a4a34, 0.28, 0.16, 0.07, q.X - 8.3 + n * 1.15, q.Y + 2.66 - (n % 2) * 0.75, q.Z - 5.7); }
+      slab(0x1c1c22, 0.2, 2.4, 9, q.X + 5.6, q.Y + 0.9, q.Z - 0.5); q.glowPanel(0x6f8aa0, 8.6, 1.9, 5.48, -0.5, 2, -Math.PI / 2); // the range, through glass
+      for (let n = 0; n < 4; n++) { slab(0xf4f4f0, 0.03, 0.9, 0.5, q.X + 8.4, q.Y + 1.5, q.Z - 3.6 + n * 2.1, M.plain); put(M.plain, new THREE.CircleGeometry(0.16, 10).rotateY(-Math.PI / 2).translate(q.X + 8.38, q.Y + 1.7, q.Z - 3.6 + n * 2.1), 0x1c1c22); slab(0x3a3a44, 2.4, 0.05, 0.05, q.X + 7, q.Y + 1, q.Z - 4.6 + n * 2.1); }
+      for (let n = 0; n < 3; n++) { q.block(0x5c6157, 1.2, 0.9, 1.2, -7.6, 1 + n * 1.6, M.plain, 0); slab(0xd8342c, 1.1, 0.25, 1.1, q.X - 7.6, q.Y + 0.9, q.Z + 1 + n * 1.6); } // pallets of ammunition
+      sign(['GUNS · AMMO · RANGE', 'CALIFORNIA: 15 DAY WAIT · (NOT TODAY)'], q.X - 2.6, q.Y + 3.2, q.Z - 5.84, 0, { w: 7, h: 0.8, color: '#f4f4f0', bg: '#23232b', size: 0.66, glow: false });
+      q.window(-5, 5.72, 4, 1.6, 1.8, Math.PI);
+      q.light(-2, 3.2, 1, 0xf0f6ff, 60, 16); q.light(6.5, 3.2, -0.5, 0xfff0d0, 30, 10);
+      clerk(q, -2, -2.1, 0, { shirt: 0x5c6157, sleeves: undefined, tee: true, bulk: 1.3, stubble: 0.5, glasses: 'shades' });
+    }
+    { // a pawn shop: the counter and its cage down the east wall, televisions stacked to the ceiling, an island of jewellery
+      const q = rooms.PAWN = room(14, 10, 3.4, { floor: M.gravel, floorTint: 0x6f6a66, floorScale: 3, wallTint: 0xd9c7a0, ceil: 0x55525a });
+      counter(q, 4.6, -0.5, 7, 0x3a2418, Math.PI / 2); for (let n = 0; n < 9; n++) post(0x8a8d96, 0.02, 2.2, q.X + 4.1, q.Y + 1.1, q.Z - 3.7 + n * 0.8, 4);
+      for (let r = 0; r < 3; r++) for (let n = 0; n < 4; n++) { slab(0x1c1c22, 0.9, 0.7, 0.7, q.X - 6.2, q.Y + r * 0.72, q.Z - 3.8 + n * 1.05); q.glowPanel([0x9fd0f5, 0x2a2a30, 0x7dffb0][(r + n) % 3], 0.6, 0.5, -5.83, -3.8 + n * 1.05, 0.36 + r * 0.72, Math.PI / 2); }
+      collide(q.X - 6.2, q.Z - 2.2, 1, 4.4, 2.4);
+      q.block(0x3a2418, 3, 0.9, 1.4, -1, 0.2, M.wood, 1); slab(0x55707c, 2.8, 0.06, 1.2, q.X - 1, q.Y + 0.92, q.Z + 0.2, M.glow); for (let n = 0; n < 10; n++) slab(n % 2 ? 0xd9a520 : 0xc9cbd2, 0.1, 0.05, 0.1, q.X - 2.2 + (n % 5) * 0.55, q.Y + 0.97, q.Z - 0.1 + Math.floor(n / 5) * 0.5);
+      for (let n = 0; n < 5; n++) { put(M.plain, new THREE.BoxGeometry(0.3, 0.9, 0.08).translate(q.X - 3 + n * 0.7, q.Y + 2, q.Z - 4.75), [0xd8342c, 0xf2c230, 0x1c1c22, 0xf4f4f0, 0x2f56c8][n]); post(0x3a2418, 0.03, 0.7, q.X - 3 + n * 0.7, q.Y + 2.4, q.Z - 4.75, 4); }
+      sign(['EZ PAWN', 'CASH FOR GOLD · TOOLS · STEREOS'], q.X + 1.6, q.Y + 2.7, q.Z - 4.84, 0, { w: 4.4, h: 1.1, color: '#ffe066', bg: '#23232b', size: 0.6 });
+      q.window(-2, 4.72, 4, 1.6, 1.8, Math.PI);
+      q.light(-1, 3, 0, 0xfff0d0, 45, 14);
+      clerk(q, 5.6, -0.5, -Math.PI / 2, { glasses: 'clear', age: 0.5, hat: undefined });
+    }
+    { // a record and video store: bins down the middle, posters, a wall of tapes, a listening post
+      const q = rooms.STORE = room(14, 12, 3.4, { floorTint: 0x8d8f96, wallTint: 0x16161c, ceil: 0x23232b });
+      for (const x of [-3, 0, 3]) { q.block(0x5a3320, 1.4, 0.9, 7, x, -0.5, M.wood, 1); for (let n = 0; n < 12; n++) slab(GOODS[(n + x + 6) % 6], 1.2, 0.34, 0.05, q.X + x, q.Y + 0.9, q.Z - 3.6 + n * 0.56); }
+      racks(q, -6.4, -1, 8, 3, [0x1c1c22, 0xd8342c, 0x2f56c8, 0xf2c230], Math.PI / 2);
+      for (let n = 0; n < 5; n++) slab([0xff5a4a, 0x6fb0ff, 0xffe066, 0x7dffb0, 0xff5fd2][n], 1.3, 1.8, 0.03, q.X - 4.4 + n * 2.2, q.Y + 1.2, q.Z - 5.82, M.glow); // posters, lit
+      counter(q, 5.2, 3.6, 3, 0x23232b, Math.PI / 2); slab(0x1c1c22, 0.5, 0.3, 0.4, q.X + 5.2, q.Y + 1.13, q.Z + 4.4);
+      q.block(0x23232b, 0.6, 1.3, 0.6, 6.2, -4, M.plain, 0); slab(0x1c1c22, 0.08, 0.3, 0.3, q.X + 5.88, q.Y + 1.2, q.Z - 4); // the listening post
+      sign(['NEW · USED · IMPORTS', 'VHS RENTAL 99¢'], q.X + 4, q.Y + 2.9, q.Z - 5.84, 0, { w: 3.6, h: 1, color: '#ff5a4a', bg: '#16161c', size: 0.6 });
+      q.window(-3, 5.72, 4, 1.8, 1.9, Math.PI);
+      q.light(0, 3, -1, 0xfff0d0, 50, 15); q.light(4, 3, 3.5, 0xffb060, 22, 9);
+      clerk(q, 6.1, 3.6, -Math.PI / 2, { shirt: 0x16161c, sleeves: undefined, tee: true, hair: 0x7a3b1a, hairMesh: 'long' });
+    }
+    { // the bookstore: tall shelves in rows, a table of new arrivals, the desk by the door
+      const q = rooms.BOOKS = room(14, 12, 3.6, { floor: M.wood, floorTint: 0xb98a5e, wallTint: 0xf4f2ee, ceil: 0xf6f1e6 });
+      for (const x of [-5, -2, 1]) racks(q, x, -2.2, 6, 4, BOOKS, Math.PI / 2);
+      racks(q, -1, -5.5, 12, 4, BOOKS, 0);
+      q.block(0x5a3320, 2.6, 0.8, 1.4, -2.5, 3, M.wood, 1); for (let n = 0; n < 8; n++) slab(BOOKS[n % 7], 0.5, 0.08, 0.36, q.X - 3.4 + (n % 4) * 0.6, q.Y + 0.8 + Math.floor(n / 4) * 0.08, q.Z + 2.8 + (n % 2) * 0.4);
+      counter(q, 4.6, 2.4, 3.6, 0x5a3320, Math.PI / 2); slab(0x1c1c22, 0.5, 0.3, 0.4, q.X + 4.6, q.Y + 1.13, q.Z + 3.4);
+      post(0x1c1c22, 0.03, 1.5, q.X + 6.2, q.Y, q.Z - 4.6, 6); put(M.glow, new THREE.ConeGeometry(0.3, 0.4, 12, 1, true).translate(q.X + 6.2, q.Y + 1.7, q.Z - 4.6), 0xffe2a6); q.block(0x2f4a44, 0.9, 0.5, 0.9, 5.6, -3.4, M.plain, 0);
+      sign(['ART · ARCHITECTURE', 'DESIGN · ENGINEERING'], q.X + 4.4, q.Y + 2.9, q.Z - 5.84, 0, { w: 3.6, h: 1, color: '#f6e7b4', bg: '#2c3a5a', size: 0.6, glow: false });
+      q.window(-3, 5.72, 4, 1.8, 1.9, Math.PI);
+      q.light(-2, 3.2, 0, 0xfff0d0, 50, 15); q.light(4.5, 3.2, 2, 0xffe2a6, 26, 10);
+      q.desk = q.at(4.6, 2.4); q.till = q.at(3, 2.4);
+      q.person(pick(OLD_LOOKS), -3.4, -0.4, Math.PI / 2);
+    }
+    { // a laundromat: washers down one wall, dryers down the other, a folding table, plastic chairs, a television nobody chose
+      const q = rooms.LAUNDRY = room(12, 12, 3.2, { floor: M.paver, floorTint: 0xcfd8dc, wallTint: 0xcfe8ff, ceil: 0xf6f6f2 });
+      for (let n = 0; n < 7; n++) { q.block(0xf4f4f0, 0.8, 1, 0.8, -5.3, -4.6 + n * 1.2, M.plain, 0); put(M.plain, new THREE.CylinderGeometry(0.24, 0.24, 0.04, 14).rotateZ(Math.PI / 2).translate(q.X - 4.88, q.Y + 0.55, q.Z - 4.6 + n * 1.2), 0x24324c); }
+      for (let n = 0; n < 5; n++) for (const r of [0, 1]) { slab(0xc9cbd2, 0.9, 1, 0.9, q.X + 5.3, q.Y + r * 1.02, q.Z - 4.4 + n * 1.3); put(M.plain, new THREE.CylinderGeometry(0.3, 0.3, 0.04, 14).rotateZ(Math.PI / 2).translate(q.X + 4.83, q.Y + 0.5 + r * 1.02, q.Z - 4.4 + n * 1.3), n === 2 && r ? 0xffb060 : 0x24324c); }
+      collide(q.X + 5.3, q.Z - 1.8, 0.9, 6.4, 2.2);
+      q.block(0xf4f4f0, 3, 0.9, 1.4, 0, -1.5, M.plain, 0); for (let n = 0; n < 4; n++) slab(GOODS[n], 0.5, 0.12 + n * 0.04, 0.4, q.X - 1 + n * 0.7, q.Y + 0.9, q.Z - 1.5);
+      for (let n = 0; n < 4; n++) slab([0xf08a3c, 0x1f9c8f][n % 2], 0.5, 0.45, 0.5, q.X - 1.5 + n * 1, q.Y, q.Z + 2.2);
+      slab(0x1c1c22, 0.9, 0.7, 0.6, q.X, q.Y + 2.3, q.Z - 5.5); q.glowPanel(0x9fd0f5, 0.7, 0.5, 0, -5.18, 2.65);
+      q.block(0x8d8a8e, 0.8, 1.7, 0.6, 2.4, -5.4); sign(['WASH 75¢ · DRY 25¢', 'NO DYEING'], q.X - 3, q.Y + 2.5, q.Z - 5.84, 0, { w: 3.4, h: 0.9, color: '#2f56c8', bg: '#f4f4f0', size: 0.62, glow: false });
+      q.window(0, 5.72, 6, 1.8, 1.8, Math.PI);
+      q.light(0, 2.9, -1, 0xf0f6ff, 55, 14);
+      q.person(pick(OLD_LOOKS), -1.5, 2.2, Math.PI, 'sit'); q.person(pick(PED_ROOM_LOOKS), 1.2, -0.3, Math.PI);
+    }
+    { // an auto parts counter: a wall of boxes behind it, tyres, a rack of belts, a catalogue the size of a suitcase
+      const q = rooms.PARTS = room(14, 10, 3.4, { floor: M.gravel, floorTint: 0x6f6a66, floorScale: 3, wallTint: 0xf2c230, ceil: 0x8d8f96 });
+      counter(q, 0, -1.6, 11, 0x23232b, 0); slab(0xe9e2cf, 0.9, 0.2, 0.6, q.X - 2, q.Y + 1.13, q.Z - 1.6); slab(0x1c1c22, 0.5, 0.3, 0.4, q.X + 3, q.Y + 1.13, q.Z - 1.6);
+      racks(q, 0, -4.5, 12, 4, [0xd8342c, 0x2f56c8, 0xf4f4f0, 0x1c1c22, 0xf08a3c], 0);
+      for (const [x, z, n] of [[-6, 2.5, 4], [-5.1, 2.9, 3], [-6, 3.8, 2]]) for (let k = 0; k < n; k++) put(M.plain, new THREE.CylinderGeometry(0.36, 0.36, 0.24, 12).translate(q.X + x, q.Y + 0.12 + k * 0.25, q.Z + z), 0x17171b);
+      for (let n = 0; n < 8; n++) put(M.plain, new THREE.TorusGeometry(0.22 + (n % 3) * 0.05, 0.015, 5, 14).rotateY(Math.PI / 2).translate(q.X + 6.7, q.Y + 2, q.Z - 0.5 + n * 0.5), 0x1c1c22); // belts
+      q.block(0xd8342c, 1.4, 0.9, 0.7, 4, 3, M.plain, 0); for (let n = 0; n < 6; n++) post([0xd9a520, 0x1c1c22][n % 2], 0.07, 0.24, q.X + 3.5 + (n % 3) * 0.45, q.Y + 0.9, q.Z + 2.85 + Math.floor(n / 3) * 0.3, 8); // oil
+      sign(['PARTS COUNTER', 'NO RETURNS ON ELECTRICAL'], q.X, q.Y + 3, q.Z - 4.84, 0, { w: 5, h: 0.8, color: '#1c1c22', bg: '#f2c230', size: 0.66, glow: false });
+      q.window(-1, 4.72, 4, 1.6, 1.8, Math.PI);
+      q.light(0, 3, 0, 0xfff6e0, 50, 14);
+      clerk(q, 0, -2.7, 0, { shirt: 0x2f56c8, sleeves: undefined, hat: 'cap', hatColor: 0x2f56c8, mustache: 0x2b1b12, bulk: 1.2 });
+    }
+    { // a check-cashing office: three windows of thick glass, a rope line, rates on a board, a guard on a stool
+      const q = rooms.OFFICE = room(12, 9, 3.2, { floorTint: 0xb9b3ac, wallTint: 0xdfe5ea });
+      q.block(0x3a3a44, 11, 1.1, 0.8, 0, -1.6, M.plain, 0); for (let n = 0; n < 3; n++) { q.glowPanel(0x9fd0f5, 2.6, 1.5, -3.6 + n * 3.6, -1.18, 1.9); slab(0xc9cbd2, 0.5, 0.05, 0.3, q.X - 3.6 + n * 3.6, q.Y + 1.12, q.Z - 1.2); }
+      for (let n = 0; n < 4; n++) slab(0x3a3a44, 0.2, 2.1, 0.8, q.X - 5.4 + n * 3.6, q.Y + 1.1, q.Z - 1.6);
+      sign(['CHECKS CASHED · MONEY ORDERS', 'PAYROLL 1.5% · PERSONAL 6% · WE WIRE'], q.X, q.Y + 2.8, q.Z - 4.32, 0, { w: 8, h: 0.9, color: '#f4f4f0', bg: '#1f6b4a', size: 0.62, glow: false });
+      for (let n = 0; n < 4; n++) { post(0xd9a520, 0.04, 1, q.X - 3.6 + n * 2.4, q.Y, q.Z + 1.2, 6); if (n) slab(0x8a1c1c, 2.4, 0.05, 0.05, q.X - 4.8 + n * 2.4, q.Y + 0.9, q.Z + 1.2); }
+      post(0x1c1c22, 0.2, 0.7, q.X + 5, q.Y, q.Z + 2.6, 8);
+      q.window(-2, 4.22, 4, 1.4, 1.7, Math.PI);
+      q.light(0, 2.9, 0.5, 0xf0f6ff, 45, 12);
+      clerk(q, 0, -2.6, 0, { body: 'female', hair: 0x111111, hairMesh: 'long', dark: true });
+      q.person({ shirt: 0x9fb0c4, sleeves: 'long', tucked: true, badge: true, pants: 0x23232b, hair: 0x2b1b12, hairMesh: 'buzzed', bulk: 1.2 }, 5, 2.6, -Math.PI / 2);
+    }
+    { // a ranch house: one long room, the kitchen at an island, a sectional sofa, glass doors on a yard with a lemon tree
+      const q = rooms.HOUSE = room(16, 11, 3.2, { floor: M.wood, floorTint: 0xc9a47a, wallTint: 0xf4f2ee, ceil: 0xf6f6f2, doorX: 5 });
+      q.glowPanel(0x4a6a52, 7, 2.4, -3.5, -5.32, 1.3); for (let n = -1; n <= 1; n++) slab(0xf4f4f0, 0.08, 2.5, 0.08, q.X - 3.5 + n * 2.3, q.Y, q.Z - 5.28); ball(0xffe066, 0.12, q.X - 2, q.Y + 1.9, q.Z - 5.3, M.glow); // the yard
+      q.block(0xb9a58a, 4.6, 0.5, 1.2, -4.2, 0.4); q.block(0xb9a58a, 1.2, 0.5, 2.6, -6.4, -1.4); q.block(0xb9a58a, 4.6, 0.5, 0.3, -4.2, 1.05, M.plain, 0, 0.5); // the sectional
+      q.block(0x5a3320, 1.6, 0.4, 0.9, -3.8, -1.6, M.wood, 1); slab(0xd8d0c4, 5, 0.02, 3.6, q.X - 4, q.Y + 0.01, q.Z - 1);
+      q.block(0x1c1c22, 1.5, 1, 0.5, -3.8, -4.2, M.plain, 0, 0.3); q.glowPanel(0x9fd0f5, 1.3, 0.8, -3.8, -3.94, 0.9, Math.PI);
+      q.block(0xf4f4f0, 3.4, 0.92, 1.2, 3.4, -1.2, M.plain, 0); slab(0x8d8a8e, 3.5, 0.05, 1.3, q.X + 3.4, q.Y + 0.92, q.Z - 1.2); for (let n = 0; n < 3; n++) { slab(0x5a3320, 0.4, 0.06, 0.4, q.X + 2.4 + n, q.Y + 0.62, q.Z - 0.1); post(0x8a8d96, 0.03, 0.62, q.X + 2.4 + n, q.Y, q.Z - 0.1, 4); }
+      q.block(0xf4f4f0, 6, 0.92, 0.7, 4.6, -4.9, M.plain, 0); q.block(0xc9cbd2, 0.9, 2, 0.8, 7.3, -3.6, M.plain, 0); for (const [x, hex] of [[2.6, 0xd8342c], [3.2, 0xf2c230], [3.8, 0xf2c230]]) ball(hex, 0.12, q.X + x, q.Y + 1.05, q.Z - 1.2);
+      for (let n = 0; n < 3; n++) slab(0xe9e2cf, 0.9, 0.7, 0.04, q.X + 2 + n * 1.8, q.Y + 2, q.Z - 5.34, M.plain);
+      q.window(-2, 5.22, 3, 1.4, 1.8, Math.PI);
+      q.light(-4, 2.9, -1, 0xfff0d0, 40, 14); q.light(4, 2.9, -2, 0xfff6e0, 34, 12);
+      q.person(pick(PED_ROOM_LOOKS), -4.4, 0.3, Math.PI, 'sit');
+    }
+  }
+
   { // Neil's house inside: a wall of glass, a table, a bed, and nothing he could not walk away from in thirty seconds.
     const q = rooms.NEIL = room(18, 12, 3.6, { floor: M.gravel, floorTint: 0xb9b3ba, floorScale: 4, wallTint: 0xf1f1ee, ceil: 0xf6f6f2, door: 0x16161c, doorX: -6 });
     q.glowPanel(0x2b4a6e, 16, 2.9, 0, -5.82, 1.75); for (let n = -3; n <= 3; n++) slab(0xc9cbd2, 0.06, 3.2, 0.06, q.X + n * 2.3, q.Y + 0.2, q.Z - 5.78); // the sea at dusk, through the glass
@@ -2120,9 +2279,9 @@ export function buildWorld(scene) {
     q.vault = q.at(9, -6); q.floor = q.at(0, 2);
   }
 
-  const SHOP_ROOM = { BAR: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'DINER', DONUTS: 'DINER', BURGERS: 'DINER', 'AUTO PARTS': 'STORE', LAUNDRY: 'STORE', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
+  const SHOP_ROOM = { BAR: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'FASTFOOD', DONUTS: 'FASTFOOD', BURGERS: 'FASTFOOD', 'AUTO PARTS': 'PARTS', LAUNDRY: 'LAUNDRY', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
   const SHOP_NAME = { BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
-    HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office' };
+    HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the store', BOOKS: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office' };
   places.rooms = rooms;
   places.parkedSpots = parkedSpots;
   // The story's diner is the one a short drive from Dr. Melfi's office; its bar is the one nearest the park.

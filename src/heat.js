@@ -77,10 +77,10 @@ async function theCrew(g) {
   await reach(g, truckstop.kerb, 'Drive to the <b>truck stop</b>.');
   await reach(g, truckstop.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
 
-  await roomScene(g, inRoom(DINER, [-0.5, 0.4], [-1, -2.6], 1.5, 1.1), q => ({
-    waingro: actor(g, 'waingro', roomSpot(q, -2, -2.3), NORTH),
-    cheritto: actor(g, 'cheritto', roomSpot(q, 1, -2.3), NORTH),
-    neil: actor(g, 'neil', roomSpot(q, -0.5, -1.2), NORTH),
+  await roomScene(g, inRoom(DINER, [-3.8, 3.8], [-0.6, 0.4], 1.5, 1.1), q => ({
+    waingro: actor(g, 'waingro', roomSpot(q, -2, 1.05), NORTH),
+    cheritto: actor(g, 'cheritto', roomSpot(q, 0.7, 1.05), NORTH),
+    neil: actor(g, 'neil', roomSpot(q, -0.6, 2.2), NORTH),
   }), async cast => {
     await talk(g, [
       [WAINGRO, "You're the one they all wait for. They told me not to talk. I talk. It's how I know I'm awake.", cast.waingro],
@@ -251,9 +251,9 @@ async function bearerBonds(g) {
   g.hud.card();
   await reach(g, bar.kerb, 'Drive to <b>Nate\'s bar</b>.');
   await reach(g, bar.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
-  await roomScene(g, inRoom(BAR, [2.6, 0.2], [-1, -2.6], 1.5, 1.1), q => ({
-    nate: actor(g, 'nate', roomSpot(q, -1.6, -2.5), EAST),
-    neil: actor(g, 'neil', roomSpot(q, 0.2, -2.5), WEST),
+  await roomScene(g, inRoom(BAR, [1.9, 0.8], [-2.2, -2], 1.5, 1.1), q => ({
+    nate: actor(g, 'nate', roomSpot(q, -2.9, -2.1), EAST),
+    neil: actor(g, 'neil', roomSpot(q, -1.3, -2.1), WEST),
   }), async cast => {
     await talk(g, [
       [NATE, 'The bonds belong to a man called Roger Van Zant. Offshore money, onshore lawyers.', cast.nate],
@@ -270,11 +270,11 @@ async function bearerBonds(g) {
   await reach(g, truckstop.kerb, 'The crew is at the <b>truck stop</b>. So is Waingro.');
   await reach(g, truckstop.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
 
-  await roomScene(g, inRoom(DINER, [-1.6, 4.8], [-5, 1.9]), q => ({
-    waingro: actor(g, 'waingro', roomSpot(q, -5.5, 1.35), SOUTH, 'sit'),
-    chris: actor(g, 'shiherlis', roomSpot(q, -3.6, 0.6), WEST),
-    cheritto: actor(g, 'cheritto', roomSpot(q, -3.4, 3.4), WEST),
-    neil: actor(g, 'neil', roomSpot(q, -3.7, 2.1), WEST),
+  await roomScene(g, inRoom(DINER, [-0.6, 1.6], [-4.6, 4.2]), q => ({
+    waingro: actor(g, 'waingro', roomSpot(q, -5.15, 4.6), EAST, 'sit'),
+    chris: actor(g, 'shiherlis', roomSpot(q, -2.4, 3.6), WEST),
+    cheritto: actor(g, 'cheritto', roomSpot(q, -6.2, 2.9), SOUTH),
+    neil: actor(g, 'neil', roomSpot(q, -4.2, 3.1), SOUTH),
   }), async cast => {
     await talk(g, [
       [WAINGRO, "So where's my end? I held them. I did what you said.", cast.waingro],
@@ -403,7 +403,7 @@ async function slick(g) {
 // A book about steel, a counter at a diner, and the end of a pier at night.
 
 async function eady(g) {
-  const { bookstore, kates, pier } = g.places, p = g.player, STORE = g.places.rooms.STORE, DINER = g.places.rooms.DINER;
+  const { bookstore, kates, pier } = g.places, p = g.player, BOOKS = g.places.rooms.BOOKS, DINER = g.places.rooms.DINER;
 
   await g.wait(1);
   g.hud.card('Eady', 'A bookstore, downtown');
@@ -411,9 +411,9 @@ async function eady(g) {
   g.hud.card();
   await reach(g, bookstore.kerb, 'Drive to the <b>bookstore</b>.');
   await reach(g, bookstore.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
-  await roomScene(g, inRoom(STORE, [0.4, 1], [3, -4.6]), q => ({
-    eady: actor(g, 'eady', roomSpot(q, 3, -5.3), SOUTH),
-    neil: actor(g, 'neil', roomSpot(q, 2.6, -3.2), NORTH),
+  await roomScene(g, inRoom(BOOKS, [1.4, 5], [4.3, 2.3]), q => ({
+    eady: actor(g, 'eady', roomSpot(q, 5.6, 2.4), WEST),
+    neil: actor(g, 'neil', roomSpot(q, 3.1, 2.4), EAST),
   }), async cast => {
     await talk(g, [
       [EADY, 'Stress fractures in alloy steels. Is that for work?', cast.eady],
@@ -428,9 +428,9 @@ async function eady(g) {
   p.locked = false;
   await reach(g, kates.kerb, "Drive to <b>Kate's</b>.");
   await reach(g, kates.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
-  await roomScene(g, inRoom(DINER, [-0.6, 0.6], [1.5, -2.4], 1.5, 1.1), q => ({
-    eady: actor(g, 'eady', roomSpot(q, 2.5, -2.3), NORTH),
-    neil: actor(g, 'neil', roomSpot(q, 1, -2.3), NORTH),
+  await roomScene(g, inRoom(DINER, [4, 3.6], [1.3, 0.5], 1.5, 1.1), q => ({
+    eady: actor(g, 'eady', roomSpot(q, 2, 1.05), NORTH),
+    neil: actor(g, 'neil', roomSpot(q, 0.7, 1.05), NORTH),
   }), async cast => {
     await talk(g, [
       [EADY, 'The steel book. You were in the store today.', cast.eady],

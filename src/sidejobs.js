@@ -4,8 +4,8 @@
 import { near } from './grid.js';
 import { WEAPONS } from './combat.js';
 
-const SHAKEDOWN = new Set(['BAR', 'DINER', 'LIQUOR', 'PAWN', 'STORE', 'KIOSK', 'SHOWROOM', 'MOTEL', 'BEAN', 'OFFICE']); // nobody shakes down a gun shop
-const FOOD = { DINER: ['Eat', 15], KIOSK: ['Buy a hot dog', 8], BEAN: ['Coffee and a cannoli', 6], BAR: ['A drink', 10], VESUVIO: ['Dinner', 40] };
+const SHAKEDOWN = new Set(['BAR', 'DINER', 'LIQUOR', 'PAWN', 'STORE', 'KIOSK', 'SHOWROOM', 'MOTEL', 'BEAN', 'OFFICE', 'FASTFOOD', 'PARTS', 'BOOKS']); // nobody shakes down a gun shop
+const FOOD = { FASTFOOD: ['Eat', 6], DINER: ['Eat', 15], KIOSK: ['Buy a hot dog', 8], BEAN: ['Coffee and a cannoli', 6], BAR: ['A drink', 10], VESUVIO: ['Dinner', 40] };
 const HANDOVER = ['Take it. Take it, just go.', "It's all there. Please.", 'Okay. Okay! Here.', "I don't want trouble.", "Take it, I've got kids."];
 const REFUSAL = ['Get out of my store!', 'You picked the wrong place, pal.', 'I pay already. I pay every month!', 'Not today. Not you.'];
 
