@@ -6,10 +6,10 @@ Unofficial fan project for personal use. Not affiliated with HBO or Rockstar Gam
 
 ## Run
 
-Any static file server works:
+Use the bundled server, which stops the browser caching old files (a plain `python3 -m http.server` works too, but after an update the browser may mix old and new files and hang on "Loading…"; a hard reload, Cmd+Shift+R, fixes that):
 
 ```bash
-python3 -m http.server 8137
+python3 serve.py
 ```
 
 Then open http://localhost:8137 for Vice City (The Sopranos), or http://localhost:8137/?city=la for Los Angeles (Heat). The title screen has a button to switch.

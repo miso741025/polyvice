@@ -291,8 +291,10 @@ async function boot() {
   // Each city has its own title, and a way across to the other.
   if (LA) { document.body.classList.add('la'); document.querySelector('.logo .sop').textContent = 'Heat'; document.querySelector('.logo .vc').textContent = 'Los Angeles'; document.title = 'Heat: Los Angeles'; g.setNight(0); }
   const otherBtn = document.getElementById('other');
-  otherBtn.textContent = LA ? 'Vice City · The Sopranos' : 'Los Angeles · Heat';
-  otherBtn.addEventListener('click', () => { location.search = LA ? '' : '?city=la'; });
+  if (otherBtn) { // (an old cached page may not have the button)
+    otherBtn.textContent = LA ? 'Vice City · The Sopranos' : 'Los Angeles · Heat';
+    otherBtn.addEventListener('click', () => { location.search = LA ? '' : '?city=la'; });
+  }
   const startBtn = document.getElementById('start');
   startBtn.disabled = false;
   startBtn.textContent = 'Start';

@@ -56,6 +56,17 @@
   <div class="fine">Unofficial fan project for personal use. Not affiliated with HBO, Warner Bros. or Rockstar Games.</div>
 </div>
 
+<script>
+  // If a module fails to load (usually an old cached copy of one file beside new copies of the rest), say so instead of hanging.
+  addEventListener('error', e => {
+    const b = document.getElementById('start');
+    if (b && b.disabled) b.textContent = 'Could not start: press Cmd+Shift+R (Ctrl+Shift+R) to reload';
+  }, true);
+  addEventListener('unhandledrejection', () => {
+    const b = document.getElementById('start');
+    if (b && b.disabled) b.textContent = 'Could not start: press Cmd+Shift+R (Ctrl+Shift+R) to reload';
+  });
+</script>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>
