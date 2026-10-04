@@ -1085,6 +1085,10 @@ export const LOOKS = {
   agent: { jacket: 0x23232b, shirt: 0xf4f4f4, tie: 0x23232b, tucked: true, pants: 0x23232b, hair: 0x2b1b12, hairMesh: 'buzzed', glasses: 'shades', bulk: 1.05, stubble: 0.1 },
   adriana: { body: 'female', jacket: 0x1c1c22, shirt: 0xff5fd2, pants: 0x1c1c22, tucked: true, chain: true, hair: 0x1c1410, hairMesh: 'long', hairScale: [1.14, 1.12, 1.1], age: 0.1 },
 };
+// Episode five.
+Object.assign(LOOKS, {
+  febby: { pattern: 'plaid', shirt: 0x8d93cc, sleeves: 'long', pants: 0x4a3324, shoes: 0x6a4a34, hair: 0x6f6a66, hairStyle: 'balding', mustache: 0x6f6a66, glasses: 'clear', hat: 'cap', hatColor: 0x1f6b4a, bulk: 1.28, age: 0.6, face: { jaw: 0.15, cheeks: 0.7, jowls: 0.6 } },
+});
 // The people of Heat, in Los Angeles. As with the others, nobody's face is copied: build, hair and clothes carry it.
 Object.assign(LOOKS, {
   neil: { jacket: 0x55585f, shirt: 0xf4f4f4, tucked: true, pants: 0x55585f, hair: 0x4a4038, hairSides: 0x8d8a8e, hairSidesWidth: 0.046, hairMesh: 'parted', hairScale: [1.0, 0.94, 1.02], goatee: 0x6f6a66, bulk: 1.02, age: 0.6, face: { nose: 0.5, cheeks: -0.2, brow: 0.3 } },

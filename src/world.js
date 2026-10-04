@@ -17,7 +17,8 @@ const FLOOR = 3.4, GROUND = 4.2, BAY = 4; // storey height, shopfront height, wi
 const SPECIAL_LA = { '15,1': 'neil', '8,6': 'bank', '2,9': 'drivein', '6,9': 'kates', '3,5': 'truckstop', '10,3': 'hospital', '8,3': 'precinct', '6,2': 'depository', '10,8': 'bookstore',
   '12,4': 'park', '4,11': 'park', '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '2,7': 'yard', '13,8': 'church' };
 const SPECIAL_VICE = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
-  '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel' };
+  '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel',
+  '13,0': 'college', '12,2': 'travel' }; // episode five: up the coast
 const SUN = new THREE.Vector3(1250, 190, 420).normalize();
 const HOUSE_WALLS = LA ? [0xe9e2d2, 0xf4f2ee, 0xd9c7a0, 0xc9b79c, 0xe6d2b4, 0xdfe5ea] : [0xcfe8ff, 0xfff1c9, 0xffd9e8, 0xe9e2d2, 0xd6fff4, 0xf7a8c4, 0xf4f2ee, 0xc9b6f2];
 const FIRMS = [['VICE FREIGHT', 'INTERSTATE HAULAGE'], ['ATLANTIC SALVAGE', 'SCRAP · PARTS · TOWING'], ['GULF SEAFOOD', 'WHOLESALE'], ['SUNSHINE CEMENT', 'READY MIX'], ['BAYSIDE PLUMBING', 'SUPPLY CO.'], ['MARINA ICE', 'BLOCK & CRUSHED']];
@@ -647,6 +648,8 @@ export function buildWorld(scene) {
     else if (kind === 'depository') buildDepository(c);
     else if (kind === 'bookstore') { buildBookstore(c); lots(c, i, [1, 1]); }
     else if (kind === 'apron' || kind === 'terminal' || kind === 'hangar') buildAirport(c, kind);
+    else if (kind === 'college') buildCollege(c);
+    else if (kind === 'travel') { buildTravel(c); lots(c, i, [-1, 1]); }
     else if (kind === 'home') buildHome(c);
     else if (kind === 'melfi') buildMelfi(c);
     else if (kind === 'bing') buildBing(c);
@@ -1006,6 +1009,7 @@ export function buildWorld(scene) {
         continue;
       }
       house(c.x + a * 14, c.z + b * 13, b, pick(HOUSE_WALLS), pick([0x6a5a56, 0x55525a, 0x6a3a30, 0x3f3c44]), rand() < 0.35 ? 2 : 1);
+      (places.flats ??= []).push({ door: shopDoors[shopDoors.length - 1].outside, kerb: { x: c.x + a * 14 + 4.4, z: c.z + b * 34, h: b > 0 ? Math.PI / 2 : -Math.PI / 2 } });
       places.flat ??= { door: shopDoors[shopDoors.length - 1].outside, kerb: { x: c.x + a * 14 + 4.4, z: c.z + b * 34, h: b > 0 ? Math.PI / 2 : -Math.PI / 2 }, yard: { x: c.x + a * 14 - 5, z: c.z + b * 21 } }; // Brendan's place
       if (rand() < 0.3) parkedSpots.push({ x: c.x + a * 14 + 4.4, z: c.z + b * 24, h: b > 0 ? 0 : Math.PI, kind: pick(['sedan', 'pickup', 'suv', 'coupe']) });
     }
@@ -1088,6 +1092,7 @@ export function buildWorld(scene) {
     slab(0x2f5a3f, 2.6, 1.5, 1.6, x - 11, 0.03, z - 11); slab(0x244a33, 2.7, 0.1, 1.7, x - 11, 1.53, z - 11); collide(x - 11, z - 11, 2.6, 1.6, 1.6);
     parkedSpots.push({ x: x - 5, z: z + 9, h: Math.PI / 2, kind: pick(['sedan', 'pickup', 'van']) });
     places.gas ??= { pumps: { x, z }, kerb: { x: x + 4, z: c.z + 34, h: Math.PI / 2 } };
+    (places.gasStations ??= []).push({ pumps: { x, z }, kerb: { x: x + 4, z: c.z + 34, h: Math.PI / 2 } });
   }
 
   // ----- Sunshine Autos: a dealership forecourt under strings of bunting, with a glass showroom -----
@@ -1397,6 +1402,41 @@ export function buildWorld(scene) {
       for (const s of [-1, 1]) { slab(GREEN, 0.45, 0.06, 0.45, x + tx + s * 0.95, y + 0.45, front + 2.8); slab(GREEN, 0.06, 0.5, 0.45, x + tx + s * 1.16, y + 0.45, front + 2.8); post(0xc9cbd2, 0.03, 0.45, x + tx + s * 0.95, y, front + 2.8, 4); }
     }
     places.cafe = { door: { x, z: front + 2.6 }, kerb: { x, z: c.z + 34, h: Math.PI / 2 } };
+  }
+
+  // ----- A college up the coast: a brick hall with a white cupola over a quad, where Meadow has her interview -----
+  function buildCollege(c) {
+    const y = CURB, BRICK = 0xb5523b, top = y + FLOOR * 3;
+    flat(M.grass, 0xffffff, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z, 6);
+    put(M.stucco, walls(44, FLOOR * 3, 14, c.x, y, c.z - 19, 3), BRICK); collide(c.x, c.z - 19, 44, 14, top);
+    gable(0x55525a, 15, 3.4, 45, c.x, top, c.z - 19, Math.PI / 2);
+    slab(0xf4f2ee, 4.4, 5, 4.4, c.x, top + 2.6, c.z - 19, M.siding, 1); put(M.plain, new THREE.CylinderGeometry(1.5, 2.2, 2.2, 8).translate(c.x, top + 8.7, c.z - 19), 0xf4f2ee); put(M.plain, new THREE.ConeGeometry(1.7, 3, 8).translate(c.x, top + 11.3, c.z - 19), 0x2f6b5c);
+    put(M.glow, new THREE.CircleGeometry(1, 16).translate(c.x, top + 5.2, c.z - 16.78), 0xfff1c9); slab(0x1c1c22, 0.08, 0.8, 0.04, c.x, top + 5.2, c.z - 16.75); // the clock
+    slab(0xf4f2ee, 12, 0.5, 4, c.x, y + 4.4, c.z - 10.4); gable(0xf4f2ee, 12.4, 2, 4.2, c.x, y + 4.9, c.z - 10.4, 0, M.plain);
+    for (const sx of [-4.8, -1.6, 1.6, 4.8]) post(0xf4f2ee, 0.28, 4.4, c.x + sx, y, c.z - 9, 12);
+    slab(0x3a2418, 2.6, 3.2, 0.2, c.x, y, c.z - 11.95); for (let n = 0; n < 3; n++) slab(0xd8d0c4, 10 - n, 0.18, 1, c.x, y + n * 0.18, c.z - 8 - n * 0.5);
+    flat(M.paint, 0xd8d0c4, 3, 26, c.x, y + 0.09, c.z + 6); flat(M.paint, 0xd8d0c4, BLOCK - 8, 2.6, c.x, y + 0.09, c.z + 8);
+    for (const [bx, bz, t] of [[-6, 10, Math.PI], [6, 10, Math.PI], [-14, 6.2, 0], [14, 6.2, 0]]) bench(c.x + bx, c.z + bz, t);
+    post(0xc9cbd2, 0.07, 10, c.x + 18, y, c.z + 2); [0xd8342c, 0xf4f4f4, 0x2f56c8].forEach((hex, n) => slab(hex, 2.4, 0.45, 0.04, c.x + 19.3, y + 9.5 - n * 0.45, c.z + 2));
+    slab(0xd8d0c4, 6, 1.6, 0.6, c.x, y, c.z + 24, M.gravel, 2);
+    sign(['BOWDOIN COLLEGE', 'FOUNDED 1794'], c.x, y + 0.9, c.z + 24.32, 0, { w: 5.6, h: 1.3, color: '#f4f2ee', bg: '#2c3a5a', size: 0.66, glow: false });
+    slab(0xd8d0c4, 3, 1.2, 0.3, c.x - 12, y, c.z - 11.8, M.gravel, 2); sign(['NO MAN CAN WEAR ONE FACE', 'TO HIMSELF AND ANOTHER TO THE CROWD', 'AND LONG REMEMBER WHICH IS HIS OWN'], c.x - 12, y + 0.65, c.z - 11.62, 0, { w: 2.8, h: 1, color: '#2a2a30', bg: '#d8d0c4', size: 0.62, glow: false });
+    for (const [px, pz] of [[-22, 18], [22, 18], [-24, -4], [24, -6], [-10, 22], [10, 22]]) palms.push({ x: c.x + px, z: c.z + pz });
+    shopDoors.push({ shop: 'SCHOOL', outside: { x: c.x, z: c.z - 9.6, h: 0 } });
+    places.college = { kerb: { x: c.x + 4, z: c.z + 34, h: Math.PI / 2 }, quad: { x: c.x, z: c.z + 8 }, door: { x: c.x, z: c.z - 7.4 }, bench: { x: c.x + 6, z: c.z + 9.4 }, stone: { x: c.x - 12, z: c.z - 9.6 } };
+  }
+
+  // ----- Peters Travel: a storefront on the south-west lot, posters of somewhere else in the window -----
+  function buildTravel(c) {
+    const x = c.x - 13, z = c.z + 13, y = CURB, front = z + 7;
+    slab(0xf4f2ee, 14, 4.6, 14, x, y, z, M.siding, 1); collide(x, z, 14, 14, y + 4.6);
+    slab(0x2f56c8, 14.3, 0.8, 14.3, x, y + 3.6, z); slab(0x55525a, 14.6, 0.3, 14.6, x, y + 4.6, z);
+    windowAt(x - 3.4, y + 0.9, front, 5, 2.2, 0, 1, true); for (let n = 0; n < 3; n++) slab([0x49e0d0, 0xff8a5c, 0xffe066][n], 1.1, 1.5, 0.04, x - 5 + n * 1.6, y + 1.2, front + 0.09, M.glow); // posters
+    slab(0x3a2418, 1.6, 2.8, 0.2, x + 3.6, y, front + 0.05);
+    sign(['PETERS TRAVEL', 'CRUISES · TOURS · AIRLINE TICKETS'], x, y + 5.3, front - 1, 0, { w: 9, h: 1.6, color: '#f4f2ee', bg: '#2f56c8', size: 0.62, glow: false }); slab(0x2f56c8, 9.4, 2, 0.3, x, y + 4.5, front - 1.2);
+    slab(0x55525a, 1.2, 2.4, 0.16, x - 4, y, z - 7.04);
+    shopDoors.push({ shop: 'OFFICE', outside: { x: x + 3.6, z: front + 1.6, h: 0 } });
+    places.travel = { door: { x: x + 3.6, z: front + 1.6, h: 0 }, kerb: { x, z: c.z + 34, h: Math.PI / 2 }, back: { x: x - 4, z: z - 9 }, woods: { x: x + 2, z: z - 14 } };
   }
 
   // ================= Los Angeles (Heat) =================
@@ -2096,23 +2136,31 @@ export function buildWorld(scene) {
       q.block(0x14080f, 0.3, 2.4, 11, -5.6, -2, M.plain, 0, 1); q.glowPanel(0x4a6fd0, 10.4, 0.8, -5.42, -2, 2.4, Math.PI / 2);
       for (let n = 0; n < 20; n++) post([0xd9a520, 0x6fb0ff, 0xc8312a, 0xe9e2cf][n % 4], 0.05, 0.3 + (n % 3) * 0.05, q.X - 5.4, q.Y + 1.5 + (n % 2) * 0.7, q.Z - 7 + n * 0.52, 6);
       for (let n = 0; n < 7; n++) { post(0xc9cbd2, 0.04, 0.75, q.X - 3.1, q.Y, q.Z - 6.6 + n * 1.5); post(0x1c1c22, 0.22, 0.08, q.X - 3.1, q.Y + 0.75, q.Z - 6.6 + n * 1.5, 10); }
-      for (let n = 0; n < 4; n++) { const z = -6 + n * 3.4; q.block(0x8a1c2a, 1, 1.2, 1.1, 5, z - 1); q.block(0x8a1c2a, 1, 1.2, 1.1, 5, z + 1); q.block(0x1c1418, 0.9, 0.75, 0.8, 5, z, M.plain, 0); ball(0xffb060, 0.07, q.X + 5, q.Y + 0.85, q.Z + z, M.glow); }
+      for (let n = 0; n < 4; n++) { const z = -6 + n * 3.4; // a booth: two benches with high backs, a table, a candle
+        for (const s of [-1, 1]) { slab(0x8a1c2a, 1.1, 0.46, 0.62, q.X + 5, q.Y, q.Z + z + s * 0.92); slab(0x6a1420, 1.1, 1.2, 0.14, q.X + 5, q.Y, q.Z + z + s * 1.3); collide(q.X + 5, q.Z + z + s * 1.25, 1.1, 0.3, 1.2); }
+        slab(0x1c1418, 0.9, 0.06, 0.8, q.X + 5, q.Y + 0.72, q.Z + z); post(0x1c1418, 0.05, 0.72, q.X + 5, q.Y, q.Z + z); collide(q.X + 5, q.Z + z, 0.8, 0.7, 0.8); ball(0xffb060, 0.06, q.X + 5, q.Y + 0.84, q.Z + z, M.glow); }
+      for (let n = 0; n < 7; n++) { put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.11, 8).translate(q.X - 3.9, q.Y + 1.19, q.Z - 6.4 + n * 1.5), 0xcfe8ff); if (n % 2) put(M.plain, new THREE.CylinderGeometry(0.07, 0.07, 0.025, 10).translate(q.X - 4, q.Y + 1.14, q.Z - 6 + n * 1.5), 0x8d8a8e); } // glasses and ashtrays along the bar
       q.block(0x14080f, 5, 0.35, 2.6, 1.5, -7.3, M.plain, 0); post(0xc9cbd2, 0.02, 1.4, q.X + 1.5, q.Y + 0.35, q.Z - 7, 5); ball(0x1c1c22, 0.06, q.X + 1.5, q.Y + 1.8, q.Z - 7); // the stage and its microphone
       q.glowPanel(0xff3b4a, 2.4, 0.5, 1.5, -8.82, 2.6); q.glowPanel(0x6fb0ff, 0.5, 0.9, 5.82, 5.5, 2.2, -Math.PI / 2);
       sign(['COCKTAILS', 'LIVE JAZZ FRI · SAT'], q.X + 3.6, q.Y + 2.9, q.Z - 8.84, 0, { w: 3, h: 1, color: '#6fb0ff', bg: '#14101a', size: 0.6 });
       q.block(0x8d8a8e, 0.8, 1.6, 0.6, -5, 7.6); // the cigarette machine
-      q.light(-3, 3.2, -2, 0x6f8fff, 40, 14); q.light(4, 3.2, 0, 0xff5a4a, 30, 12); q.light(1.5, 3.2, -6.5, 0xffe2a6, 26, 9);
+      q.light(-3, 3.2, -2, 0x6f8fff, 40, 14); q.light(4, 3.2, 0, 0xff5a4a, 30, 12); q.light(1.5, 3.2, -6.5, 0xffe2a6, 26, 9); q.light(-4.4, 2.3, -1.4, 0xffd9a8, 16, 6); // and the lamps over the bar, on the faces
       clerk(q, -5, -2, Math.PI / 2, { shirt: 0x16161c, open: undefined, tie: 0x8a1c1c });
-      q.person(pick(PED_ROOM_LOOKS), -3.1, -5.1, -Math.PI / 2); q.person(pick(OLD_LOOKS), 5, 1.4, Math.PI, 'sit');
+      q.person(pick(PED_ROOM_LOOKS), -3.1, -5.1, -Math.PI / 2); q.person(pick(OLD_LOOKS), 5, 1.32, Math.PI, 'sit');
+      q.stools = [0, 1, 2, 3, 4, 5, 6].map(n => ({ x: q.X - 3.1, y: q.Y + 0.27, z: q.Z - 6.6 + n * 1.5 })); // for scenes: sit facing west, 0.2 up
     }
     { // a coffee shop out of the fifties: an island counter with stools all round, booths under the windows, orange and teal
       const q = rooms.DINER = room(22, 12, 3.6, { floor: M.paver, floorTint: 0xd9c7a0, wallTint: 0x8fd0c8, ceil: 0xfff1c9 });
       for (const [x, z, w, d] of [[0, -3.4, 9, 0.8], [0, -0.2, 9, 0.8], [-4.1, -1.8, 0.8, 2.4], [4.1, -1.8, 0.8, 2.4]]) { q.block(0xf08a3c, w, 1.05, d, x, z, M.plain, 0); slab(0xf4f4f0, w + 0.2, 0.06, d + 0.2, q.X + x, q.Y + 1.05, q.Z + z); }
       for (let n = 0; n < 6; n++) { post(0xc9cbd2, 0.04, 0.7, q.X - 3.3 + n * 1.32, q.Y, q.Z + 0.75); post(0x1f9c8f, 0.22, 0.1, q.X - 3.3 + n * 1.32, q.Y + 0.7, q.Z + 0.75, 10); }
       q.block(0xc9cbd2, 1.2, 1.5, 0.7, -2, -1.8, M.plain, 0); q.block(0xc9cbd2, 0.7, 1.3, 0.6, 2, -1.8, M.plain, 0); q.glowPanel(0xffe066, 0.5, 0.4, 2, -1.48, 1); // the grill hood and the coffee urns inside the island
-      for (let n = 0; n < 4; n++) slab(0xf4f4f0, 0.5, 0.4, 0.5, q.X - 3 + n * 0.8, q.Y + 1.11, q.Z - 0.2, M.plain);
+      for (let n = 0; n < 6; n++) { const sx = q.X - 3.3 + n * 1.32; put(M.plain, new THREE.CylinderGeometry(0.13, 0.11, 0.02, 12).translate(sx, q.Y + 1.12, q.Z - 0.05), 0xf4f4f0); put(M.plain, new THREE.CylinderGeometry(0.04, 0.035, 0.09, 8).translate(sx + 0.26, q.Y + 1.15, q.Z - 0.1), 0xf4f4f0); if (n % 2) slab(0xc9cbd2, 0.1, 0.12, 0.14, sx - 0.4, q.Y + 1.11, q.Z - 0.3); } // a setting at every stool
       for (let n = 0; n < 5; n++) { const x = -8.4 + n * 4.2; // booths along the window wall
-        q.block(0x1f9c8f, 0.7, 1.1, 1.6, x - 0.95, 4.6); q.block(0x1f9c8f, 0.7, 1.1, 1.6, x + 0.95, 4.6); slab(0xf4f4f0, 1, 0.07, 1.5, q.X + x, q.Y + 0.72, q.Z + 4.6); post(0xc9cbd2, 0.05, 0.72, q.X + x, q.Y, q.Z + 4.6); collide(q.X + x, q.Z + 4.6, 1, 1.5, 0.8);
+        for (const s of [-1, 1]) { slab(0x1f9c8f, 0.62, 0.46, 1.6, q.X + x + s * 0.98, q.Y, q.Z + 4.6); slab(0x178a7e, 0.14, 1.15, 1.6, q.X + x + s * 1.36, q.Y, q.Z + 4.6); collide(q.X + x + s * 1.3, q.Z + 4.6, 0.3, 1.6, 1.2); }
+        slab(0xf4f4f0, 1, 0.07, 1.5, q.X + x, q.Y + 0.72, q.Z + 4.6); post(0xc9cbd2, 0.05, 0.72, q.X + x, q.Y, q.Z + 4.6); collide(q.X + x, q.Z + 4.6, 0.9, 1.5, 0.8);
+        // what is on the table: plates, cups, the ketchup and the napkins
+        for (const s of [-1, 1]) { put(M.plain, new THREE.CylinderGeometry(0.13, 0.11, 0.02, 12).translate(q.X + x + s * 0.24, q.Y + 0.77, q.Z + 4.3), 0xf4f4f0); put(M.plain, new THREE.CylinderGeometry(0.04, 0.035, 0.09, 8).translate(q.X + x + s * 0.3, q.Y + 0.8, q.Z + 4.85), 0xf4f4f0); }
+        slab(0xc8312a, 0.06, 0.16, 0.06, q.X + x, q.Y + 0.76, q.Z + 5.2); slab(0xc9cbd2, 0.1, 0.12, 0.14, q.X + x + 0.12, q.Y + 0.76, q.Z + 5.2);
         if (n !== 2) q.window(x, 5.72, 3.4, 1.8, 1.9, Math.PI, 0xcfe0ff); }
       q.block(0xc9cbd2, 14, 2.2, 0.6, 0, -5.5, M.plain, 0); q.glowPanel(0xffb060, 8, 0.7, 0, -5.18, 1.6); // the kitchen pass
       sign(['COFFEE SHOP', 'BREAKFAST ALL DAY'], q.X - 7.5, q.Y + 2.8, q.Z - 5.84, 0, { w: 4.4, h: 1.2, color: '#ff8a5c', bg: '#14080f', size: 0.6 });
@@ -2120,8 +2168,10 @@ export function buildWorld(scene) {
       q.light(0, 3.2, -1.5, 0xfff0d0, 60, 16); q.light(-7, 3.2, 3, 0xffe2a6, 30, 12); q.light(7, 3.2, 3, 0xffe2a6, 30, 12);
       clerk(q, 0, -1.8, 0, { body: 'female', shirt: 0x8fd0c8, sleeves: undefined, tee: true, hair: 0x7a3b1a, hairMesh: 'long' });
       q.till = q.at(0, 1.5);
-      q.person(pick(PED_ROOM_LOOKS), 3.3, 0.9, Math.PI); q.person(pick(OLD_LOOKS), -9.35, 4.6, Math.PI / 2, 'sit');
-      q.counter = { x: 0, z: 1.1 }; q.booth = { x: -4.2, z: 4.6 }; // where a scene can stand at the counter, and the second booth
+      q.person(pick(PED_ROOM_LOOKS), 3.3, 0.95, Math.PI); q.person(pick(OLD_LOOKS), -8.4 - 0.98, 4.6, Math.PI / 2, 'sit');
+      // For scenes: the stools along the island's south side (sit facing north, 0.2 up), and the second booth's four seats.
+      q.stools = [0, 1, 2, 3, 4, 5].map(n => ({ x: q.X - 3.3 + n * 1.32, y: q.Y + 0.27, z: q.Z + 0.75 }));
+      q.boothSeats = { west: [0.36, -0.36].map(dz => ({ x: q.X - 4.2 - 0.98, y: q.Y, z: q.Z + 4.6 + dz })), east: [0.36, -0.36].map(dz => ({ x: q.X - 4.2 + 0.98, y: q.Y, z: q.Z + 4.6 + dz })) };
     }
     { // a walk-up place: a counter with the menu over it, a soda machine, plastic tables bolted to the floor
       const q = rooms.FASTFOOD = room(12, 10, 3.2, { floor: M.paver, floorTint: 0xe6d2b4, wallTint: 0xffe066, ceil: 0xf6f1e6 });
@@ -2281,7 +2331,7 @@ export function buildWorld(scene) {
 
   const SHOP_ROOM = { BAR: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'FASTFOOD', DONUTS: 'FASTFOOD', BURGERS: 'FASTFOOD', 'AUTO PARTS': 'PARTS', LAUNDRY: 'LAUNDRY', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
   const SHOP_NAME = { BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
-    HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the store', BOOKS: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office' };
+    HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the store', BOOKS: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office', SCHOOL: 'the hall' };
   places.rooms = rooms;
   places.parkedSpots = parkedSpots;
   // The story's diner is the one a short drive from Dr. Melfi's office; its bar is the one nearest the park.

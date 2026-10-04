@@ -77,10 +77,10 @@ async function theCrew(g) {
   await reach(g, truckstop.kerb, 'Drive to the <b>truck stop</b>.');
   await reach(g, truckstop.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
 
-  await roomScene(g, inRoom(DINER, [-3.8, 3.8], [-0.6, 0.4], 1.5, 1.1), q => ({
-    waingro: actor(g, 'waingro', roomSpot(q, -2, 1.05), NORTH),
-    cheritto: actor(g, 'cheritto', roomSpot(q, 0.7, 1.05), NORTH),
-    neil: actor(g, 'neil', roomSpot(q, -0.6, 2.2), NORTH),
+  await roomScene(g, inRoom(DINER, [-0.9, -1.3], [-1.32, 1.1], 1.45, 1.25), q => ({ // from behind the counter: three faces in a row
+    waingro: actor(g, 'waingro', q.stools[1], NORTH, 'sit'),
+    cheritto: actor(g, 'cheritto', q.stools[2], NORTH, 'sit'),
+    neil: actor(g, 'neil', roomSpot(q, -1.32, 1.9), NORTH),
   }), async cast => {
     await talk(g, [
       [WAINGRO, "You're the one they all wait for. They told me not to talk. I talk. It's how I know I'm awake.", cast.waingro],
@@ -251,9 +251,9 @@ async function bearerBonds(g) {
   g.hud.card();
   await reach(g, bar.kerb, 'Drive to <b>Nate\'s bar</b>.');
   await reach(g, bar.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
-  await roomScene(g, inRoom(BAR, [1.9, 0.8], [-2.2, -2], 1.5, 1.1), q => ({
-    nate: actor(g, 'nate', roomSpot(q, -2.9, -2.1), EAST),
-    neil: actor(g, 'neil', roomSpot(q, -1.3, -2.1), WEST),
+  await roomScene(g, inRoom(BAR, [-5.05, -0.5], [-3.1, -1.35], 1.5, 1.3), q => ({ // from behind the bar
+    nate: actor(g, 'nate', q.stools[3], WEST, 'sit'),
+    neil: actor(g, 'neil', q.stools[4], WEST, 'sit'),
   }), async cast => {
     await talk(g, [
       [NATE, 'The bonds belong to a man called Roger Van Zant. Offshore money, onshore lawyers.', cast.nate],
@@ -270,11 +270,11 @@ async function bearerBonds(g) {
   await reach(g, truckstop.kerb, 'The crew is at the <b>truck stop</b>. So is Waingro.');
   await reach(g, truckstop.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
 
-  await roomScene(g, inRoom(DINER, [-0.6, 1.6], [-4.6, 4.2]), q => ({
-    waingro: actor(g, 'waingro', roomSpot(q, -5.15, 4.6), EAST, 'sit'),
-    chris: actor(g, 'shiherlis', roomSpot(q, -2.4, 3.6), WEST),
-    cheritto: actor(g, 'cheritto', roomSpot(q, -6.2, 2.9), SOUTH),
-    neil: actor(g, 'neil', roomSpot(q, -4.2, 3.1), SOUTH),
+  await roomScene(g, inRoom(DINER, [-1.5, 2.3], [-4.3, 4.5], 1.7, 1.05), q => ({ // the crew in a booth; Neil comes to the end of the table
+    waingro: actor(g, 'waingro', q.boothSeats.west[0], EAST, 'sit'),
+    cheritto: actor(g, 'cheritto', q.boothSeats.west[1], EAST, 'sit'),
+    chris: actor(g, 'shiherlis', q.boothSeats.east[0], WEST, 'sit'),
+    neil: actor(g, 'neil', roomSpot(q, -4.2, 3.35), SOUTH),
   }), async cast => {
     await talk(g, [
       [WAINGRO, "So where's my end? I held them. I did what you said.", cast.waingro],
@@ -428,9 +428,9 @@ async function eady(g) {
   p.locked = false;
   await reach(g, kates.kerb, "Drive to <b>Kate's</b>.");
   await reach(g, kates.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
-  await roomScene(g, inRoom(DINER, [4, 3.6], [1.3, 0.5], 1.5, 1.1), q => ({
-    eady: actor(g, 'eady', roomSpot(q, 2, 1.05), NORTH),
-    neil: actor(g, 'neil', roomSpot(q, 0.7, 1.05), NORTH),
+  await roomScene(g, inRoom(DINER, [1.3, -1.3], [1.3, 1.1], 1.45, 1.25), q => ({ // two stools apart, then not
+    eady: actor(g, 'eady', q.stools[4], NORTH, 'sit'),
+    neil: actor(g, 'neil', q.stools[3], NORTH, 'sit'),
   }), async cast => {
     await talk(g, [
       [EADY, 'The steel book. You were in the store today.', cast.eady],
