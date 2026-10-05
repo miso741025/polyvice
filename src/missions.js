@@ -678,32 +678,58 @@ async function collections(g) {
 
   await g.wait(1.5);
   g.hud.card('Collections', 'Ocean Drive');
-  await phone(g, CHRIS, "T, it's me. That degenerate Mahaffey is down on the beach, working on his tan.");
-  await phone(g, CHRIS, 'He owes us ten grand and he walks around like he won the lottery.');
-  await say(g, TONY, "Stay on him. I'm on my way.");
+  await phone(g, CHRIS, "T, it's me. I found that degenerate Mahaffey. He owes us ten grand and he walks around like he won the lottery.");
+  await phone(g, CHRIS, "Pick me up on Ocean Drive. I'll show you where he spends our money.");
+  await say(g, TONY, "Stay there. I'm on my way.");
   g.hud.card();
 
   const chris = actor(g, 'christopher', ocean.chris, WEST);
-  const debtor = actor(g, 'mahaffey', ocean.debtor, EAST);
-  const d = { pos: new THREE.Vector3(ocean.debtor.x, 0, ocean.debtor.z), side: -1, caught: false };
+  await reach(g, ocean.marker, 'Meet Christopher on <b>Ocean Drive</b>.', { r: 7 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  if (!p.car) approach(g, chris, 2);
+  chris.group.rotation.y = toward(chris.group.position, p.pos);
+  frame(g, p.pos, chris.group.position, { dist: 5 });
+  await talk(g, [
+    [CHRIS, "He's not here no more. Every afternoon he's down the south end of the promenade, chatting up tourists. Three blocks.", chris],
+    [TONY, 'With my ten grand in his pocket. Get in.', p],
+    [CHRIS, 'He sees this car, T, he is gonna run. He always runs.', chris],
+  ]);
+  g.cam.fixed = null;
+  const tail = follower(g, chris, { gap: 2 });
+  p.locked = false;
+
+  // Three blocks down: Mahaffey, with company, not looking at the road.
+  const spotH = ocean.hangout;
+  const friend = makeHuman({ ...randomPedLook(), body: 'female' });
+  friend.group.position.set(spotH.x + 1.3, groundAt(spotH.x + 1.3, spotH.z + 0.3), spotH.z + 0.3); friend.group.rotation.y = WEST; friend.set('idle'); g.track(friend.group);
+  const debtor = actor(g, 'mahaffey', spotH, EAST, 'talk');
+  const d = { pos: new THREE.Vector3(spotH.x, 0, spotH.z), side: 1, caught: false };
   const alex = g.addNpc(debtor, { health: 90, cash: 0, stays: true }); // he can be hit, and he goes down rather than dies
   alex.die = () => { alex.health = 1; d.caught = true; };
   fistsOnly(g, true);
-
-  g.hud.objective('Meet Christopher on <b>Ocean Drive</b>.');
-  const m = g.addMarker(ocean.marker.x, ocean.marker.z, 7);
-  await g.until(() => near(p.pos, m, 9) || near(p.pos, d.pos, 22));
+  if (!p.car) { g.hud.objective('Get in the <b>car</b> with Christopher.'); await g.until(() => p.car); }
+  g.hud.objective('<b>Drive</b> down Ocean Drive. Mahaffey is at the south end of the promenade.');
+  const m = g.addMarker(ocean.approach.x, ocean.approach.z, 6);
+  await g.until(() => near(p.pos, d.pos, 34) || alex.health < 90);
   g.removeMarker(m);
 
+  // He looks up, sees the car, and is gone.
   const blip = { x: d.pos.x, z: d.pos.z, color: '#ff3b4a' };
   g.blips.push(blip);
+  say(g, CHRIS, "That's him, with the girl. ...He's seen the car. He's running!", 3.2);
+  debtor.set('idle'); debtor.group.rotation.y = toward(debtor.group.position, p.pos);
+  friend.group.rotation.y = toward(friend.group.position, p.pos);
+  g.hud.objective('Chase down <b>Mahaffey</b>. Run him over, or catch him and beat it out of him.');
+  const bolt = g.time + 0.9; // the moment it takes him to believe it
   g.updaters.push(dt => {
     if (d.caught) return false;
     if (debtor.busy) { d.pos.copy(debtor.group.position); return true; }
     let ax = d.pos.x - p.pos.x, az = d.pos.z - p.pos.z;
     const dist = Math.hypot(ax, az) || 1;
     if ((p.car && dist < 2.6 && Math.abs(p.car.speed) > 3) || alex.health < 40) { d.caught = true; return false; }
-    if (dist < 70) {
+    if (g.time < bolt) return true;
+    if (dist < 80) {
       ax /= dist; az /= dist;
       // Keep him running along the beach rather than pinned against the water.
       const minZ = bounds.minZ + 4, maxZ = bounds.maxZ - 4;
@@ -714,12 +740,10 @@ async function collections(g) {
       debtor.set('sprint');
       debtor.group.rotation.y = Math.atan2(ax, az);
       debtor.group.position.set(d.pos.x, groundAt(d.pos.x, d.pos.z), d.pos.z);
-    } else debtor.set('idle');
+    } else debtor.set('idle'); // out of sight, he stops to get his breath
     blip.x = d.pos.x; blip.z = d.pos.z;
     return true;
   });
-  g.hud.objective('Chase down <b>Mahaffey</b>. Run him over, or catch him and beat it out of him.');
-  say(g, CHRIS, "That's him by the water. He's seen us, he's running!", 3);
   await g.until(() => d.caught);
 
   g.blips.splice(g.blips.indexOf(blip), 1);
@@ -739,7 +763,6 @@ async function collections(g) {
   await passed(g, '$1,000', 1000);
 
   // Christopher catches up, with something on his mind.
-  const tail = follower(g, chris, { gap: 2 });
   const t0 = g.time;
   await g.until(() => near(tail.pos, p.pos, 3.2) || p.car || g.time - t0 > 25);
   await talk(g, [
@@ -753,6 +776,7 @@ async function collections(g) {
   chris.set('idle');
   await g.wait(3);
   dismiss(g, chris, debtor);
+  g.untrack(friend.group);
 }
 
 // ---------- 3. Family Business ----------

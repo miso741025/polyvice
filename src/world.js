@@ -2525,6 +2525,8 @@ export function buildWorld(scene) {
     marker: { x: nodeX(NX), z: oz },
     chris: { x: SHORE + 1.5, z: oz - 5 },
     debtor: { x: SHORE + 30, z: oz + 14 },
+    hangout: { x: SHORE + 3.2, z: blockCenter(NX - 1, 8).z + 6 }, // where Mahaffey passes his afternoons, three blocks down the promenade
+    approach: { x: nodeX(NX) + 3.6, z: blockCenter(NX - 1, 8).z - 22 },
   };
 
   // ----- Merge everything into one mesh per material -----
