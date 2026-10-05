@@ -774,6 +774,20 @@ export function buildWorld(scene) {
     for (const [lx, lz] of [[-0.3, -0.2], [0.3, -0.2], [0, 0.32]]) post(0x8a8d96, 0.025, 0.75, gx + lx, y, gz + lz, 4);
     slab(0xc79a6a, 1.6, 0.06, 0.8, gx - 1.6, y + 0.85, gz, M.wood, 1); for (const s of [-1, 1]) post(0x8a8d96, 0.04, 0.85, gx - 1.6 + s * 0.7, y, gz, 4);
 
+    // The patio is where the family eats and entertains: a long table under a string of lights, set for company.
+    const bx = c.x + 2.6, bz = c.z + 0.9;
+    slab(0x8a5a44, 4.2, 0.08, 0.9, bx, y + 0.76, bz, M.wood, 1); slab(0xf4f4f0, 4, 0.02, 0.8, bx, y + 0.84, bz); for (const s of [-1, 1]) for (const t of [-1, 1]) post(0x8a5a44, 0.04, 0.76, bx + s * 1.9, y, bz + t * 0.35, 4);
+    collide(bx, bz, 4.2, 0.9, 1);
+    for (let n = 0; n < 5; n++) { put(M.plain, new THREE.CylinderGeometry(0.2, 0.17, 0.05, 14).translate(bx - 1.6 + n * 0.8, y + 0.88, bz), 0xe9e2cf); ball([0xc8312a, 0xd9a520, 0x2f7d46, 0xb5523b, 0xf2a3b4][n], 0.13, bx - 1.6 + n * 0.8, y + 0.94, bz); } // platters
+    for (let n = 0; n < 4; n++) put(M.plain, new THREE.CylinderGeometry(0.04, 0.05, 0.28, 8).translate(bx + 1.75, y + 1, bz - 0.25 + n * 0.16), [0x2f5a3f, 0x8a1c2a, 0x2f5a3f, 0xd9a520][n]);
+    for (let n = 0; n < 6; n++) put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.09, 8).translate(bx - 1.9 + (n % 3) * 0.1, y + 0.9, bz + 0.2 + Math.floor(n / 3) * 0.1), 0xf4f4f0);
+    slab(0x2f56c8, 0.9, 0.5, 0.5, bx + 2.9, y, bz); slab(0xf4f4f0, 0.94, 0.08, 0.54, bx + 2.9, y + 0.5, bz); // the cooler
+    for (const s of [-1, 1]) post(0xf4f4f0, 0.05, 3, c.x - 1 + s * 6, y, c.z + 8.6, 5);
+    slab(0x1c1c22, 12, 0.02, 0.02, c.x - 1, y + 2.95, c.z + 8.6); for (let n = 0; n < 13; n++) { ball([0xffe066, 0xff5fd2, 0x49e0d0, 0xff8a5c][n % 4], 0.09, c.x - 7 + n, y + 2.86, c.z + 8.6, M.glow); if (n % 3 === 0) halo(c.x - 7 + n, y + 2.86, c.z + 8.6, 0xffd9a8, 4); }
+    for (const [lx, lz, t] of [[-6.2, 3, 0.5], [-6.4, 6, 0.2], [4.6, 7.4, -0.6]]) { // lawn chairs
+      put(M.plain, new THREE.BoxGeometry(0.6, 0.06, 0.6).rotateY(t).translate(c.x + lx, y + 0.42, c.z + lz), 0x49e0d0); put(M.plain, new THREE.BoxGeometry(0.6, 0.6, 0.06).translate(0, 0.3, -0.3).rotateY(t).translate(c.x + lx, y + 0.42, c.z + lz), 0x49e0d0);
+      for (const [fx, fz] of [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]]) post(0xc9cbd2, 0.02, 0.42, c.x + lx + fx, y, c.z + lz + fz, 4);
+    }
     places.home = {
       grill: { x: gx, z: gz + 1.1 }, patio: { x: c.x - 2, z: c.z + 5 }, drive: { x: c.x - 20.5, z: c.z + 20 },
       road: { x: c.x - 20.5, z: c.z + 34 }, guest: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 },
@@ -914,6 +928,8 @@ export function buildWorld(scene) {
     slab(0x3a3a44, 3.2, 0.5, 1.6, x, y + 8.02, pz);
     // Tables out front, where the crew sits.
     for (const tx of [-7, 6.5]) {
+      for (const s of [-1, 1]) put(M.plain, new THREE.CylinderGeometry(0.04, 0.035, 0.07, 8).translate(x + tx + s * 0.28, y + 0.84, front + 2.6 + s * 0.1), 0xf4f4f0); // espresso cups
+      slab(0xe9e2cf, 0.34, 0.015, 0.26, x + tx, y + 0.8, front + 2.84); put(M.plain, new THREE.CylinderGeometry(0.07, 0.07, 0.025, 10).translate(x + tx - 0.05, y + 0.81, front + 2.36), 0x8d8a8e); // the paper, an ashtray
       post(0xc9cbd2, 0.05, 0.75, x + tx, y, front + 2.6); post(0xffffff, 0.55, 0.05, x + tx, y + 0.75, front + 2.6, 12);
       for (const s of [-1, 1]) { slab(0xd8342c, 0.45, 0.06, 0.45, x + tx + s * 0.95, y + 0.45, front + 2.6); slab(0xd8342c, 0.06, 0.5, 0.45, x + tx + s * 1.16, y + 0.45, front + 2.6); post(0xc9cbd2, 0.03, 0.45, x + tx + s * 0.95, y, front + 2.6, 4); }
     }
@@ -931,6 +947,8 @@ export function buildWorld(scene) {
     collide(x, z, 20, 18, y + 6.4);
     const table = (tx, tz, shade) => {
       post(0xc9cbd2, 0.05, 0.75, tx, y, tz); post(0xffffff, 0.6, 0.05, tx, y + 0.75, tz, 12);
+      for (const s of [-1, 1]) { put(M.plain, new THREE.CylinderGeometry(0.14, 0.12, 0.02, 12).translate(tx + s * 0.3, y + 0.81, tz), 0xf4f4f0); put(M.plain, new THREE.CylinderGeometry(0.03, 0.02, 0.14, 8).translate(tx + s * 0.34, y + 0.87, tz + 0.26), 0x8a1c2a); } // plates, and a glass of red each
+      put(M.plain, new THREE.CylinderGeometry(0.04, 0.05, 0.26, 8).translate(tx, y + 0.93, tz - 0.2), 0x2f5a3f);
       for (const s of [-1, 1]) { slab(0x3a2418, 0.46, 0.06, 0.46, tx + s * 1, y + 0.46, tz); slab(0x3a2418, 0.06, 0.55, 0.46, tx + s * 1.22, y + 0.46, tz); post(0x3a2418, 0.03, 0.46, tx + s * 1, y, tz, 4); }
       if (shade) { post(0xffffff, 0.04, 2.5, tx, y, tz, 5); put(M.plain, new THREE.ConeGeometry(1.7, 0.6, 8).translate(tx, y + 2.7, tz), shade); }
     };
@@ -1663,6 +1681,7 @@ export function buildWorld(scene) {
     for (let n = 0; n < 16; n++) post([0xd9a520, 0x2f7d46, 0xc8312a, 0xe9e2cf, 0x8a5a2a][n % 5], 0.05, 0.32 + (n % 3) * 0.05, X + 0.3 + n * 0.5, Y + 1.55 + (n % 2) * 0.75, Z - 6.62, 6);
     for (let n = 0; n < 5; n++) { post(0xc9cbd2, 0.04, 0.75, X + 0.8 + n * 1.6, Y, Z - 4.2); post(0x8a1c3a, 0.22, 0.08, X + 0.8 + n * 1.6, Y + 0.75, Z - 4.2, 10); }
     slab(0x1c1c22, 0.26, 0.1, 0.2, X + 1.3, Y + 1.18, Z - 5.2); slab(0x1c1c22, 0.07, 0.07, 0.24, X + 1.3, Y + 1.3, Z - 5.2);
+    for (let n = 0; n < 5; n++) { put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.11, 8).translate(X + 0.55 + n * 1.6, Y + 1.24, Z - 4.9), 0xcfe8ff); if (n % 2 === 0) put(M.plain, new THREE.CylinderGeometry(0.07, 0.07, 0.025, 10).translate(X + 1.05 + n * 1.6, Y + 1.19, Z - 5), 0x8d8a8e); else slab(0x8a5a2a, 0.07, 0.24, 0.07, X + 1.1 + n * 1.6, Y + 1.18, Z - 5.05); } // glasses, ashtrays, a bottle here and there
     sign('Bada Bing!', X + 4, Y + 3.55, Z - 6.66, 0, { w: 5, h: 1.25, color: '#ff5fd2', bg: '#14080f', font: '"Mr Dafoe", cursive', size: 0.78 });
     // The stage, its pole, and a ring of neon.
     put(M.plain, new THREE.CylinderGeometry(2.4, 2.4, 0.5, 24).translate(X - 6.4, Y + 0.25, Z - 3.6), 0x14080f);
@@ -1692,6 +1711,7 @@ export function buildWorld(scene) {
       ambient: [georgie, dancer], inside: { x: X + 7, z: Z + 4, h: -Math.PI / 2 },
       y: Y, seats, table: { x: tx, y: Y, z: tz },
       bar: { x: X + 1.3, y: Y, z: Z - 4.0 }, tender: { x: X + 1.9, y: Y, z: Z - 6.1 }, stool: { x: X + 3.4, y: Y, z: Z - 3.6 },
+      stools: [2, 1, 3, 0, 4].map(n => ({ x: X + 0.8 + n * 1.6, y: Y + 0.27, z: Z - 4.2 })), // the middle ones first
       tableCam: { pos: new THREE.Vector3(X + 3.8, Y + 2.1, Z + 6.2), look: new THREE.Vector3(tx, Y + 0.95, tz) },
       barCam: { pos: new THREE.Vector3(X - 1.8, Y + 1.7, Z - 1.6), look: new THREE.Vector3(X + 1.9, Y + 1.25, Z - 5.4) },
     };

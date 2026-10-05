@@ -45,7 +45,7 @@ function direct(g, cast, withPlayer) {
     if (!move.player) pushOut(move.pos, 0.3);
   }
   const fixed = g.cam.fixed;
-  if (!fixed || all.length < 2) return;
+  if (!fixed) { audit(g, all, 0); return; }
   const hidden = (cx, cy, cz) => { // how many people are behind somebody else, seen from there
     let n = 0;
     for (const T of all) for (const O of all) {
@@ -57,7 +57,7 @@ function direct(g, cast, withPlayer) {
     return n;
   };
   const c0 = fixed.pos, L = fixed.look, r = Math.hypot(c0.x - L.x, c0.z - L.z), a0 = Math.atan2(c0.x - L.x, c0.z - L.z);
-  if (!hidden(c0.x, c0.y, c0.z)) return;
+  if (!hidden(c0.x, c0.y, c0.z)) { audit(g, all, 0); return; }
   let best = null;
   for (const lift of [0, 0.5, 1.1]) for (const turn of [0, 0.3, -0.3, 0.6, -0.6, 0.95, -0.95, 1.4, -1.4]) {
     if (!lift && !turn) continue;
@@ -67,6 +67,21 @@ function direct(g, cast, withPlayer) {
     if (!best || score < best.score) best = { x, y, z, score };
   }
   if (best && best.score < hidden(c0.x, c0.y, c0.z) * 10) fixed.pos.set(best.x, best.y, best.z);
+  audit(g, all, hidden(fixed.pos.x, fixed.pos.y, fixed.pos.z));
+}
+// A note of anything still wrong with a scene's staging, for whoever is checking them (window.game.audit).
+function audit(g, all, hiddenCount) {
+  const issues = [];
+  if (hiddenCount) issues.push(`${hiddenCount} hidden from the camera`);
+  for (let i = 0; i < all.length; i++) {
+    const A = all[i];
+    if (!A.seated && !A.player && blocked(A.pos.x, A.pos.z) && !colliders.some(c => c.thin && Math.abs(A.pos.x - (c.minX + c.maxX) / 2) < 1)) issues.push('someone stands inside something');
+    if (!A.seated && !A.player && Math.abs(A.pos.y - groundAt(A.pos.x, A.pos.z)) > 0.07) issues.push(`feet ${(A.pos.y - groundAt(A.pos.x, A.pos.z)).toFixed(2)} off the ground`);
+    for (let j = i + 1; j < all.length; j++) if (Math.hypot(all[j].pos.x - A.pos.x, all[j].pos.z - A.pos.z) < 0.55 && !(A.seated && all[j].seated)) issues.push('two people overlap');
+  }
+  const f = g.cam.fixed;
+  if (f && blocked(f.pos.x, f.pos.z) && f.pos.y < 3) issues.push('camera inside a wall');
+  if (issues.length) (g.audit ??= []).push(`${g.progress?.mission || '?'}: ${[...new Set(issues)].join('; ')}`);
 }
 
 // A run of dialogue: [speaker, text, who gestures]. The third entry is an actor, or g.player for the player.
@@ -140,6 +155,7 @@ export function actor(g, look, at, heading = 0, state = 'idle') {
   a.group.position.set(at.x, at.y ?? groundAt(at.x, at.z), at.z); // interior sets give their own height
   a.group.rotation.y = heading;
   a.set(state);
+  a.group.userData.human = a; // so a set can find the people standing on it
   g.track(a.group);
   return a;
 }
@@ -225,9 +241,16 @@ export function follower(g, human, { lead, gap = 1.6, pace = 3.6, runs = true } 
 // One character hits another, for a scene: a swing, a flinch, and the wait for both to settle.
 export async function punch(g, from, to, down = false) {
   const swing = from === g.player ? from.human : from;
+  // Step in first: a punch thrown from across the room hits nothing.
+  const fp = from === g.player ? from.pos : from.group.position, tp = to.group.position, dx = fp.x - tp.x, dz = fp.z - tp.z, d = Math.hypot(dx, dz);
+  if (d > 1.15 && swing.state !== 'sit') {
+    fp.x = tp.x + dx / d * 1.05; fp.z = tp.z + dz / d * 1.05;
+    if (from === g.player) from.heading = Math.atan2(-dx, -dz); else from.group.rotation.y = Math.atan2(-dx, -dz);
+    await g.wait(0.15);
+  }
   swing.play(Math.random() < 0.5 ? 'cross' : 'jab', 'idle', 1.3);
   await g.wait(0.3);
-  if (down) { to.after = null; to.set('down'); }
+  if (down) { to.after = null; to.set('down'); if (to.floorY !== undefined) to.group.position.y = to.floorY; }
   else if (to.state === 'sit') to.layer('nod', { once: true, speed: 0.6 }); // seated: the head snaps, the rest of him stays in the chair
   else to.play('hitHead', 'idle');
   await g.wait(0.9);
@@ -401,7 +424,17 @@ async function intoBing(g, text, setup, find = 'They are <b>inside</b>, by the b
   p.inside = g.places.doors.find(d => d.inside === bingRoom.inside);
   p.pos.set(bingRoom.inside.x, 0, bingRoom.inside.z); p.heading = g.cam.yaw = bingRoom.inside.h;
   g.cam.fixed = null;
+  const before = new Set(g.tracked);
   setup(club);
+  // Whoever is waiting sits at the bar, turned on a stool to face the room; a man with a gun out stays on his feet.
+  let n = 0;
+  for (const obj of g.tracked) {
+    const who = obj.userData?.human;
+    if (before.has(obj) || !who || !['idle', 'talk'].includes(who.state)) continue;
+    const st = bingRoom.stools[n++];
+    if (!st) break;
+    who.group.position.set(st.x, st.y, st.z); who.group.rotation.y = SOUTH; who.floorY = bingRoom.y; who.set('sit');
+  }
   await fade(g, 0, 0.5);
   p.locked = false;
   await reach(g, club.door, find, { r: 2.6, how: 'foot' });
@@ -1785,7 +1818,7 @@ async function fortySixLong(g) {
   });
   await cut(g, () => {
     place(g, club.door, WEST, bing.park);
-    shot(g, spot(club.door, 2.5, 5.6), spot(club.door, -1.4, -0.6), 1.9, 1.2);
+    shot(g, spot(club.door, 0.6, 5.2), spot(club.door, -0.4, -2.4), 1.9, 1.1);
   }, 0.4);
   await talk(g, [
     [TONY, 'A man is dead over a load of suits. A working man, driving a truck that pays my uncle.', p],
@@ -2768,7 +2801,7 @@ async function schoolyard(g) {
   dismiss(g, aj);
 
   const den = { X: houseRoom.inside.x - 2, Y: -0.1, Z: houseRoom.inside.z - 3.2, ambient: houseRoom.ambient };
-  await roomScene(g, inRoom(den, [1.8, 0.6], [5.2, -3.6], 1.5, 0.9), q => ({
+  await roomScene(g, inRoom(den, [2.7, -0.2], [5.2, -3.8], 1.5, 0.9), q => ({
     aj: actor(g, 'aj', roomSpot(q, 4.5, -4.1), SOUTH, 'sit'),
     meadow: actor(g, 'meadow', roomSpot(q, 5.8, -4.1), SOUTH, 'sit'),
   }), async cast => {
@@ -3482,9 +3515,9 @@ async function oneFace(g) {
   dismiss(g, meadow);
 
   const R = { X: houseRoom.inside.x - 2, Y: -0.1, Z: houseRoom.inside.z - 3.2, ambient: houseRoom.ambient };
-  await roomScene(g, inRoom(R, [-0.4, 1.2], [-3.6, -2.2], 1.5, 1.1), q => ({
-    carmela: actor(g, 'carmela', roomSpot(q, -5.4, -1.5), EAST),
-    tony: actor(g, 'tony', roomSpot(q, -2.2, -2.6), WEST),
+  await roomScene(g, inRoom(R, [-3.6, 2.6], [-4, -1.5], 1.6, 1.15), q => ({ // across the kitchen island
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    tony: actor(g, 'tony', roomSpot(q, -1.7, -1.5), WEST),
   }), async cast => {
     await talk(g, [
       [CARMELA, 'Your therapist called. Jennifer.', cast.carmela],
