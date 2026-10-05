@@ -25,7 +25,7 @@ WASD move / drive · Mouse look · Shift run · Space jump / handbrake · F ente
 - `src/people.js`: characters and the crew's outfits
 - `src/entities.js`: cars, traffic, pedestrians
 - `src/missions.js`: the story (episodes one to five, thirty-five missions), written as async scripts
-- `src/heat.js`: the Los Angeles story (Heat, chapter one)
+- `src/heat.js`: the Los Angeles story (Heat, chapters one to three)
 - `src/combat.js`: fists, the pistol, lock-on, health, the wanted level and the police
 - `src/sidejobs.js`: shakedowns, food, armour, confession and the motel, between missions
 - `src/audio.js`: all the sound, synthesised

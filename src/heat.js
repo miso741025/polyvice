@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { near, groundAt } from './grid.js';
+import { near, groundAt, nodeX, nodeZ, blockCenter } from './grid.js';
 import { makeLook, makeHuman, randomPedLook } from './entities.js';
 import {
   say, talk, phone, fade, cut, titleCard, passed, actor, dismiss, spot, toward, place, approach, shot, frame, reach, follower,
-  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, quarry, tail, NORTH, SOUTH, EAST, WEST,
+  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, quarry, tail, careful, smoke, lying, NORTH, SOUTH, EAST, WEST,
 } from './missions.js';
 
 // Los Angeles. The story follows the plot of Michael Mann's "Heat"; every line of dialogue is written for the game.
@@ -1035,9 +1035,664 @@ async function coffee(g) {
   await passed(g, 'Chapter two complete', 2000);
 }
 
+// ========== Chapter Three: The Bank ==========
+// The preparation is shared out: Trejo finds the car, Chris fetches the rifles, Cheritto cuts the alarm. Each is played as the man who does it.
+
+const KELSO = 'Kelso', BREEDAN = 'Breedan';
+// Become one of the crew (or a detective) for a mission.
+function asCrew(g, look, at, heading) {
+  const p = g.player;
+  if (p.car) g.leaveCar();
+  const who = makeLook(look);
+  g.setPlayer(who);
+  place(g, at, heading);
+  return who;
+}
+// A car a mission puts somewhere; it is cleared away with the mission.
+function prop(g, at, heading, color, kind) {
+  const car = g.spawnCar(at.x, at.z, heading, color, kind);
+  car.driverless = true; car.mission = true; car.speed = 0;
+  return car;
+}
+// Somebody with a gun and a grudge, marked on the radar until he is down.
+function gunmen(g, look, spots, { health = 100, damage = 8 } = {}) {
+  const p = g.player;
+  return spots.map(at => {
+    const h = typeof look === 'string' ? actor(g, look, at, toward(at, p.pos)) : (() => { const x = makeHuman(look()); x.group.position.set(at.x, groundAt(at.x, at.z), at.z); g.track(x.group); return x; })();
+    h.arm(true);
+    const npc = g.addNpc(h, { ai: 'shooter', health, damage, cash: 0 }), blip = { x: at.x, z: at.z, color: '#ff3b4a' };
+    g.blips.push(blip);
+    g.updaters.push(() => { blip.x = npc.pos.x; blip.z = npc.pos.z; if (!npc.dead) return true; const k = g.blips.indexOf(blip); if (k >= 0) g.blips.splice(k, 1); return false; });
+    return npc;
+  });
+}
+// A passer-by with a part in it.
+function extra(g, at, heading, state = 'idle') {
+  const who = makeHuman(randomPedLook());
+  who.group.position.set(at.x, at.y ?? groundAt(at.x, at.z), at.z); who.group.rotation.y = heading; who.set(state);
+  g.track(who.group);
+  return who;
+}
+// Take fighters out of the scene, dead or not.
+function clearOut(g, npcs) { for (const n of npcs) { n.dead = true; dismiss(g, n.human); } npcs.length = 0; }
+const allDead = (g, npcs) => g.until(() => npcs.every(n => n.dead));
+// One of the crew with a carbine: he walks with the player, and stands and fires at whoever of `foes()` is near.
+function rifleman(g, human, foes, opts) {
+  const f = follower(g, human, opts), at = human.group.position;
+  let next = 0;
+  human.arm('rifle');
+  g.updaters.push(() => {
+    if (!f.on) return false;
+    if (f.hurt) return true;
+    if (g.player.car) { f.stay = false; return true; }
+    let foe = null, best = 36;
+    for (const n of foes()) { const d = Math.hypot(n.pos.x - at.x, n.pos.z - at.z); if (!n.dead && d < best) { best = d; foe = n; } }
+    f.stay = !!foe && near(at, g.player.pos, 30);
+    if (!f.stay) return true;
+    human.group.rotation.y = toward(at, foe.pos);
+    if (g.time > next) { next = g.time + 1.1 + Math.random() * 0.9; human.play('shoot', 'aim'); g.sfx?.shot(); foe.hurt(17, at); }
+    else if (!human.busy) human.set('aim');
+    return true;
+  });
+  return f;
+}
+// The carbine, loaded, with enough for a long morning.
+function carbine(g, rounds = 240) {
+  const p = g.player;
+  g.giveWeapon('rifle');
+  const have = p.mag.rifle + p.ammo.rifle;
+  if (have < rounds) g.giveAmmo('rifle', rounds - have);
+  g.setWeapon('rifle');
+}
+
+// ---------- 1. Kelso ----------
+// A man in the hills who reads other people's wires, and three jobs handed out in the yard.
+
+async function kelso(g) {
+  const { home, yard } = g.places, p = g.player, HOUSE = g.places.rooms.HOUSE, his = houseNear(g, home.road, 560);
+
+  await g.wait(1);
+  g.hud.card('Kelso', 'The hills');
+  await phone(g, NATE, 'Kelso will see you. He lives up top and he does not come down, so you go to him. Bring nothing. He sweeps his visitors.');
+  g.hud.card();
+  await reach(g, his.kerb, "Drive to <b>Kelso's house</b>.");
+  await reach(g, his.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  await roomScene(g, inRoom(HOUSE, [-1.2, -3], [-4.4, 0], 1.5, 1), q => ({
+    kelso: actor(g, 'kelso', roomSpot(q, -3.6, 0.35), NORTH, 'sit'),
+    neil: actor(g, 'neil', roomSpot(q, -6.3, -1.3), EAST, 'sit'),
+  }), async cast => {
+    await talk(g, [
+      [KELSO, 'Everything a bank says to another bank goes through the air, and the air is free. I only listen.', cast.kelso],
+      [NEIL, 'What did you hear?', cast.neil],
+      [KELSO, 'Far East Pacific, the downtown branch. Thursday they hold twelve point one million in cash for one morning. It arrives at nine. It is gone by one.', cast.kelso],
+      [NEIL, 'Alarms.', cast.neil],
+      [KELSO, 'Three lines out of the building. One to the police, one to the alarm company, one spare. I will give you the boxes. Cut them the night before and the system reports itself healthy for twenty hours.', cast.kelso],
+      [NEIL, 'And your end?', cast.neil],
+      [KELSO, 'Ten per cent, and you never climb this hill again.', cast.kelso],
+      [NEIL, 'Done. To both.', cast.neil],
+    ]);
+  });
+  place(g, his.door, his.door.h ?? SOUTH);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await reach(g, yard.gate, 'Drive to the <b>yard</b>. The crew is waiting.');
+  p.locked = true;
+  let chris, cheritto, trejo;
+  await cut(g, () => {
+    place(g, spot(yard.shed, -3, 2.4), EAST, { x: yard.shed.x - 9, z: yard.shed.z + 7, h: EAST });
+    chris = actor(g, 'shiherlis', spot(yard.shed, 0.2, 1.4), WEST);
+    cheritto = actor(g, 'cheritto', spot(yard.shed, -1, 4.6), NORTH);
+    trejo = actor(g, 'trejo', spot(yard.shed, -3.4, 5.2), NORTH);
+    frame(g, p.pos, chris.group.position, { dist: 5.2 });
+  });
+  await talk(g, [
+    [NEIL, 'Thursday. A bank, in daylight, in and out in under three minutes. Everybody carries a piece of the week before it.', p],
+    [NEIL, 'Trejo. The car. Four doors, grey or beige, big trunk. Nothing a witness can describe. New plates on it before it comes here.', p],
+    [TREJO, 'There is long-term parking at the airport. Nobody misses a car there for a week.', trejo],
+    [NEIL, 'Chris. Three carbines and magazines. There is a man at the freight terminal who sells out of a container. Pay what he asks and count nothing in front of him.', p],
+    [CHRIS, 'And if he asks twice?', chris],
+    [NEIL, 'Then he is not selling. Come home with the case either way.', p],
+    [NEIL, 'Michael. Wednesday night you cut three lines behind the bank. There is a guard who walks the building. He never sees you.', p],
+    [CHERITTO, 'I am a big man, Neil.', cheritto],
+    [NEIL, 'Then be a big man standing very still.', p],
+  ]);
+  await cut(g, () => { dismiss(g, chris, cheritto, trejo); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 2. Wheels ----------
+// Played as Trejo. The right car out of the airport lot, other plates, and a sedan in the mirror that will not go away.
+
+async function wheels(g) {
+  const { airport, parts, yard } = g.places, p = g.player, neil = p.human;
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'Trejo took a bus to the airport with a slim piece of steel up his sleeve, like a man going to meet a flight.');
+  asCrew(g, 'trejo', spot(airport.kerb, -18, 5), EAST);
+  const row = spot(airport.kerb, 0, 2.2);
+  const loud = prop(g, spot(row, -8, 0), EAST, 0xd8342c, 'coupe'), box = prop(g, spot(row, 2, 0), EAST, 0xf4f4f0, 'van'), grey = prop(g, spot(row, 12, 0), EAST, 0x8d8a8e, 'sedan');
+  g.cam.fixed = null;
+  g.hud.fade(0, 1.2);
+  await titleCard(g, 'Wheels', 'Long-term parking, Los Angeles International');
+  await say(g, TREJO, 'Four doors. Grey or beige. Nothing anybody can describe.');
+  p.locked = false;
+  g.hud.objective('<b>Take the right car</b> from the row. Remember what Neil asked for.');
+  for (;;) {
+    await g.until(() => p.car);
+    const car = p.car;
+    if (car === grey) break;
+    g.leaveCar();
+    await say(g, TREJO, car === loud ? 'Red, two doors. Every witness on the street would know it by lunchtime.' : car === box ? 'A white van outside a bank. I might as well paint the word on the side.' : 'Not this one. From the row.', 3);
+  }
+  grey.driverless = false;
+  await say(g, TREJO, 'A grey sedan. I have already forgotten what it looks like.', 2.6);
+  const reset = () => { g.enterCar(grey); grey.pos.set(row.x + 12, 0, row.z); grey.heading = EAST; grey.speed = 0; };
+  const drive = careful(g, 'Bodywork', 'A grey car with a crushed wing is a car people describe. He put it back and found another just like it.', reset);
+  await drive.to(parts.kerb, '<b>Drive</b> it to the parts store for plates. Not a scratch.', grey);
+  drive.stop();
+  p.locked = true;
+  await cut(g, () => {
+    grey.speed = 0;
+    g.leaveCar();
+    const back = { x: grey.pos.x - Math.sin(grey.heading) * 3, z: grey.pos.z - Math.cos(grey.heading) * 3 };
+    place(g, back, grey.heading);
+    shot(g, spot(back, 3.4, 2.6), back, 1.2, 0.6);
+  });
+  p.human.play('kneel', 'idle');
+  await say(g, '', 'Two plates off a wreck behind the store, eight screws, ninety seconds. The car now belonged to a dentist in Fresno.');
+  g.cam.fixed = null;
+  g.enterCar(grey);
+  // Somebody behind him.
+  const unit = prop(g, { x: grey.pos.x - Math.sin(grey.heading) * 34, z: grey.pos.z - Math.cos(grey.heading) * 34 }, grey.heading, 0x23232b, 'sedan');
+  dispatch(g, unit, unit.pos, p.pos, 15); unit.nav.goal = p.pos;
+  const blip = { x: unit.pos.x, z: unit.pos.z, color: '#ff3b4a' }; g.blips.push(blip);
+  let clear = 0;
+  g.updaters.push(dt => {
+    if (!g.blips.includes(blip)) return false;
+    blip.x = unit.pos.x; blip.z = unit.pos.z;
+    clear = Math.hypot(unit.pos.x - p.pos.x, unit.pos.z - p.pos.z) > 150 ? clear + dt : 0;
+    return true;
+  });
+  p.locked = false;
+  await say(g, TREJO, 'Black sedan. It was at the airport. It is here.', 2.6);
+  g.hud.objective('<b>Drive.</b> Lose the black sedan before you go anywhere near the yard.');
+  await g.until(() => clear > 2.5);
+  g.blips.splice(g.blips.indexOf(blip), 1);
+  g.removeCar(unit);
+  g.hud.objective();
+  await phone(g, NEIL, 'You had a tail and you lost it. Then they have your face. Put the car in the yard and stay away from the rest of us until Thursday.');
+  await reach(g, yard.gate, '<b>Drive</b> the car to the yard.', { how: 'car', r: 8 });
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'He backed it under the shed, wiped the wheel, and walked four blocks before he let himself look over his shoulder.');
+  g.removeCar(grey); g.removeCar(loud); g.removeCar(box);
+  g.pardon();
+  asNeil(g, neil);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'The car');
+}
+
+// ---------- 3. Hardware ----------
+// Played as Chris. A man who sells out of a container, and asks twice.
+
+async function hardware(g) {
+  const { containers, yard, home } = g.places, p = g.player, neil = p.human, theirs = houseNear(g, home.road, 420);
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'Chris took the envelope Neil gave him, and did not open it, and did not go by way of Vegas.');
+  asCrew(g, 'shiherlis', spot(theirs.kerb, 0, theirs.kerb.h > 0 ? -3 : 3), theirs.kerb.h);
+  const truck = prop(g, theirs.kerb, theirs.kerb.h, 0x3b4a66, 'pickup');
+  g.cam.fixed = null;
+  g.hud.fade(0, 1.2);
+  await titleCard(g, 'Hardware', 'Thirty thousand dollars in an envelope');
+  p.locked = false;
+  g.hud.objective('Get in the <b>pickup</b>.');
+  await g.until(() => p.car);
+  truck.driverless = false;
+  await reach(g, containers.gate, '<b>Drive</b> to the freight terminal.', { how: 'car', r: 8 });
+  p.locked = true;
+  let seller;
+  const men = [], c = containers.centre;
+  await cut(g, () => {
+    place(g, spot(c, 0, 5), NORTH, containers.gate);
+    seller = extra(g, spot(c, 0, 2.6), SOUTH);
+    men.push(extra(g, spot(c, -5, 0), EAST), extra(g, spot(c, 5.5, -1), WEST));
+    shot(g, spot(c, 4.6, 7), spot(c, 0, 3.6), 1.6, 1.3);
+  });
+  await talk(g, [
+    ['Seller', 'Three carbines, short barrels, nine magazines. Army never noticed. Thirty, like the man said.', seller],
+    [CHRIS, 'It is all there.', p],
+    ['Seller', 'I believe you. That is the problem. A man who pays thirty without a word would have paid fifty. So it is fifty.', seller],
+    [CHRIS, 'He told me you might ask twice.', p],
+    ['Seller', 'And what did he say to do?', seller],
+    [CHRIS, 'Come home with the case.', p],
+  ]);
+  g.cam.fixed = null;
+  g.noHeat = true;
+  seller.arm(true);
+  const foes = [g.addNpc(seller, { ai: 'shooter', health: 90, damage: 8 }), ...men.map(h => { h.arm(true); return g.addNpc(h, { ai: 'shooter', health: 70, damage: 7 }); })];
+  g.setWeapon('pistol');
+  p.locked = false;
+  g.hud.objective('<b>Shoot your way out.</b>');
+  await allDead(g, foes);
+  await reach(g, spot(c, 0, 0.6), 'Grab the <b>case</b>.', { r: 1.6, how: 'foot' });
+  p.locked = true;
+  p.human.play('pickup', 'idle');
+  await g.wait(1);
+  carbine(g, 90);
+  await say(g, '', 'Three carbines in a moulded case, and the envelope back in his jacket. Neil would want both explained.');
+  p.locked = false;
+  g.noHeat = false;
+  g.hud.objective('Get in the <b>pickup</b> again.');
+  await g.until(() => p.car);
+  await reach(g, yard.gate, '<b>Drive</b> the case to the yard.', { how: 'car', r: 8 });
+  p.locked = true;
+  let cheritto;
+  await cut(g, () => {
+    place(g, spot(yard.shed, -3, 2.4), EAST, { x: yard.shed.x - 9, z: yard.shed.z + 7, h: EAST });
+    cheritto = actor(g, 'cheritto', spot(yard.shed, -0.4, 2.2), WEST);
+    frame(g, p.pos, cheritto.group.position, { dist: 4.4 });
+  });
+  await talk(g, [
+    [CHERITTO, 'You got them. And you have still got the envelope. Slick, what did you do?', cheritto],
+    [CHRIS, 'He asked twice.', p],
+    [CHERITTO, 'Three guns and the money back. Neil is going to be angry at you and he will not be able to say why.', cheritto],
+  ]);
+  await fade(g, 1, 1);
+  dismiss(g, cheritto, seller, ...men);
+  g.removeCar(truck);
+  g.pardon();
+  asNeil(g, neil);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Three carbines', 3000);
+}
+
+// ---------- 4. The Line ----------
+// Played as Cheritto. Wednesday night, three boxes on the back of a bank, and a guard with a torch.
+
+async function theLine(g) {
+  const { bank } = g.places, p = g.player, neil = p.human, c = blockCenter(8, 6);
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'Wednesday, eleven at night. Michael Cheritto, two hundred and forty pounds, in a telephone company jacket.');
+  g.setNight(1);
+  asCrew(g, 'cheritto', spot(bank.kerb, -3, -2.5), NORTH);
+  const van = prop(g, bank.kerb, EAST, 0xf4f4f0, 'van');
+  // The guard walks the building, round and round.
+  const loop = [[-26, 16], [-26, -27], [26, -27], [26, 16]].map(([x, z]) => ({ x: c.x + x, z: c.z + z }));
+  const guard = actor(g, 'guard', loop[1], EAST, 'walk');
+  let leg = 1, caught = false, on = true;
+  const blip = { x: guard.group.position.x, z: guard.group.position.z, color: '#ff3b4a' }; g.blips.push(blip);
+  g.updaters.push(dt => {
+    if (!on) return false;
+    const at = guard.group.position, to = loop[(leg + 1) % 4], dx = to.x - at.x, dz = to.z - at.z, d = Math.hypot(dx, dz);
+    if (d < 0.5) leg = (leg + 1) % 4;
+    else if (!p.locked || p.cutting) { at.x += dx / d * 1.7 * dt; at.z += dz / d * 1.7 * dt; at.y = groundAt(at.x, at.z); guard.group.rotation.y = Math.atan2(dx, dz); }
+    blip.x = at.x; blip.z = at.z;
+    if (near(at, p.pos, p.cutting ? 12 : 7) && !p.car && (!p.locked || p.cutting)) caught = true;
+    return true;
+  });
+  const boxes = [[-21.2, -8], [3, -24.2], [21.2, 2]].map(([x, z]) => ({ x: c.x + x, z: c.z + z }));
+  g.cam.fixed = null;
+  g.hud.fade(0, 1.2);
+  await titleCard(g, 'The Line', 'Far East Pacific, 11:10 p.m.');
+  await say(g, CHERITTO, 'Three boxes. West wall, back wall, east wall. And one old man with a torch, who is red on the radar.');
+  p.locked = false;
+  let n = 0;
+  while (n < boxes.length) {
+    const at = boxes[n], m = g.addMarker(at.x, at.z, 1.6);
+    g.hud.objective(`Cut the <b>alarm line</b> at box ${n + 1} of 3. Keep away from the <b>guard</b>.`);
+    caught = false;
+    await g.until(() => caught || (near(p.pos, at, 2) && !p.car));
+    if (!caught) {
+      p.locked = true; p.cutting = true;
+      p.human.play('kneel', 'idle');
+      const t0 = g.time;
+      await g.until(() => caught || g.time - t0 > 2.6);
+      p.cutting = false;
+      if (!caught) { g.sfx?.click(); n++; p.locked = false; g.removeMarker(m); if (n < 3) await say(g, CHERITTO, n === 1 ? 'One. The police will hear nothing.' : 'Two. Nor the alarm company.', 2.2); continue; }
+    }
+    g.removeMarker(m);
+    p.locked = true;
+    await say(g, 'Guard', 'Hey. You. Phone company does not work nights.', 2.6);
+    await fade(g, 1, 0.8);
+    await say(g, '', 'He talked his way back to the van, and the job waited a night it did not have. Again.');
+    place(g, spot(bank.kerb, -3, -2.5), NORTH);
+    guard.group.position.set(loop[1].x, 0, loop[1].z); leg = 1;
+    n = 0;
+    await fade(g, 0, 0.8);
+    p.locked = false;
+  }
+  on = false; p.cutting = false;
+  g.blips.splice(g.blips.indexOf(blip), 1);
+  await say(g, CHERITTO, 'Three. As far as anybody knows, this bank is fine.', 2.6);
+  g.hud.objective('Get in the <b>van</b>.');
+  await g.until(() => p.car);
+  g.hud.objective();
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'He drove home under the limit and ate a second dinner. Thursday was nine hours away.');
+  dismiss(g, guard);
+  g.removeCar(van);
+  asNeil(g, neil);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'The alarm');
+}
+
+// ---------- 5. Far East Pacific ----------
+// Thursday. Trejo telephones, a cook takes off his apron, and four men walk into a bank.
+
+async function farEastPacific(g) {
+  const { kates, bank } = g.places, p = g.player, DINER = g.places.rooms.DINER, BANK = g.places.rooms.BANK;
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', "Thursday, ten in the morning. Three of them sat in Kate's with coffee none of them was drinking. The fourth was late.");
+  if (p.car) g.leaveCar();
+  g.setNight(0);
+  place(g, kates.door, SOUTH);
+  await roomScene(g, inRoom(DINER, [-1.5, 2.3], [-4.3, 4.5], 1.7, 1.05), q => ({
+    neil: actor(g, 'neil', q.boothSeats.west[0], EAST, 'sit'),
+    chris: actor(g, 'shiherlis', q.boothSeats.east[0], WEST, 'sit'),
+    cheritto: actor(g, 'cheritto', q.boothSeats.east[1], WEST, 'sit'),
+    breedan: actor(g, 'breedan', roomSpot(q, -0.8, -1.1), SOUTH),
+  }), async cast => {
+    g.hud.card('Far East Pacific', "Kate's, 10:04 a.m.");
+    await g.wait(2.5);
+    g.hud.card();
+    await phone(g, TREJO, 'Neil. They are on me. Two cars since six this morning, they do not even hide it. I cannot shake them and I will not bring them to you. I am out.');
+    await talk(g, [
+      [CHERITTO, 'So we have no driver.', cast.cheritto],
+      [CHRIS, 'So we go home. We do it another Thursday.', cast.chris],
+      [NEIL, 'There is no other Thursday. The money is there for three more hours.', cast.neil],
+    ]);
+    g.cam.fixed = inRoom(DINER, [2.6, 1.9], [-0.8, -0.5], 1.5, 1.2).cam;
+    cast.neil.set('idle'); cast.neil.group.position.set(DINER.X - 0.9, DINER.Y, DINER.Z + 1.5); cast.neil.group.rotation.y = NORTH;
+    await say(g, '', 'The man at the grill had a face Neil knew from a yard in Folsom. He drove then. He was flipping eggs now, for a manager who took a cut of his wages.');
+    await talk(g, [
+      [NEIL, 'Donald. You still drive?', cast.neil],
+      [BREEDAN, 'I drive a spatula. Eight months out. I have a parole officer and a woman who thinks I am finished with all that.', cast.breedan],
+      [NEIL, 'I have a car outside and a job that takes eleven minutes. Your end is more than this place will pay you in thirty years. Yes or no. I need it now.', cast.neil],
+      [BREEDAN, '...Eleven minutes.', cast.breedan],
+      [NEIL, 'Eleven minutes.', cast.neil],
+      [BREEDAN, 'Let me turn off the grill.', cast.breedan],
+    ]);
+  });
+  // The grey car, at the kerb.
+  const car = prop(g, kates.kerb, kates.kerb.h, 0x8d8a8e, 'sedan');
+  place(g, spot(kates.door, 0, 2), SOUTH);
+  const chris = actor(g, 'shiherlis', spot(kates.door, -1.4, 3), SOUTH), cheritto = actor(g, 'cheritto', spot(kates.door, 1.4, 3.2), SOUTH), breedan = actor(g, 'breedan', spot(kates.door, 0.4, 4.4), SOUTH);
+  const crew = [follower(g, chris), follower(g, cheritto, { gap: 2.4 }), follower(g, breedan, { gap: 3.2 })];
+  carbine(g);
+  p.armour = 100; g.hud.armour(100);
+  await fade(g, 0, 1);
+  p.locked = false;
+  g.hud.objective('Get in the <b>grey sedan</b>.');
+  await g.until(() => p.car === car);
+  car.driverless = false;
+  await say(g, NEIL, 'Donald takes the wheel at the bank and keeps it running. Vests on. Nobody says a name.');
+  await reach(g, bank.kerb, '<b>Drive</b> to the bank.', { how: 'car', r: 8 });
+  await reach(g, bank.door, 'Masks. <b>Go in.</b>', { r: 2, how: 'foot' });
+
+  // Inside.
+  p.locked = true;
+  await fade(g, 1, 0.5);
+  for (const f of crew) f.on = false;
+  breedan.group.visible = false;
+  g.sfx?.door();
+  const q = BANK, at = (x, z) => roomSpot(q, x, z);
+  p.inside = g.places.doors.find(d => d.inside === q.inside);
+  const teller = q.clerk;
+  for (const a of q.ambient) a.group.visible = a === teller;
+  p.pos.set(q.inside.x, 0, q.inside.z); p.heading = g.cam.yaw = NORTH;
+  const setAt = (h, s, heading, state) => { h.group.position.set(s.x, s.y, s.z); h.group.rotation.y = heading; h.group.visible = true; h.set(state); };
+  setAt(chris, at(2.2, 4.6), NORTH, 'aim'); chris.arm('rifle');
+  setAt(cheritto, at(-2.2, 4.6), NORTH, 'aim'); cheritto.arm('rifle');
+  const people = [[-6, 1.6, NORTH], [-3.4, 1.7, NORTH], [-0.8, 1.6, NORTH], [8, 4.4, WEST], [-9.6, -1, EAST]].map(([x, z, h]) => extra(g, at(x, z), h));
+  const manager = actor(g, 'manager', at(6, 2.05), NORTH, 'sit');
+  const guards = [actor(g, 'guard', at(-9.5, 3.4), EAST), actor(g, 'guard', at(4, -1.2), SOUTH)];
+  g.cam.fixed = null;
+  g.noHeat = true;
+  await fade(g, 0, 0.5);
+  cheritto.play('shoot', 'aim'); g.sfx?.shot(); g.hud.flash('#ffffff', 0.15);
+  await say(g, CHERITTO, 'Everybody on the floor! Faces on the marble! This money is insured, so nobody here needs to be brave!', 4);
+  for (const who of [...people, teller]) who.set('crouch');
+  const guns = { ...p.weapons };
+  Object.assign(p.weapons, { pistol: false, smg: false, shotgun: false, rifle: false }); g.setWeapon('fist');
+  const foes = guards.map(h => g.makeEnemy(h, { health: 55, damage: 8, cash: 0 }));
+  p.locked = false;
+  g.hud.objective('Two <b>guards</b> are still standing. Put them on the floor. <b>No shots.</b>');
+  await g.until(() => foes.every(n => n.dead));
+  Object.assign(p.weapons, guns); g.setWeapon('rifle');
+  await reach(g, at(6, 3.5), 'Get the vault <b>keys</b> from the manager.', { r: 1.5, how: 'foot' });
+  p.locked = true;
+  p.heading = NORTH;
+  shot(g, at(8.6, 4.6), at(6, 2.4), 1.5, 1.1); g.cam.fixed.pos.y = q.Y + 1.5; g.cam.fixed.look.y = q.Y + 1.1;
+  await talk(g, [
+    [NEIL, 'The keys are on your belt. You will hand them to me with your left hand. Nobody is going to hurt you.', p],
+    ['Manager', 'There is a time lock. It does not open until...', manager],
+    [NEIL, 'It opened at nine, for the delivery. I know your morning better than you do. Left hand.', p],
+  ]);
+  manager.layer?.('nod', { once: true });
+  g.cam.fixed = null;
+  p.locked = false;
+  setAt(chris, at(7.6, -5.4), NORTH, 'idle');
+  await reach(g, q.vault, 'Open the <b>vault</b>.', { r: 1.7, how: 'foot' });
+  p.locked = true;
+  p.heading = NORTH;
+  for (let n = 1; n <= 3; n++) {
+    g.hud.objective(`Filling the bags: <b>${n} of 3</b>`);
+    p.human.play('pickup', 'idle'); chris.play('pickup', 'idle');
+    await g.wait(2.2);
+    g.sfx?.cash();
+    if (n === 1) await say(g, CHRIS, 'It is all here. Shrink-wrapped. Twelve point one.', 2.4);
+    if (n === 2) await say(g, '', 'Across town a telephone rang on a desk in Major Crimes. A man who would not give his name gave a bank, and a time, and hung up.');
+  }
+  g.hud.objective();
+  await say(g, CHERITTO, 'Two minutes ten! Walk!', 2);
+  setAt(chris, at(1.6, 4.4), SOUTH, 'idle'); setAt(cheritto, at(-1.6, 4.4), SOUTH, 'idle');
+  p.locked = false;
+  g.hud.objective('<b>Walk out.</b> Front door. Do not run.');
+  const m = g.addMarker(q.inside.x, q.inside.z, 1.6);
+  await g.until(() => !p.inside || near(p.pos, q.inside, 2));
+  g.removeMarker(m);
+  g.hud.objective();
+  p.locked = true;
+  await fade(g, 1, 0.6);
+  for (const a of q.ambient) a.group.visible = true;
+  teller.set('idle');
+  p.inside = null;
+  dismiss(g, chris, cheritto, breedan, manager, ...guards, ...people);
+  g.removeCar(car);
+  place(g, bank.plaza, SOUTH);
+  g.noHeat = false;
+  g.cam.fixed = null;
+  await say(g, '', 'Three men came out of the bank into the sunshine with a bag on each shoulder, at a walk. It was the last quiet second of the day.');
+  await fade(g, 0, 0.8);
+  p.locked = false;
+  await passed(g, '$12,100,000', 0);
+}
+
+// ---------- 6. The Street ----------
+// The police are already there. Four blocks of downtown, in daylight, with a bag on each shoulder.
+
+async function theStreet(g) {
+  const { bank, bar } = g.places, p = g.player, neil = p.human, BAR = bar.room, c = blockCenter(8, 6);
+  const S = nodeZ(7), X8 = nodeX(8), X7 = nodeX(7);
+
+  p.locked = true;
+  await fade(g, 1, 0.6);
+  if (p.car) g.leaveCar();
+  g.setNight(0);
+  g.noHeat = true;
+  g.pardon();
+  place(g, bank.plaza, SOUTH);
+  carbine(g, 300);
+  p.health = 100; g.hud.health(100); p.armour = 100; g.hud.armour(100);
+  const foes = [], all = () => foes;
+  const chris = actor(g, 'shiherlis', spot(bank.plaza, -1.8, 0.6), SOUTH), cheritto = actor(g, 'cheritto', spot(bank.plaza, 1.8, 0.8), SOUTH);
+  const car = prop(g, { x: c.x - 3, z: S - 3.6 }, WEST, 0x8d8a8e, 'sedan');
+  const blocks = [prop(g, { x: c.x + 34, z: S - 3 }, 0.5, 0xf4f4f0, 'police'), prop(g, { x: c.x + 36, z: S + 3.4 }, -0.4, 0xf4f4f0, 'police')];
+  const men = [rifleman(g, chris, all), rifleman(g, cheritto, all, { gap: 2.6 })];
+  shot(g, spot(bank.plaza, -5, 9), spot(bank.plaza, 14, 12), 1.6, 1.4);
+  g.hud.fade(0, 0.8);
+  await titleCard(g, 'The Street', 'Downtown, 11:32 a.m.');
+  await say(g, '', 'Across the street a man in a black suit was running toward them with a rifle, and he was not alone.');
+  await say(g, HANNA, 'Police! Put the bags down!', 2);
+  g.cam.fixed = null;
+  foes.push(...gunmen(g, 'cop', [{ x: c.x + 30, z: S - 5 }, { x: c.x + 31, z: S + 1 }, { x: c.x + 33, z: S + 5.5 }, { x: c.x + 22, z: S + 6.5 }], { health: 90 }));
+  p.locked = false;
+  g.hud.objective('Police, from the east. <b>Get to the grey sedan.</b>');
+  const mk = g.addMarker(car.pos.x, car.pos.z, 3.5);
+  await g.until(() => p.car === car);
+  g.removeMarker(mk);
+  g.hud.objective();
+
+  // Forty yards. Then the windscreen.
+  p.locked = true;
+  car.driverless = true;
+  const crash = { x: X8 - 22, z: S - 3.4 };
+  shot(g, { x: X8 - 30, z: S + 5 }, { x: c.x - 20, z: S - 3 }, 1.4, 1.2);
+  let rolling = true;
+  g.updaters.push(dt => { if (!rolling) return false; car.pos.x -= 15 * dt; car.sync(); if (car.pos.x <= crash.x + 3) rolling = false; return true; });
+  for (let k = 0; k < 5; k++) { g.sfx?.shot(); await g.wait(0.22); }
+  await say(g, '', 'Breedan got them forty yards. Then the windscreen went white, and he was dead with his foot still on the pedal.', 4);
+  rolling = false;
+  await cut(g, () => {
+    clearOut(g, foes);
+    car.pos.set(crash.x, 0, crash.z); car.heading = WEST + 0.6; car.speed = 0; car.sync();
+    g.leaveCar();
+    place(g, spot(crash, 2.6, 3), WEST);
+    for (const [k, f] of men.entries()) { f.pos.set(crash.x + 4 + k * 1.6, 0, crash.z + 4.4 + k); f.car = null; f.human.group.visible = true; }
+    g.sfx?.crash(1);
+  }, 0.4);
+  const steam = smoke(g, { x: crash.x - 2, z: crash.z }, 1.6);
+  const body = lying(g, 'breedan', spot(crash, 0.6, -2.2), EAST);
+  g.cam.fixed = null;
+  p.locked = false;
+  await say(g, NEIL, 'On foot! West! Stay off the middle of the street!', 2.4);
+
+  // Two roadblocks on the way to the freeway.
+  const stage = async (spots, cars, text) => {
+    for (const [x, z, h] of cars) blocks.push(prop(g, { x, z }, h, 0xf4f4f0, 'police'));
+    const wave = gunmen(g, 'cop', spots.map(([x, z]) => ({ x, z })), { health: 90 });
+    foes.push(...wave);
+    g.hud.objective(text);
+    await allDead(g, wave);
+    g.hud.objective();
+    p.health = Math.min(100, p.health + 40); g.hud.health(p.health);
+  };
+  await stage([[X8 - 62, S - 4], [X8 - 60, S + 2], [X8 - 66, S + 5.5], [X8 - 40, S - 6.5]], [[X8 - 64, S - 2.5, 0.5], [X8 - 65, S + 3.6, -0.5]], 'A roadblock. <b>Break it.</b> The red marks on the radar are police.');
+  await say(g, CHERITTO, 'More of them behind us! Keep going!', 2);
+  await stage([[X7 - 30, S - 4.5], [X7 - 28, S + 4.5], [X7 - 34, S], [X7 + 4, S - 28], [X7 - 4, S + 26]], [[X7 - 32, S - 2.8, 0.6]], 'Another line of them at the next corner. <b>Break it.</b>');
+
+  // Chris is hit. Cheritto goes his own way.
+  p.locked = true;
+  const corner = { x: X7 - 14, z: S + 2 };
+  await cut(g, () => {
+    for (const f of men) { f.on = false; }
+    place(g, spot(corner, 0, 2), NORTH);
+    chris.group.position.set(corner.x - 1.2, groundAt(corner.x, corner.z), corner.z - 0.4); chris.group.rotation.y = SOUTH; chris.after = null; chris.set('crouch');
+    cheritto.group.position.set(corner.x + 2, groundAt(corner.x, corner.z), corner.z - 0.6); cheritto.group.rotation.y = WEST; cheritto.set('idle');
+    frame(g, p.pos, chris.group.position, { dist: 4.4, height: 1.4, lift: 0.9 });
+  }, 0.5);
+  await talk(g, [
+    [CHRIS, 'I am hit. Collarbone. I cannot lift the arm.', chris],
+    [NEIL, 'You can walk. That is all you have to do.', p],
+    [CHERITTO, 'Three of us together is one target. I go north with my bag and they have to choose.', cheritto],
+    [NEIL, 'Michael.', p],
+    [CHERITTO, 'Tell Elaine I had a good time. Go.', cheritto],
+  ]);
+  await fade(g, 1, 0.6);
+
+  // The other side of the street: Hanna, and the man who went north.
+  g.setPlayer(makeLook('hanna'));
+  const hanna = p.human;
+  place(g, { x: X7 + 4, z: S - 10 }, NORTH);
+  carbine(g, 300);
+  cheritto.group.position.set(X7 + 2, groundAt(X7 + 2, S - 44), S - 44); cheritto.group.rotation.y = NORTH; cheritto.arm('rifle');
+  const runner = g.addNpc(cheritto, { ai: 'flee', health: 170, damage: 10 }), mark = quarry(g, runner);
+  g.cam.fixed = null;
+  await fade(g, 0, 0.6);
+  await say(g, DRUCKER + ' (radio)', 'Vincent! The big one has gone north on his own, with a bag!', 2.6);
+  p.locked = false;
+  g.hud.objective('<b>Cheritto</b> is running north. <b>Stop him.</b>');
+  await g.until(() => runner.dead);
+  mark();
+  g.hud.objective();
+  p.locked = true;
+  shot(g, spot(p.pos, 1.5, 2), runner.pos, 1.6, 0.5);
+  await say(g, '', 'Hanna stood over him for as long as it took to be sure, which was no time at all, and then he turned back toward the shooting.');
+  await fade(g, 1, 0.6);
+  g.setPlayer(neil); g.scene.remove(hanna.group);
+  neil.group.visible = true;
+  dismiss(g, cheritto);
+
+  // Neil, and a man who can only walk.
+  place(g, spot(corner, 0, 2), WEST);
+  carbine(g, 240);
+  const wagon = prop(g, { x: X7 - 44, z: S + 3.6 }, WEST, 0xb9a58a, 'suv');
+  chris.arm(false); chris.set('idle');
+  const limp = follower(g, chris, { gap: 1.4, pace: 2.6, runs: false });
+  limp.pos.set(corner.x - 1.2, 0, corner.z - 0.4);
+  g.cam.fixed = null;
+  await fade(g, 0, 0.6);
+  const last = gunmen(g, 'cop', [[X7 - 70, S - 4], [X7 - 74, S + 4], [X7 + 30, S]].map(([x, z]) => ({ x, z })), { health: 90 });
+  foes.push(...last);
+  p.locked = false;
+  g.hud.objective('Get to the <b>station wagon</b> up the street, and bring Chris.');
+  const mw = g.addMarker(wagon.pos.x, wagon.pos.z, 3.5);
+  await g.until(() => p.car === wagon && near(limp.pos, wagon.pos, 9));
+  g.removeMarker(mw);
+  g.hud.objective();
+  wagon.driverless = false;
+  clearOut(g, foes);
+  g.noHeat = false;
+  g.heat(3);
+  await say(g, CHRIS, 'Where is Michael?', 2);
+  await say(g, NEIL, 'Keep your hand on it. Press.', 2.2);
+  await reach(g, bar.kerb, "Lose them. <b>Drive</b> Chris to Nate's.", { how: 'car', r: 8 });
+  g.pardon();
+  p.locked = true;
+  limp.on = false;
+  await roomScene(g, inRoom(BAR, [-5.05, -0.5], [-3.1, -1.35], 1.5, 1.3), q => ({
+    nate: actor(g, 'nate', q.stools[2], WEST, 'sit'),
+    chris: actor(g, 'shiherlis', q.stools[3], WEST, 'sit'),
+    neil: actor(g, 'neil', q.stools[4], WEST, 'sit'),
+  }), async cast => {
+    await talk(g, [
+      [NATE, 'There is a doctor on his way who owes me. It went through clean. He will keep the arm.', cast.nate],
+      [CHRIS, 'Charlene. Somebody has to tell Charlene.', cast.chris],
+      [NATE, 'Nobody goes near Charlene. They will be sitting on her by tonight.', cast.nate],
+      [NEIL, 'They were across the street before we came out, Nate. Not a patrol car. Him. Somebody gave them the bank and the hour.', cast.neil],
+      [NATE, 'Trejo was the one who dropped out.', cast.nate],
+      [NEIL, 'Trejo was the one who told me why. I want to hear him say it again, to my face.', cast.neil],
+      [NATE, 'You have twelve million dollars and a way out of the country. Take it.', cast.nate],
+      [NEIL, 'Michael is on a pavement with a sheet over him. Donald never got his eleven minutes. I will take it after.', cast.neil],
+    ]);
+    await say(g, '', 'Two dead, one hurt, and somebody had sold them. Neil sat in the dark of the bar and began, for the first time in his life, to turn around.');
+  }, { night: 1 });
+  steam?.stop?.();
+  dismiss(g, chris, body);
+  for (const b of [...blocks, car, wagon]) if (g.cars.includes(b)) g.removeCar(b);
+  asNeil(g, neil);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Chapter three complete', 25000);
+}
+
 export const HEAT = [
   { name: 'Chapter One', title: 'Heat', missions: [theCrew, armoured, bearerBonds, slick, eady, theDriveIn],
     titles: ['The Crew', 'Armoured', 'Bearer Bonds', 'Slick', 'Eady', 'The Drive-In'] },
   { name: 'Chapter Two', title: 'Surveillance', missions: [eyesOn, theNextOne, preciousMetals, counterSurveillance, justine, coffee],
     titles: ['Eyes On', 'The Next One', 'Precious Metals', 'Counter-Surveillance', 'Justine', 'Coffee'] },
+  { name: 'Chapter Three', title: 'The Bank', missions: [kelso, wheels, hardware, theLine, farEastPacific, theStreet],
+    titles: ['Kelso', 'Wheels', 'Hardware', 'The Line', 'Far East Pacific', 'The Street'] },
 ];

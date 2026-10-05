@@ -2386,6 +2386,7 @@ export function buildWorld(scene) {
   places.bar = { door: barDoor.outside, kerb: barDoor.kerb, room: rooms.BAR };
   const gunDoor = nearestShop('GUNS', places.home.spawn, 60, 400);
   places.guns = { door: gunDoor.outside, kerb: gunDoor.kerb };
+  if (LA) { const d = nearestShop('PARTS', places.airport.kerb, 150, 420); places.parts = { door: d.outside, kerb: d.kerb }; } // where a stolen car gets other plates
   places.gunShops = shopDoors.filter(d => d.shop === 'GUNS').map(d => d.outside).filter((d, n) => n % 3 === 0); // the map marks a few; the rest are found by their neon
 
   places.chop = { x: SHORE + 18, z: bounds.minZ + 16 }; // the north end of the beach, where stolen cars get stripped

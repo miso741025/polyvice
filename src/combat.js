@@ -14,8 +14,9 @@ export const WEAPONS = {
   pistol: { name: 'Pistol', dmg: 55, range: 70, rate: 0.38, mag: 12, spread: 0.015, price: 350, ammoPrice: 60, pack: 24 },
   smg: { name: 'SMG', dmg: 22, range: 55, rate: 0.085, mag: 30, spread: 0.05, auto: true, price: 1200, ammoPrice: 140, pack: 60 },
   shotgun: { name: 'Shotgun', dmg: 34, range: 26, rate: 0.95, mag: 6, spread: 0.11, pellets: 6, price: 850, ammoPrice: 90, pack: 12 },
+  rifle: { name: 'Carbine', dmg: 36, range: 95, rate: 0.11, mag: 30, spread: 0.028, auto: true, price: 2600, ammoPrice: 180, pack: 60 },
 };
-const GUNS = ['pistol', 'smg', 'shotgun'];
+const GUNS = ['pistol', 'smg', 'shotgun', 'rifle'];
 const cashMat = new THREE.MeshLambertMaterial({ color: 0x4fd36a });
 const bandMat = new THREE.MeshLambertMaterial({ color: 0xe9e2cf });
 const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.8 });
@@ -23,7 +24,7 @@ const flashMat = new THREE.MeshBasicMaterial({ color: 0xffd080, transparent: tru
 
 export function installCombat(g, { scene, hud, peds, cars, keys }) {
   const p = g.player;
-  Object.assign(p, { health: 100, armour: 0, weapon: 'fist', weapons: { fist: true, pistol: true, smg: false, shotgun: false }, mag: { pistol: 12, smg: 0, shotgun: 0 }, ammo: { pistol: 48, smg: 0, shotgun: 0 }, hitAt: -9, dying: false, reloading: 0 });
+  Object.assign(p, { health: 100, armour: 0, weapon: 'fist', weapons: { fist: true, pistol: true, smg: false, shotgun: false, rifle: false }, mag: { pistol: 12, smg: 0, shotgun: 0, rifle: 0 }, ammo: { pistol: 48, smg: 0, shotgun: 0, rifle: 0 }, hitAt: -9, dying: false, reloading: 0 });
   g.npcs = []; g.wanted = 0;
   const pickups = [], effects = [], cops = { cars: [], officers: [] };
   let swing = 0, lastShot = -9, lastHit = -9, calm = 0, lastAttack = -9, sprintUntil = -9;
@@ -389,6 +390,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     if (g.consume('Digit2')) g.setWeapon('pistol');
     if (g.consume('Digit3')) g.setWeapon('smg');
     if (g.consume('Digit4')) g.setWeapon('shotgun');
+    if (g.consume('Digit5')) g.setWeapon('rifle');
     if (g.consume('KeyR')) g.reload();
     if (g.consume('Mouse2') || g.consume('KeyQ') || g.consume('Tab')) g.lockOn(!!lock);
     if (g.consume('Mouse0') || g.consume('KeyE') || (keys.Mouse0 && WEAPONS[p.weapon].auto)) g.attack();

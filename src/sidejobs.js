@@ -95,7 +95,7 @@ export function installSideJobs(g) {
     if (!lines.length) return;
     if (g.consume('KeyF')) {
       if (food && p.health < 100 && g.cash >= food[1]) { g.addMoney(-food[1]); p.health = Math.min(100, p.health + 50); hud.health(p.health); g.sfx?.cash(); say('', 'That hit the spot.', 2); }
-      else if (key === 'GUNS') gunCounter('Guns and ammunition');
+      else if (key === 'GUNS') gunCounter('Guns and ammunition', ['pistol', 'smg', 'shotgun', 'rifle']);
       else if (key === 'PAWN') gunCounter('Under the counter', ['pistol']);
       else if (key === 'CHURCH' && g.wanted > 0 && g.cash >= 100) { g.addMoney(-100); g.pardon(); g.sfx?.passed(); say('Father Phil', 'Go in peace, Anthony. And perhaps drive slower.', 3); }
       else if (key === 'MOTEL' && g.cash >= 40) { g.addMoney(-40); p.health = 100; hud.health(100); g.pardon(); g.clockOffset = (g.clockOffset || 0) + 60 * 8; hud.fade(1, 0.4); g.wait(1).then(() => hud.fade(0, 0.8)).catch(() => {}); say('', 'Eight hours, no questions.', 3); }

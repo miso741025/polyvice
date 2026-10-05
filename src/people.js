@@ -925,6 +925,7 @@ export function makeHuman(opts = {}) {
   gun('pistol', [[0.024, 0.034, 0.17, 0, 0.02, 0.05, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3]]);
   gun('smg', [[0.03, 0.05, 0.3, 0, 0.02, 0.1, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3], [0.024, 0.13, 0.03, 0, -0.05, 0.1, 0], [0.018, 0.018, 0.1, 0, 0.03, 0.3, 0], [0.03, 0.03, 0.12, 0, 0.02, -0.1, 0, woodMat]]);
   gun('shotgun', [[0.028, 0.028, 0.5, 0, 0.03, 0.22, 0], [0.034, 0.034, 0.22, 0, 0.0, 0.2, 0, woodMat], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3, woodMat], [0.03, 0.07, 0.18, 0, -0.01, -0.12, 0.15, woodMat]]);
+  gun('rifle', [[0.03, 0.05, 0.36, 0, 0.02, 0.12, 0], [0.018, 0.018, 0.26, 0, 0.03, 0.42, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3], [0.026, 0.15, 0.04, 0, -0.06, 0.14, 0.25], [0.028, 0.06, 0.24, 0, 0.0, -0.2, 0], [0.012, 0.03, 0.03, 0, 0.06, 0.3, 0]]);
   const pistol = guns.pistol;
 
   const mixer = new THREE.AnimationMixer(root), actions = {};
@@ -1107,6 +1108,9 @@ Object.assign(LOOKS, {
   guard: { shirt: 0x9fb0c4, sleeves: 'long', tucked: true, badge: true, pants: 0x23232b, hair: 0x4a3324, hairMesh: 'buzzed', hat: 'cap', hatColor: 0x23232b, bulk: 1.1 },
   justine: { body: 'female', jacket: 0x23232b, shirt: 0xf5f0e6, pants: 0x23232b, tucked: true, hair: 0x2a1a14, hairMesh: 'long', hairScale: [1.04, 1, 1.04], age: 0.3 },
   lauren: { body: 'female', shirt: 0xc9b6f2, tee: true, pants: 0x3b6ea8, shoes: 0xf2efe8, hair: 0x7a3b1a, hairMesh: 'long', height: 0.9, head: 1.1 },
+  breedan: { shirt: 0xf4f4f0, tee: true, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', dark: true, bulk: 1.22, age: 0.5, stubble: 0.3, face: { jaw: 0.2, brow: 0.3 } },
+  kelso: { shirt: 0x8a6a4a, sleeves: 'long', pattern: 'plaid', pants: 0x4a4038, shoes: 0x6a4a34, hair: 0xb9b6b0, hairMesh: 'long', hairScale: [1, 0.88, 1], beard: 0xb9b6b0, beardMesh: true, glasses: 'clear', bulk: 1.1, age: 0.9 },
+  manager: { jacket: 0x3d4658, shirt: 0xf4f4f4, tie: 0x8a1c1c, tucked: true, pants: 0x3d4658, hair: 0x6f6a66, hairStyle: 'balding', glasses: 'clear', bulk: 1.1, age: 0.6 },
   snitch: { shirt: 0xffe066, tee: true, jacket: 0x5b53c9, pants: 0x23232b, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'buzzed', dark: true, chain: true, bulk: 0.95, goatee: 0x141110 },
 });
 export const makeLook = name => makeHuman(LOOKS[name]);
