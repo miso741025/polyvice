@@ -15,7 +15,18 @@ export class Hud {
   ammo(text) { $('ammo').textContent = text || ''; }
   aim(on) { $('aim').classList.toggle('on', on); }
   wasted(on) { $('wasted').classList.toggle('on', on); }
-  money(n) { $('money').textContent = '$' + String(n).padStart(8, '0'); }
+  // The counter, and beside it what just came in or went out: "+$1,000" in green, "-$500" in red, for a few seconds.
+  money(n) {
+    const el = $('money'), was = this.cash;
+    this.cash = n;
+    el.textContent = '$' + String(n).padStart(8, '0');
+    const gain = $('gain'), diff = n - (was ?? 0);
+    if (!gain || !diff) return;
+    gain.textContent = (diff > 0 ? '+$' : '-$') + Math.abs(diff).toLocaleString('en-US');
+    gain.className = diff > 0 ? 'on' : 'on loss';
+    clearTimeout(this.gainTimer);
+    this.gainTimer = setTimeout(() => { gain.className = ''; }, 3200);
+  }
   clock(seconds) {
     const m = (18 * 60 + 30 + Math.floor(seconds)) % 1440;
     $('clock').textContent = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');

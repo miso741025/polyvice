@@ -20,6 +20,9 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
 }
 #clock { top: 24px; font-size: 34px; color: #f4f1e6; }
 #money { top: 62px; font-size: 44px; color: #3fd16b; }
+#gain { position: absolute; right: 250px; top: 68px; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 34px; letter-spacing: 2px; color: #8dffa8; text-shadow: 3px 3px 0 #000; opacity: 0; transform: translateY(8px); transition: opacity .35s, transform .35s; white-space: nowrap; }
+#gain.on { opacity: 1; transform: none; }
+#gain.loss { color: #ff6b6b; }
 
 #wanted { position: absolute; right: 32px; top: 112px; font-size: 30px; letter-spacing: 4px; color: #ffd34d; text-shadow: 2px 2px 0 #000; opacity: .35; transition: opacity .3s; }
 #wanted.on { opacity: 1; }
