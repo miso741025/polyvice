@@ -255,6 +255,25 @@ export async function punch(g, from, to, down = false) {
   else to.play('hitHead', 'idle');
   await g.wait(0.9);
 }
+// Someone to be run down: a blip on the radar and the map, and an arrow over his head that shows through walls,
+// both following him until `stop()` is called.
+export function quarry(g, npc) {
+  const blip = { x: npc.pos.x, z: npc.pos.z, color: '#ffd23f' };
+  g.blips.push(blip);
+  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.6, 4).rotateX(Math.PI), new THREE.MeshBasicMaterial({ color: 0xffd23f, depthTest: false, transparent: true, opacity: 0.95 }));
+  arrow.renderOrder = 6;
+  g.track(arrow);
+  let on = true;
+  g.updaters.push(() => {
+    if (!on) return false;
+    blip.x = npc.pos.x; blip.z = npc.pos.z;
+    const far = Math.hypot(npc.pos.x - g.player.pos.x, npc.pos.z - g.player.pos.z), k = 1 + far * 0.07; // bigger the farther he is, so it can be seen across a block
+    arrow.scale.setScalar(k);
+    arrow.position.set(npc.pos.x, npc.pos.y + 2.3 + k * 0.4 + Math.sin(g.time * 5) * 0.12, npc.pos.z); arrow.rotation.y = g.time * 2;
+    return true;
+  });
+  return () => { on = false; g.untrack(arrow); const i = g.blips.indexOf(blip); if (i >= 0) g.blips.splice(i, 1); };
+}
 // Only fists for a while: for beatings that must not end in a shooting.
 export function fistsOnly(g, on) {
   const p = g.player;
@@ -3448,8 +3467,10 @@ async function theInterview(g) {
   g.noHeat = true;
   fistsOnly(g, true);
   await say(g, '', 'Through the window: a desk, a rack of brochures, and a back door swinging shut.', 2.6);
-  g.hud.objective('<b>Chase down</b> Febby. He is going for the trees.');
+  const found = quarry(g, runner);
+  g.hud.objective('<b>Chase down</b> Febby: he went out the back. Follow the <b>yellow arrow</b>.');
   await g.until(() => runner.health < 500);
+  found();
   g.removeNpc(febby);
   const foe = g.makeEnemy(febby, { health: 150, damage: 10, cash: 0 });
   foe.die = () => { foe.health = 1; foe.human.after = null; foe.human.set('down'); foe.ai = null; foe.stays = true; };

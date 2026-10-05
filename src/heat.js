@@ -3,7 +3,7 @@ import { near, groundAt } from './grid.js';
 import { makeLook, makeHuman, randomPedLook } from './entities.js';
 import {
   say, talk, phone, fade, cut, titleCard, passed, actor, dismiss, spot, toward, place, approach, shot, frame, reach, follower,
-  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, NORTH, SOUTH, EAST, WEST,
+  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, quarry, NORTH, SOUTH, EAST, WEST,
 } from './missions.js';
 
 // Los Angeles. The story follows the plot of Michael Mann's "Heat"; every line of dialogue is written for the game.
@@ -373,8 +373,10 @@ async function slick(g) {
   runner.threat = p.pos.clone();
   fistsOnly(g, true);
   g.noHeat = true;
-  g.hud.objective('He has seen you. <b>Chase down</b> the informant.');
+  const found = quarry(g, runner);
+  g.hud.objective('He has seen you. <b>Chase down</b> the informant: follow the <b>yellow arrow</b>.');
   await g.until(() => runner.health < 400 || runner.dead);
+  found();
   g.hud.objective();
   g.removeNpc(snitch);
   fistsOnly(g, false);
