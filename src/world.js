@@ -15,7 +15,7 @@ const HOTELS = LA ? ['HOTEL', 'PALMS', 'SUNSET', 'PACIFIC', 'WILSHIRE', 'ROOSEVE
 const CURB = 0.14;                       // sidewalk height
 const FLOOR = 3.4, GROUND = 4.2, BAY = 4; // storey height, shopfront height, width of one window bay
 const SPECIAL_LA = { '15,1': 'neil', '8,6': 'bank', '2,9': 'drivein', '6,9': 'kates', '3,5': 'truckstop', '10,3': 'hospital', '8,3': 'precinct', '6,2': 'depository', '10,8': 'bookstore',
-  '12,4': 'park', '4,11': 'park', '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '2,7': 'yard', '13,8': 'church' };
+  '12,4': 'park', '4,11': 'park', '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '2,7': 'yard', '13,8': 'church', '1,10': 'containers' };
 const SPECIAL_VICE = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
   '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel',
   '13,0': 'college', '12,2': 'travel' }; // episode five: up the coast
@@ -648,6 +648,7 @@ export function buildWorld(scene) {
     else if (kind === 'depository') buildDepository(c);
     else if (kind === 'bookstore') { buildBookstore(c); lots(c, i, [1, 1]); }
     else if (kind === 'apron' || kind === 'terminal' || kind === 'hangar') buildAirport(c, kind);
+    else if (kind === 'containers') buildContainers(c);
     else if (kind === 'college') buildCollege(c);
     else if (kind === 'travel') { buildTravel(c); lots(c, i, [-1, 1]); }
     else if (kind === 'home') buildHome(c);
@@ -1595,6 +1596,29 @@ export function buildWorld(scene) {
     sign(['HENNESSY BOOKS', 'ART · ARCHITECTURE · DESIGN'], x, y + 4.4, front + 0.17, 0, { w: 9, h: 1.5, color: '#f6e7b4', bg: '#2c3a5a', size: 0.62, glow: false });
     shopDoors.push({ shop: 'BOOKS', outside: { x, z: front + 1.6, h: 0 } });
     places.bookstore = { door: { x, z: front + 1.6, h: 0 }, kerb: { x, z: c.z + 34, h: Math.PI / 2 } };
+  }
+
+  // ----- The container yard by the harbour: stacks three high in rows, a gantry crane, and a square of empty ground in the middle -----
+  function buildContainers(c) {
+    const y = 0.03, COLS = [0xd8342c, 0x2f56c8, 0x1f6b4a, 0xf2c230, 0x8d8a8e, 0xb5523b, 0x49a0d0];
+    flat(M.asphalt, 0xffffff, BLOCK - 2, BLOCK - 2, c.x, y, c.z, 5); lowGround.push({ x: c.x, z: c.z, half: BLOCK / 2 - 1 });
+    const stack = (x, z, n, alongX) => { // n boxes high
+      for (let k = 0; k < n; k++) slab(COLS[Math.floor(rand() * COLS.length)], alongX ? 12 : 2.5, 2.6, alongX ? 2.5 : 12, x, y + k * 2.6, z, M.siding, 0.6);
+      collide(x, z, alongX ? 12 : 2.5, alongX ? 2.5 : 12, n * 2.6);
+    };
+    for (const sx of [-24, -20.5, 20.5, 24]) for (const sz of [-18, -4, 10]) stack(c.x + sx, c.z + sz, 2 + Math.floor(rand() * 2), false); // the long rows either side
+    for (const sx of [-10, 4]) stack(c.x + sx, c.z - 25, 3, true);                                   // and across the north end
+    stack(c.x - 12, c.z + 24, 2, true);
+    // The crane: two legs each side and a beam across, with its cab.
+    for (const sx of [-15, 15]) for (const sz of [-12, -8]) slab(0xf2c230, 0.8, 18, 0.8, c.x + sx, y, c.z + sz);
+    slab(0xf2c230, 34, 1.4, 5, c.x, 18, c.z - 10); slab(0x1c1c22, 3, 2.2, 3, c.x + 6, 15.8, c.z - 10); post(0x1c1c22, 0.05, 9, c.x + 6, 6.8, c.z - 10, 4);
+    for (const sx of [-15, 15]) collide(c.x + sx, c.z - 10, 1.2, 5, 18);
+    for (const s of [-1, 1]) { post(STEEL, 0.1, 9, c.x + s * 12, y, c.z + 14); slab(0xffe2a6, 0.9, 0.1, 0.5, c.x + s * 11.4, 9, c.z + 14, M.glow); halo(c.x + s * 11.4, 8.9, c.z + 14, 0xcfe0ff, 4); }
+    lamp(c.x, 8, c.z + 4, 0xcfe0ff, 70, 36);
+    for (let n = 0; n < 9; n++) slab(0x8a8d96, 0.5, 0.05, 0.05, c.x + 3.6, y + 0.4 + n * 0.8, c.z - 23.7); for (const s of [-1, 1]) post(0x8a8d96, 0.03, 7.8, c.x + 3.6 + s * 0.25, y, c.z - 23.7, 4); // a ladder up the north stack
+    sign(['HARBOR FREIGHT TERMINAL', 'BERTH 46 · AUTHORIZED ONLY'], c.x, 4.6, c.z + 25.4, 0, { w: 10, h: 1.6, color: '#f4f4f0', bg: '#1c2740', size: 0.62, glow: false });
+    places.containers = { gate: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 }, centre: { x: c.x, z: c.z + 4 }, ladder: { x: c.x + 3.6, z: c.z - 22.2 },
+      high: { x: c.x + 4, y: 9.6, z: c.z - 24 }, spots: [{ x: c.x - 9, z: c.z + 2 }, { x: c.x + 9, z: c.z - 2 }, { x: c.x, z: c.z + 13 }] };
   }
 
   // ----- The airport along the south edge: aprons with runway markings, a terminal with its tower, a hangar and a jet -----

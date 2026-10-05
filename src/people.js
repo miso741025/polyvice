@@ -1105,6 +1105,8 @@ Object.assign(LOOKS, {
   drucker: { jacket: 0x6f5a44, shirt: 0xf4f4f4, tie: 0x2c3a5a, tucked: true, pants: 0x4a3324, hair: 0x2b1b12, hairMesh: 'parted', mustache: 0x2b1b12, bulk: 1.15, age: 0.5 },
   casals: { jacket: 0x3d4658, shirt: 0xcfe8ff, tucked: true, pants: 0x3d4658, hair: 0x111111, hairMesh: 'buzzed', dark: true, bulk: 1.05, age: 0.4 },
   guard: { shirt: 0x9fb0c4, sleeves: 'long', tucked: true, badge: true, pants: 0x23232b, hair: 0x4a3324, hairMesh: 'buzzed', hat: 'cap', hatColor: 0x23232b, bulk: 1.1 },
+  justine: { body: 'female', jacket: 0x23232b, shirt: 0xf5f0e6, pants: 0x23232b, tucked: true, hair: 0x2a1a14, hairMesh: 'long', hairScale: [1.04, 1, 1.04], age: 0.3 },
+  lauren: { body: 'female', shirt: 0xc9b6f2, tee: true, pants: 0x3b6ea8, shoes: 0xf2efe8, hair: 0x7a3b1a, hairMesh: 'long', height: 0.9, head: 1.1 },
   snitch: { shirt: 0xffe066, tee: true, jacket: 0x5b53c9, pants: 0x23232b, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'buzzed', dark: true, chain: true, bulk: 0.95, goatee: 0x141110 },
 });
 export const makeLook = name => makeHuman(LOOKS[name]);
