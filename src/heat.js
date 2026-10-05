@@ -3,7 +3,7 @@ import { near, groundAt, nodeX, nodeZ, blockCenter } from './grid.js';
 import { makeLook, makeHuman, randomPedLook } from './entities.js';
 import {
   say, talk, phone, fade, cut, titleCard, passed, actor, dismiss, spot, toward, place, approach, shot, frame, reach, follower,
-  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, quarry, tail, careful, smoke, lying, NORTH, SOUTH, EAST, WEST,
+  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, quarry, tail, careful, smoke, lying, playing, photograph, NORTH, SOUTH, EAST, WEST,
 } from './missions.js';
 
 // Los Angeles. The story follows the plot of Michael Mann's "Heat"; every line of dialogue is written for the game.
@@ -11,9 +11,6 @@ import {
 
 const NEIL = 'Neil', CHRIS = 'Chris', CHERITTO = 'Cheritto', TREJO = 'Trejo', WAINGRO = 'Waingro', NATE = 'Nate', HANNA = 'Hanna';
 const EADY = 'Eady', VANZANT = 'Van Zant', DRUCKER = 'Drucker', CASALS = 'Casals';
-
-// Say plainly whose shoes the player is in, whenever it is not Neil's.
-async function playing(g, name, role) { g.hud.card(name, role); await g.wait(2.8); g.hud.card(); }
 
 // Put Neil back in his own body at his own door, by the light the city usually has.
 function asNeil(g, neil) {
@@ -569,20 +566,6 @@ function asHanna(g, at, heading) {
   place(g, at, heading);
   return hanna;
 }
-// A long lens on somebody: the view narrows on them, and a click (or E, or Enter) takes the picture.
-async function photograph(g, who, name, from) {
-  const at = who.group.position, fov = g.camera.fov;
-  g.cam.fixed = { pos: new THREE.Vector3(from.x, groundAt(from.x, from.z) + 1.7, from.z), look: new THREE.Vector3(at.x, at.y + 1.45, at.z) };
-  g.camera.fov = 14; g.camera.updateProjectionMatrix();
-  g.hud.objective(`<b>Photograph</b> ${name}: click, or press E.`);
-  await g.until(() => !g.keys.Mouse0 && !g.keys.KeyE);
-  await g.until(() => g.keys.Mouse0 || g.keys.KeyE || g.consume('Enter'));
-  g.sfx?.click(); g.hud.flash('#ffffff', 0.18);
-  g.hud.objective();
-  await g.wait(0.6);
-  g.camera.fov = fov; g.camera.updateProjectionMatrix();
-}
-
 // ---------- 1. Eyes On ----------
 // Played as Hanna. A van outside Cheritto's house, then a parking lot, a long lens, and a fourth man nobody knows.
 

@@ -1088,6 +1088,14 @@ export const LOOKS = {
 };
 // Episode five.
 Object.assign(LOOKS, {
+  // Episode six: the captains, a card player, a dealer, a man from New York, a waiter.
+  jimmy: { jacket: 0x6f5a44, shirt: 0xf4f4f4, pants: 0x4a3324, hair: 0x2b1b12, hairStyle: 'receding', mustache: 0x2b1b12, bulk: 1.25, age: 0.6, face: { jaw: 0.15, cheeks: 0.5 } },
+  larry: { jacket: 0x3d4658, shirt: 0xcfe8ff, tucked: true, pants: 0x3d4658, hair: 0x9a9690, hairMesh: 'parted', glasses: 'clear', bulk: 1.32, age: 0.8, face: { jowls: 0.6, cheeks: 0.6 } },
+  raymond: { shirt: 0xb9a58a, sleeves: 'long', pants: 0x4a4652, hair: 0xb9b6b0, hairStyle: 'balding', bulk: 0.95, age: 0.9, face: { cheeks: -0.3, nose: 0.4 } },
+  sammy: { pattern: 'palms', shirt: 0x2f56c8, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', chain: true, bulk: 1.15, stubble: 0.4 },
+  rusty: { jacket: 0x2f7d46, shirt: 0xf4f4f4, tee: true, pants: 0x3b4a66, shoes: 0xf2efe8, hair: 0xb5523b, hairMesh: 'long', bulk: 0.92, stubble: 0.5, age: 0.3 },
+  johnnysack: { jacket: 0x1c2740, jacketPattern: 'pinstripe', shirt: 0xf4f4f4, tie: 0x8a1c1c, tucked: true, pants: 0x1c2740, hair: 0x6f6a66, hairMesh: 'parted', bulk: 0.95, height: 1.04, age: 0.6, face: { cheeks: -0.3, nose: 0.4 } },
+  waiter: { jacket: 0xf4f4f0, shirt: 0xf4f4f4, tie: 0x16161c, tucked: true, pants: 0x16161c, hair: 0x2b1b12, hairMesh: 'parted', bulk: 1 },
   febby: { pattern: 'plaid', shirt: 0x8d93cc, sleeves: 'long', pants: 0x4a3324, shoes: 0x6a4a34, hair: 0x6f6a66, hairStyle: 'balding', mustache: 0x6f6a66, glasses: 'clear', hat: 'cap', hatColor: 0x1f6b4a, bulk: 1.28, age: 0.6, face: { jaw: 0.15, cheeks: 0.7, jowls: 0.6 } },
 });
 // The people of Heat, in Los Angeles. As with the others, nobody's face is copied: build, hair and clothes carry it.

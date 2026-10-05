@@ -18,7 +18,8 @@ const SPECIAL_LA = { '15,1': 'neil', '8,6': 'bank', '2,9': 'drivein', '6,9': 'ka
   '12,4': 'park', '4,11': 'park', '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '2,7': 'yard', '13,8': 'church', '1,10': 'containers' };
 const SPECIAL_VICE = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
   '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel',
-  '13,0': 'college', '12,2': 'travel' }; // episode five: up the coast
+  '13,0': 'college', '12,2': 'travel', // episode five: up the coast
+  '15,12': 'manor' };                  // episode six: the banquet hall at the south end of Ocean Drive
 const SUN = new THREE.Vector3(1250, 190, 420).normalize();
 const HOUSE_WALLS = LA ? [0xe9e2d2, 0xf4f2ee, 0xd9c7a0, 0xc9b79c, 0xe6d2b4, 0xdfe5ea] : [0xcfe8ff, 0xfff1c9, 0xffd9e8, 0xe9e2d2, 0xd6fff4, 0xf7a8c4, 0xf4f2ee, 0xc9b6f2];
 const FIRMS = [['VICE FREIGHT', 'INTERSTATE HAULAGE'], ['ATLANTIC SALVAGE', 'SCRAP · PARTS · TOWING'], ['GULF SEAFOOD', 'WHOLESALE'], ['SUNSHINE CEMENT', 'READY MIX'], ['BAYSIDE PLUMBING', 'SUPPLY CO.'], ['MARINA ICE', 'BLOCK & CRUSHED']];
@@ -663,6 +664,7 @@ export function buildWorld(scene) {
     else if (kind === 'containers') buildContainers(c);
     else if (kind === 'college') buildCollege(c);
     else if (kind === 'travel') { buildTravel(c); lots(c, i, [-1, 1]); }
+    else if (kind === 'manor') buildManor(c);
     else if (kind === 'home') buildHome(c);
     else if (kind === 'melfi') buildMelfi(c);
     else if (kind === 'bing') buildBing(c);
@@ -1378,7 +1380,9 @@ export function buildWorld(scene) {
     put(M.plain, new THREE.CylinderGeometry(2.6, 2.6, 0.4, 16).translate(x + 4, y + 0.2, z + 4), 0xd8d0c4); put(M.glow, new THREE.CylinderGeometry(2.3, 2.3, 0.06, 16).translate(x + 4, y + 0.42, z + 4), 0x4fc4dc); collide(x + 4, z + 4, 5, 5, 0.6); // a small pool
     for (const [lx, lz] of [[-1, 8], [9, -1]]) { slab(0xffffff, 0.75, 0.3, 2, x + lx, y + 0.05, z + lz); put(M.plain, new THREE.BoxGeometry(0.75, 0.08, 0.8).rotateX(-0.7).translate(x + lx, y + 0.62, z + lz - 1), 0xff8a5c); }
     lamp(x, y + 3, z - 4.5, 0xffe2a6, 30, 16);
-    places.motel = { kerb: { x: x + 4, z: c.z + 34, h: Math.PI / 2 }, office: { x: x - 4.6, z: z + 3 }, court: { x: x + 1, z: z - 1 }, officeDoor: { x: x - 4.4, z: z + 3, h: Math.PI / 2 } };
+    slab(0xd9a520, 0.22, 0.3, 0.04, x, y + 1.75, z - 5.87); // the brass 6 on the middle door, where the card game is
+    shopDoors.push({ shop: 'CARDROOM', outside: { x, z: z - 4.8, h: 0 } });
+    places.motel = { room: { x, z: z - 4.8, h: 0 }, kerb: { x: x + 4, z: c.z + 34, h: Math.PI / 2 }, office: { x: x - 4.6, z: z + 3 }, court: { x: x + 1, z: z - 1 }, officeDoor: { x: x - 4.4, z: z + 3, h: Math.PI / 2 } };
   }
 
   // ----- Comley Trucking: a warehouse with loading docks over a yard -----
@@ -1492,6 +1496,26 @@ export function buildWorld(scene) {
     slab(0x55525a, 1.2, 2.4, 0.16, x - 4, y, z - 7.04);
     shopDoors.push({ shop: 'OFFICE', outside: { x: x + 3.6, z: front + 1.6, h: 0 } });
     places.travel = { door: { x: x + 3.6, z: front + 1.6, h: 0 }, kerb: { x, z: c.z + 34, h: Math.PI / 2 }, back: { x: x - 4, z: z - 9 }, woods: { x: x + 2, z: z - 14 } };
+  }
+
+  // ----- The Manor: a banquet hall at the south end of Ocean Drive, where the family holds its dinners -----
+  function buildManor(c) {
+    const y = CURB, x = c.x, z = c.z - 8, front = z + 11, CREAM = 0xf6eedc;
+    flat(M.tarmac, 0xffffff, BLOCK - 6, 22, c.x, y + 0.015, c.z + 16, 5);
+    slab(CREAM, 42, 8, 22, x, y, z, M.gravel, 3); collide(x, z, 42, 22, y + 8);
+    slab(0xc9b79c, 42.1, 0.9, 22.1, x, y, z, M.brick, 2); slab(0xffffff, 43, 0.4, 23, x, y + 8, z);
+    hip(0xd0623a, 44, 24, 3.6, x, y + 8.4, z, 0.4);
+    for (const s of [-1, 1]) for (const k of [8, 13, 18]) { windowAt(x + s * k, y + 1.3, front, 2.6, 4, 0, 1, true); slab(0xffffff, 3.2, 0.5, 0.3, x + s * k, y + 5.4, front + 0.1); }
+    // The porte-cochere: four columns and a canopy over the doors, a red carpet out to the cars.
+    slab(0xffffff, 13, 0.5, 8, x, y + 4.6, front + 4); slab(0xd0623a, 13.4, 0.3, 8.4, x, y + 5.1, front + 4);
+    for (const s of [-1, 1]) for (const t of [1.4, 7.4]) { post(0xffffff, 0.32, 4.6, x + s * 5.8, y, front + t, 12); collide(x + s * 5.8, front + t, 0.7, 0.7, 4.6, true); }
+    slab(0x3a2418, 3.4, 3.4, 0.2, x, y, front + 0.05); slab(0xd9a520, 0.08, 3.4, 0.24, x, y, front + 0.07); for (const s of [-1, 1]) slab(0xf0bf78, 0.9, 1.6, 0.06, x + s * 0.85, y + 1.3, front + 0.17, M.glow);
+    slab(0x8a1c2a, 3, 0.03, 9, x, y + 0.02, front + 4.6); for (const s of [-1, 1]) { ball(0x2f7d46, 0.7, x + s * 2.6, y + 1, front + 1); slab(0xb9a58a, 0.9, 0.5, 0.9, x + s * 2.6, y, front + 1); ball(0xffe2a6, 0.16, x + s * 2.2, y + 3, front + 0.3, M.glow); }
+    sign(['The Manor', 'BANQUETS  ·  WEDDINGS  ·  TESTIMONIALS'], x, y + 6.9, front + 0.3, 0, { w: 15, h: 2.3, color: '#f6e7b4', bg: '#3a1414', font: '"Mr Dafoe", cursive', size: 0.7 });
+    halo(x, y + 4, front + 6, 0xffd9a8, 10); lamp(x, y + 4.3, front + 4, 0xffe2a6, 40, 18);
+    for (const s of [-1, 1]) for (const k of [0, 1]) palms.push({ x: x + s * (19 + k * 6), z: c.z + 8 });
+    shopDoors.push({ shop: 'BANQUET', outside: { x, z: front + 1.6, h: 0 } });
+    places.manor = { door: { x, z: front + 1.6, h: 0 }, kerb: { x: x + 6, z: c.z + 34, h: Math.PI / 2 }, lot: { x: x - 14, z: c.z + 18 } };
   }
 
   // ================= Los Angeles (Heat) =================
@@ -2075,7 +2099,7 @@ export function buildWorld(scene) {
     q.glowPanel(0xff8a5c, 3, 4, 0, -12.84, 4.2); for (const s of [-1, 1]) for (let n = 0; n < 4; n++) q.window(s * 6.72, -8 + n * 5, 1.4, 3, 3.4, s * Math.PI / 2, 0xffb86a);
     for (const s of [-1, 1]) q.block(0x3a2418, 0.5, 2.6, 0.5, s * 2.2, 11.4, M.wood, 1); // the holy water fonts become pillars by the door
     q.light(0, 5.5, -8, 0xffd9a8, 140, 24); q.light(0, 5.5, 3, 0xffe8c8, 120, 24);
-    q.clerk = q.person('priest', 0.8, -9.3, Math.PI); q.till = q.at(0.8, -7.6);
+    q.clerk = q.person('priest', 0.8, -8.6, Math.PI); q.clerk.group.position.y = q.Y + 0.4; q.till = q.at(0.8, -6.6); // he stands on the altar step, not in it
     q.person(pick(PED_ROOM_LOOKS), -3.6, 1.6, Math.PI, 'sit');
   }
   if (!LA) { // an office: desks, a filing cabinet, a water cooler, a calendar of the wrong year
@@ -2166,6 +2190,55 @@ export function buildWorld(scene) {
     q.window(2, 3.72, 3, 1.4, 1.7, Math.PI, 0xffd9a8);
     q.light(0, 2.9, 0, 0xffe8c8, 34, 12);
     clerk(q, 0, -3.2, 0, { hairStyle: 'balding', hairMesh: undefined, age: 0.7, pattern: 'plaid', shirt: 0x8d93cc, sleeves: undefined });
+  }
+  // A dining chair at a seat { x, z, h }: a thin seat on four legs and a back, facing h.
+  const chairAt = (st, y, hex) => {
+    slab(hex, 0.46, 0.07, 0.46, st.x, y + 0.4, st.z);
+    for (const [fx, fz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) post(0x3a2418, 0.025, 0.4, st.x + fx, y, st.z + fz, 4);
+    put(M.plain, new THREE.BoxGeometry(0.46, 0.5, 0.05).translate(0, 0.74, -0.22).rotateY(st.h).translate(st.x, y, st.z), hex);
+  };
+  if (!LA) { // Room six at the motor lodge: the beds stood against the wall, a felt table under one hanging lamp, a cooler, the curtains shut
+    const q = rooms.CARDROOM = room(9, 8, 3, { floor: M.gravel, floorTint: 0x7a5a4a, wallTint: 0xffd3a1, ceil: 0xe9e2cf });
+    const cx = -0.6, cz = -0.9;
+    put(M.plain, new THREE.CylinderGeometry(1.2, 1.2, 0.08, 20).translate(q.X + cx, q.Y + 0.76, q.Z + cz), 0x1f6b4a); put(M.plain, new THREE.CylinderGeometry(1.26, 1.26, 0.05, 20).translate(q.X + cx, q.Y + 0.74, q.Z + cz), 0x3a2418);
+    post(0x3a2418, 0.12, 0.74, q.X + cx, q.Y, q.Z + cz, 8); collide(q.X + cx, q.Z + cz, 2, 2, 0.9);
+    q.seats = [-2.3, -1.15, 0, 1.15, 2.3].map(a => ({ x: q.X + cx - Math.sin(a) * 1.8, y: q.Y, z: q.Z + cz - Math.cos(a) * 1.8, h: a }));
+    for (const st of [...q.seats, { x: q.X + cx, z: q.Z + cz + 1.8, h: Math.PI }]) chairAt(st, q.Y, 0x8a5a44);
+    for (let n = 0; n < 5; n++) { const a = [-2.3, -1.15, 0, 1.15, 2.3][n], sx = q.X + cx - Math.sin(a) * 0.75, sz = q.Z + cz - Math.cos(a) * 0.75;
+      for (let k = 0; k < 3; k++) post([0xd8342c, 0x2f56c8, 0x16161c][(n + k) % 3], 0.05, 0.04 + ((n * 3 + k) % 4) * 0.03, sx + k * 0.12 - 0.12, q.Y + 0.8, sz, 8);
+      slab(0xf4f4f0, 0.14, 0.01, 0.2, sx + 0.3, q.Y + 0.81, sz + 0.1); }
+    for (let k = 0; k < 9; k++) slab(k % 2 ? 0x4fd36a : 0xe9e2cf, 0.26, 0.02, 0.13, q.X + cx + (k % 3) * 0.12 - 0.12, q.Y + 0.81 + k * 0.012, q.Z + cz + (k % 2) * 0.1); // the pot
+    post(0x1c1c22, 0.012, 0.9, q.X + cx, q.Y + 2.1, q.Z + cz, 4); put(M.glow, new THREE.ConeGeometry(0.34, 0.3, 12, 1, true).translate(q.X + cx, q.Y + 2, q.Z + cz), 0xffc27a);
+    q.block(0x8a2f3a, 0.5, 2, 3.2, 4, -1.6); q.block(0xe9e2cf, 0.3, 2, 3, 3.6, -1.6);                 // the mattresses, stood on end
+    q.block(0x3a2418, 1.4, 0.7, 0.5, -3.4, -3.5, M.wood, 1); q.block(0x1c1c22, 0.8, 0.6, 0.5, -3.4, -3.5, M.plain, 0, 0.7); q.glowPanel(0x9fd0f5, 0.6, 0.42, -3.4, -3.24, 1); // the television, on with the sound off
+    q.block(0x2f56c8, 0.9, 0.5, 0.5, 3.4, 2.4); slab(0xf4f4f0, 0.94, 0.08, 0.54, q.X + 3.4, q.Y + 0.5, q.Z + 2.4); for (let n = 0; n < 4; n++) post(0x8a5a2a, 0.035, 0.22, q.X + 3 + n * 0.2, q.Y + 0.58, q.Z + 2.4, 6); // the cooler
+    slab(0x8a2f3a, 3.2, 1.8, 0.08, q.X - 2, q.Y + 1, q.Z + 3.68); slab(0x3a2418, 3.4, 0.08, 0.1, q.X - 2, q.Y + 2.85, q.Z + 3.66); // the curtains, shut
+    slab(0xe9e2cf, 0.9, 0.7, 0.04, q.X + 1, q.Y + 1.7, q.Z - 3.84, M.plain); slab(0x49a0d0, 0.8, 0.6, 0.02, q.X + 1, q.Y + 1.75, q.Z - 3.8); // a print of a sailboat
+    q.light(cx, 2.5, cz, 0xffd9a8, 44, 10);
+    q.table = q.at(cx, cz); q.pot = q.at(cx, cz + 1.9);
+  }
+  if (!LA) { // The Manor's ballroom: a top table across the end of the room, round tables in white cloths, chandeliers, drapes, a parquet square to dance on
+    const q = rooms.BANQUET = room(26, 18, 5.2, { floor: M.gravel, floorTint: 0x7a2f3a, wallTint: 0xf6eedc, ceil: 0xf6f1e6, door: 0x3a2418 });
+    slab(0xc79a6a, 7, 0.02, 6, q.X, q.Y + 0.005, q.Z + 3.4, M.wood, 1);                                // the dance floor
+    slab(0xf4f4f0, 13, 0.78, 1.1, q.X, q.Y, q.Z - 6.3); slab(0xffffff, 13.2, 0.03, 1.3, q.X, q.Y + 0.78, q.Z - 6.3); collide(q.X, q.Z - 6.3, 13, 1.1, 0.9); // the top table
+    q.head = [-5, -3, -1, 1, 3, 5].map(x => ({ x: q.X + x, y: q.Y, z: q.Z - 7.25, h: 0 }));
+    for (const st of q.head) chairAt(st, q.Y, 0xd9a520);
+    for (let n = 0; n < 6; n++) { const x = q.X - 5 + n * 2; put(M.plain, new THREE.CylinderGeometry(0.16, 0.14, 0.02, 12).translate(x, q.Y + 0.82, q.Z - 6.4), 0xffffff); post(0x8a1c2a, 0.035, 0.26, x + 0.3, q.Y + 0.81, q.Z - 6.1, 6); post(0xe9e2cf, 0.03, 0.12, x - 0.3, q.Y + 0.81, q.Z - 6.15, 6); }
+    for (const x of [-2, 2]) { post(0xd9a520, 0.03, 0.4, q.X + x, q.Y + 0.81, q.Z - 6.3, 6); ball(0xc8312a, 0.2, q.X + x, q.Y + 1.32, q.Z - 6.3); ball(0xffffff, 0.14, q.X + x + 0.16, q.Y + 1.26, q.Z - 6.2); } // flowers
+    q.rounds = [];
+    for (const [x, z] of [[-8, -1.5], [8, -1.5], [-8, 4.2], [8, 4.2], [-3.2, -2.4], [3.2, -2.4]]) {
+      put(M.plain, new THREE.CylinderGeometry(1.15, 1.2, 0.76, 18).translate(q.X + x, q.Y + 0.38, q.Z + z), 0xf4f4f0); collide(q.X + x, q.Z + z, 1.9, 1.9, 0.9);
+      ball(0xc8312a, 0.16, q.X + x, q.Y + 0.98, q.Z + z); post(0xd9a520, 0.02, 0.2, q.X + x, q.Y + 0.76, q.Z + z, 5);
+      const seats = [0, 1, 2, 3].map(k => { const a = k * Math.PI / 2 + Math.PI / 4; return { x: q.X + x - Math.sin(a) * 1.65, y: q.Y, z: q.Z + z - Math.cos(a) * 1.65, h: a }; });
+      for (const st of seats) { chairAt(st, q.Y, 0xd9a520); put(M.plain, new THREE.CylinderGeometry(0.15, 0.13, 0.02, 10).translate(st.x + Math.sin(st.h) * 0.85, q.Y + 0.78, st.z + Math.cos(st.h) * 0.85), 0xffffff); }
+      q.rounds.push({ x: q.X + x, z: q.Z + z, seats });
+    }
+    for (const [x, z] of [[-6, -2], [6, -2], [-6, 4], [6, 4], [0, 1]]) { post(0xd9a520, 0.02, 0.9, q.X + x, q.Y + 4.3, q.Z + z, 4); put(M.glow, new THREE.SphereGeometry(0.5, 10, 6).scale(1, 0.55, 1).translate(q.X + x, q.Y + 4.1, q.Z + z), 0xffe8c0); for (let k = 0; k < 6; k++) ball(0xfff6e0, 0.07, q.X + x + Math.sin(k) * 0.62, q.Y + 3.9, q.Z + z + Math.cos(k) * 0.62, M.glow); } // chandeliers
+    for (const sx of [-1, 1]) for (const z of [-6, -1.5, 3, 7]) { slab(0x8a1c2a, 0.12, 4.2, 1.5, q.X + sx * 12.62, q.Y + 0.4, q.Z + z); slab(0xd9a520, 0.16, 0.14, 1.7, q.X + sx * 12.6, q.Y + 4.5, q.Z + z); ball(0xffd9a8, 0.12, q.X + sx * 12.5, q.Y + 2.6, q.Z + z + 2.2, M.glow); } // drapes and sconces
+    slab(0x8a1c2a, 14, 3.4, 0.1, q.X, q.Y + 1, q.Z - 8.64); sign(['SALUTE', 'CORRADO SOPRANO'], q.X, q.Y + 3.4, q.Z - 8.56, 0, { w: 8, h: 1.5, color: '#f6e7b4', bg: '#8a1c2a', size: 0.62, glow: false }); // the banner behind the top table
+    q.block(0x16161c, 2.6, 1, 1.5, -10.4, 7, M.plain, 0); slab(0xf4f4f0, 2.2, 0.04, 0.3, q.X - 10.4, q.Y + 1, q.Z + 6.5); q.block(0x3a2418, 3, 1.1, 0.8, 9.6, 7.6, M.wood, 1); for (let n = 0; n < 8; n++) post(BOTTLES[n % 6], 0.05, 0.32, q.X + 8.4 + n * 0.34, q.Y + 1.1, q.Z + 7.6, 6); // a piano, and the bar
+    q.light(0, 4.4, -4, 0xffe2b0, 150, 26); q.light(-6, 4.4, 4, 0xffd9a8, 110, 22); q.light(6, 4.4, 4, 0xffd9a8, 110, 22);
+    q.serve = q.head.map(st => ({ x: st.x, z: q.Z - 5.2 }));                                          // where a waiter stands to pour, across the table from each chair
   }
   { // Green Grove: a lobby with a reception desk, armchairs, a piano nobody plays, residents
     const q = rooms.GROVE = room(16, 12, 3.8, { floor: M.gravel, floorTint: 0x9a8a7a, wallTint: 0xfff1c9, ceil: 0xf6f1e6 });
@@ -2425,7 +2498,7 @@ export function buildWorld(scene) {
   }
 
   const SHOP_ROOM = { BAR: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'FASTFOOD', DONUTS: 'FASTFOOD', BURGERS: 'FASTFOOD', 'AUTO PARTS': 'PARTS', LAUNDRY: 'LAUNDRY', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
-  const SHOP_NAME = { BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
+  const SHOP_NAME = { CARDROOM: 'room six', BANQUET: 'the Manor', BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
     HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the store', BOOKS: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office', SCHOOL: 'the hall' };
   places.rooms = rooms;
   places.parkedSpots = parkedSpots;
@@ -2437,6 +2510,7 @@ export function buildWorld(scene) {
   places.bar = { door: barDoor.outside, kerb: barDoor.kerb, room: rooms.BAR };
   const gunDoor = nearestShop('GUNS', places.home.spawn, 60, 400);
   places.guns = { door: gunDoor.outside, kerb: gunDoor.kerb };
+  if (!LA) { const d = nearestShop('PAWN', places.home.spawn, 150, 520); places.pawn = { door: d.outside, kerb: d.kerb }; } // the pawnbroker Tony buys from
   if (LA) { const d = nearestShop('PARTS', places.airport.kerb, 150, 420); places.parts = { door: d.outside, kerb: d.kerb }; } // where a stolen car gets other plates
   places.gunShops = shopDoors.filter(d => d.shop === 'GUNS').map(d => d.outside).filter((d, n) => n % 3 === 0); // the map marks a few; the rest are found by their neon
 
@@ -2529,7 +2603,7 @@ export function buildWorld(scene) {
     for (const s of [-1, 1]) post(0x55525a, 0.2, 8, sx, 0, z + s * (W / 2 + 0.6), 8);
     slab(0x55525a, 0.4, 3.2, W + 1.2, sx, 6.6, z);
     sign([there, 'BRIDGE  ·  2 MILES'], sx - dir * 0.24, 8.2, z, dir > 0 ? -Math.PI / 2 : Math.PI / 2, { w: 11, h: 2.8, color: '#f4f4f0', bg: '#1f6b4a', size: 0.62, glow: false });
-    places.bridge = { dir, there, start: { x: x0 - dir * 6, z }, far: { x: end - dir * 30, z }, arrive: { x: end - dir * 90, z: z + dir * 3, h: dir > 0 ? -Math.PI / 2 : Math.PI / 2 } };
+    places.bridge = { dir, there, mid: { x: deck + dir * len * 0.2, z: z - dir * 3.2, rail: z - dir * (W / 2 - 1.2), y: Y }, start: { x: x0 - dir * 6, z }, far: { x: end - dir * 30, z }, arrive: { x: end - dir * 90, z: z + dir * 3, h: dir > 0 ? -Math.PI / 2 : Math.PI / 2 } };
     for (let n = palms.length - 1; n >= 0; n--) if (Math.abs(palms[n].z - z) < W / 2 + 3 && (palms[n].x - x0) * dir > -4) palms.splice(n, 1); // no palms growing through the deck
   }
 
