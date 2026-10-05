@@ -2100,6 +2100,21 @@ export function buildWorld(scene) {
     for (const x of [-5, 0]) q.window(x, 6.72, 4, 2, 1.9, Math.PI);
     q.light(-3, 3.3, 0, 0xffd9a8, 90, 18); q.light(4.5, 3.3, -4, 0xffb060, 50, 14);
     q.clerk = q.person('artie', 4.5, -5.9, 0); q.clerk.set('talk'); q.till = q.at(4.5, -4.2);
+    // Dressing: dark panelling to chair height, pictures of the old country, sconces, beams, a lamp over every table, a runner from the door to the bar.
+    for (const sx of [-1, 1]) { slab(0x4a2a1c, 0.08, 1.05, 13.4, q.X + sx * 8.66, q.Y, q.Z, M.wood, 2); slab(0xd9a520, 0.1, 0.05, 13.4, q.X + sx * 8.65, q.Y + 1.05, q.Z); }
+    slab(0x4a2a1c, 17.4, 1.05, 0.08, q.X, q.Y, q.Z + 6.66, M.wood, 2); slab(0xd9a520, 17.4, 0.05, 0.1, q.X, q.Y + 1.05, q.Z + 6.65);
+    for (const [n, z] of [-4.6, -1.6, 1.4, 4.4].entries()) for (const sx of [-1, 1]) {
+      if (sx > 0 && n < 2) continue; // the wine is on that stretch of wall
+      slab(0x8a5a44, 0.06, 1.15, 1.6, q.X + sx * 8.62, q.Y + 1.55, q.Z + z, M.wood, 1);
+      q.glowPanel([0x7fb6c9, 0xd9b27a, 0x9cc08a, 0xe0a07a][(n + (sx > 0 ? 2 : 0)) % 4], 1.4, 0.95, sx * 8.57, z, 2.12, sx < 0 ? Math.PI / 2 : -Math.PI / 2);
+      ball(0xffd9a8, 0.11, q.X + sx * 8.5, q.Y + 2.5, q.Z + z + 1.5, M.glow); slab(0xd9a520, 0.1, 0.3, 0.1, q.X + sx * 8.6, q.Y + 2.2, q.Z + z + 1.5);
+    }
+    for (const z of [-4, 0, 4]) slab(0x3a2418, 17.4, 0.2, 0.28, q.X, q.Y + 3.5, q.Z + z, M.wood, 2);
+    for (const [x, z] of [[-5, -2], [-1, -2], [-5, 2], [-1, 2], [3, 1], [-5, 5], [-1, 5]]) { post(0x1c1c22, 0.012, 1, q.X + x, q.Y + 2.5, q.Z + z, 4); put(M.glow, new THREE.ConeGeometry(0.24, 0.26, 10, 1, true).translate(q.X + x, q.Y + 2.42, q.Z + z), 0xffc27a); }
+    slab(0x8a1c2a, 2, 0.02, 10.4, q.X + 4, q.Y, q.Z + 1.4); for (const sx of [-1, 1]) slab(0xd9a520, 0.08, 0.025, 10.4, q.X + 4 + sx * 0.92, q.Y, q.Z + 1.4);
+    q.block(0x3a2418, 0.7, 1.15, 0.5, 2.3, 5.4, M.wood, 1); slab(0xf4f4f0, 0.5, 0.03, 0.36, q.X + 2.3, q.Y + 1.16, q.Z + 5.4);                 // the host's stand, the book open on it
+    q.block(0x3a2418, 0.45, 2.3, 4.6, 8.4, -3.2, M.wood, 2); for (let n = 0; n < 24; n++) put(M.plain, new THREE.CylinderGeometry(0.045, 0.045, 0.3, 6).rotateZ(Math.PI / 2).translate(q.X + 8.12, q.Y + 0.45 + (n % 4) * 0.5, q.Z - 5.2 + Math.floor(n / 4) * 0.8), BOTTLES[n % 6]); // the wine wall
+    for (const [k, hex] of [0x2f7d46, 0xf4f4f0, 0xc8312a].entries()) slab(hex, 0.5, 0.9, 0.04, q.X - 8 + k * 0.5, q.Y + 2.3, q.Z + 6.62);
     q.person(pick(PED_ROOM_LOOKS), -5.9, -2, Math.PI / 2, 'sit');
     q.person(pick(PED_ROOM_LOOKS), -0.1, 2, -Math.PI / 2, 'sit');
   }

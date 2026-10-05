@@ -3,7 +3,7 @@ import { CITY, NX, NZ, ROAD, CELL, SHORE, nodeX, nodeZ, blockCenter, colliders, 
 import { buildWorld } from './world.js';
 import { makeLook, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
-import { runStory, savedMission, clearSave } from './missions.js';
+import { runStory, savedMission, clearSave, storyList, jumpTo } from './missions.js';
 import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
 import { installSideJobs } from './sidejobs.js';
@@ -354,6 +354,8 @@ async function boot() {
     freshBtn.hidden = false;
     freshBtn.addEventListener('click', () => { clearSave(); begin(); });
   }
+  // A mission picked from the settings menu: the page comes back straight into it.
+  if (sessionStorage.getItem('jump') && !arrived) { sessionStorage.removeItem('jump'); begin(); }
 
   // ----- Per-frame systems -----
   const tmp = new THREE.Vector3(), focus = new THREE.Vector3(), want = new THREE.Vector3();
@@ -506,6 +508,30 @@ async function boot() {
 
   // Advance the simulation by dt seconds and draw. Exposed as game.step for debugging.
   // The settings, as a menu; the game waits while it is open.
+  // Every mission, a chapter to a page. Picking one puts the save there and starts the page again at it.
+  const missionMenu = current => {
+    const story = storyList(), starts = [];
+    let n = 0;
+    for (const e of story) { starts.push(n); n += e.titles.length; }
+    let page = Math.max(0, starts.findLastIndex(s => s <= current));
+    const show = () => {
+      const e = story[page], KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9'];
+      const items = [
+        { label: `${e.name}: ${e.title}`, hint: `page ${page + 1} of ${story.length}` },
+        ...e.titles.map((t, k) => ({ key: KEYS[k], label: t, hint: starts[page] + k === current ? 'you are here' : '' })),
+        ...(page > 0 ? [{ key: 'KeyQ', label: 'Previous chapter' }] : []), ...(page < story.length - 1 ? [{ key: 'KeyE', label: 'Next chapter' }] : []),
+        { key: 'Escape', label: 'Back' },
+      ];
+      hud.menu('Missions', items, code => {
+        const k = KEYS.indexOf(code);
+        if (code === 'KeyQ' && page > 0) { page--; show(); }
+        else if (code === 'KeyE' && page < story.length - 1) { page++; show(); }
+        else if (code === 'Escape') openSettings();
+        else if (k >= 0 && k < e.titles.length) { jumpTo(starts[page] + k, g.cash); sessionStorage.setItem('jump', '1'); location.reload(); }
+      });
+    };
+    show();
+  };
   const openSettings = () => {
     g.paused = true;
     const pr = g.progress, story = !pr ? 'Not started' : pr.done ? `All ${pr.total} missions complete` : `${pr.episode}: ${pr.title}  ·  mission ${pr.k} of ${pr.of}, "${pr.mission}"`;
@@ -516,6 +542,7 @@ async function boot() {
       { key: 'Digit5', label: 'Invert mouse Y', hint: settings.invert ? 'on' : 'off' },
       { key: 'Digit6', label: 'Crowd', hint: ['light', 'normal', 'heavy'][settings.crowd] },
       { key: 'Digit7', label: 'Shadows', hint: settings.shadows ? 'on' : 'off' },
+      { key: 'Digit8', label: 'Missions', hint: 'play any mission again, or skip ahead' },
       { key: 'Escape', label: 'Resume' },
       { key: 'Digit0', label: 'Quit to the title screen', hint: 'progress is saved after each mission' },
     ].filter(i => i.label), code => {
@@ -526,6 +553,7 @@ async function boot() {
       else if (code === 'Digit5') settings.invert = !settings.invert;
       else if (code === 'Digit6') { settings.crowd = (settings.crowd + 1) % 3; crowdLimit(); }
       else if (code === 'Digit7') settings.shadows = !settings.shadows;
+      else if (code === 'Digit8') { applySettings(); missionMenu(pr && !pr.done ? pr.n - 1 : 0); return; }
       else if (code === 'Digit0') { applySettings(); location.reload(); return; }
       else if (code === 'Escape' || code === 'Enter') { applySettings(); hud.menu(); g.paused = false; for (const k in keys) keys[k] = false; return; }
       else return;

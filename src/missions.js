@@ -21,6 +21,9 @@ const SAVE = CITY === 'la' ? 'heat-la.save' : 'sopranos-vice.save';
 const readSave = () => { try { return JSON.parse(localStorage.getItem(SAVE)) || {}; } catch { return {}; } };
 export const savedMission = () => readSave().mission || 0;
 export function clearSave() { try { localStorage.removeItem(SAVE); } catch { /* storage unavailable: nothing to clear */ } }
+// For the settings menu: every chapter with its mission titles, and a way to put the save at any one of them.
+export const storyList = () => (CITY === 'la' ? HEAT : EPISODES).map(e => ({ name: e.name, title: e.title, titles: e.titles }));
+export function jumpTo(n, cash) { save(n, cash); }
 function save(mission, cash) { try { localStorage.setItem(SAVE, JSON.stringify({ mission, cash })); } catch { /* play on without saving */ } }
 
 // ---------- Building blocks for scenes ----------
@@ -500,6 +503,35 @@ export async function roomScene(g, room, arrange, play, { night: dark = 0 } = {}
   p.hidden = false;
   g.setNight(night);
 }
+// Through a door on foot, and free to walk about inside: the room's own people are there, and whoever the mission adds.
+export async function enter(g, room) {
+  const p = g.player;
+  p.locked = true;
+  await fade(g, 1, 0.45);
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  g.sfx?.door();
+  const door = g.places.doors.find(d => d.inside === room.inside);
+  for (const h of door.hide || []) h.group.visible = false;
+  p.inside = door;
+  p.pos.set(room.inside.x, 0, room.inside.z); p.heading = g.cam.yaw = room.inside.h;
+  g.cam.fixed = null;
+  await fade(g, 0, 0.45);
+  p.locked = false;
+  return door;
+}
+// And out again, onto the step outside (unless the player has already walked out by himself).
+export async function leave(g) {
+  const p = g.player, door = p.inside;
+  if (!door) return;
+  p.locked = true;
+  await fade(g, 1, 0.45);
+  g.sfx?.door();
+  for (const h of door.hide || []) h.group.visible = true;
+  p.inside = null;
+  p.pos.set(door.outside.x, 0, door.outside.z); p.heading = g.cam.yaw = door.outside.h;
+  await fade(g, 0, 0.45);
+  p.locked = false;
+}
 // One of the rooms behind the shop doors, with a camera: `from` and `to` are [x, z] in room coordinates.
 export function inRoom(q, from, to, height = 1.6, lift = 1.1) {
   return { ...q, cam: { pos: new THREE.Vector3(q.X + from[0], q.Y + height, q.Z + from[1]), look: new THREE.Vector3(q.X + to[0], q.Y + lift, q.Z + to[1]) } };
@@ -789,21 +821,35 @@ async function familyBusiness(g) {
   await phone(g, SILVIO, "Tone. Your uncle's holding court on the terrace at Vesuvio.");
   await phone(g, SILVIO, "Word is he's planning something for that place. You should hear it from him.");
   g.hud.card();
+  // Junior is at his table on the terrace from the moment the car pulls up; Artie is inside, behind his bar.
+  const junior = actor(g, 'junior', v.seat, WEST, 'sit');
   await reach(g, v.kerb, "Drive to <b>Vesuvio</b>, Artie Bucco's restaurant.");
-
+  const VES = g.places.rooms.VESUVIO, artie = VES.clerk, way = g.places.doors.find(d => d.inside === VES.inside);
+  await reach(g, way.outside, 'Go <b>in</b>. Say hello to Artie first.', { r: 1.8, how: 'foot' });
+  await enter(g, VES);
+  await reach(g, VES.till, 'Find <b>Artie</b>. He is behind the bar.', { r: 1.5, how: 'foot' });
   p.locked = true;
-  let artie, junior;
-  await cut(g, () => {
-    place(g, spot(v.door, -1.6, 0.6), NORTH, v.kerb);
-    artie = actor(g, 'artie', spot(v.door, 0, -1.6), SOUTH);
-    junior = actor(g, 'junior', v.seat, WEST, 'sit');
-    frame(g, p.pos, artie.group.position, { dist: 5.2 });
-  });
+  p.pos.set(VES.till.x, 0, VES.till.z + 0.3); p.heading = NORTH;
+  artie.group.rotation.y = SOUTH;
+  g.cam.fixed = inRoom(VES, [6.9, -6.2], [3.4, -2.6], 1.75, 1.2).cam; // over Artie's shoulder: Tony at the bar, and the dining room behind him
   await talk(g, [
     [ARTIE, 'Tony! Look who it is. You eat yet? Sit, I made the rabbit today.', artie],
     [TONY, 'Place looks beautiful, Artie. Full every night, I hear.', p],
-    [ARTIE, "Twelve years of my life in these walls. Go on, your uncle's on the terrace.", artie],
+    [ARTIE, "Twelve years of my life in these walls. My father's oven is still back there.", artie],
+    [TONY, 'I came to see my uncle.', p],
+    [ARTIE, "On the terrace, since noon. Same table. He's been asking who comes in and what night. Go on, I'll send out a plate.", artie],
   ]);
+  artie.set('talk');
+  g.cam.fixed = null;
+  p.locked = false;
+  g.hud.objective('Go out to the <b>terrace</b>.');
+  const out = g.addMarker(VES.inside.x, VES.inside.z, 1.5);
+  await g.until(() => !p.inside || near(p.pos, VES.inside, 1.9));
+  g.removeMarker(out);
+  g.hud.objective();
+  await leave(g);
+  await reach(g, spot(v.seat, -3.2, 1.3), "<b>Uncle Junior</b> is at his table on the terrace. Sit down with him.", { r: 1.6, how: 'foot' });
+  p.locked = true;
   await cut(g, () => {
     place(g, spot(v.seat, -3.2, 1.3), EAST);
     p.heading = toward(p.pos, v.seat);
@@ -820,7 +866,7 @@ async function familyBusiness(g) {
     [JUNIOR, 'Go see your mother. She says you never call.'],
   ]);
   await cut(g, () => {
-    dismiss(g, artie, junior);
+    dismiss(g, junior);
     g.cam.fixed = null;
     place(g, spot(v.door, 0, 2), SOUTH);
   });
