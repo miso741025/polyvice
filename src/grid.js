@@ -24,6 +24,13 @@ export const colliders = [];
 // piers (and the bridge) run out over the water: { minZ, maxZ, ramp (x where it leaves the land), deck (x where it is level), maxX (its far end), y, dir (1 east, -1 west) }.
 // interiors are rooms built far out over the water; a player inside one is kept inside it. Each lists its `lights`.
 export const lowGround = [], piers = [], interiors = [];
+// Lawns, patios and paths laid a little above the sidewalk, by block: { x, z, hx, hz, y }. Feet stand on the highest one under them.
+export const raised = new Map();
+export function raise(x, z, w, d, y) {
+  const key = Math.floor((x - OX) / CELL) + ',' + Math.floor((z - OZ) / CELL);
+  if (!raised.has(key)) raised.set(key, []);
+  raised.get(key).push({ x, z, hx: w / 2, hz: d / 2, y });
+}
 export const roomAt = (x, z, margin = 1) => interiors.find(q => x > q.minX - margin && x < q.maxX + margin && z > q.minZ - margin && z < q.maxZ + margin);
 export function groundAt(x, z) {
   for (const p of piers) { // a pier or a bridge: up a ramp, then level; `dir` -1 runs west instead of east
@@ -35,7 +42,10 @@ export function groundAt(x, z) {
   const u = ((x - OX) % CELL + CELL) % CELL, v = ((z - OZ) % CELL + CELL) % CELL;
   if (u < ROAD / 2 || u > CELL - ROAD / 2 || v < ROAD / 2 || v > CELL - ROAD / 2) return 0;
   for (const g of lowGround) if (Math.abs(x - g.x) < g.half && Math.abs(z - g.z) < g.half) return 0.03;
-  return 0.14;
+  let y = 0.14;
+  const beds = raised.get(Math.floor((x - OX) / CELL) + ',' + Math.floor((z - OZ) / CELL));
+  if (beds) for (const b of beds) if (b.y > y && Math.abs(x - b.x) < b.hx && Math.abs(z - b.z) < b.hz) y = b.y;
+  return y;
 }
 
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CITY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, piers, interiors, mulberry32 } from './grid.js';
+import { CITY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, mulberry32 } from './grid.js';
 import { makeHuman } from './people.js';
 import { box, makeLook, makeTony, makeDuck, Car } from './entities.js';
 
@@ -292,6 +292,7 @@ export function buildWorld(scene) {
   const flat = (mat, hex, w, d, x, y, z, s = 0) => {
     const geo = new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(x, y, z), uv = geo.attributes.uv;
     if (s) for (let i = 0; i < 4; i++) uv.setXY(i, uv.getX(i) * w / s, uv.getY(i) * d / s);
+    if ((mat === M.grass || mat === M.paint) && y > CURB && y < CURB + 0.2) raise(x, z, w, d, y); // a lawn or a patio: people stand on it, not in it
     return put(mat, geo, hex);
   };
   const post = (hex, r, h, x, y0, z, sides = 6) => put(M.plain, new THREE.CylinderGeometry(r, r, h, sides).translate(x, y0 + h / 2, z), hex);
@@ -423,10 +424,21 @@ export function buildWorld(scene) {
   updaters.push(t => { sea.material.uniforms.time.value = t; });
 
   const bw = bounds.maxX - bounds.minX + 8, bd = bounds.maxZ - bounds.minZ + 8;
-  flat(M.sand, 0xffffff, bw, bd, (bounds.minX + bounds.maxX) / 2, -0.1, (bounds.minZ + bounds.maxZ) / 2, 12);
+  // Tony's pool is a real hole: the sand and the road plane under his garden are cut out where it goes.
+  const poolHole = LA ? null : { x: blockCenter(0, 0).x + 13, z: blockCenter(0, 0).z + 13, w: 12, d: 18 };
+  const holed = (w, d, cx, cz, y, s) => { // a w x d sheet centred on (cx, cz) with the pool cut out of it; one texture repeat every s metres (0: once over the sheet)
+    const shape = new THREE.Shape([[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]].map(([x, z]) => new THREE.Vector2(x, z)));
+    const hx = poolHole.x - cx, hz = -(poolHole.z - cz), a = poolHole.w / 2, b = poolHole.d / 2;
+    shape.holes.push(new THREE.Path([[hx - a, hz - b], [hx - a, hz + b], [hx + a, hz + b], [hx + a, hz - b]].map(([x, z]) => new THREE.Vector2(x, z))));
+    const geo = new THREE.ShapeGeometry(shape), pos = geo.attributes.position, uv = geo.attributes.uv;
+    for (let k = 0; k < pos.count; k++) uv.setXY(k, (pos.getX(k) / w + 0.5) * (s ? w / s : 1), (pos.getY(k) / d + 0.5) * (s ? d / s : 1));
+    return geo.rotateX(-Math.PI / 2).translate(cx, y, cz);
+  };
+  if (poolHole) put(M.sand, holed(bw, bd, (bounds.minX + bounds.maxX) / 2, (bounds.minZ + bounds.maxZ) / 2, -0.1, 12), 0xffffff);
+  else flat(M.sand, 0xffffff, bw, bd, (bounds.minX + bounds.maxX) / 2, -0.1, (bounds.minZ + bounds.maxZ) / 2, 12);
   const roadMap = roadTexture(rand);
   roadMap.repeat.set(W / CELL, D / CELL); roadMap.offset.set(-ROAD / 2 / CELL, -ROAD / 2 / CELL);
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: roadMap }));
+  const road = new THREE.Mesh(poolHole ? holed(W, D, 0, 0, 0, 0) : new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: roadMap }));
   road.receiveShadow = true;
   scene.add(road);
 
@@ -632,7 +644,7 @@ export function buildWorld(scene) {
         slab(0xffffff, BLOCK, CURB, 5, c.x, 0, c.z + s * (BLOCK / 2 - 2.5), M.paver, 6);
         slab(0xffffff, 5, CURB, BLOCK - 10, c.x + s * (BLOCK / 2 - 2.5), 0, c.z, M.paver, 6);
       }
-    } else if (kind !== 'river') slab(LA ? 0xcfcfd2 : 0xffffff, BLOCK, CURB, BLOCK, c.x, 0, c.z, M.paver, 6);
+    } else if (kind !== 'river' && kind !== 'home') slab(LA ? 0xcfcfd2 : 0xffffff, BLOCK, CURB, BLOCK, c.x, 0, c.z, M.paver, 6); // the house lays its own, around the pool
     if (kind !== 'river') {
       for (const sx of [-1, 1]) for (const sz of LA ? [0] : [-14, 14]) palms.push({ x: c.x + sx * 28.8, z: c.z + sz }); // one tall palm a side in Los Angeles, two in Vice City
       furniture(c, i, j);
@@ -702,7 +714,14 @@ export function buildWorld(scene) {
   // ----- Tony's house: a stucco mansion with a tiled roof, a garage, lawn, pool and ducks -----
   function buildHome(c) {
     const CREAM = 0xfdf1dc, TILE = 0xd0623a, y = CURB;
-    flat(M.grass, 0xffffff, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z, 6);
+    const pool = { x: c.x + 13, z: c.z + 13, w: 12, d: 18 };
+    // The ground is laid in four pieces around the pool, so that the pool is a hole in it and not a picture on it.
+    const around = (W, D, lay) => {
+      const x0 = c.x - W / 2, x1 = c.x + W / 2, z0 = c.z - D / 2, z1 = c.z + D / 2, px0 = pool.x - pool.w / 2, px1 = pool.x + pool.w / 2, pz0 = pool.z - pool.d / 2, pz1 = pool.z + pool.d / 2;
+      for (const [ax, bx, az, bz] of [[x0, x1, z0, pz0], [x0, x1, pz1, z1], [x0, px0, pz0, pz1], [px1, x1, pz0, pz1]]) if (bx > ax && bz > az) lay(bx - ax, bz - az, (ax + bx) / 2, (az + bz) / 2);
+    };
+    around(BLOCK, BLOCK, (w, d, x, z) => slab(0xffffff, w, CURB, d, x, 0, z, M.paver, 6));
+    around(BLOCK - 4, BLOCK - 4, (w, d, x, z) => flat(M.grass, 0xffffff, w, d, x, y + 0.05, z, 6));
     // Main house, east wing and garage keep the footprints the missions were written around.
     for (const [w, h, d, x, z] of [[32, 8, 16, c.x + 2, c.z - 18], [12, 5, 10, c.x + 12, c.z - 6], [11, 4.6, 12, c.x - 20.5, c.z - 20]]) {
       slab(CREAM, w, h, d, x, y, z, M.gravel, 3);
@@ -734,23 +753,40 @@ export function buildWorld(scene) {
       collide(x, z, w, d, 1.5);
     }
 
-    const pool = { x: c.x + 13, z: c.z + 13, w: 12, d: 18 };
-    flat(M.paint, 0xf3ece0, pool.w + 5, pool.d + 5, pool.x, y + 0.09, pool.z);
-    for (const s of [-1, 1]) { // coping
-      slab(0xffffff, pool.w + 0.8, 0.12, 0.4, pool.x, y + 0.08, pool.z + s * (pool.d / 2 + 0.2));
-      slab(0xffffff, 0.4, 0.12, pool.d + 0.8, pool.x + s * (pool.w / 2 + 0.2), y + 0.08, pool.z);
+    { // the deck, in four pieces as well
+      const W = pool.w + 5, D = pool.d + 5;
+      for (const sgn of [-1, 1]) { flat(M.paint, 0xf3ece0, W, 2.5, pool.x, y + 0.09, pool.z + sgn * (pool.d / 2 + 1.25)); flat(M.paint, 0xf3ece0, 2.5, pool.d, pool.x + sgn * (pool.w / 2 + 1.25), y + 0.09, pool.z); }
+      void D;
     }
+    for (const s of [-1, 1]) { // coping: a lip of white stone that stands above the deck and hangs over the water
+      slab(0xffffff, pool.w + 0.9, 0.2, 0.5, pool.x, y + 0.02, pool.z + s * (pool.d / 2 + 0.15));
+      slab(0xffffff, 0.5, 0.2, pool.d + 0.9, pool.x + s * (pool.w / 2 + 0.15), y + 0.02, pool.z);
+    }
+    // The basin: tiled walls going down, a floor that slopes to the deep end, and the water a hand below the lip.
+    const DEPTH = 0.7, WATER = y - 0.08; // the sea lies at -0.6 under everything: the floor stays above it
+    const tiles = texture(128, 128, (g, w) => {
+      g.fillStyle = '#58c8e0'; g.fillRect(0, 0, w, w);
+      g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 2;
+      for (let k = 0; k <= 4; k++) { g.beginPath(); g.moveTo(k * 32, 0); g.lineTo(k * 32, w); g.moveTo(0, k * 32); g.lineTo(w, k * 32); g.stroke(); }
+    });
+    tiles.repeat.set(6, 3);
+    const basinMat = new THREE.MeshLambertMaterial({ map: tiles, side: THREE.BackSide });
+    const basin = new THREE.Mesh(new THREE.BoxGeometry(pool.w, DEPTH, pool.d), basinMat);
+    basin.position.set(pool.x, y - DEPTH / 2 + 0.01, pool.z);
+    scene.add(basin);
     const caustics = texture(128, 128, (g, w) => {
-      g.fillStyle = '#2fc6e4'; g.fillRect(0, 0, w, w);
-      g.strokeStyle = 'rgba(210,250,255,.55)'; g.lineWidth = 2;
+      g.clearRect(0, 0, w, w);
+      g.fillStyle = 'rgba(40,190,225,.55)'; g.fillRect(0, 0, w, w);
+      g.strokeStyle = 'rgba(225,252,255,.7)'; g.lineWidth = 2;
       for (let k = 0; k < 16; k++) { g.beginPath(); g.ellipse(rand() * w, rand() * w, 8 + rand() * 14, 5 + rand() * 9, rand() * 3, 0, 7); g.stroke(); }
     });
     caustics.repeat.set(3, 4.5);
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(pool.w, pool.d).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: caustics }));
-    water.position.set(pool.x, y + 0.13, pool.z);
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(pool.w, pool.d).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: caustics, transparent: true, depthWrite: false }));
+    water.position.set(pool.x, WATER, pool.z);
+    water.renderOrder = 1;
     scene.add(water);
     updaters.push(t => { caustics.offset.set(Math.sin(t * 0.4) * 0.04, t * 0.02); });
-    collide(pool.x, pool.z, pool.w, pool.d, 0.3);
+    collide(pool.x, pool.z, pool.w + 0.9, pool.d + 0.9, 0.3);
     slab(0xffffff, 0.6, 0.08, 2.6, pool.x, y + 0.55, pool.z + pool.d / 2 + 0.6); slab(0xb9bcc4, 0.5, 0.5, 0.5, pool.x, y, pool.z + pool.d / 2 + 1.5); // diving board
     for (const lz of [-4, -1.2]) { // sun loungers
       slab(0xffffff, 0.75, 0.3, 2, pool.x + pool.w / 2 + 1.6, y + 0.05, pool.z + lz);
@@ -760,7 +796,7 @@ export function buildWorld(scene) {
     const ducks = [];
     for (let k = 0; k < 5; k++) {
       const d = makeDuck();
-      d.group.position.set(pool.x - 2.5 + (k % 3) * 1.6, y + 0.13, pool.z - 2 + Math.floor(k / 3) * 2.2 + (k % 2) * 0.7);
+      d.group.position.set(pool.x - 2.5 + (k % 3) * 1.6, WATER, pool.z - 2 + Math.floor(k / 3) * 2.2 + (k % 2) * 0.7);
       d.group.rotation.y = -Math.PI / 2 + (rand() - 0.5);
       d.group.scale.setScalar(k === 0 ? 1.25 : 0.9);
       scene.add(d.group);
