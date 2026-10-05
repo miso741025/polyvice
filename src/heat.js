@@ -12,6 +12,9 @@ import {
 const NEIL = 'Neil', CHRIS = 'Chris', CHERITTO = 'Cheritto', TREJO = 'Trejo', WAINGRO = 'Waingro', NATE = 'Nate', HANNA = 'Hanna';
 const EADY = 'Eady', VANZANT = 'Van Zant', DRUCKER = 'Drucker', CASALS = 'Casals';
 
+// Say plainly whose shoes the player is in, whenever it is not Neil's.
+async function playing(g, name, role) { g.hud.card(name, role); await g.wait(2.8); g.hud.card(); }
+
 // Put Neil back in his own body at his own door, by the light the city usually has.
 function asNeil(g, neil) {
   const { home } = g.places, p = g.player;
@@ -104,10 +107,13 @@ async function theCrew(g) {
 async function armoured(g) {
   const { yard, freeway } = g.places, p = g.player;
 
+  await g.wait(1);
+  await say(g, '', 'Tuesday. Seven in the morning, by the light of a city that never quite gets dark or light.');
+  await phone(g, CHERITTO, 'Everybody is at the yard. The rig is warm. We are waiting on you.');
+  await reach(g, yard.gate, 'Drive to the <b>yard</b>.');
   p.locked = true;
   await fade(g, 1, 1);
-  await say(g, '', 'Tuesday. Seven in the morning, by the light of a city that never quite gets dark or light.');
-  if (p.car) g.leaveCar();
+  if (p.car) { const mine = p.car; g.leaveCar(); mine.speed = 0; mine.pos.set(yard.gate.x + 3.6, 0, yard.gate.z + 22); mine.heading = yard.gate.h; }
   const rig = g.spawnCar(yard.gate.x - 8, yard.gate.z, WEST, 0xd8342c, 'truck');
   rig.driverless = true;
   place(g, spot(yard.gate, -4, 3), WEST);
@@ -338,6 +344,7 @@ async function slick(g) {
   const wreck = g.spawnCar(freeway.under.x + 5, freeway.under.z - 4, SOUTH + 1.2, 0x6f6f7a, 'armored'), rig = g.spawnCar(freeway.under.x - 2, freeway.under.z - 8, WEST + 0.4, 0xd8342c, 'truck');
   wreck.driverless = rig.driverless = true;
   place(g, spot(freeway.under, -6, 6), NORTH);
+  await playing(g, 'Lieutenant Vincent Hanna', 'You play the detective in this one');
   const drucker = actor(g, 'drucker', spot(freeway.under, -4.4, 4), SOUTH), casals = actor(g, 'casals', spot(freeway.under, -7.4, 3.6), SOUTH);
   const witness = makeHuman(randomPedLook()); witness.group.position.set(freeway.under.x + 12, groundAt(freeway.under.x + 12, freeway.under.z), freeway.under.z + 8); g.track(witness.group);
   frame(g, p.pos, spot(freeway.under, -6, 3.8), { dist: 5 });
@@ -585,22 +592,35 @@ async function eyesOn(g) {
   p.locked = true;
   await fade(g, 1, 1);
   await say(g, '', 'Major Crimes put a van on Michael Cheritto, and for three days he did nothing but eat.');
-  asHanna(g, spot(house.kerb, -26, 2), EAST);
-  const unit = g.spawnCar(house.kerb.x - 26, house.kerb.z, house.kerb.h, 0x23232b, 'sedan');
-  const mark = g.spawnCar(house.kerb.x, house.kerb.z, house.kerb.h, 0x3a3a44, 'suv'); mark.driverless = true;
-  const drucker = actor(g, 'drucker', spot(p.pos, 1.6, 0.6), WEST);
-  frame(g, p.pos, drucker.group.position, { dist: 4 });
+  asHanna(g, spot(precinct.door, 0, -1.6), NORTH);
+  await playing(g, 'Lieutenant Vincent Hanna', 'You play the detective in this one');
+  const stake = spot(house.kerb, -26, 0);
+  const unit = g.spawnCar(precinct.kerb.x, precinct.kerb.z, precinct.kerb.h, 0x23232b, 'sedan'); unit.mission = true;
+  const mark = g.spawnCar(house.kerb.x, house.kerb.z, house.kerb.h, 0x3a3a44, 'suv'); mark.driverless = true; mark.mission = true;
+  const drucker = actor(g, 'drucker', spot(precinct.door, -1.3, -3.8), SOUTH), casals = actor(g, 'casals', spot(precinct.door, 1.4, -3.5), SOUTH);
+  frame(g, p.pos, drucker.group.position, { dist: 4.6 });
   g.hud.fade(0, 1.2);
-  await titleCard(g, 'Eyes On', "Outside Cheritto's house");
+  await titleCard(g, 'Eyes On', 'Major Crimes');
   await talk(g, [
-    [DRUCKER, "He's coming out. Clean shirt. He's meeting somebody.", drucker],
-    [HANNA, 'Then so are we. I drive. Nobody gets closer than a block.', p],
+    [DRUCKER, 'Three days on Cheritto. He eats, he sleeps, he eats. This morning he ironed a shirt.', drucker],
+    [HANNA, 'Then he is meeting somebody. Where is he now?', p],
+    [CASALS, 'Still at the house. Grey truck at the kerb.', casals],
+    [HANNA, 'I will sit on him myself. When he moves, nobody gets closer than a block.', p],
   ]);
   g.cam.fixed = null;
-  dismiss(g, drucker);
+  dismiss(g, drucker, casals);
   p.locked = false;
   g.hud.objective('Get in the <b>car</b>.');
   await g.until(() => p.car);
+  await reach(g, stake, "<b>Drive</b> to Cheritto's street and park behind the grey truck.", { how: 'car', r: 7 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  const leaving = actor(g, 'cheritto', spot(house.door, 0, Math.cos(house.door.h ?? 0) * 1.5), house.door.h ?? SOUTH);
+  shot(g, spot(stake, 0, house.kerb.h > 0 ? -4 : 4), house.door, 1.5, 1.3);
+  await say(g, '', 'He sat for forty minutes. Then the front door opened, and a big man in a clean shirt came down the path and got into the truck.');
+  dismiss(g, leaving);
+  g.cam.fixed = null;
+  p.locked = false;
   for (;;) {
     dispatch(g, mark, house.kerb, truckstop.kerb, 9);
     if (await tail(g, mark, truckstop.kerb, "<b>Follow the</b> grey truck. Stay back. Don't lose him.")) break;
@@ -716,13 +736,14 @@ async function theNextOne(g) {
 async function preciousMetals(g) {
   const { depository, bar } = g.places, p = g.player;
 
+  await g.wait(1);
+  g.setNight(1);
+  await say(g, '', 'Two in the morning. Chris had a drill, Cheritto had the bags, and Neil had the street.');
+  await phone(g, CHRIS, 'We are parked a block off the depository. Nothing moving. Come and open the night for us.');
+  await reach(g, depository.gate, '<b>Drive</b> to the depository.', { how: 'car', r: 8 });
   p.locked = true;
   await fade(g, 1, 1);
-  await say(g, '', 'Two in the morning. Chris had a drill, Cheritto had the bags, and Neil had the street.');
-  if (p.car) g.leaveCar();
-  g.setNight(1);
-  const ride = g.tonyCar; ride.pos.set(depository.gate.x - 8, 0, depository.gate.z); ride.heading = depository.gate.h; ride.speed = 0;
-  place(g, spot(depository.gate, -4, -4), NORTH);
+  place(g, spot(depository.gate, -4, -4), NORTH, { x: depository.gate.x - 8, z: depository.gate.z, h: depository.gate.h });
   const chris = actor(g, 'shiherlis', spot(depository.door, -1.2, 1.2), NORTH), cheritto = actor(g, 'cheritto', spot(depository.door, 1.2, 1.6), NORTH);
   g.cam.fixed = null;
   g.hud.fade(0, 1.2);
@@ -852,6 +873,7 @@ async function counterSurveillance(g) {
   await fade(g, 1, 1);
   await say(g, '', 'Twenty minutes later three detectives walked into the same square of asphalt to see what the crew had been looking at.');
   const hanna = asHanna(g, spot(containers.centre, 0, 12), NORTH);
+  await playing(g, 'Lieutenant Vincent Hanna', 'The other side of it');
   const drucker = actor(g, 'drucker', spot(containers.centre, -2, 13), NORTH), casals = actor(g, 'casals', spot(containers.centre, 2.2, 13.4), NORTH);
   const men = [follower(g, drucker, { gap: 2.2 }), follower(g, casals, { gap: 3.4 })];
   g.cam.fixed = null;
@@ -890,11 +912,19 @@ async function justine(g) {
   await fade(g, 1, 1);
   await say(g, '', 'Hanna went home, which he did some nights.');
   g.setNight(1);
-  asHanna(g, spot(precinct.kerb, 0, -3), SOUTH);
-  const unit = g.spawnCar(precinct.kerb.x, precinct.kerb.z, precinct.kerb.h, 0x23232b, 'sedan');
-  g.cam.fixed = null;
+  asHanna(g, spot(precinct.door, 0, -1.6), NORTH);
+  await playing(g, 'Lieutenant Vincent Hanna', 'You play the detective in this one');
+  const unit = g.spawnCar(precinct.kerb.x, precinct.kerb.z, precinct.kerb.h, 0x23232b, 'sedan'); unit.mission = true;
+  const drucker = actor(g, 'drucker', spot(precinct.door, 1, -3.8), SOUTH);
+  frame(g, p.pos, drucker.group.position, { dist: 4.2 });
   g.hud.fade(0, 1.2);
   await titleCard(g, 'Justine', 'Major Crimes, 11 p.m.');
+  await talk(g, [
+    [DRUCKER, 'Go home, Vincent. They are not going to rob anything tonight. We will call you.', drucker],
+    [HANNA, 'Home. Right. I know where that is.', p],
+  ]);
+  g.cam.fixed = null;
+  dismiss(g, drucker);
   p.locked = false;
   g.hud.objective('Get in the <b>car</b>.');
   await g.until(() => p.car);
@@ -933,22 +963,41 @@ async function justine(g) {
 // Hanna pulls Neil over, and buys him a cup of coffee.
 
 async function coffee(g) {
-  const { freeway, kates } = g.places, p = g.player, neil = p.human, DINER = g.places.rooms.DINER;
+  const { freeway, kates, precinct, home } = g.places, p = g.player, neil = p.human, DINER = g.places.rooms.DINER;
 
   p.locked = true;
   await fade(g, 1, 1);
-  await say(g, '', 'His name was Neil McCauley. Folsom, McNeil, no wife, no address worth the name. Hanna read the file twice and went to look at him.');
+  await say(g, '', 'It took Major Crimes a week to put a name to the man in the grey suit.');
   g.setNight(1);
-  asHanna(g, spot(freeway.north, -4, -34), SOUTH);
-  const unit = g.spawnCar(freeway.north.x - 3.6, freeway.north.z - 30, SOUTH, 0x23232b, 'sedan');
-  const his = g.spawnCar(freeway.north.x - 3.6, freeway.north.z + 60, SOUTH, 0x1d1d24, 'sedan'); his.driverless = true;
-  g.cam.fixed = null;
+  asHanna(g, spot(precinct.door, 0, -1.6), NORTH);
+  await playing(g, 'Lieutenant Vincent Hanna', 'You play the detective in this one');
+  const unit = g.spawnCar(precinct.kerb.x, precinct.kerb.z, precinct.kerb.h, 0x23232b, 'sedan'); unit.mission = true;
+  const his = g.tonyCar, stake = spot(home.road, -36, 0);
+  his.pos.set(home.road.x, 0, home.road.z); his.heading = WEST; his.speed = 0; his.driverless = true; his.sync?.();
+  const casals = actor(g, 'casals', spot(precinct.door, 1, -3.8), SOUTH);
+  frame(g, p.pos, casals.group.position, { dist: 4.2 });
   g.hud.fade(0, 1.2);
-  await titleCard(g, 'Coffee', 'The avenue under the freeway, midnight');
+  await titleCard(g, 'Coffee', 'Major Crimes, midnight');
+  await talk(g, [
+    [CASALS, 'Neil McCauley. Folsom, McNeil before that. No wife, no address worth the name. A house on the water he sleeps in.', casals],
+    [HANNA, 'I have read about him for a week. Now I want to look at him.', p],
+    [CASALS, 'He goes out most nights around twelve. Black sedan.', casals],
+  ]);
+  g.cam.fixed = null;
+  dismiss(g, casals);
   p.locked = false;
   g.hud.objective('Get in the <b>car</b>.');
   await g.until(() => p.car);
-  dispatch(g, his, freeway.north, { x: freeway.x, z: freeway.south.z + 300 }, 15);
+  await reach(g, stake, "<b>Drive</b> to McCauley's house and wait down the road.", { how: 'car', r: 7 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  const out = actor(g, 'neil', spot(home.road, 1.8, 0.6), WEST);
+  shot(g, spot(stake, 0, 3.5), home.road, 1.5, 1.2);
+  await say(g, '', 'At ten to twelve a man in a grey suit came down to the road, looked at the street for longer than most people do, and got into a black sedan.');
+  dismiss(g, out);
+  g.cam.fixed = null;
+  p.locked = false;
+  dispatch(g, his, home.road, { x: freeway.x, z: freeway.south.z + 300 }, 15);
   const blip = { x: his.pos.x, z: his.pos.z, color: '#ffffff' }; g.blips.push(blip);
   g.hud.objective('<b>Catch up</b> with the black sedan and sit on its bumper.');
   let close = 0;
@@ -1171,6 +1220,7 @@ async function wheels(g) {
   await fade(g, 1, 1);
   await say(g, '', 'Trejo took a bus to the airport with a slim piece of steel up his sleeve, like a man going to meet a flight.');
   asCrew(g, 'trejo', spot(airport.kerb, -18, 5), EAST);
+  await playing(g, 'Trejo', 'The driver. You play him in this one');
   const row = spot(airport.kerb, 0, 2.2);
   const loud = prop(g, spot(row, -8, 0), EAST, 0xd8342c, 'coupe'), box = prop(g, spot(row, 2, 0), EAST, 0xf4f4f0, 'van'), grey = prop(g, spot(row, 12, 0), EAST, 0x8d8a8e, 'sedan');
   g.cam.fixed = null;
@@ -1244,11 +1294,21 @@ async function hardware(g) {
   p.locked = true;
   await fade(g, 1, 1);
   await say(g, '', 'Chris took the envelope Neil gave him, and did not open it, and did not go by way of Vegas.');
-  asCrew(g, 'shiherlis', spot(theirs.kerb, 0, theirs.kerb.h > 0 ? -3 : 3), theirs.kerb.h);
+  const dh = theirs.door.h ?? SOUTH;
+  asCrew(g, 'shiherlis', { x: theirs.door.x - 0.8, z: theirs.door.z + Math.cos(dh) * 1.8 }, dh + Math.PI);
+  await playing(g, 'Chris Shiherlis', 'The boxman. You play him in this one');
   const truck = prop(g, theirs.kerb, theirs.kerb.h, 0x3b4a66, 'pickup');
-  g.cam.fixed = null;
+  const charlene = actor(g, 'charlene', spot(theirs.door, 0.6, 0), dh);
+  shot(g, theirs.kerb, theirs.door, 1.5, 1.4);
   g.hud.fade(0, 1.2);
   await titleCard(g, 'Hardware', 'Thirty thousand dollars in an envelope');
+  await talk(g, [
+    [CHARLENE, 'An envelope that thick, and I am supposed to believe it is not going on a card table.', charlene],
+    [CHRIS, 'It is not mine. It goes where Neil said, and I come home with what he asked for.', p],
+    [CHARLENE, 'Then come home.', charlene],
+  ]);
+  g.cam.fixed = null;
+  dismiss(g, charlene);
   p.locked = false;
   g.hud.objective('Get in the <b>pickup</b>.');
   await g.until(() => p.car);
@@ -1323,6 +1383,7 @@ async function theLine(g) {
   await say(g, '', 'Wednesday, eleven at night. Michael Cheritto, two hundred and forty pounds, in a telephone company jacket.');
   g.setNight(1);
   asCrew(g, 'cheritto', spot(bank.kerb, -3, -2.5), NORTH);
+  await playing(g, 'Michael Cheritto', 'The big man. You play him in this one');
   const van = prop(g, bank.kerb, EAST, 0xf4f4f0, 'van');
   // The guard walks the building, round and round.
   const loop = [[-26, 16], [-26, -27], [26, -27], [26, 16]].map(([x, z]) => ({ x: c.x + x, z: c.z + z }));
@@ -1617,6 +1678,7 @@ async function theStreet(g) {
   const hanna = p.human;
   place(g, { x: X7 + 4, z: S - 10 }, NORTH);
   carbine(g, 300);
+  await playing(g, 'Lieutenant Vincent Hanna', 'The other side of the street');
   cheritto.group.position.set(X7 + 2, groundAt(X7 + 2, S - 44), S - 44); cheritto.group.rotation.y = NORTH; cheritto.arm('rifle');
   const runner = g.addNpc(cheritto, { ai: 'flee', health: 170, damage: 10 }), mark = quarry(g, runner);
   g.cam.fixed = null;
