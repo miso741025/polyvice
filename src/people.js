@@ -239,6 +239,13 @@ function prepareBody(scene, skins, animations, sourcePelvis, female) {
     { t: 0, rot: {} }, { t: 0.25, rot: { [R]: [-1.25, 0, 0.12], [r]: [-0.25], spine_02: [0.06] } }, { t: 0.5, rot: { [R]: [-1.15, 0, 0.12], [r]: [-0.5], spine_02: [0.06] } },
     { t: 0.75, rot: { [R]: [-1.25, 0, 0.12], [r]: [-0.2], spine_02: [0.06] } }, { t: 1.3, rot: { [R]: [-1.2, 0, 0.12], [r]: [-0.3] } }, { t: 1.8, rot: {} },
   ], true);
+  author('phone', stand, 0, [ // a telephone held to the right ear, the head a little toward it
+    { t: 0, rot: { [R]: [-0.62, 0, 0.5], [r]: [-2.3], Head: [0.04, 0, -0.1] } }, { t: 1.4, rot: { [R]: [-0.66, 0, 0.5], [r]: [-2.34], Head: [0.1, 0, -0.12] } },
+    { t: 2.8, rot: { [R]: [-0.62, 0, 0.5], [r]: [-2.3], Head: [0.04, 0, -0.1] } },
+  ], true);
+  author('listen', stand, 0, [ // hearing somebody out: the head goes a little to one side, and back
+    { t: 0, rot: {} }, { t: 0.5, rot: { Head: [0.05, 0.1, 0.06], spine_02: [0.03] } }, { t: 1.6, rot: { Head: [0.03, 0.06, 0.08], spine_02: [0.04] } }, { t: 2.4, rot: {} },
+  ], true);
   author('nod', stand, 0, [{ t: 0, rot: {} }, { t: 0.18, rot: { Head: [0.22] } }, { t: 0.36, rot: { Head: [0.02] } }, { t: 0.54, rot: { Head: [0.18] } }, { t: 0.8, rot: {} }], true);
   author('no', stand, 0, [{ t: 0, rot: {} }, { t: 0.18, rot: { Head: [0, 0.3] } }, { t: 0.42, rot: { Head: [0, -0.3] } }, { t: 0.66, rot: { Head: [0, 0.22] } }, { t: 0.9, rot: {} }], true);
   B.parts = {};
@@ -926,6 +933,7 @@ export function makeHuman(opts = {}) {
   gun('smg', [[0.03, 0.05, 0.3, 0, 0.02, 0.1, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3], [0.024, 0.13, 0.03, 0, -0.05, 0.1, 0], [0.018, 0.018, 0.1, 0, 0.03, 0.3, 0], [0.03, 0.03, 0.12, 0, 0.02, -0.1, 0, woodMat]]);
   gun('shotgun', [[0.028, 0.028, 0.5, 0, 0.03, 0.22, 0], [0.034, 0.034, 0.22, 0, 0.0, 0.2, 0, woodMat], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3, woodMat], [0.03, 0.07, 0.18, 0, -0.01, -0.12, 0.15, woodMat]]);
   gun('rifle', [[0.03, 0.05, 0.36, 0, 0.02, 0.12, 0], [0.018, 0.018, 0.26, 0, 0.03, 0.42, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3], [0.026, 0.15, 0.04, 0, -0.06, 0.14, 0.25], [0.028, 0.06, 0.24, 0, 0.0, -0.2, 0], [0.012, 0.03, 0.03, 0, 0.06, 0.3, 0]]);
+  gun('phone', [[0.055, 0.02, 0.13, 0, 0.012, 0.02, 0, new THREE.MeshLambertMaterial({ color: 0x16161c })], [0.006, 0.006, 0.09, 0.02, 0.012, 0.12, 0]]); // a telephone, of the years when they had aerials
   const pistol = guns.pistol;
   // A long gun he owns but is not holding hangs across his back, on its sling.
   let spineBone = null;

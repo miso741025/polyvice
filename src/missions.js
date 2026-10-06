@@ -153,7 +153,28 @@ export async function talk(g, lines) {
   }
   talking = false;
 }
-export const phone = (g, who, text) => { if (!g.ringing) { g.ringing = true; g.sfx?.phone(); g.wait(1.5).then(() => { g.ringing = false; }).catch(() => {}); } return say(g, who + ' (phone)', text); };
+// A telephone call. It rings, he takes the phone out and holds it to his ear (walking or standing; in a car it
+// cannot be seen), and puts it away a few seconds after the last thing said.
+export const phone = (g, who, text) => {
+  const p = g.player;
+  if (!g.ringing) { g.ringing = true; g.sfx?.phone(); g.wait(1.5).then(() => { g.ringing = false; }).catch(() => {}); }
+  if (!p.car && !p.hidden) {
+    if (!p.onPhone) {
+      const who0 = p.human;
+      p.onPhone = true; p.topPose = 'phone'; who0.arm('phone');
+      g.updaters.push(() => {
+        if (p.human === who0 && !p.car && !p.hidden && g.time < g.hangUp) { if (!p.topPose) p.topPose = 'phone'; return true; }
+        p.onPhone = false;
+        if (p.topPose === 'phone') p.topPose = null;
+        who0.arm(false);
+        if (p.human === who0) g.setWeapon(p.weapon, true); // whatever he was holding, back in his hand
+        return false;
+      });
+    }
+    g.hangUp = g.time + Math.max(2.4, text.length * 0.065) + 3.6;
+  }
+  return say(g, who + ' (phone)', text);
+};
 
 export async function fade(g, to, seconds) {
   g.hud.fade(to, seconds);
@@ -359,16 +380,43 @@ export const allDown = (g, npcs) => g.until(() => npcs.every(n => n.dead || n.hu
 
 // A session with Dr. Melfi in the interior set. Leaves the screen black; the caller sets up what follows.
 export async function therapy(g, lines) {
-  const { office } = g.places, p = g.player, night = g.night;
+  const { office } = g.places, p = g.player, night = g.night, { tony, melfi } = office.cast, T = tony.group.position, M = melfi.group.position;
   p.locked = true;
   await fade(g, 1, 1);
   if (p.car) p.car.speed = 0;
   p.hidden = true;
   g.setNight(0);
-  g.cam.fixed = { pos: office.cam, look: office.look };
+  tony.group.visible = melfi.group.visible = true;
+  // Three ways of looking at it: the two of them across the rug, and each over the other's shoulder.
+  const v = (x, y, z) => new THREE.Vector3(x, T.y + y, z), cx = (T.x + M.x) / 2;
+  const wide = { pos: office.cam.clone(), look: office.look.clone() };
+  const onTony = { pos: v(M.x - 0.5, 1.42, M.z + 1.25), look: v(T.x, 1.12, T.z) }, onMelfi = { pos: v(T.x + 0.5, 1.42, T.z + 1.25), look: v(M.x, 1.12, M.z) };
+  const low = { pos: v(cx + 0.2, 0.85, T.z + 3.1), look: v(cx, 1, T.z) };
+  g.cam.fixed = wide;
   await fade(g, 0, 1);
-  for (const [who, text] of lines) await say(g, who, text);
+  await g.wait(0.8);
+  let last = null, n = 0;
+  for (const [who, text] of lines) {
+    const a = who === TONY ? tony : who === MELFI ? melfi : null, other = a === tony ? melfi : tony;
+    n++;
+    // A new speaker is a new shot; a long silence, or a line of narration, goes back to the room.
+    if (!a) g.cam.fixed = n % 2 ? wide : low;
+    else if (a !== last) g.cam.fixed = a === tony ? onTony : onMelfi;
+    else if (text.length > 110) g.cam.fixed = wide;
+    last = a;
+    if (a) {
+      const loud = /!/.test(text), ask = /\?/.test(text), r = Math.random();
+      const gesture = text.length < 16 ? null : loud ? 'say3' : ask ? (r < 0.6 ? 'say2' : 'say1') : r < 0.55 ? 'say1' : r < 0.8 ? 'say2' : null;
+      if (gesture) a.layer(gesture); else if (/^\.\.\./.test(text)) a.layer('no', { once: true, speed: 0.5 });
+      other.layer(r < 0.5 ? 'listen' : null);
+    }
+    await say(g, who, text);
+    if (a) { a.layer(null); other.layer(null); if (!/\?$/.test(text) && Math.random() < 0.4) other.layer('nod', { once: true }); }
+  }
+  g.cam.fixed = wide;
+  await g.wait(0.6);
   await fade(g, 1, 1);
+  tony.layer(null); melfi.layer(null);
   g.cam.fixed = null;
   p.hidden = false;
   g.setNight(night);

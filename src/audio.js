@@ -80,16 +80,16 @@ const spotAt = (level, pan = 0, to = world) => { const p = panTo(to), g = ctx.cr
 // resonances, like an exhaust and an intake, put most of it between 300 and 1500 Hz, where a laptop's speakers can
 // actually reproduce it. (The first version lived below 200 Hz and could not be heard on anything small.)
 const engine = (() => {
-  const out = gainAt(0, master), body = filter('lowpass', 3200, 0.5, out);
-  const f1 = filter('bandpass', 380, 1.2, gainAt(1.1, body)), f2 = filter('bandpass', 950, 1.6, gainAt(0.7, body)), low = filter('lowpass', 240, 0.7, gainAt(0.8, body));
+  const out = gainAt(0, master), body = filter('lowpass', 1500, 0.5, out);
+  const f1 = filter('bandpass', 340, 0.9, gainAt(1.1, body)), f2 = filter('bandpass', 820, 1.1, gainAt(0.28, body)), low = filter('lowpass', 240, 0.7, gainAt(0.9, body));
   const shape = ctx.createWaveShaper(), curve = new Float32Array(1024);
-  for (let k = 0; k < 1024; k++) curve[k] = Math.tanh((k / 512 - 1) * 3.2);
+  for (let k = 0; k < 1024; k++) curve[k] = Math.tanh((k / 512 - 1) * 1.3); // only a little grit: any more and it rasps
   shape.curve = curve; shape.connect(f1); shape.connect(f2); shape.connect(low);
   const pre = ctx.createGain(); pre.gain.value = 0.7; pre.connect(shape);
   const a = ctx.createOscillator(), b = ctx.createOscillator(), c = ctx.createOscillator();
-  a.type = 'sawtooth'; b.type = 'sawtooth'; c.type = 'square';
-  a.connect(gainAt(0.6, pre)); b.connect(gainAt(0.3, pre)); c.connect(gainAt(0.45, pre));
-  const rasp = gainAt(0, body), rb = filter('bandpass', 1500, 0.8, rasp), rn = noise(); rn.connect(rb);
+  a.type = 'sawtooth'; b.type = 'triangle'; c.type = 'triangle';
+  a.connect(gainAt(0.5, pre)); b.connect(gainAt(0.35, pre)); c.connect(gainAt(0.5, pre));
+  const rasp = gainAt(0, body), rb = filter('bandpass', 700, 0.6, rasp), rn = noise(BROWN); rn.connect(rb);
   a.start(); b.start(); c.start(); rn.start();
   return { out, a, b, c, f1, f2, rasp };
 })();
@@ -97,8 +97,8 @@ const engine = (() => {
 const GEARS = [0, 8, 16, 25, 35, 60];
 const revs = v => { const k = Math.max(0, GEARS.findIndex(g => v < g) - 1), lo = GEARS[k], hi = GEARS[k + 1] ?? 80; return { gear: k, frac: Math.min(1, (v - lo) / (hi - lo)) }; };
 // The road under the tyres, and the air over the roof: both grow with speed.
-const road = (() => { const out = gainAt(0, master), bp = filter('bandpass', 700, 0.6, out), s = noise(); s.connect(bp); s.start(); return { out, bp }; })();
-const rush = (() => { const out = gainAt(0, master), hp = filter('highpass', 2200, 0.5, out), s = noise(); s.connect(hp); s.start(); return { out }; })();
+const road = (() => { const out = gainAt(0, master), bp = filter('lowpass', 420, 0.6, out), s = noise(BROWN); s.connect(bp); s.start(); return { out, bp }; })();
+const rush = (() => { const out = gainAt(0, master), hp = filter('bandpass', 1100, 0.4, out), s = noise(); s.connect(hp); s.start(); return { out }; })();
 // Tyres: a squeal while sliding.
 const skid = (() => {
   const out = gainAt(0, master), bp = filter('bandpass', 1800, 6, out), s = noise();
@@ -414,11 +414,11 @@ export const sfx = {
     const quiet = radio.playing ? 0.6 : 1, car = bed('car', master, inCar ? (0.3 + throttle * 0.14) * quiet : 0, 0.15, 0.6 + (v < 0.6 ? throttle * 0.35 : 0.12 + frac * 0.85));
     smooth(engine.a.frequency, fire, 0.07); smooth(engine.b.frequency, fire * 2.01, 0.07); smooth(engine.c.frequency, fire / 2, 0.07);
     smooth(engine.f1.frequency, 300 + fire * 2.2, 0.1); smooth(engine.f2.frequency, 720 + fire * 5, 0.1);
-    smooth(engine.rasp.gain, inCar ? throttle * 0.05 + frac * 0.02 : 0, 0.1);
-    smooth(engine.out.gain, inCar && !car ? (0.11 + throttle * 0.09 + frac * 0.04) * quiet : 0, 0.08);
-    smooth(road.out.gain, inCar ? Math.min(0.07, v / 40 * 0.07) * (surface === 'sand' || surface === 'grass' ? 1.8 : 1) : 0, 0.15);
-    smooth(road.bp.frequency, surface === 'wood' ? 300 : 500 + v * 14, 0.2);
-    smooth(rush.out.gain, inCar ? Math.min(0.05, (v / 38) ** 2 * 0.05) : 0, 0.2);
+    smooth(engine.rasp.gain, inCar ? throttle * 0.03 + frac * 0.012 : 0, 0.1);
+    smooth(engine.out.gain, inCar && !car ? (0.07 + throttle * 0.05 + frac * 0.025) * quiet : 0, 0.35); // it comes up over a second, so getting in is not a jolt
+    smooth(road.out.gain, inCar ? Math.min(0.16, v / 40 * 0.16) * (surface === 'sand' || surface === 'grass' ? 1.5 : 1) : 0, 0.3);
+    smooth(road.bp.frequency, surface === 'wood' ? 260 : 300 + v * 8, 0.3);
+    smooth(rush.out.gain, inCar ? Math.min(0.012, (v / 38) ** 2 * 0.012) : 0, 0.4);
     smooth(skid.out.gain, inCar ? sliding * 0.2 : 0, 0.04);
 
     // Indoors the street is behind a wall.

@@ -2933,12 +2933,52 @@ function buildOffice(scene, T, X, Z) {
   add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 6), new THREE.MeshLambertMaterial({ color: 0x1c1c22 })), -4.6, 0.8, 3.6);
   add(new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.5, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe2a6, side: THREE.DoubleSide })), -4.6, 1.8, 3.6); // floor lamp
 
+  // ----- The rest of the room: it is seen every week, so it is furnished like a room somebody works in -----
+  const lam = hex => new THREE.MeshLambertMaterial({ color: hex }), glowOf = hex => new THREE.MeshBasicMaterial({ color: hex });
+  const cyl = (r0, r1, h, hex, sides = 14, glow = false) => new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, sides), glow ? glowOf(hex) : lam(hex));
+  // Panelling to the height of a chair back, a rail above it, a skirting board, a cornice.
+  for (const [w, d, x, z] of [[12, 0.06, 0, -4.97], [12, 0.06, 0, 4.97], [0.06, 10, -5.97, 0], [0.06, 10, 5.97, 0]]) {
+    add(box(w, 1.1, d, 0x5a3a2a), x, 0.55, z); add(box(w + 0.02, 0.08, d + 0.04, 0x3a2418), x, 1.13, z); add(box(w + 0.02, 0.16, d + 0.04, 0x3a2418), x, 0.08, z); add(box(w + 0.02, 0.14, d + 0.06, 0xe9e2cf), x, 4.5, z);
+  }
+  // A low table between the chairs: water, two glasses, a small bronze nobody has ever asked about.
+  add(cyl(0.62, 0.62, 0.05, 0x3a2418, 24), 0, 0.42, -0.1); add(cyl(0.08, 0.2, 0.4, 0x2b1a12, 10), 0, 0.2, -0.1);
+  add(cyl(0.07, 0.09, 0.26, 0xcfe8f5, 10), -0.22, 0.58, -0.2); for (const dx of [0.02, 0.2]) add(cyl(0.035, 0.03, 0.1, 0xe9f4fa, 8), dx, 0.5, 0.12);
+  add(cyl(0.02, 0.09, 0.22, 0x6a4a34, 6), 0.26, 0.56, -0.3); add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), lam(0x6a4a34)), 0.26, 0.71, -0.3);
+  // Her desk, in the corner behind her: a lamp with a green shade, files, a telephone, the chair pushed in.
+  add(box(2.3, 0.07, 1.05, 0x3a2418), 2.9, 0.78, -3.5); for (const dx of [-0.85, 0.85]) add(box(0.5, 0.75, 0.95, 0x2b1a12), 2.9 + dx, 0.375, -3.5);
+  add(cyl(0.03, 0.09, 0.34, 0xd9a520, 8), 3.7, 0.98, -3.7); add(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.2, 0.14, 12), glowOf(0x7fd0a0)), 3.7, 1.2, -3.7);
+  for (let k = 0; k < 4; k++) add(box(0.32, 0.03, 0.42, [0xe9e2cf, 0xd9c7a0, 0xf4f4f0, 0xc9b79c][k]), 2.35 + (k % 2) * 0.05, 0.83 + k * 0.03, -3.45);
+  add(box(0.24, 0.08, 0.2, 0x16161c), 3.1, 0.86, -3.3); add(box(0.2, 0.05, 0.06, 0x16161c), 3.1, 0.92, -3.3);
+  add(box(0.6, 0.1, 0.6, 0x27403b), 2.9, 0.5, -4.3); add(box(0.6, 0.8, 0.1, 0x27403b), 2.9, 0.95, -4.6);
+  // A couch along the west wall, for the patients who cannot look at her.
+  add(box(0.95, 0.42, 3.2, 0x6a4a52), -5.25, 0.21, -0.4); add(box(0.25, 0.9, 3.2, 0x5a3e46), -5.78, 0.6, -0.4);
+  for (const dz of [-1.75, 1.75]) add(box(0.95, 0.62, 0.25, 0x5a3e46), -5.25, 0.42, -0.4 + dz); for (const dz of [-1.1, 0.9]) add(box(0.16, 0.45, 0.5, 0xd9a520), -5.5, 0.62, -0.4 + dz);
+  // Things on the walls: three prints over the couch, a clock that is always nearly ten to the hour, two more frames by the diploma.
+  for (const [k, hex] of [0x2f56c8, 0xd8342c, 0xd9a520].entries()) { const f = add(box(0.05, 0.9, 0.7, 0x2b1a12), -5.94, 2.5, -1.3 + k * 0.95); f.name = 'frame'; add(box(0.03, 0.74, 0.54, 0xe9e2cf), -5.9, 2.5, -1.3 + k * 0.95); add(box(0.02, 0.4, 0.3, hex), -5.88, 2.45 + (k % 2) * 0.1, -1.3 + k * 0.95); }
+  add(cyl(0.3, 0.3, 0.05, 0xf4f1e6, 24), 0.4, 3.2, -4.92).rotation.x = Math.PI / 2; add(cyl(0.33, 0.33, 0.04, 0x2b1a12, 24), 0.4, 3.2, -4.94).rotation.x = Math.PI / 2;
+  add(box(0.03, 0.22, 0.02, 0x16161c), 0.4, 3.28, -4.88).rotation.z = 0.5; add(box(0.02, 0.26, 0.02, 0x16161c), 0.33, 3.26, -4.88).rotation.z = 1.2;
+  for (const [x, hex] of [[4.3, 0x49a0d0], [0.9, 0x8a6f8f]]) { add(box(0.7, 0.9, 0.05, 0x2b1a12), x, 2.3, -4.95); add(box(0.56, 0.76, 0.03, hex), x, 2.3, -4.92); }
+  // A cabinet under the diploma, with a vase and a photograph turned away from the patient.
+  add(box(1.9, 0.8, 0.5, 0x3a2418), 1.0, 0.4, -4.68); add(cyl(0.1, 0.07, 0.3, 0x49a0d0, 10), 0.5, 0.95, -4.68); add(new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), lam(0xf7a8c4)), 0.5, 1.2, -4.68); add(box(0.22, 0.28, 0.03, 0xd9a520), 1.5, 0.94, -4.6).rotation.y = 2.6;
+  // Curtains at the window, a second lamp, a coat stand by the door with one umbrella in it.
+  for (const dz of [-1.5, 1.5]) add(box(0.14, 3.2, 0.5, 0x6a2a34), 5.86, 2.2, dz); add(box(0.1, 0.1, 3.6, 0x3a2418), 5.86, 3.85, 0);
+  add(box(0.5, 0.55, 0.5, 0x2b1a12), 4.4, 0.275, 2.6); add(cyl(0.03, 0.08, 0.4, 0xd9a520, 8), 4.4, 0.75, 2.6); add(new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.3, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xffe2a6, side: THREE.DoubleSide })), 4.4, 1.05, 2.6);
+  add(cyl(0.03, 0.03, 1.8, 0x2b1a12, 6), -4.9, 0.9, 4.4); add(cyl(0.25, 0.25, 0.04, 0x2b1a12, 10), -4.9, 0.02, 4.4); for (let k = 0; k < 3; k++) add(box(0.22, 0.03, 0.03, 0x2b1a12), -4.9, 1.7, 4.4).rotation.y = k * 2.1;
+  add(cyl(0.025, 0.015, 0.9, 0x16161c, 6), -4.7, 0.5, 4.5).rotation.z = 0.12;
+  // A lamp over the middle of the room, a notebook on the arm of her chair, a box of tissues within reach of his.
+  add(cyl(0.02, 0.02, 0.5, 0x2b1a12, 6), 0, 4.3, 0); add(new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 8).scale(1, 0.55, 1), glowOf(0xffe8c0)), 0, 4.0, 0);
+  add(box(0.2, 0.02, 0.28, 0xf4f4f0), 2.3, 0.78, 0.56); add(box(0.015, 0.015, 0.16, 0x16161c), 2.3, 0.8, 0.5).rotation.y = 0.5;
+  add(box(0.24, 0.12, 0.14, 0xe9eef2), -2.25, 0.83, -0.56);
+  // The rug's border, and its middle.
+  for (const [r0, r1, hex] of [[1.2, 1.32, 0xd9b25a], [0.5, 1.2, 0x7a2430]]) { const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 32), lam(hex)); m.rotation.x = -Math.PI / 2; add(m, 0, 0.036, 0); }
+
   const tony = makeTony();
   tony.set('sit'); tony.group.rotation.y = Math.PI / 2; add(tony.group, -2.02, 0, 0);
   const melfi = makeLook('melfi');
   melfi.set('sit'); melfi.group.rotation.y = -Math.PI / 2; add(melfi.group, 2.02, 0, 0);
 
-  interiors.push({ minX: X - 5.6, maxX: X + 5.6, minZ: Z - 4.6, maxZ: Z + 4.6, lights: [{ x: X, y: base + 3.9, z: Z + 1, hex: 0xffd9a8, power: 45, reach: 30 }] });
+  interiors.push({ minX: X - 5.6, maxX: X + 5.6, minZ: Z - 4.6, maxZ: Z + 4.6, lights: [{ x: X, y: base + 3.7, z: Z + 0.6, hex: 0xffd9a8, power: 42, reach: 30 }, { x: X + 3.4, y: base + 1.6, z: Z - 3.2, hex: 0x9fe0b8, power: 9, reach: 7 }, { x: X + 4.4, y: base + 1.3, z: Z + 2.6, hex: 0xffd9a8, power: 10, reach: 8 }] });
+  for (const [x, z, w, d] of [[2.9, -3.7, 2.5, 1.9], [-5.3, -0.4, 1.2, 3.4], [0, -0.1, 1.3, 1.3], [1, -4.7, 2, 0.6]]) colliders.push({ minX: X + x - w / 2, maxX: X + x + w / 2, minZ: Z + z - d / 2, maxZ: Z + z + d / 2, h: 1 });
   for (const [x, z, w, d] of [[-2.2, 0, 1.2, 1.2], [2.2, 0, 1.2, 1.2], [0, 1.4, 0.8, 0.8], [-2.5, -4.6, 3.4, 0.8]]) colliders.push({ minX: X + x - w / 2, maxX: X + x + w / 2, minZ: Z + z - d / 2, maxZ: Z + z + d / 2, h: 1.5 });
   add(box(1.2, 2.4, 0.08, 0x3a2418), -3.6, 1.2, 4.95);           // the door out
   return {

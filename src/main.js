@@ -741,7 +741,7 @@ async function boot() {
     else if (p.jumping) { if (!me.busy) me.set('jumpLoop'); }
     else if (!me.busy) me.set(p.pose || (p.car || p.locked ? 'idle' : p.motion === 'idle' ? (p.fighting && p.weapon === 'fist' ? 'guard' : 'idle') : p.motion));
     // The arms: aiming while the legs stand or run, or a gesture in a scene.
-    const raised = !p.car && !p.locked && !p.hidden && !p.down && !p.jumping && (p.aiming || (g.lockTarget && p.weapon !== 'fist'));
+    const raised = !p.car && !p.locked && !p.hidden && !p.down && !p.jumping && !p.onPhone && (p.aiming || (g.lockTarget && p.weapon !== 'fist'));
     me.layer(raised ? 'aim' : p.topPose || null);
 
     for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
