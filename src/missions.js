@@ -625,6 +625,28 @@ async function bingRoom(g, cam, arrange, play) {
   g.setNight(night);
 }
 
+// A walk from here to there, through these points, at this pace; it resolves when he has arrived.
+export function walkTo(g, who, pts, pace = 1.3) {
+  return new Promise((resolve, reject) => {
+    const pos = who.group.position; let k = 0, last = g.time;
+    who.set('walk', pace / 1.4);
+    g.until(() => {
+      const to = pts[k], dx = to.x - pos.x, dz = to.z - pos.z, d = Math.hypot(dx, dz), dt = Math.min(0.1, g.time - last);
+      last = g.time;
+      if (d < 0.12) { k++; return k >= pts.length; }
+      const step = Math.min(pace * dt, d);
+      pos.x += dx / d * step; pos.z += dz / d * step; who.group.rotation.y = Math.atan2(dx, dz);
+      return false;
+    }).then(() => { who.set('idle'); resolve(); }, reject);
+  });
+}
+// The ways of looking at the bed in Jackie's room: the room from the door, the man in the bed, whoever is standing over
+// him, his wife in her chair, and the door from the bed.
+const wardCams = g => {
+  const w = g.places.wardRoom, b = w.bed, y = b.y - 0.95, v = (x, yy, z) => new THREE.Vector3(x, y + yy, z);
+  return { wide: w.cam, jackie: { pos: v(b.x + 1.6, 1.35, b.z + 1.5), look: v(b.x - 0.7, 1, b.z) }, tony: { pos: v(b.x - 1.6, 1.2, b.z - 0.1), look: v(b.x + 0.5, 1.5, b.z + 1.5) },
+    rosalie: { pos: v(b.x + 1.4, 1.4, b.z + 0.7), look: v(w.chair.x, 1.15, w.chair.z) }, door: { pos: v(b.x + 0.4, 1.7, b.z - 1.6), look: v(w.inside.x, 1.25, w.inside.z + 0.6) }, floor: y };
+};
 // Up to Jackie's room on foot: in at the front of the hospital, the desk (if `ask` gives the exchange to have there), the
 // lift, the corridor, his door. It ends with the player standing in the room, ready for the scene to begin.
 async function intoWard(g, ask, text = 'Go <b>in</b>.') {
@@ -5277,17 +5299,28 @@ async function visitingHours(g) {
 
   await roomScene(g, wardRoom, room => ({
     jackie: lying(g, 'jackie', room.bed, EAST),
-    rosalie: actor(g, 'rosalie', room.chair, NORTH, 'sit'),
-    tony: actor(g, 'tony', spot(room.bed, 0.4, 1.6), NORTH),
+    rosalie: actor(g, 'rosalie', room.chair, -1.25, 'sit'),
+    tony: actor(g, 'tony', { x: room.inside.x - 0.4, y: room.bed.y - 0.95, z: room.inside.z + 0.3 }, NORTH),
   }), async cast => {
-    await talk(g, [
-      [ROSALIE, "He's been asking since this morning. Twenty minutes, the nurse says. Then he sleeps.", cast.rosalie],
-      [JACKIE, 'Tony. Look at this. Tubes. I got a tube for everything.'],
-      [TONY, 'You look good. Better than Silvio.', cast.tony],
-      [JACKIE, "Don't. ...They talk about me like I'm a photograph already. Junior's out there measuring the chair."],
-      [TONY, "Nobody's measuring anything. You get well.", cast.tony],
-      [JACKIE, 'Do me a favour. Make me laugh. One time, before this is over.'],
-    ]);
+    const C = wardCams(g), bed = wardRoom.bed, at = (dx, dz) => ({ x: bed.x + dx, z: bed.z + dz });
+    g.cam.fixed = C.door;
+    await talk(g, [[ROSALIE, "He's been asking since this morning. Twenty minutes, the nurse says. Then he sleeps.", cast.rosalie]]);
+    g.cam.fixed = C.wide;
+    await walkTo(g, cast.tony, [at(2.2, 3), at(0.5, 1.7)], 1.2);
+    cast.tony.group.rotation.y = toward(cast.tony.group.position, at(-0.6, 0));
+    g.cam.fixed = C.jackie;
+    await talk(g, [[JACKIE, 'Tony. Look at this. Tubes. I got a tube for everything.']]);
+    g.cam.fixed = C.tony;
+    await talk(g, [[TONY, 'You look good. Better than Silvio.', cast.tony]]);
+    g.cam.fixed = C.jackie;
+    await talk(g, [[JACKIE, "Don't. ...They talk about me like I'm a photograph already. Junior's out there measuring the chair."]]);
+    g.cam.fixed = C.wide;
+    cast.tony.play('interact', 'idle');                   // a hand on the rail of the bed
+    await talk(g, [[TONY, "Nobody's measuring anything. You get well.", cast.tony]]);
+    g.cam.fixed = C.jackie;
+    await talk(g, [[JACKIE, 'Do me a favour. Make me laugh. One time, before this is over.']]);
+    g.cam.fixed = C.rosalie;
+    await say(g, '', 'Rosalie looked at the window. She had heard him ask for stranger things this week.', 3.6);
   });
   { const LOBBY = downToLobby(g);
     await fade(g, 0, 1);
@@ -5691,18 +5724,39 @@ async function denial(g) {
 
   await roomScene(g, wardRoom, room => ({
     jackie: lying(g, 'jackie', room.bed, EAST),
-    rosalie: actor(g, 'rosalie', room.chair, NORTH, 'sit'),
-    tony: actor(g, 'tony', spot(room.bed, 0.4, 1.6), NORTH),
+    rosalie: actor(g, 'rosalie', room.chair, -1.25, 'sit'),
+    tony: actor(g, 'tony', { x: room.inside.x - 0.4, y: room.bed.y - 0.95, z: room.inside.z + 0.3 }, NORTH),
   }), async cast => {
-    await talk(g, [
-      [JACKIE, 'Tony. You hear what Junior is doing. With your nephew.'],
-      [TONY, 'I hear everything, Jackie. Rest.', cast.tony],
-      [JACKIE, "When I'm gone. Don't let it be a war. Promise me that."],
-      [TONY, "You're not going anywhere.", cast.tony],
-      [ROSALIE, 'He needs to sleep now, Tony.', cast.rosalie],
-      [JACKIE, 'Promise me.'],
-    ]);
-    await say(g, '', 'Tony did not promise. He straightened the blanket and left.');
+    const C = wardCams(g), bed = wardRoom.bed, at = (dx, dz) => ({ x: bed.x + dx, y: C.floor, z: bed.z + dz }), way = { x: wardRoom.inside.x, y: C.floor, z: wardRoom.inside.z + 1.2 };
+    g.cam.fixed = C.wide;
+    await walkTo(g, cast.tony, [at(2.2, 3), at(0.5, 1.7)], 1.1);
+    cast.tony.group.rotation.y = toward(cast.tony.group.position, at(-0.6, 0));
+    g.cam.fixed = C.jackie;
+    await talk(g, [[JACKIE, 'Tony. You hear what Junior is doing. With your nephew.']]);
+    g.cam.fixed = C.tony;
+    await talk(g, [[TONY, 'I hear everything, Jackie. Rest.', cast.tony]]);
+    // The nurse, with the next bag: in at the door, round the foot of the bed, a minute at the stand, and out again.
+    const nurse = extraAt(g, way, NORTH, 'idle', { body: 'female', shirt: 0xf4f4f0, tee: true, pants: 0xf4f4f0, shoes: 0xf2efe8, hair: 0x2a1a14, hairMesh: 'long' });
+    g.cam.fixed = C.door;
+    g.sfx?.door();
+    const round = walkTo(g, nurse, [at(3.2, 2.6), at(2.2, -0.4), at(1.9, -1)], 1.4).then(async () => { nurse.group.rotation.y = WEST; nurse.play('interact', 'idle'); await g.wait(1.4); nurse.play('interact', 'idle'); await g.wait(1.2); });
+    await say(g, 'Nurse', 'Do not mind me. This one is finished, and he will not tell you when it hurts, so I come and look.', 4);
+    await round;
+    g.cam.fixed = C.jackie;
+    await talk(g, [[JACKIE, "When I'm gone. Don't let it be a war. Promise me that."]]);
+    const out = walkTo(g, nurse, [at(2.2, -0.4), at(3.2, 2.6), way], 1.4).then(() => { g.untrack(nurse.group); g.sfx?.door(); });
+    g.cam.fixed = C.tony;
+    await talk(g, [[TONY, "You're not going anywhere.", cast.tony]]);
+    g.cam.fixed = C.rosalie;
+    await talk(g, [[ROSALIE, 'He needs to sleep now, Tony.', cast.rosalie]]);
+    g.cam.fixed = C.jackie;
+    await talk(g, [[JACKIE, 'Promise me.']]);
+    await out;
+    g.cam.fixed = C.wide;
+    cast.tony.play('interact', 'idle');
+    await say(g, '', 'Tony did not promise. He straightened the blanket,', 2.6);
+    walkTo(g, cast.tony, [at(2.2, 3), way], 1.2).catch(() => {});
+    await say(g, '', 'and left.', 2.2);
   });
   outOfHospital(g);
   place(g, spot(hospital.door, 0, -2), SOUTH, hospital.kerb);
@@ -6323,7 +6377,7 @@ async function figurehead(g) {
 
   await roomScene(g, wardRoom, room => ({
     jackie: lying(g, 'jackie', room.bed, EAST),
-    rosalie: actor(g, 'rosalie', room.chair, NORTH, 'sit'),
+    rosalie: actor(g, 'rosalie', room.chair, -1.25, 'sit'),
     silvio: actor(g, 'silvio', spot(room.bed, 2.4, 1.6), NORTH),
     tony: actor(g, 'tony', spot(room.bed, 0.4, 1.6), NORTH),
   }), async cast => {
