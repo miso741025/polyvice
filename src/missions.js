@@ -287,7 +287,7 @@ export function frame(g, a, b, { dist = 4.8, height = 1.7, lift = 1.3, side = 1 
 }
 
 // Wait until the player reaches a spot. `how` may be 'car' (must drive there) or 'foot' (must walk).
-export async function reach(g, at, text, { r = 6, how } = {}) {
+export async function reach(g, at, text, { r = 6, how, color } = {}) {
   { // He took the job standing at a yellow marker. If the first place it sends him is where he already is, he is not sent.
     const hub = g.hubAt, pl = g.player; g.hubAt = null;
     if (hub && near(hub, at, 45) && near(whereabouts(g), at, 55) && !(how === 'foot' && pl.car)) { // 45 m: the marker at home is at the door, and "drive home" means the road outside
@@ -300,7 +300,8 @@ export async function reach(g, at, text, { r = 6, how } = {}) {
     }
   }
   g.hud.objective(text);
-  const m = g.addMarker(at.x, at.z, r), p = g.player;
+  const m = color ? g.addMarker(at.x, at.z, r, color) : g.addMarker(at.x, at.z, r), p = g.player;
+  if (color) m.color = '#' + color.toString(16).padStart(6, '0');
   if (!p.locked) g.setCheckpoint?.();   // killed on the way: back to where the errand was given
   await g.until(() => near(p.pos, m, r + 0.4) && (how === 'car' ? p.car && Math.abs(p.car.speed) < 6 : how === 'foot' ? !p.car : true));
   g.removeMarker(m);
@@ -691,7 +692,7 @@ function outOfHospital(g) {
 // `k` is how many evenings there have been: the place and the talk go round. Every line is written for the game. -----
 const IRINA = 'Irina';
 export async function evening(g, her, home, k) {
-  const p = g.player, { pier, rideland, cafe } = g.places, COST = 150;
+  const p = g.player, { pier, rideland, cafe } = g.places, COST = 150, VIOLET = 0x9b6bff, tag = '<span style="color:#b79bff">Side job · Irina</span> &nbsp; ';
   const plans = [
     { name: 'the <b>pier</b>', drive: pier.start, walk: pier.end, card: 'The pier', lines: [
       [IRINA, 'When I was small I thought the sea was the same sea everywhere. One sea. You could walk in at home and walk out here.', her],
@@ -726,9 +727,9 @@ export async function evening(g, her, home, k) {
     g.addMoney(-COST);
     f = follower(g, her, { pace: 3.2 });
     g.hud.card('An evening out', plan.card); g.wait(3).then(() => g.hud.card()).catch(() => {});
-    if (!p.car) { g.hud.objective('Get in the <b>car</b> with Irina.'); await g.until(() => p.car); }
-    await reach(g, plan.drive, `Take her to ${plan.name}.`, { how: 'car', r: 7 });
-    await reach(g, plan.walk, 'Walk with her.', { r: 2.6, how: 'foot' });
+    if (!p.car) { g.hud.objective(tag + 'Get in the <b>car</b> with her.'); await g.until(() => p.car); }
+    await reach(g, plan.drive, `${tag}Take her to ${plan.name}.`, { how: 'car', r: 7, color: VIOLET });
+    await reach(g, plan.walk, tag + 'Walk with her.', { r: 2.6, how: 'foot', color: VIOLET });
     p.locked = true;
     f.stay = true;
     const side = spot(p.pos, 1.3, 0.3);
@@ -737,7 +738,7 @@ export async function evening(g, her, home, k) {
     frame(g, p.pos, side, { dist: 4.2, side: -1 });
     await talk(g, plan.lines);
     g.cam.fixed = null; p.locked = false; f.stay = false;
-    await reach(g, home, 'Drive her <b>home</b>.', { how: 'car', r: 7 });
+    await reach(g, home, tag + 'Drive her <b>home</b>.', { how: 'car', r: 7, color: VIOLET });
     p.locked = true;
     if (p.car) { p.car.speed = 0; g.leaveCar(); }
     await g.wait(0.8);
@@ -3197,7 +3198,7 @@ async function offer(g, mission, title, straight) {
     // If the last job left him where this one starts (at home; in the club), he is not made to walk away and come back:
     // Enter begins it. If he wanders off instead, it is the marker as usual. In a room, "where he is" is its street door.
     const dist = () => { const w = whereabouts(g); return Math.hypot(w.x - at.x, w.z - at.z); }, t0 = g.time;
-    let here = anywhere || dist() < 45, armed = false;
+    let here = anywhere || dist() < 45, armed = false, away = false;
     const m = anywhere ? null : g.addMarker(at.x, at.z, 3.2, 0xffe066);
     if (m) { m.color = '#ffe066'; m.name = title; }
     g.hud.objective(here ? close : far);
@@ -3206,7 +3207,8 @@ async function offer(g, mission, title, straight) {
         const d = dist();
         if (d > 7) armed = true;
         if (here && !anywhere && d > 55) { here = false; g.hud.objective(far); }
-        if (g.sideBusy) return false;                      // out with Irina, or collecting: the story waits
+        if (g.sideBusy) { away = true; return false; }     // out with Irina, or collecting: the story waits
+        if (away) { away = false; g.hud.objective(here ? close : far); } // and says again what is next when he is back
         if (here && g.time - t0 > 1.2 && !p.locked && g.consume('Enter')) return true;
         return !anywhere && armed && Math.hypot(p.pos.x - at.x, p.pos.z - at.z) < 3.8 && !p.locked && !p.inside && (!p.car || Math.abs(p.car.speed) < 9);
       });
@@ -4226,6 +4228,45 @@ function partyDress(g) {
   });
   { const m = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshLambertMaterial({ color: 0xf4f4f0 })); m.position.set(P.x - 9, y + 0.2, P.z + 7); add(m); box(0x49e0d0, 0.3, 0.1, 0.06, P.x + 6.6, y + 0.1, P.z + 9.5); }
   return { seats, clear: () => { for (const m of things) g.untrack(m); things.length = 0; } };
+}
+
+// The same garden on a night when the tickets were two hundred dollars: round tables in white cloths with a candle on
+// each, the board that says how much has been raised, a banner, the buffet under the pergola. Returns the seats at the
+// tables and what clears it all away.
+function benefitDress(g) {
+  const { home } = g.places, P = home.patio, y = groundAt(P.x, P.z), things = [], at = (dx, dz) => ({ x: P.x + dx, z: P.z + dz });
+  const add = m => { things.push(m); return g.track(m); };
+  const mesh = (geo, hex, x, yy, z, glow) => { const m = new THREE.Mesh(geo, glow ? new THREE.MeshBasicMaterial({ color: hex }) : new THREE.MeshLambertMaterial({ color: hex })); m.position.set(x, yy, z); return add(m); };
+  const seats = [];
+  for (const [dx, dz] of [[-6.4, 9.6], [-2.6, 11.4], [1.8, 11.8], [-10.6, 6.6]]) { // (clear of the fountain)
+    const t = at(dx, dz), ty = groundAt(t.x, t.z);
+    mesh(new THREE.CylinderGeometry(0.78, 0.86, 0.74, 18), 0xf4f4f0, t.x, ty + 0.37, t.z); mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.012, 14), 0x8a1c2a, t.x, ty + 0.75, t.z);
+    mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.16, 8), 0xcfe8ff, t.x, ty + 0.83, t.z); mesh(new THREE.SphereGeometry(0.03, 6, 5), 0xffd060, t.x, ty + 0.93, t.z, true);
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.6, sx = t.x + Math.sin(a) * 1.25, sz = t.z + Math.cos(a) * 1.25, grp = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ color: 0xf4f4f0 });
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.04, 0.44), mat); seat.position.y = 0.44; const back = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.44, 0.04), mat); back.position.set(0, 0.72, -0.22); grp.add(seat, back);
+      for (const [fx, fz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.44, 4), mat); leg.position.set(fx, 0.22, fz); grp.add(leg); }
+      grp.position.set(sx, ty, sz); grp.rotation.y = a + Math.PI; add(grp); seats.push({ x: sx, z: sz, h: a + Math.PI });
+      mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.012, 12), 0xf4f4f0, t.x + Math.sin(a) * 0.5, ty + 0.76, t.z + Math.cos(a) * 0.5); mesh(new THREE.CylinderGeometry(0.03, 0.02, 0.12, 6), 0xcfe8ff, t.x + Math.sin(a + 0.4) * 0.5, ty + 0.81, t.z + Math.cos(a + 0.4) * 0.5); }
+  }
+  // The banner, and the board with the thermometer on it.
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 128; const x2 = c.getContext('2d');
+  x2.fillStyle = '#1f3a5a'; x2.fillRect(0, 0, 1024, 128); x2.strokeStyle = '#d9b25a'; x2.lineWidth = 6; x2.strokeRect(8, 8, 1008, 112);
+  x2.fillStyle = '#f4f0e0'; x2.font = 'bold 58px "Bebas Neue", Impact, sans-serif'; x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText('VICE GENERAL  ·  PEDIATRIC WING BENEFIT', 512, 68);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  for (const turn of [0, Math.PI]) { const b = new THREE.Mesh(new THREE.PlaneGeometry(6.6, 0.82), new THREE.MeshBasicMaterial({ map: tex })); b.position.set(P.x + 1, y + 2.3, P.z + 3.62 + (turn ? -0.01 : 0.01)); b.rotation.y = turn; add(b); }
+  const eb = at(-6.2, 1.4);
+  mesh(new THREE.BoxGeometry(0.9, 1.3, 0.04), 0xf4f4f0, eb.x, y + 1.35, eb.z).rotation.y = 0.5; for (const s of [-1, 1]) mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.9, 4), 0x8a6a44, eb.x + s * 0.3, y + 0.95, eb.z + s * 0.16);
+  { const th = mesh(new THREE.BoxGeometry(0.14, 0.7, 0.05), 0xd8342c, eb.x + 0.02, y + 1.2, eb.z + 0.03); th.rotation.y = 0.5; const top = mesh(new THREE.BoxGeometry(0.14, 0.3, 0.05), 0xe9e2cf, eb.x + 0.02, y + 1.7, eb.z + 0.03); top.rotation.y = 0.5; }
+  // The buffet, on the long table: three dishes kept hot, the plates, bread, and a queue forming.
+  const bt = at(4.6, -4.1);
+  for (let k = 0; k < 3; k++) { mesh(new THREE.BoxGeometry(0.6, 0.16, 0.4), 0xc9cbd2, bt.x - 1.2 + k * 0.9, y + 0.95, bt.z); mesh(new THREE.BoxGeometry(0.52, 0.03, 0.32), [0xd8703a, 0xe9d9a8, 0x8a3a22][k], bt.x - 1.2 + k * 0.9, y + 1.04, bt.z); mesh(new THREE.BoxGeometry(0.2, 0.03, 0.14), 0x4f8cff, bt.x - 1.2 + k * 0.9, y + 0.86, bt.z, true); }
+  for (let k = 0; k < 8; k++) mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.012, 12), 0xf4f4f0, bt.x + 1.7, y + 0.87 + k * 0.014, bt.z);
+  mesh(new THREE.BoxGeometry(0.4, 0.1, 0.26), 0xc79a6a, bt.x - 1.9, y + 0.92, bt.z);
+  // Wine at the top of the drive, where the van was unloaded; flowers either side of the path.
+  const w = spot(home.drive, 4.2, -3.6), crates = [];
+  for (let k = 0; k < 4; k++) crates.push(mesh(new THREE.BoxGeometry(0.5, 0.32, 0.36), 0x8a6a44, w.x + (k % 2) * 0.56, groundAt(w.x, w.z) + 0.16 + Math.floor(k / 2) * 0.33, w.z));
+  for (const [dx, dz] of [[-2.2, -3.2], [0.2, -3.2], [-2.2, -0.2], [0.2, -0.2]]) { const f = at(dx, dz); mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.4, 8), 0xf4f4f0, f.x, y + 0.2, f.z); for (let k = 0; k < 5; k++) mesh(new THREE.SphereGeometry(0.08, 6, 5), [0xf4f4f0, 0xffe066, 0xff8ad8][k % 3], f.x + Math.sin(k * 1.3) * 0.1, y + 0.5 + (k % 2) * 0.08, f.z + Math.cos(k * 1.3) * 0.1); }
+  return { seats, crates, clear: () => { for (const m of things) g.untrack(m); things.length = 0; } };
 }
 
 // ---------- 8. The Party ----------
@@ -5791,21 +5832,39 @@ async function theBenefit(g) {
   g.hud.card('The Benefit', 'The Soprano house');
   await phone(g, CARMELA, "The benefit is tonight. The Buccos are doing the food, Father Phil is coming, and you are coming, Anthony. In a jacket.");
   g.hud.card();
-  await reach(g, home.road, 'Drive <b>home</b>.');
-
+  // He is at home already. The evening comes to him: the garden fills while the light goes.
+  const crowd = [];
   p.locked = true;
-  await cut(g, () => {
-    place(g, home.drive, EAST, home.car);
-    const at = (dx, dz) => spot(home.patio, dx, dz);
-    cast.carmela = actor(g, 'carmela', at(2.2, 2.8), WEST);
-    cast.charmaine = actor(g, 'charmaine', at(4.2, 1.4), WEST);
-    cast.phil = actor(g, 'priest', at(-3, 4), EAST, 'talk');
-    cast.meadow = actor(g, 'meadow', at(-4.5, 5), WEST);
-    cast.aj = actor(g, 'aj', spot(home.pool, -1.4, 3.5), NORTH);
-    cast.artie = actor(g, 'artie', spot(home.drive, 3, -3), SOUTH);
-    cast.g1 = actor(g, 'hesh', at(-1, 7), EAST); cast.g2 = actor(g, 'rosalie', at(1, 7.4), WEST, 'talk');
-    g.cam.fixed = null;
-  });
+  await fade(g, 1, 1);
+  await say(g, '', 'By eight the garden was full of people who had paid two hundred dollars a head to eat ziti off the good plates.', 4.4);
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  g.tonyCar.pos.set(home.car.x, 0, home.car.z); g.tonyCar.heading = home.car.h; g.tonyCar.speed = 0;
+  g.setNight(1);
+  place(g, spot(home.drive, 0, -8), EAST);
+  const at = (dx, dz) => spot(home.patio, dx, dz), dress = benefitDress(g);
+  cast.carmela = actor(g, 'carmela', at(2.2, 2.8), WEST);
+  cast.charmaine = actor(g, 'charmaine', at(4.2, 1.4), WEST);
+  cast.phil = actor(g, 'priest', at(-3, 4), EAST, 'talk');
+  cast.meadow = actor(g, 'meadow', at(-4.5, 5), WEST);
+  cast.aj = actor(g, 'aj', spot(home.pool, -1.4, 3.5), NORTH);
+  cast.artie = actor(g, 'artie', spot(home.drive, 3, -3), SOUTH);
+  cast.g1 = actor(g, 'hesh', at(-1, 7), EAST); cast.g2 = actor(g, 'rosalie', at(1, 7.4), WEST, 'talk');
+  { // The paying public: at the tables, at the bar by the pool, in a line for the food; two girls from Artie's going round with trays.
+    const guest = (where, h, state, look) => { const who = extraAt(g, where, h, state, look); crowd.push(who); return who; };
+    const DRESSED = [{ jacket: 0x23232b, shirt: 0xf4f4f0, tie: 0x8a1c2a, tucked: true, pants: 0x23232b, hair: 0x8d8a8e, age: 0.5 }, { body: 'female', shirt: 0x8a1c2a, sleeves: 'long', pants: 0x16161c, hair: 0x2a1a14, hairMesh: 'long' }, { jacket: 0x3d4658, shirt: 0x9fd0f5, tucked: true, pants: 0x3d4658, hair: 0x2b1b12, bulk: 1.15 }, { body: 'female', shirt: 0x1f5a3a, sleeves: 'long', pants: 0x16161c, hair: 0xc9a14a, hairMesh: 'long' },
+      { jacket: 0x4a4652, shirt: 0xf4f4f0, tie: 0x2c3a5a, tucked: true, pants: 0x4a4652, hair: 0xb9b6b0, hairStyle: 'balding', glasses: 'clear', age: 0.7 }, { body: 'female', shirt: 0x2c3a5a, sleeves: 'long', pants: 0x2c3a5a, hair: 0x8d8a8e, hairMesh: 'long', age: 0.6 }];
+    dress.seats.forEach((st, k) => { if (k % 4 < 2 || k === 7) guest({ x: st.x, z: st.z }, st.h, k % 3 ? 'sit' : 'sit', DRESSED[k % 6]); });
+    guest(at(27.6, 8.5), WEST, 'idle', { shirt: 0xf4f4f0, sleeves: 'long', tucked: true, pants: 0x23232b, hair: 0x2b1b12, hairMesh: 'parted' });
+    guest(at(24.5, 7.5), EAST, 'talk', DRESSED[2]); guest(at(24.5, 9.6), EAST, 'idle', DRESSED[3]);
+    guest(at(3, -2.8), NORTH, 'idle', DRESSED[0]); guest(at(4.2, -2.6), NORTH, 'talk', DRESSED[1]); guest(at(5.5, -2.8), NORTH, 'idle', DRESSED[4]);
+    guest(at(-6.8, 3), SOUTH + 0.8, 'idle', DRESSED[5]);   // somebody reading the board with the thermometer on it
+    const WAIT = { body: 'female', shirt: 0xf4f4f0, sleeves: 'long', pants: 0x16161c, hair: 0x111111, hairMesh: 'long' };
+    mill(g, guest(at(3, -1.6), 0, 'walk', WAIT), [at(3, -1.6), at(-2.6, 2.6), at(-5, 9), at(-1, 10), at(2.4, 10.4), at(6.2, 4)], { pace: 1.3, pause: 2.4 });
+    mill(g, guest(at(-8, 12), 0, 'walk', { ...WAIT, hair: 0xb5392a }), [at(-8, 12), at(-4, 12.6), at(0, 13), at(-3, 8), at(-7.6, 8.4)], { pace: 1.2, pause: 3 });
+    crowd.push(propCar(g, spot(home.guest, 0, 0), home.guest.h, 0x23232b, 'sedan'), propCar(g, spot(home.guest, 7.5, 0), home.guest.h, 0x8a1c2a, 'coupe'), propCar(g, spot(home.guest, -7.5, 0), home.guest.h, 0xf4f4f0, 'sedan'));
+  }
+  g.cam.fixed = null;
+  await fade(g, 0, 1.2);
   p.locked = false;
 
   await reach(g, cast.phil.group.position, 'Say hello to <b>Father Phil</b>.', { r: 1.7, how: 'foot' });
@@ -5832,10 +5891,14 @@ async function theBenefit(g) {
     [ARTIE, "From your mouth. Take that one to the patio, it's the good stuff.", cast.artie],
   ]);
   p.locked = false;
-  await reach(g, home.patio, 'Carry the case to the <b>patio</b>.', { r: 2, how: 'foot' });
-  p.locked = true;
-  p.human.play('pickup', 'idle');
-  await g.wait(0.8);
+  { const crate = dress.crates[dress.crates.length - 1]; let held = true;
+    g.updaters.push(() => { if (!held || !crate.parent) return false; crate.position.set(p.pos.x + Math.sin(p.heading) * 0.42, groundAt(p.pos.x, p.pos.z) + 1.02, p.pos.z + Math.cos(p.heading) * 0.42); crate.rotation.y = p.heading; return true; });
+    await reach(g, home.patio, 'Carry the case to the <b>patio</b>.', { r: 2, how: 'foot' });
+    p.locked = true;
+    p.human.play('pickup', 'idle');
+    await g.wait(0.6);
+    held = false; crate.position.set(home.patio.x - 0.6, groundAt(home.patio.x, home.patio.z) + 0.16, home.patio.z + 0.6); crate.rotation.y = 0.3;
+    await g.wait(0.4); }
 
   // Across the patio, Charmaine has had enough of being pointed at.
   await cut(g, () => {
@@ -5855,7 +5918,7 @@ async function theBenefit(g) {
   await say(g, TONY, 'Both of them?');
   await phone(g, SILVIO, 'Both.');
   await say(g, TONY, "...I'm at a benefit for the pediatric wing. I don't know anything.");
-  await cut(g, () => { dismiss(g, ...Object.values(cast)); });
+  await cut(g, () => { dismiss(g, ...Object.values(cast)); for (const who of crowd) { if (who.group) g.untrack(who.group); else g.removeCar(who); } dress.clear(); g.setNight(0); });
   p.locked = false;
   await passed(g, 'Respect +');
 }

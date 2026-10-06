@@ -24,7 +24,7 @@ const STAKES = [
   { key: 'lodge', door: 'the motel office', name: 'Teittleman Motor Lodge', from: 19, rate: 520, cap: 3120, who: 'Night man', look: { shirt: 0xd9c7a0, tee: true, pants: 0x3b4a66, hair: 0x2b1b12, hairMesh: 'parted', bulk: 0.9, glasses: 'clear' },
     lines: ['Twenty-five per cent, to the dollar. Mr. Teittleman watched me count it. He did not enjoy it.', 'Your quarter. We are full at the weekend, for once.', 'It is here. He says to tell you the roof needs doing, and that a quarter of the roof is yours as well.'] },
 ];
-// ----- Irina. A pink ring outside her building on Ocean Drive, once the story has got as far as the fourth job; one
+// ----- Irina. A violet ring outside her building on Ocean Drive (not the story's pink, not its yellow), once the story has got as far as the fourth job; one
 // evening between each job and the next. -----
 function installDates(g) {
   const { places, player: p } = g, FROM = 3;
@@ -40,9 +40,9 @@ function installDates(g) {
       const open = at && !g.missionActive && jobs >= FROM && jobs > last;
       if (!open || busy) { if (mark && !busy) clear(); return; }
       if (!mark) {
-        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 2.2, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xff5fa8, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false }));
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 2.2, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0x9b6bff, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false }));
         mesh.position.set(at.x, groundAt(at.x, at.z) + 1.1, at.z); g.scene.add(mesh);
-        mark = { mesh, blip: { x: at.x, z: at.z, color: '#ff5fa8', name: 'Irina' }, her: null };
+        mark = { mesh, blip: { x: at.x, z: at.z, color: '#9b6bff', name: 'Irina (side job)' }, her: null };
         g.blips.push(mark.blip);
       }
       const d = Math.hypot(p.pos.x - at.x, p.pos.z - at.z);
@@ -51,8 +51,10 @@ function installDates(g) {
         mark.her = makeHuman({ body: 'female', shirt: [0xd8342c, 0x16161c, 0x8a5cff][n % 3], tee: true, pants: 0x16161c, shoes: 0x16161c, hair: 0xe0c070, hairMesh: 'long', height: 0.97 });
         mark.her.group.position.set(at.x - 2.2, groundAt(at.x - 2.2, at.z - 1.2), at.z - 1.2); mark.her.group.rotation.y = 0; g.scene.add(mark.her.group);
       } else if (d > 80 && mark.her) { g.scene.remove(mark.her.group); mark.her = null; }
-      if (d < 2.4 && !p.car && !p.locked && !p.inside && mark.her && !g.sideBusy) {
-        busy = true; g.sideBusy = true;
+      const near2 = d < 2.6 && !p.car && !p.locked && !p.inside && mark.her && !g.sideBusy;
+      if (near2) g.hud.prompt(`G  ·  Take Irina out ($150)${g.cash < 150 ? ': not enough' : ''}`);
+      if (near2 && g.consume('KeyG')) {
+        busy = true; g.sideBusy = true; g.hud.prompt('');
         const her = mark.her, home = { x: at.x + 4, z: at.z + 3 };
         g.scene.remove(mark.mesh); const i = g.blips.indexOf(mark.blip); if (i >= 0) g.blips.splice(i, 1);
         g.tracked.add(her.group); her.group.userData.human = her;         // hers to be cleared with anything else, if it goes wrong
@@ -124,7 +126,7 @@ function installStakes(g) {
         if (d < 46 && !m.man) { // whoever minds the money is out on the step when he comes in sight
           m.man = makeHuman(m.st.look); m.man.group.position.set(m.at.face.x - 1.6, groundAt(m.at.face.x, m.at.face.z), m.at.face.z + 0.3); m.man.group.rotation.y = 0; g.scene.add(m.man.group);
         } else if (d > 70 && m.man) { g.scene.remove(m.man.group); m.man = null; }
-        if (d < 2.4 && !p.car && !p.locked && m.man) { collect(m); return; }
+        if (d < 2.6 && !p.car && !p.locked && m.man) { hud.prompt(`G  ·  Collect your end ($${Math.floor(due[m.st.key] || 0).toLocaleString()})`); if (g.consume('KeyG')) { hud.prompt(''); collect(m); } return; }
       }
     },
   };
