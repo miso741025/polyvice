@@ -1422,6 +1422,48 @@ export function buildWorld(scene) {
     for (const [ox, oz] of [[-22, -20], [22, -22], [-20, 22], [20, 24], [0, -24], [-24, 0], [4, 22]]) palms.push({ x: c.x + ox, z: c.z + oz });
     for (const [ox, oz, hex] of [[-8, -16, 0xff5fd2], [8, 16, 0xffe066], [-16, 8, 0xff8a5c]]) { slab(0x5a3d2b, 5, 0.25, 2.4, c.x + ox, y, c.z + oz); for (let n = 0; n < 9; n++) ball(n % 3 ? hex : 0x2f7d46, 0.3, c.x + ox - 2 + (n % 5) * 1, y + 0.45, c.z + oz - 0.5 + (n % 2) * 1); }
     post(STEEL, 0.07, 2.4, c.x, y, c.z + 1.8, 6); slab(0x1f6b4a, 1.2, 0.8, 0.06, c.x, y + 1.6, c.z + 1.8); // the park notice
+    { // The park, kept: lamps on the paths, trees for shade, ducks and lilies on the pond, a playground, tables for chess,
+      // a cart selling something hot, bins, a drinking fountain. (No dice are thrown here: the city's layout is not disturbed.)
+      const first = !places.park, GLOBE = 0xfff2c0, IRON = 0x23232b;
+      for (const [lx, lz] of [[-2.2, -18], [2.2, -8], [-2.2, 8], [2.2, 18], [-18, 2.2], [-8, -2.2], [8, 2.2], [18, -2.2]]) { post(IRON, 0.07, 3.2, c.x + lx, y, c.z + lz, 6); post(IRON, 0.14, 0.3, c.x + lx, y, c.z + lz, 8); ball(GLOBE, 0.24, c.x + lx, y + 3.35, c.z + lz, M.glow); halo(c.x + lx, y + 3.35, c.z + lz, 0xffd9a0, 4); collide(c.x + lx, c.z + lz, 0.3, 0.3, 3, true); }
+      for (const [tx, tz, hgt] of [[-22, -9, 5], [-9, -23, 5.6], [22, 5, 5], [15, 21, 6], [-7, 21, 5.2], [-21, 13, 5.8], [24, 16, 5]]) { post(0x5a3d2b, 0.28, hgt * 0.55, c.x + tx, y, c.z + tz, 7); ball(0x2f7d46, hgt * 0.42, c.x + tx, y + hgt * 0.8, c.z + tz); ball(0x3f9a5a, hgt * 0.3, c.x + tx + hgt * 0.22, y + hgt * 0.95, c.z + tz - hgt * 0.12); ball(0x277040, hgt * 0.3, c.x + tx - hgt * 0.2, y + hgt * 0.72, c.z + tz + hgt * 0.16); collide(c.x + tx, c.z + tz, 0.7, 0.7, 4, true); }
+      for (let n = 0; n < 7; n++) { const a = n * 0.9 + 0.3, r = 3 + (n % 3) * 2; put(M.plain, new THREE.CylinderGeometry(0.42, 0.42, 0.02, 9, 1, false, 0.5, 5.6).translate(px + Math.cos(a) * r, y + 0.335, pz + Math.sin(a) * r), 0x2f7d46); if (n % 3 === 0) ball(0xf7c8d4, 0.1, px + Math.cos(a) * r, y + 0.4, pz + Math.sin(a) * r); }
+      for (let n = 0; n < 9; n++) { const a = 3.6 + n * 0.16; post(0x4a6a3a, 0.025, 1 + (n % 3) * 0.3, px + Math.cos(a) * 8.9, y + 0.3, pz + Math.sin(a) * 8.9, 4); if (n % 2) put(M.plain, new THREE.CylinderGeometry(0.05, 0.05, 0.22, 5).translate(px + Math.cos(a) * 8.9, y + 1.25 + (n % 3) * 0.3, pz + Math.sin(a) * 8.9), 0x5a3d2b); } // bulrushes
+      const ducks = [0, 1, 2, 3].map(k => { const d = makeDuck(); d.group.scale.setScalar(k === 0 ? 1.15 : 0.85); scene.add(d.group); return d; });
+      const jet = [0, 1, 2, 3, 4].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 4), new THREE.MeshBasicMaterial({ color: 0xe6fbff, transparent: true, opacity: 0.85 })); scene.add(m); return m; });
+      post(STONE, 0.3, 0.5, px, y + 0.2, pz, 8);
+      updaters.push(t => {
+        ducks.forEach((d, k) => { const a = t * (0.1 + k * 0.015) * (k % 2 ? -1 : 1) + k * 1.7, r = 3.4 + k * 1.1 + Math.sin(t * 0.2 + k) * 0.6; d.group.position.set(px + Math.cos(a) * r, y + 0.31 + Math.sin(t * 2 + k) * 0.012, pz + Math.sin(a) * r); d.group.rotation.y = -a + (k % 2 ? Math.PI : 0); });
+        jet.forEach((m, n) => { const k = (t * 0.8 + n / 5) % 1; m.position.set(px + Math.sin(n * 1.26) * k * 0.5, y + 0.75 + Math.sin(k * Math.PI) * 1.5, pz + Math.cos(n * 1.26) * k * 0.5); });
+      });
+      // The playground, in the corner away from the water: swings (one going), a slide, a sandpit.
+      const gx = c.x - 15, gz = c.z - 17;
+      flat(M.paint, 0xe9d9a8, 9, 7, gx, y + 0.085, gz);
+      for (const s of [-1, 1]) { for (const t of [-1, 1]) put(M.plain, new THREE.CylinderGeometry(0.05, 0.05, 2.7, 5).rotateX(t * 0.3).translate(gx - 2 + s * 1.6, y + 1.25, gz - 1.5 + t * 0.38), 0xd8342c); } slab(0xd8342c, 3.4, 0.1, 0.1, gx - 2, y + 2.5, gz - 1.5);
+      const swing = new THREE.Group(), chainM = new THREE.MeshLambertMaterial({ color: 0x8a8d96 }); for (const s of [-1, 1]) { const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.9, 4).translate(s * 0.22, -0.95, 0), chainM); swing.add(ch); } swing.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.04, 0.2).translate(0, -1.9, 0), new THREE.MeshLambertMaterial({ color: 0x23232b })));
+      swing.position.set(gx - 2.7, y + 2.45, gz - 1.5); scene.add(swing); const still = swing.clone(); still.position.x = gx - 1.3; scene.add(still); updaters.push(t => { swing.rotation.x = Math.sin(t * 2.1) * 0.5; });
+      slab(0x2f56c8, 0.9, 1.6, 0.9, gx + 2.2, y, gz - 1.6); put(M.plain, new THREE.BoxGeometry(0.7, 0.06, 3).rotateX(0.5).translate(gx + 2.2, y + 0.82, gz + 0.3), 0xffe066); for (let k = 0; k < 5; k++) slab(0x2f56c8, 0.5, 0.05, 0.08, gx + 2.2, y + 0.3 + k * 0.28, gz - 2.1); collide(gx + 2.2, gz - 1.6, 1, 1, 1.6, true);
+      put(M.wood, new THREE.BoxGeometry(2.6, 0.2, 2.2).translate(gx - 0.5, y + 0.1, gz + 2), 0x8a6a44); flat(M.paint, 0xf2dfa8, 2.3, 1.9, gx - 0.5, y + 0.22, gz + 2); slab(0xd8342c, 0.24, 0.2, 0.2, gx - 0.9, y + 0.22, gz + 1.8); ball(0xffe066, 0.12, gx - 0.1, y + 0.34, gz + 2.3);
+      // Stone tables for chess, by the bandstand.
+      for (const [k, [tx, tz]] of [[-18.5, 4.5], [-21.5, 6.5]].entries()) { post(STONE, 0.12, 0.72, c.x + tx, y, c.z + tz, 8); put(M.gravel, new THREE.CylinderGeometry(0.55, 0.55, 0.08, 14).translate(c.x + tx, y + 0.76, c.z + tz), STONE); for (let n = 0; n < 16; n++) if ((n + (n >> 2)) % 2) slab(0x23232b, 0.09, 0.01, 0.09, c.x + tx - 0.14 + (n % 4) * 0.09, y + 0.8, c.z + tz - 0.14 + (n >> 2) * 0.09);
+        for (const s of [-1, 1]) { post(STONE, 0.2, 0.45, c.x + tx + s * 0.95, y, c.z + tz, 8); if (first) { const old = makeHuman([{ shirt: 0xd9c7a0, sleeves: 'long', pants: 0x4a4652, hair: 0xe9e2cf, hat: 'cap', hatColor: 0x6f6a66, age: 0.9, bulk: 0.95 }, { shirt: 0x8d93cc, pants: 0x3a3a44, hair: 0xb9b6b0, hairStyle: 'balding', glasses: 'clear', age: 0.9 }, { shirt: 0xf4f4f0, sleeves: 'long', pants: 0x23232b, hair: 0x8d8a8e, age: 0.8, bulk: 1.15 }, { shirt: 0x2f5a3f, sleeves: 'long', pants: 0x4a4652, hair: 0xe9e2cf, age: 0.9 }][k * 2 + (s + 1) / 2]); old.group.position.set(c.x + tx + s * 0.95, y, c.z + tz); old.group.rotation.y = s > 0 ? -Math.PI / 2 : Math.PI / 2; old.set('sit'); scene.add(old.group); } }
+        collide(c.x + tx, c.z + tz, 1.2, 1.2, 1, true); }
+      // The cart, on the path by the east gate; bins; the fountain you drink from.
+      const hx = c.x + 21, hz = c.z + 3.4;
+      slab(0xc9cbd2, 1.5, 0.9, 0.8, hx, y + 0.3, hz); for (const s of [-1, 1]) put(M.plain, new THREE.TorusGeometry(0.3, 0.04, 5, 14).rotateY(Math.PI / 2).translate(hx - 0.5, y + 0.3, hz + s * 0.44), IRON); post(0x8a8d96, 0.03, 0.3, hx + 0.6, y, hz, 5);
+      post(0x8a8d96, 0.025, 1.6, hx, y + 1.2, hz, 5); put(M.plain, new THREE.ConeGeometry(1.2, 0.4, 8).translate(hx, y + 2.9, hz), 0xffe066); for (let n = 0; n < 4; n++) put(M.plain, new THREE.ConeGeometry(1.21, 0.41, 8, 1, true, n * Math.PI / 2, Math.PI / 4).translate(hx, y + 2.9, hz), 0xd8342c);
+      sign('HOT DOGS', hx, y + 0.85, hz + 0.41, 0, { w: 1.3, h: 0.34, color: '#d8342c', bg: '#ffe066', size: 0.76, glow: false }); for (const [dx, hex] of [[-0.4, 0xd8342c], [-0.25, 0xffe066]]) post(hex, 0.04, 0.2, hx + dx, y + 1.2, hz + 0.2, 6); slab(0x8a6a44, 0.3, 0.1, 0.24, hx + 0.3, y + 1.2, hz);
+      collide(hx, hz, 1.7, 1, 1.4);
+      if (first) { const man = makeHuman({ shirt: 0xf4f4f0, tee: true, pants: 0x23232b, hair: 0x2b1b12, hat: 'cap', hatColor: 0xd8342c, mustache: 0x2b1b12, bulk: 1.15 }); man.group.position.set(hx, y, hz - 0.9); man.group.rotation.y = 0; scene.add(man.group); }
+      const steam = [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), new THREE.MeshBasicMaterial({ color: 0xf4f4f0, transparent: true, opacity: 0.3, depthWrite: false })); scene.add(m); return m; });
+      updaters.push(t => steam.forEach((m, n) => { const k = (t * 0.4 + n / 3) % 1; m.position.set(hx + 0.3 + Math.sin(t + n) * 0.05, y + 1.3 + k * 0.9, hz); m.scale.setScalar(0.6 + k * 1.4); m.material.opacity = 0.3 * (1 - k); }));
+      for (const [bx2, bz2] of [[13.6, 10.3], [-2.4, 4.6], [3.4, -18], [-18, -2.6]]) { post(0x1f6b4a, 0.24, 0.8, c.x + bx2, y, c.z + bz2, 10); post(IRON, 0.26, 0.05, c.x + bx2, y + 0.8, c.z + bz2, 10); }
+      post(STONE, 0.18, 0.9, c.x + 2.6, y, c.z + 2.6, 8); put(M.gravel, new THREE.CylinderGeometry(0.3, 0.2, 0.14, 10).translate(c.x + 2.6, y + 0.95, c.z + 2.6), STONE); post(0x8a8d96, 0.02, 0.12, c.x + 2.6, y + 1.02, c.z + 2.6, 5);
+      // Somebody's picnic, left for a minute; a ball; a kite that is never coming down.
+      slab(0xd8342c, 2, 0.02, 1.6, c.x - 5, y + 0.07, c.z - 13); for (let n = 0; n < 12; n++) slab(0xf4f4f0, 0.24, 0.022, 0.24, c.x - 5.75 + (n % 4) * 0.5, y + 0.07, c.z - 13.6 + Math.floor(n / 4) * 0.5); slab(0x8a6a44, 0.4, 0.26, 0.3, c.x - 4.5, y + 0.08, c.z - 12.8, M.wood, 1); post(0x2f5a3f, 0.04, 0.26, c.x - 5.4, y + 0.08, c.z - 13.3, 6);
+      ball(0xff8a30, 0.14, c.x + 7, y + 0.2, c.z + 14);
+      put(M.plain, new THREE.ConeGeometry(0.4, 0.7, 4).scale(1, 1, 0.06).rotateZ(0.5).translate(c.x - 20.6, y + 6.9, c.z + 21.4), 0xff5fd2);
+    }
     places.park ??= { bench: { x: c.x + 12, z: c.z + 10 }, kerb: { x: c.x + 34, z: c.z + 10, h: 0 }, pond: { x: px, z: pz } };
   }
 
@@ -2190,7 +2232,36 @@ export function buildWorld(scene) {
     slab(0xb9a58a, 0.6, 0.5, 0.6, X + 1.4, Y, Z - 3.4); slab(0xb9a58a, 0.6, 0.6, 0.08, X + 1.4, Y + 0.5, Z - 3.68); // a chair by the bed
     slab(0xffe8c0, 3, 1.6, 0.04, X + 2.5, Y + 1.4, Z - 5, M.glow); slab(0xffe8c0, 0.04, 1.6, 3, X + 6, Y + 1.4, Z - 1, M.glow); // windows
     slab(0x3a2418, 1.4, 2.6, 0.1, X + 2, Y, Z + 5.02);
-    roomLamp(q, X - 1, Y + 3, Z - 1.5, 0xf0f6ff, 16, 12);
+    { // The room, as a room somebody has been in for three weeks: cards, flowers nobody waters, a television, the curtain, the wall of sockets
+      const TEAL = 0x7fb8b0, STEELC = 0xc9cbd2, BRASS = 0xd9a520;
+      for (const s of [-1, 1]) { slab(TEAL, 11.4, 1, 0.04, X, Y, Z + s * 4.98); slab(TEAL, 0.04, 1, 9.4, X + s * 5.98, Y, Z); }
+      slab(0xe9e2d2, 2.3, 0.5, 0.06, X - 2.5, Y + 1.25, Z - 4.96); for (let n = 0; n < 5; n++) { slab(STEELC, 0.12, 0.12, 0.03, X - 3.3 + n * 0.4, Y + 1.44, Z - 4.92); ball([0x2f9a5a, 0xf4f4f0, 0xffe066, 0x2f6fd0, 0xd8342c][n], 0.025, X - 3.3 + n * 0.4, Y + 1.5, Z - 4.9); } // oxygen, suction, power: the panel behind the bed
+      slab(0xfdfdf6, 1.6, 0.08, 0.14, X - 2.5, Y + 2, Z - 4.92, M.glow); slab(0xd8342c, 0.06, 0.1, 0.03, X - 3.5, Y + 1.05, Z - 3.12); post(0xf4f4f0, 0.006, 0.5, X - 3.5, Y + 0.6, Z - 3.12, 3);                                    // the light over him; the button on its cord
+      slab(STEELC, 0.5, 0.75, 0.45, X - 4.5, Y, Z - 1.9); slab(0xf4f4f0, 0.52, 0.03, 0.47, X - 4.5, Y + 0.75, Z - 1.9); put(M.plain, new THREE.CylinderGeometry(0.06, 0.05, 0.18, 8).translate(X - 4.6, Y + 0.87, Z - 1.95), 0xcfe8ff); put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.09, 8).translate(X - 4.4, Y + 0.82, Z - 1.8), 0xcfe8ff);
+      put(M.plain, new THREE.CylinderGeometry(0.16, 0.11, 0.1, 10).translate(X - 4.5, Y + 0.83, Z - 2.05), 0x8a6a44); for (const [dx, hex] of [[-0.05, 0xd8342c], [0.05, 0xf2c230], [0, 0xff8a5c]]) ball(hex, 0.05, X - 4.5 + dx, Y + 0.92, Z - 2.05 + dx);     // fruit nobody is going to eat
+      slab(0xf4f4f0, 0.3, 0.4, 0.03, X - 1.3, Y + 0.5, Z - 1.98); slab(0x2f6fd0, 0.24, 0.06, 0.035, X - 1.3, Y + 0.78, Z - 1.98);                                                                                    // the chart, hung on the foot of the bed
+      for (const sx of [-0.1, 0.12]) slab(0x5a3320, 0.11, 0.05, 0.26, X - 3.3 + sx, Y, Z - 1.5);                                                                                                                  // slippers he has not worn
+      // The curtain on its rail, pulled back to the wall.
+      slab(STEELC, 0.03, 0.03, 4, X - 0.5, Y + 2.5, Z - 3); slab(STEELC, 5.3, 0.03, 0.03, X - 3.15, Y + 2.5, Z - 1); for (let n = 0; n < 5; n++) post(0x9fd0c8, 0.07, 2.2, X - 0.5, Y + 0.3, Z - 4.8 + n * 0.11, 6);
+      // The sill: cards, flowers, a balloon somebody's kid brought.
+      slab(0xf4f4f0, 3.2, 0.05, 0.3, X + 2.5, Y + 1.02, Z - 4.82); for (let n = 0; n < 6; n++) put(M.plain, new THREE.BoxGeometry(0.2, 0.26, 0.01).rotateY(n % 2 ? 0.3 : -0.3).translate(X + 1.3 + n * 0.3, Y + 1.19, Z - 4.8), [0xf7c8d4, 0xf4f4f0, 0xffe066, 0x9fd0f5, 0xf4f4f0, 0xf7a8c4][n]);
+      for (const [dx, k] of [[3.3, 0], [3.8, 1]]) { put(M.plain, new THREE.CylinderGeometry(0.08, 0.06, 0.2, 8).translate(X + dx, Y + 1.15, Z - 4.82), 0x9fd0f5); for (let n = 0; n < 4; n++) ball([0xd8342c, 0xffe066, 0xf4f4f0, 0xff8ad8][(n + k) % 4], 0.06, X + dx + Math.sin(n * 1.7) * 0.08, Y + 1.36 + (n % 2) * 0.06, Z - 4.82 + Math.cos(n * 1.7) * 0.06); }
+      ball(0x2f6fd0, 0.2, X + 4.3, Y + 2.2, Z - 4.5); post(0xf4f4f0, 0.004, 1.1, X + 4.3, Y + 1.05, Z - 4.5, 3);
+      for (const s of [-1, 1]) slab(0x9fd0c8, 0.3, 1.9, 0.08, X + 2.5 + s * 1.7, Y + 0.7, Z - 4.9);
+      // A second chair, a couch for whoever stays the night, the television up on its arm, the sink, the bin.
+      slab(0xb9a58a, 0.6, 0.5, 0.6, X + 2.6, Y, Z - 3.4); slab(0xb9a58a, 0.6, 0.6, 0.08, X + 2.6, Y + 0.5, Z - 3.68);
+      slab(0x5f8fb0, 0.9, 0.42, 2.2, X + 5.3, Y, Z + 1.4); slab(0x5f8fb0, 0.2, 0.5, 2.2, X + 5.7, Y + 0.42, Z + 1.4); slab(0xf4f4f0, 0.5, 0.12, 0.4, X + 5.3, Y + 0.42, Z + 0.6); slab(0x9fd0f5, 0.8, 0.05, 1, X + 5.3, Y + 0.43, Z + 1.8); collide(X + 5.3, Z + 1.4, 1, 2.3, 1);
+      slab(0x1c1c22, 0.5, 0.06, 0.06, X + 5.6, Y + 2.5, Z - 3.6); slab(0x1c1c22, 0.4, 0.6, 0.8, X + 5.2, Y + 2.1, Z - 3.6); slab(0x9fd0f5, 0.02, 0.48, 0.66, X + 4.99, Y + 2.16, Z - 3.6, M.glow);
+      slab(0xf4f4f0, 0.6, 0.16, 0.5, X - 5.5, Y + 0.8, Z + 3.9); post(STEELC, 0.02, 0.24, X - 5.7, Y + 0.96, Z + 3.9, 5); slab(0xb9c8d8, 0.03, 0.6, 0.5, X - 5.96, Y + 1.3, Z + 3.9); slab(0xf4f4f0, 0.14, 0.24, 0.12, X - 5.9, Y + 1.2, Z + 3.3); post(0xffe066, 0.16, 0.5, X - 5.5, Y, Z + 3.1, 8); // the sink, the gel, the yellow bin
+      slab(0xf4f4f0, 0.02, 0.5, 0.4, X - 5.97, Y + 1.5, Z + 0.4); for (let n = 0; n < 4; n++) slab(0x23232b, 0.022, 0.03, 0.3, X - 5.96, Y + 1.56 + n * 0.1, Z + 0.4);                                                 // the board: nurse today, doctor today, nil by mouth
+      slab(BRASS, 0.05, 0.3, 0.02, X - 4.6, Y + 2.2, Z - 4.97); slab(BRASS, 0.18, 0.05, 0.02, X - 4.6, Y + 2.36, Z - 4.97);
+      slab(0x2a2a30, 0.5, 0.9, 0.04, X + 5.96, Y + 1, Z + 3.6); slab(0x7a1626, 0.4, 0.8, 0.06, X + 5.9, Y + 1.05, Z + 3.6);                                                                                         // his own dressing gown, on the hook
+      // The line on the monitor, going round; the drip, dripping.
+      const blip = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 4), new THREE.MeshBasicMaterial({ color: 0xeaffff })), drop = new THREE.Mesh(new THREE.SphereGeometry(0.012, 5, 4), new THREE.MeshBasicMaterial({ color: 0xd6ecf5 }));
+      scene.add(blip); scene.add(drop);
+      updaters.push(t => { const k = (t * 0.6) % 1, beat = Math.abs(k - 0.5) < 0.06 ? Math.sin((k - 0.44) / 0.12 * Math.PI * 2) * 0.1 : 0; blip.position.set(X - 4.62 + k * 0.44, Y + 1.34 + beat, Z - 3.36); const d = (t * 0.8) % 1; drop.position.set(X - 1, Y + 1.66 - d * 0.22, Z - 3.6); });
+    }
+    q.lights.length = 0; roomLamp(q, X - 1.5, Y + 3, Z - 1.5, 0xf0f6ff, 28, 12); roomLamp(q, X + 3, Y + 2.8, Z + 1, 0xffe8d0, 16, 9);
     places.wardRoom = { inside: { x: X + 2, z: Z + 3.2, h: Math.PI }, bed: { x: X - 2.5, y: Y + 0.95, z: Z - 2.6 }, chair: { x: X + 1.4, y: Y, z: Z - 3.3 }, cam: { pos: new THREE.Vector3(X + 1.2, Y + 1.9, Z + 1.6), look: new THREE.Vector3(X - 2, Y + 1.1, Z - 2.6) } };
   }
   buildWardRoom();
@@ -2256,6 +2327,101 @@ export function buildWorld(scene) {
     return who;
   };
   const rooms = {};
+  { // ----- Vice General: the lobby, the lift up, and the corridor of the ward where Jackie's room is (owner feedback: build the hospital) -----
+    const WX = places.wardRoom.inside.x - 2, TEAL = 0x7fb8b0, STEELC = 0xc9cbd2, WHITE = 0xf4f4f0, REDX = 0xd8342c, NAVY = 0x2c3a5a;
+    const lay = (tex, w, d, x, z, yy, shiny = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), shiny ? new THREE.MeshPhongMaterial({ map: tex, shininess: shiny, specular: 0x666666 }) : new THREE.MeshLambertMaterial({ map: tex })); m.position.set(x, yy, z); scene.add(m); };
+    const vinyl = texture(128, 128, (c, w) => { c.fillStyle = '#e4e9e6'; c.fillRect(0, 0, w, w); for (let n = 0; n < 380; n++) { c.fillStyle = ['#cfd6d2', '#f4f7f5', '#b9c4c0'][n % 3]; c.fillRect((n * 53) % w, (n * 97) % w, 2, 2); } c.strokeStyle = 'rgba(150,165,160,.5)'; c.lineWidth = 1; c.strokeRect(0, 0, w, w); });
+    const shell = (q, w, d) => { // what every floor of it has: speckled vinyl, a band of colour, a rail to hold, strip lights
+      const t = vinyl.clone(); t.needsUpdate = true; t.repeat.set(w / 1.2, d / 1.2); lay(t, w - 0.6, d - 0.6, q.X, q.Z, q.Y + 0.004, 70);
+      for (const s of [-1, 1]) { slab(TEAL, w - 0.6, 1.05, 0.04, q.X, q.Y, q.Z + s * (d / 2 - 0.32)); slab(TEAL, 0.04, 1.05, d - 0.6, q.X + s * (w / 2 - 0.32), q.Y, q.Z); slab(0x8a6a4a, w - 0.6, 0.07, 0.09, q.X, q.Y + 0.95, q.Z + s * (d / 2 - 0.36), M.wood, 1); slab(0x8a6a4a, 0.09, 0.07, d - 0.6, q.X + s * (w / 2 - 0.36), q.Y + 0.95, q.Z, M.wood, 1); }
+    };
+    const strip = (q, x, z, w, d) => { slab(0xfdfdf6, w, 0.03, d, q.X + x, q.Y + q.h - 0.04, q.Z + z, M.glow); slab(STEELC, w + 0.1, 0.05, d + 0.1, q.X + x, q.Y + q.h - 0.02, q.Z + z); };
+    const wheelchair = (x, y, z, turn) => { const c2 = Math.cos(turn), s2 = Math.sin(turn); slab(NAVY, 0.5, 0.06, 0.5, x, y + 0.5, z); put(M.plain, new THREE.BoxGeometry(0.5, 0.5, 0.05).translate(0, 0.78, -0.25).rotateY(turn).translate(x, y, z), NAVY); for (const sd of [-1, 1]) { put(M.plain, new THREE.TorusGeometry(0.3, 0.025, 5, 16).rotateY(Math.PI / 2 + turn).translate(x + c2 * sd * 0.3, y + 0.3, z - s2 * sd * 0.3), 0x23232b); post(STEELC, 0.015, 0.5, x + c2 * sd * 0.26, y + 0.5, z - s2 * sd * 0.26 - 0.24, 4); } };
+    const gurney = (x, y, z, along) => { const w = along ? 2 : 0.75, d = along ? 0.75 : 2; slab(STEELC, w, 0.06, d, x, y + 0.75, z); slab(WHITE, w - 0.1, 0.12, d - 0.1, x, y + 0.81, z); slab(0x9fd0f5, along ? 1.1 : 0.66, 0.03, along ? 0.66 : 1.1, x + (along ? 0.3 : 0), y + 0.93, z + (along ? 0 : 0.3)); slab(WHITE, along ? 0.4 : 0.5, 0.1, along ? 0.5 : 0.4, x - (along ? 0.7 : 0), y + 0.93, z - (along ? 0 : 0.7)); for (const [fx, fz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { post(STEELC, 0.02, 0.75, x + fx * (w / 2 - 0.1), y, z + fz * (d / 2 - 0.1), 5); ball(0x23232b, 0.05, x + fx * (w / 2 - 0.1), y + 0.05, z + fz * (d / 2 - 0.1)); } };
+    const drip = (x, y, z) => { post(STEELC, 0.015, 1.9, x, y, z, 5); for (let n = 0; n < 4; n++) slab(STEELC, 0.3, 0.02, 0.02, x + Math.cos(n * 1.57) * 0.12, y + 0.03, z + Math.sin(n * 1.57) * 0.12); slab(0xd6ecf5, 0.14, 0.24, 0.07, x + 0.1, y + 1.6, z, M.glow); };
+    const plant = (x, y, z) => { post(0xb5523b, 0.24, 0.45, x, y, z, 10); ball(0x2f7d46, 0.45, x, y + 0.95, z); ball(0x3f9a5a, 0.32, x + 0.12, y + 1.4, z - 0.06); };
+    const SCRUBS = { shirt: 0x5fb0a8, tee: true, pants: 0x5fb0a8, shoes: 0xf2efe8 }, COAT = { jacket: 0xf4f4f0, shirt: 0x9fd0f5, tie: 0x2c3a5a, tucked: true, pants: 0x3a3a44 }, NURSE = { body: 'female', shirt: 0xf4f4f0, tee: true, pants: 0xf4f4f0, shoes: 0xf2efe8, hairMesh: 'long' };
+
+    // ----- The lobby -----
+    const q = rooms.HOSPITAL = room(22, 14, 3.8, { floor: M.paver, floorTint: 0xe6ebe8, wall: M.plain, wallTint: 0xf1f4f2, ceil: 0xf6f6f2, door: 0x9fb8c0, at: [WX, 34] });
+    shell(q, 22, 14);
+    // Lines on the floor to follow: blue to the lifts, red to Emergency, green to the pharmacy.
+    for (const [hex, pts] of [[0x2f6fd0, [[0.3, 6.4, 0.3, 0.8], [0.3, 0.8, 7.9, 0.8], [7.9, 0.8, 7.9, -5.2]]], [REDX, [[0, 6.4, 0, 1.2], [0, 1.2, 9.9, 1.2]]], [0x2f9a5a, [[-0.3, 6.4, -0.3, 1.6], [-0.3, 1.6, 4.2, 1.6], [4.2, 1.6, 4.2, 5.4]]]]) for (const [x0, z0, x1, z1] of pts) slab(hex, Math.abs(x1 - x0) + 0.1, 0.012, Math.abs(z1 - z0) + 0.1, q.X + (x0 + x1) / 2, q.Y + 0.006, q.Z + (z0 + z1) / 2);
+    // Information: the desk under the name of the place, glass in front of whoever is behind it.
+    counter(q, 0, -2.6, 6.4, 0xe9eeee, 0); slab(TEAL, 6.6, 0.3, 0.06, q.X, q.Y + 0.5, q.Z - 2.17); slab(0xcfe8ff, 6.2, 0.6, 0.02, q.X, q.Y + 1.13, q.Z - 2.3);
+    sign('INFORMATION', q.X, q.Y + 2.55, q.Z - 2.2, 0, { w: 2.6, h: 0.42, color: '#f4f4f0', bg: '#2c3a5a', size: 0.7, glow: false }); for (const s of [-1, 1]) post(STEELC, 0.012, 0.9, q.X + s * 1.2, q.Y + 2.8, q.Z - 2.2, 4);
+    for (const [dx, k] of [[-2, 0], [1.6, 1]]) { slab(0x23232b, 0.5, 0.36, 0.05, q.X + dx, q.Y + 1.2, q.Z - 2.9); slab(0x9fd0f5, 0.44, 0.3, 0.02, q.X + dx, q.Y + 1.23, q.Z - 2.93, M.glow); slab(0xe9e2cf, 0.3, 0.03, 0.14, q.X + dx, q.Y + 1.13, q.Z - 2.62); slab(0xe9e2cf, 0.22, 0.08, 0.18, q.X + dx + 0.7, q.Y + 1.13, q.Z - 2.8); void k; }
+    for (let n = 0; n < 3; n++) slab([0xf4f4f0, 0xffe066, 0xf7c8d4][n], 0.24, 0.02 + n * 0.012, 0.32, q.X - 0.6 + n * 0.3, q.Y + 1.13, q.Z - 2.5); put(M.plain, new THREE.SphereGeometry(0.05, 8, 5, 0, 7, 0, 1.6).translate(q.X + 0.5, q.Y + 1.13, q.Z - 2.4), 0xd9a520);     // forms in three colours; the bell
+    slab(0xf4f4f0, 0.3, 0.38, 0.02, q.X + 2.8, q.Y + 1.2, q.Z - 2.36); slab(REDX, 0.2, 0.06, 0.025, q.X + 2.8, q.Y + 1.42, q.Z - 2.35);                                                                 // VISITING HOURS, in a stand
+    sign(['VICE GENERAL', 'HOSPITAL'], q.X, q.Y + 2.75, q.Z - 6.66, 0, { w: 6, h: 1.3, color: '#2c3a5a', bg: '#f1f4f2', size: 0.7, glow: false });
+    for (const [w, h] of [[0.9, 0.3], [0.3, 0.9]]) slab(REDX, w, h, 0.04, q.X - 3.9, q.Y + 2.95 - h / 2 + (h < 0.5 ? 0 : 0), q.Z - 6.66); slab(REDX, 0.9, 0.3, 0.04, q.X - 3.9, q.Y + 2.35, q.Z - 6.66);
+    for (let n = 0; n < 4; n++) { slab(0xb9bcc4, 0.7, 1.3, 0.5, q.X - 2.1 + n * 0.75, q.Y, q.Z - 6.4); for (let k = 0; k < 3; k++) slab(STEELC, 0.3, 0.03, 0.02, q.X - 2.1 + n * 0.75, q.Y + 0.25 + k * 0.4, q.Z - 6.14); } collide(q.X - 1, q.Z - 6.4, 3.2, 0.6, 1.3);
+    put(M.plain, new THREE.CylinderGeometry(0.24, 0.24, 0.04, 20).rotateX(Math.PI / 2).translate(q.X + 4.2, q.Y + 2.9, q.Z - 6.66), 0xf4f4f0); put(M.plain, new THREE.TorusGeometry(0.24, 0.02, 4, 20).translate(q.X + 4.2, q.Y + 2.9, q.Z - 6.64), 0x23232b); slab(0x23232b, 0.02, 0.16, 0.01, q.X + 4.2, q.Y + 2.9, q.Z - 6.63); slab(0x23232b, 0.12, 0.02, 0.01, q.X + 4.26, q.Y + 2.9, q.Z - 6.63);
+    slab(0x8a6a4a, 1.6, 1.1, 0.04, q.X + 2.6, q.Y + 1.5, q.Z - 6.66, M.wood, 1); for (let n = 0; n < 9; n++) slab([0xf4f4f0, 0xffe066, 0xf7c8d4, 0x9fd0f5][n % 4], 0.3, 0.38, 0.045, q.X + 2.05 + (n % 4) * 0.37, q.Y + 1.6 + Math.floor(n / 4) * 0.46, q.Z - 6.65); // the notice board
+    q.clerk = q.person({ ...NURSE, hair: 0x2a1a14 }, -1.4, -3.7, 0); q.person({ ...SCRUBS, hair: 0x111111, hairMesh: 'buzzed', dark: true }, 1.8, -3.9, 0.3);
+    // Waiting: three rows of chairs bolted together, a television nobody chose the channel of, the machines, the telephones.
+    const seats = [];
+    for (let r = 0; r < 3; r++) for (let n = 0; n < 5; n++) { const st = { x: q.X - 9.3 + n * 0.62, z: q.Z - 1 + r * 1.9, h: Math.PI }; chairAt(st, q.Y, [0x5f8fb0, 0x5f8fb0, 0x7fb8b0][r]); seats.push(st); if (n === 0) collide(q.X - 8.06, st.z, 3.2, 0.5, 0.9, true); }
+    for (const [k, look] of [[1, { shirt: 0xd9c7a0, pants: 0x3b4a66, hair: 0x8d8a8e, age: 0.7 }], [3, { body: 'female', shirt: 0xf7a8c4, tee: true, pants: 0x23232b, hair: 0x2a1a14, hairMesh: 'long' }], [7, { shirt: 0x2f7d46, tee: true, pants: 0x3b6ea8, hair: 0x111111, dark: true }], [11, { body: 'female', shirt: 0x9fd0f5, pants: 0xd9c7a0, hair: 0x8d8a8e, hairMesh: 'long', age: 0.7 }], [13, { shirt: 0xf4f4f0, pants: 0x23232b, hair: 0x2b1b12, bulk: 1.2 }]]) q.person(look, seats[k].x - q.X, seats[k].z - q.Z, Math.PI, 'sit');
+    slab(0x1c1c22, 1.5, 0.9, 0.12, q.X - 8, q.Y + 2.4, q.Z - 6.6); slab(0x9fd0f5, 1.36, 0.76, 0.02, q.X - 8, q.Y + 2.47, q.Z - 6.53, M.glow); slab(0x1c1c22, 0.1, 0.4, 0.1, q.X - 8, q.Y + 3.3, q.Z - 6.6);
+    q.block(0x8a6a4a, 1.1, 0.4, 0.6, -8, -3.4, M.wood, 1); for (let n = 0; n < 4; n++) slab([0xd8342c, 0xf4f4f0, 0x2f56c8, 0xffe066][n], 0.24, 0.012, 0.32, q.X - 8.35 + n * 0.24, q.Y + 0.4 + n * 0.012, q.Z - 3.4);
+    for (const [dz, hex, lit] of [[4.2, REDX, 0xff8a70], [5.4, 0x2f56c8, 0x9fd0f5]]) { slab(hex, 0.8, 1.9, 1, q.X - 10.3, q.Y, q.Z + dz); slab(lit, 0.03, 1.2, 0.7, q.X - 9.89, q.Y + 0.55, q.Z + dz - 0.1, M.glow); slab(0x16161c, 0.03, 0.3, 0.24, q.X - 9.89, q.Y + 0.9, q.Z + dz + 0.36); slab(0x16161c, 0.04, 0.16, 0.6, q.X - 9.88, q.Y + 0.2, q.Z + dz); } collide(q.X - 10.3, q.Z + 4.8, 0.9, 2.3, 2);
+    for (const dz of [-5.6, -4.8]) { slab(STEELC, 0.12, 0.5, 0.4, q.X - 10.6, q.Y + 1.2, q.Z + dz); slab(0x16161c, 0.06, 0.2, 0.08, q.X - 10.5, q.Y + 1.32, q.Z + dz - 0.1); slab(TEAL, 0.3, 0.9, 0.03, q.X - 10.5, q.Y + 1, q.Z + dz + 0.3); }
+    slab(STEELC, 0.36, 0.9, 0.36, q.X - 10.4, q.Y, q.Z - 3.6); slab(0x8fd0e8, 0.3, 0.04, 0.3, q.X - 10.4, q.Y + 0.9, q.Z - 3.6); collide(q.X - 10.4, q.Z - 3.6, 0.5, 0.5, 1);
+    for (const [bx, bz] of [[-7.4, 5.5], [-6.6, 5.9]]) { slab([0xd8342c, 0xffe066][bx < -7 ? 0 : 1], 0.3, 0.3, 0.3, q.X + bx, q.Y, q.Z + bz); } ball(0x2f56c8, 0.14, q.X - 6.9, q.Y + 0.14, q.Z + 5.3); slab(0x49e0d0, 1.4, 0.012, 1.2, q.X - 7, q.Y + 0.006, q.Z + 5.6);          // the corner with the toys
+    // The east side: the shop with flowers and balloons, the pharmacy hatch, Emergency through the doors, chairs with wheels, a trolley.
+    q.block(0xf7e6c8, 3.4, 1, 0.7, 6.4, 5.9, M.wood, 1); slab(0xff8ad8, 3.6, 0.5, 0.05, q.X + 6.4, q.Y + 2.7, q.Z + 6.6); sign('GIFTS · FLOWERS', q.X + 6.4, q.Y + 2.95, q.Z + 6.56, Math.PI, { w: 3.2, h: 0.4, color: '#8a1c5a', bg: '#f7c8d4', size: 0.7, glow: false });
+    for (let n = 0; n < 5; n++) { put(M.plain, new THREE.CylinderGeometry(0.1, 0.07, 0.22, 8).translate(q.X + 5 + n * 0.7, q.Y + 1.11, q.Z + 5.9), [0x9fd0f5, 0xf4f4f0, 0x2f7d46, 0xffe066, 0x9fd0f5][n]); for (let k = 0; k < 4; k++) ball([REDX, 0xffe066, 0xff8ad8, 0xf4f4f0, 0xc85cff][(n + k) % 5], 0.07, q.X + 5 + n * 0.7 + Math.sin(k * 1.7) * 0.09, q.Y + 1.34 + (k % 2) * 0.07, q.Z + 5.9 + Math.cos(k * 1.7) * 0.09); }
+    for (let n = 0; n < 4; n++) { ball([REDX, 0xffe066, 0x49e0d0, 0xff8ad8][n], 0.2, q.X + 8.6 + (n % 2) * 0.32, q.Y + 2.1 + (n >> 1) * 0.34, q.Z + 5.8); post(WHITE, 0.004, 1, q.X + 8.76, q.Y + 1, q.Z + 5.8, 3); }
+    for (const [dx, hex] of [[4.9, 0xd9b25a], [5.5, 0xf4f4f0], [6.1, 0x8a5a44], [6.7, 0xf7a8c4]]) { ball(hex, 0.13, q.X + dx, q.Y + 0.14, q.Z + 6.45); ball(hex, 0.08, q.X + dx, q.Y + 0.32, q.Z + 6.45); }
+    q.person({ body: 'female', shirt: 0xf7a8c4, sleeves: 'long', pants: 0x23232b, hair: 0x8d8a8e, hairMesh: 'long', age: 0.6 }, 6.4, 6.45, Math.PI);
+    slab(0xe9eeee, 2.6, 1.05, 0.5, q.X + 4.2, q.Y, q.Z - 6.4); slab(0xcfe8ff, 2.4, 0.9, 0.03, q.X + 4.2, q.Y + 1.1, q.Z - 6.3); slab(0x23232b, 2.6, 0.12, 0.1, q.X + 4.2, q.Y + 2.05, q.Z - 6.3);
+    sign('PHARMACY', q.X + 4.2, q.Y + 2.32, q.Z - 6.62, 0, { w: 2, h: 0.36, color: '#f4f4f0', bg: '#2f9a5a', size: 0.72, glow: false }); for (let n = 0; n < 12; n++) slab([0xf4f4f0, 0xff8a30, 0x9fd0f5, 0xffe066][n % 4], 0.12, 0.18, 0.1, q.X + 3.2 + (n % 6) * 0.38, q.Y + 1.2 + Math.floor(n / 6) * 0.3, q.Z - 6.6); collide(q.X + 4.2, q.Z - 6.4, 2.7, 0.6, 2);
+    for (const s of [-1, 1]) { slab(0xb9c4c8, 0.08, 2.5, 1.3, q.X + 10.64, q.Y, q.Z + 1.2 + s * 0.68); put(M.plain, new THREE.CylinderGeometry(0.2, 0.2, 0.1, 14).rotateZ(Math.PI / 2).translate(q.X + 10.62, q.Y + 1.7, q.Z + 1.2 + s * 0.68), 0xcfe8ff); slab(STEELC, 0.1, 0.5, 0.2, q.X + 10.6, q.Y + 0.9, q.Z + 1.2 + s * 0.2); }
+    sign('EMERGENCY', q.X + 10.66, q.Y + 2.85, q.Z + 1.2, -Math.PI / 2, { w: 2.6, h: 0.5, color: '#f4f4f0', bg: '#d8342c', size: 0.76 });
+    wheelchair(q.X + 9.6, q.Y, q.Z + 3.6, -Math.PI / 2); wheelchair(q.X + 9.6, q.Y, q.Z + 4.4, -Math.PI / 2); gurney(q.X + 9.4, q.Y, q.Z - 1.6, false); drip(q.X + 10.2, q.Y, q.Z - 2.9); collide(q.X + 9.5, q.Z + 4, 0.8, 1.6, 1, true); collide(q.X + 9.4, q.Z - 1.6, 0.9, 2.1, 1, true);
+    // The lifts, in the north-east corner.
+    for (const [dx, lit] of [[7.1, 3], [8.7, 1]]) { slab(0x8a8d96, 1.3, 2.4, 0.08, q.X + dx, q.Y, q.Z - 6.64); slab(STEELC, 0.62, 2.3, 0.1, q.X + dx - 0.32, q.Y, q.Z - 6.62); slab(STEELC, 0.62, 2.3, 0.1, q.X + dx + 0.32, q.Y, q.Z - 6.62); slab(0x23232b, 0.02, 2.3, 0.11, q.X + dx, q.Y, q.Z - 6.62); slab(0x16161c, 0.5, 0.2, 0.04, q.X + dx, q.Y + 2.5, q.Z - 6.63); slab(0xff8a30, 0.12, 0.12, 0.05, q.X + dx - 0.14 + lit * 0.07, q.Y + 2.54, q.Z - 6.62, M.glow); }
+    slab(STEELC, 0.14, 0.3, 0.04, q.X + 7.9, q.Y + 1.1, q.Z - 6.64); slab(0xffe066, 0.06, 0.06, 0.05, q.X + 7.9, q.Y + 1.28, q.Z - 6.63, M.glow); slab(0x23232b, 0.06, 0.06, 0.05, q.X + 7.9, q.Y + 1.14, q.Z - 6.63);
+    sign(['LIFTS', 'WARDS  2 - 5'], q.X + 7.9, q.Y + 3.05, q.Z - 6.64, 0, { w: 2.2, h: 0.5, color: '#f4f4f0', bg: '#2f6fd0', size: 0.66, glow: false });
+    for (const [px, pz] of [[-3.6, 5.9], [3.6, -5.9], [-10, -6]]) { plant(q.X + px, q.Y, q.Z + pz); collide(q.X + px, q.Z + pz, 0.6, 0.6, 1.4, true); }
+    for (const [px, pz] of [[2.2, 6.4], [-5.2, -6.3]]) { post(0x8a8d96, 0.2, 0.7, q.X + px, q.Y, q.Z + pz, 10); slab(0x23232b, 0.3, 0.04, 0.1, q.X + px, q.Y + 0.6, q.Z + pz - 0.19); }
+    for (const [sx, sz, w, d] of [[-6, -3, 3.2, 0.5], [-6, 1.5, 3.2, 0.5], [0, 2.5, 0.5, 4.4], [6, -3, 3.2, 0.5], [6, 2.6, 3.2, 0.5], [-1.4, -5, 2.6, 0.5]]) strip(q, sx, sz, w, d);
+    q.person({ ...COAT, hair: 0x8d8a8e, hairStyle: 'balding', glasses: 'clear', age: 0.5 }, 3.4, -1.3, -2.2, 'talk'); q.person({ ...SCRUBS, body: 'female', hair: 0x2a1a14, hairMesh: 'long' }, 2.4, -1.6, 1.1);
+    q.person({ shirt: 0x9fd0f5, pants: 0x9fd0f5, hair: 0xe9e2cf, age: 0.8, bulk: 0.9 }, 9.3, 4.4, -Math.PI / 2, 'sit');                                                                             // somebody waiting for a porter
+    q.lights.length = 0; q.light(0, 3.4, -1.5, 0xf2f8ff, 44, 15); q.light(-7, 3.4, 1.5, 0xf2f8ff, 34, 13); q.light(7, 3.4, 0, 0xf2f8ff, 34, 13); q.light(6.4, 2.6, 5.2, 0xffd9e8, 16, 6);
+    q.desk = { x: q.X, z: q.Z - 1.4 }; q.lifts = { x: q.X + 7.9, z: q.Z - 5.5 };
+
+    // ----- The ward: one corridor, the station in the middle of it, numbered doors, his at the end -----
+    const u = rooms.WARDHALL = room(22, 6, 3.2, { floor: M.paver, floorTint: 0xe6ebe8, wall: M.plain, wallTint: 0xf1f4f2, ceil: 0xf6f6f2, door: 0x9fb8c0, doorX: 9.6, at: [WX, 14] });
+    shell(u, 22, 6);
+    slab(0x2f6fd0, 20, 0.012, 0.1, u.X, u.Y + 0.006, u.Z + 0.2);
+    for (let n = 0; n < 6; n++) { // doors down both sides
+      const north = n < 3, dx = -7.4 + (n % 3) * 5.2 + (north ? 0 : 2.6), dz = north ? -2.66 : 2.66;
+      if (!north && dx > 8) continue;
+      slab(0xb9c8c8, 1.2, 2.3, 0.06, u.X + dx, u.Y, u.Z + dz); slab(0xcfe8ff, 0.24, 0.6, 0.07, u.X + dx + 0.3, u.Y + 1.3, u.Z + dz); slab(STEELC, 0.05, 0.14, 0.09, u.X + dx - 0.45, u.Y + 1, u.Z + dz);
+      sign(String(north ? 412 + n * 2 : 411 + (n - 3) * 2), u.X + dx + 0.85, u.Y + 1.7, u.Z + dz + (north ? 0.04 : -0.04), north ? 0 : Math.PI, { w: 0.4, h: 0.2, color: '#2c3a5a', bg: '#f4f4f0', size: 0.8, glow: false });
+      slab(0xf4f4f0, 0.24, 0.32, 0.03, u.X + dx - 0.85, u.Y + 1.3, u.Z + dz + (north ? 0.03 : -0.03));                                                                                               // the chart, in its holder
+    }
+    sign('APRILE, G.', u.X - 7.4, u.Y + 2.05, u.Z - 2.62, 0, { w: 0.9, h: 0.16, color: '#16161c', bg: '#f4f4f0', size: 0.7, glow: false });
+    counter(u, -0.3, -1.6, 3.2, 0xe9eeee, 0); slab(TEAL, 3.4, 0.3, 0.06, u.X - 0.3, u.Y + 0.5, u.Z - 1.17); slab(0x23232b, 0.5, 0.34, 0.05, u.X - 1, u.Y + 1.2, u.Z - 1.8); slab(0x7dffb0, 0.44, 0.28, 0.02, u.X - 1, u.Y + 1.23, u.Z - 1.77, M.glow);
+    for (let n = 0; n < 8; n++) slab([0x2f56c8, REDX, 0x2f9a5a, 0xffe066][n % 4], 0.05, 0.3, 0.24, u.X + 0.2 + n * 0.07, u.Y + 1.13, u.Z - 1.8); slab(0xe9e2cf, 0.22, 0.08, 0.18, u.X - 0.3, u.Y + 1.13, u.Z - 1.5); put(M.plain, new THREE.CylinderGeometry(0.06, 0.06, 0.12, 8).translate(u.X + 1.1, u.Y + 1.19, u.Z - 1.4), 0xf4f4f0);
+    sign("NURSES' STATION", u.X - 0.3, u.Y + 2.6, u.Z - 2.66, 0, { w: 2.4, h: 0.34, color: '#f4f4f0', bg: '#2c3a5a', size: 0.7, glow: false }); sign('QUIET PLEASE', u.X + 4, u.Y + 2.3, u.Z + 2.66, Math.PI, { w: 1.6, h: 0.3, color: '#2c3a5a', bg: '#f4f4f0', size: 0.7, glow: false });
+    u.clerk = u.person({ ...NURSE, hair: 0xc9a14a }, -0.3, -2.35, 0); u.person({ ...COAT, hair: 0x2b1b12, hairMesh: 'parted' }, 2.3, -0.7, -1.9, 'talk');
+    gurney(u.X + 5.2, u.Y, u.Z + 2.1, true); collide(u.X + 5.2, u.Z + 2.1, 2.1, 0.9, 1, true); drip(u.X + 3.7, u.Y, u.Z + 2.3); wheelchair(u.X - 3.6, u.Y, u.Z + 2.2, Math.PI);
+    slab(STEELC, 0.8, 0.9, 0.5, u.X + 2.2, u.Y, u.Z + 2.3); for (let n = 0; n < 3; n++) slab(0xf4f4f0, 0.7, 0.14, 0.44, u.X + 2.2, u.Y + 0.92 + n * 0.14, u.Z + 2.3); collide(u.X + 2.2, u.Z + 2.3, 0.9, 0.6, 1.3, true);          // the linen
+    slab(STEELC, 0.5, 0.85, 0.4, u.X + 4.4, u.Y, u.Z - 2.3); for (let n = 0; n < 6; n++) put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.08, 6).translate(u.X + 4.25 + (n % 3) * 0.14, u.Y + 0.9, u.Z - 2.36 + Math.floor(n / 3) * 0.14), [0xff8a30, 0xf4f4f0, 0x9fd0f5][n % 3]); // the drugs trolley
+    u.block(0x5f8fb0, 1.6, 0.44, 0.5, -4.6, 2.4); slab(0x5f8fb0, 1.6, 0.4, 0.08, u.X - 4.6, u.Y + 0.44, u.Z + 2.62); u.person({ body: 'female', shirt: 0x3a3a44, sleeves: 'long', pants: 0x23232b, hair: 0x2a1a14, hairMesh: 'long' }, -4.9, 2.4, Math.PI, 'sit');   // somebody's wife, waiting
+    u.person({ shirt: 0x9fd0f5, pants: 0x9fd0f5, hair: 0x8d8a8e, age: 0.8, bulk: 0.9 }, 6.9, -1.3, -Math.PI / 2); drip(u.X + 7.3, u.Y, u.Z - 1.5);                                                           // a man in a gown, taking his drip for a walk
+    slab(REDX, 0.16, 0.5, 0.16, u.X + 8.2, u.Y + 0.9, u.Z + 2.6); slab(0xf4f4f0, 0.2, 0.3, 0.1, u.X - 9.2, u.Y + 1.2, u.Z + 2.64); put(M.plain, new THREE.CylinderGeometry(0.2, 0.2, 0.04, 18).rotateX(Math.PI / 2).translate(u.X + 6.4, u.Y + 2.5, u.Z + 2.66), 0xf4f4f0);
+    u.window(-10.72, 0, 2, 1.4, 1.9, Math.PI / 2, 0xffd9a8); plant(u.X - 10, u.Y, u.Z + 1.9);
+    for (const [dx, lit] of [[10.64, 4]]) { slab(0x8a8d96, 0.08, 2.4, 2.8, u.X + dx, u.Y, u.Z); for (const s of [-1, 1]) slab(STEELC, 0.1, 2.3, 0.62, u.X + dx - 0.02, u.Y, u.Z - 0.7 + s * 0.32); for (const s of [-1, 1]) slab(STEELC, 0.1, 2.3, 0.62, u.X + dx - 0.02, u.Y, u.Z + 0.7 + s * 0.32); slab(0x16161c, 0.04, 0.2, 0.5, u.X + dx - 0.02, u.Y + 2.5, u.Z); slab(0xff8a30, 0.05, 0.12, 0.12, u.X + dx - 0.03, u.Y + 2.54, u.Z + 0.1, M.glow); void lit; }
+    for (const sx of [-7, -2, 3, 8]) strip(u, sx, 0, 2.4, 0.5);
+    u.lights.length = 0; u.light(-6, 2.9, 0, 0xf2f8ff, 30, 12); u.light(1, 2.9, 0, 0xf2f8ff, 34, 12); u.light(7.5, 2.9, 0, 0xf2f8ff, 26, 10);
+    u.lift = { x: u.X + 9.4, z: u.Z, h: -Math.PI / 2 }; u.his = { x: u.X - 7.4, z: u.Z - 1.7 }; u.station = { x: u.X - 0.3, z: u.Z - 0.4 };
+    (places.stairs ??= []).push({ a: { x: q.lifts.x, z: q.lifts.z, h: 0 }, b: u.lift, up: 'Take the lift up to the wards', down: 'Take the lift down to the lobby' });
+    (places.stairs ??= []).push({ a: { x: u.his.x, z: u.his.z, h: 0 }, b: { x: places.wardRoom.inside.x, z: places.wardRoom.inside.z + 0.6, h: Math.PI }, up: 'Go into room 412', down: 'Go back out to the corridor' });
+  }
 
   if (!LA) { // a neighbourhood bar: a long counter, the back bar lit, a jukebox, booths and a pool table
     const q = rooms.BAR = room(16, 12, 3.8, { floor: M.wood, floorTint: 0x6a4a34, wall: M.wood, wallTint: 0x5a3a2a, ceil: 0x2a2024 });
@@ -2790,6 +2956,28 @@ export function buildWorld(scene) {
     q.window(2, 3.72, 3, 1.4, 1.7, Math.PI, 0xffd9a8);
     q.light(0, 2.9, 0, 0xffe8c8, 34, 12);
     clerk(q, 0, -3.2, 0, { hairStyle: 'balding', hairMesh: undefined, age: 0.7, pattern: 'plaid', shirt: 0x8d93cc, sleeves: undefined });
+    { // The office, as forty years of a family running it have left it: panelling, a rate board, the register, a fan, the machine for ice
+      const WOOD = 0x6a4a34, BRASS = 0xd9a520;
+      const worn = texture(64, 64, (c, w) => { c.fillStyle = '#7a5a4a'; c.fillRect(0, 0, w, w); c.fillStyle = '#8a6a56'; for (let k = 0; k < 4; k++) for (let j = 0; j < 4; j++) if ((k + j) % 2) c.fillRect(k * 16 + 3, j * 16 + 3, 10, 10); c.fillStyle = '#6a4c3e'; for (let n = 0; n < 80; n++) c.fillRect((n * 37) % w, (n * 59) % w, 2, 1); });
+      worn.repeat.set(7, 5.5); { const m = new THREE.Mesh(new THREE.PlaneGeometry(9.4, 7.4).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: worn })); m.position.set(q.X, q.Y + 0.004, q.Z); scene.add(m); }
+      for (const s2 of [-1, 1]) { slab(WOOD, 9.4, 1.1, 0.04, q.X, q.Y, q.Z + s2 * 3.68, M.wood, 2); slab(WOOD, 0.04, 1.1, 7.4, q.X + s2 * 4.68, q.Y, q.Z, M.wood, 2); }
+      sign(['SINGLE  $29', 'DOUBLE  $39', 'WEEKLY RATES · ASK'], q.X + 2.2, q.Y + 2.3, q.Z - 3.84, 0, { w: 2.2, h: 1.1, color: '#f4f4f0', bg: '#1f3a2c', size: 0.5, glow: false });
+      slab(0x23232b, 0.5, 0.36, 0.4, q.X - 2.2, q.Y + 1.13, q.Z - 2.4); slab(0x7dffb0, 0.3, 0.1, 0.02, q.X - 2.2, q.Y + 1.4, q.Z - 2.19, M.glow); for (let n = 0; n < 9; n++) slab(0xe9e2cf, 0.07, 0.03, 0.07, q.X - 2.36 + (n % 3) * 0.1, q.Y + 1.2 + Math.floor(n / 3) * 0.06, q.Z - 2.2); // the register
+      slab(0x3a2418, 0.5, 0.05, 0.36, q.X + 0.4, q.Y + 1.13, q.Z - 2.3); slab(0xf1ece0, 0.44, 0.02, 0.3, q.X + 0.4, q.Y + 1.18, q.Z - 2.3); slab(0x16161c, 0.012, 0.012, 0.16, q.X + 0.55, q.Y + 1.2, q.Z - 2.25);                                               // the book everybody signs, and the pen on its chain
+      for (let n = 0; n < 12; n++) slab([0x49e0d0, 0xff8a5c, 0xffe066, 0xf4f4f0][n % 4], 0.12, 0.2, 0.02, q.X + 2.2 + (n % 6) * 0.15, q.Y + 1.2 + Math.floor(n / 6) * 0.24, q.Z - 2.75); slab(WOOD, 1, 0.5, 0.06, q.X + 2.55, q.Y + 1.13, q.Z - 2.8, M.wood, 1);   // cards of the beach
+      slab(0xf4f4f0, 0.9, 1.5, 0.8, q.X - 4.2, q.Y, q.Z - 0.6); slab(0x9fd0f5, 0.03, 0.5, 0.6, q.X - 3.74, q.Y + 0.8, q.Z - 0.6, M.glow); sign('ICE', q.X - 3.74, q.Y + 1.3, q.Z - 0.6, Math.PI / 2, { w: 0.6, h: 0.24, color: '#2f56c8', bg: '#f4f4f0', size: 0.8, glow: false }); collide(q.X - 4.2, q.Z - 0.6, 1, 0.9, 1.5);
+      slab(0xd8342c, 0.8, 1.8, 0.7, q.X - 4.25, q.Y, q.Z + 0.5); slab(0xfff2c0, 0.03, 1, 0.5, q.X - 3.84, q.Y + 0.6, q.Z + 0.5, M.glow); collide(q.X - 4.25, q.Z + 0.5, 0.9, 0.8, 1.8);
+      q.block(WOOD, 0.9, 0.42, 0.5, -1.6, 2.6, M.wood, 1); for (let n = 0; n < 3; n++) slab([0xd8342c, 0xf4f4f0, 0x2f56c8][n], 0.22, 0.012, 0.3, q.X - 1.85 + n * 0.25, q.Y + 0.42 + n * 0.012, q.Z + 2.6); put(M.plain, new THREE.CylinderGeometry(0.08, 0.08, 0.03, 10).translate(q.X - 1.3, q.Y + 0.44, q.Z + 2.7), 0x8d8a8e);
+      put(M.plain, new THREE.CylinderGeometry(0.22, 0.22, 0.04, 18).rotateX(Math.PI / 2).translate(q.X - 0.6, q.Y + 2.75, q.Z - 3.84), 0xf1ece0); put(M.plain, new THREE.TorusGeometry(0.22, 0.02, 4, 18).translate(q.X - 0.6, q.Y + 2.75, q.Z - 3.82), 0x3a2418);
+      slab(BRASS, 0.4, 0.5, 0.03, q.X + 4.66, q.Y + 1.7, q.Z - 1); slab(0xf1ece0, 0.32, 0.42, 0.035, q.X + 4.65, q.Y + 1.74, q.Z - 1); slab(0xf4f4f0, 0.03, 0.5, 0.4, q.X + 4.67, q.Y + 1.6, q.Z + 0.6); for (let n = 0; n < 9; n++) slab(0x23232b, 0.035, 0.03, 0.03, q.X + 4.66, q.Y + 1.66 + (n % 3) * 0.1, q.Z + 0.5 + Math.floor(n / 3) * 0.1);
+      for (let n = 0; n < 9; n++) { post(BRASS, 0.012, 0.16, q.X + 3.5 + (n - 4) * 0.07, q.Y + 1.42, q.Z - 3.7, 4); } slab(BRASS, 0.7, 0.03, 0.08, q.X + 3.5, q.Y + 1.38, q.Z - 3.7); post(BRASS, 0.03, 0.12, q.X + 3.5, q.Y + 1.26, q.Z - 3.7, 6);                    // on the shelf behind the desk: nine branches
+      slab(0x3a2418, 1, 2.2, 0.06, q.X - 3.2, q.Y, q.Z - 3.84, M.wood, 1); sign('PRIVATE', q.X - 3.2, q.Y + 1.8, q.Z - 3.78, 0, { w: 0.7, h: 0.18, color: '#f4f4f0', bg: '#3a2418', size: 0.7, glow: false });
+      sign('VACANCY', q.X + 2, q.Y + 2.1, q.Z + 3.66, Math.PI, { w: 1.5, h: 0.36, color: '#ff5fd2', bg: '#16161c', size: 0.78 });
+      slab(0xd8342c, 0.14, 0.44, 0.14, q.X + 4.6, q.Y + 0.6, q.Z + 1.9); post(0x8a8d96, 0.14, 0.6, q.X - 0.4, q.Y, q.Z + 3.3, 8); post(0x23232b, 0.16, 0.04, q.X - 0.4, q.Y + 0.6, q.Z + 3.3, 8);
+      const fan = new THREE.Group(); for (let n = 0; n < 4; n++) { const b = new THREE.Mesh(new THREE.BoxGeometry(1, 0.02, 0.18).translate(0.6, 0, 0), new THREE.MeshLambertMaterial({ color: 0x5a3d2b })); b.rotation.y = n * Math.PI / 2; fan.add(b); }
+      fan.position.set(q.X, q.Y + 2.95, q.Z + 0.4); scene.add(fan); post(BRASS, 0.05, 0.22, q.X, q.Y + 2.98, q.Z + 0.4, 8); updaters.push(t => { fan.rotation.y = t * 1.7; });
+      q.lights.length = 0; q.light(0, 2.8, -0.6, 0xffe2b8, 36, 11); q.light(-3, 2.6, 2, 0xffd9a8, 16, 7);
+    }
   }
   if (LA) { // The Regent's lobby: a long desk, two lifts, sofas round low tables, a carpet with a pattern nobody chose
     const q = rooms.HOTEL = room(24, 14, 4.8, { floor: M.gravel, floorTint: 0x5a3a52, wallTint: 0xf2e6d2, ceil: 0xf6f1e6, door: 0x1a242c });
@@ -3474,14 +3662,14 @@ export function buildWorld(scene) {
   // Doors between the street and the rooms: stand at `outside` and press F.
   const shopList = shopDoors.map(d => ({ name: SHOP_NAME[d.shop], outside: d.outside, inside: rooms[SHOP_ROOM[d.shop] ?? d.shop].inside }));
   places.doors = LA ? [
-    { name: 'the hospital', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: places.wardRoom.inside },
+    { name: 'the hospital', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: rooms.HOSPITAL.inside },
     ...shopList,
   ] : [
     { name: "Satriale's", outside: { x: places.satriale.door.x, z: places.satriale.door.z - 2.3, h: 0 }, inside: places.shopRoom.inside },
     { name: 'the Bada Bing', outside: { x: places.bing.door.x, z: places.bing.door.z - 6.4, h: 0 }, inside: places.bingRoom.inside },
     { name: 'home', outside: { x: places.home.spawn.x, z: places.home.spawn.z - 2.6, h: 0 }, inside: places.houseRoom.inside },
     { name: "Dr. Melfi's office", outside: { x: places.melfi.door.x, z: places.melfi.door.z - 2.6, h: 0 }, inside: places.office.inside, hide: [places.office.cast.tony] },
-    { name: 'the hospital', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: places.wardRoom.inside },
+    { name: 'the hospital', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: rooms.HOSPITAL.inside },
     { name: 'Vesuvio', outside: { x: places.vesuvio.door.x, z: places.vesuvio.door.z - 1.4, h: 0 }, inside: rooms.VESUVIO.inside, closed: () => places.vesuvio.burnt }, // after the fire there is no dining room to walk into
     { name: 'Bean Scene', outside: { x: places.cafe.door.x, z: places.cafe.door.z - 1, h: 0 }, inside: rooms.BEAN.inside },
     { name: 'F-Note Records', outside: { x: places.hesh.door.x, z: places.hesh.door.z + 0.6, h: Math.PI }, inside: rooms.FNOTE.inside },

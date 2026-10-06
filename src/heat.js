@@ -3,7 +3,7 @@ import { near, groundAt, nodeX, nodeZ, blockCenter } from './grid.js';
 import { makeLook, makeHuman, randomPedLook } from './entities.js';
 import {
   say, talk, phone, fade, cut, titleCard, passed, actor, dismiss, spot, toward, place, approach, shot, frame, reach, follower,
-  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, quarry, tail, careful, smoke, lying, playing, photograph, enter, leave, walkOut, wantCar, gauge, NORTH, SOUTH, EAST, WEST,
+  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, quarry, tail, careful, smoke, lying, playing, photograph, enter, leave, walkOut, wantCar, gauge, outdoors, NORTH, SOUTH, EAST, WEST,
 } from './missions.js';
 
 // Los Angeles. The story follows the plot of Michael Mann's "Heat"; every line of dialogue is written for the game.
@@ -16,6 +16,7 @@ const EADY = 'Eady', VANZANT = 'Van Zant', DRUCKER = 'Drucker', CASALS = 'Casals
 function asNeil(g, neil) {
   const { home } = g.places, p = g.player;
   if (p.car) g.leaveCar();
+  outdoors(g);
   if (p.human !== neil) { const other = p.human; g.setPlayer(neil); g.scene.remove(other.group); }
   neil.group.visible = true;
   g.setNight(0);

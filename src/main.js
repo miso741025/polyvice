@@ -3,7 +3,7 @@ import { CITY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, blockCenter, col
 import { buildWorld } from './world.js';
 import { makeLook, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
-import { runStory, savedMission, clearSave, storyList, jumpTo, explode, people } from './missions.js';
+import { runStory, savedMission, clearSave, storyList, jumpTo, explode, people, respray } from './missions.js';
 import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
 import { installSideJobs } from './sidejobs.js';
@@ -434,8 +434,20 @@ async function boot() {
       p.pos.copy(car.pos);
       // The body shop puts it right.
       const shop = LA ? places.parts?.kerb : places.bodyshop?.kerb, fix = shop && (car.hp ?? 100) < 95 && !car.wreck && near(car.pos, shop, 9) && Math.abs(car.speed) < 3 && !g.missionActive;
-      hud.prompt(car.wreck ? 'The engine is dead.   F  ·  Get out' : fix ? `R  ·  Repair the car ($${g.cash >= 150 ? 150 : 'not enough'})` : '');
-      if (fix && g.cash >= 150 && g.consume('KeyR')) { g.addMoney(-150); car.hp = 100; sfx.cash(); }
+      // And with the police after him, it does more: in one colour, out another, and nobody is looking for this car.
+      const hot = shop && g.wanted >= 1 && !car.wreck && near(car.pos, shop, 13) && Math.abs(car.speed) < 3 && !g.spraying && !p.locked;
+      hud.prompt(car.wreck ? 'The engine is dead.   F  ·  Get out' : hot ? `R  ·  Respray: lose the police ($${g.cash >= 250 ? 250 : 'not enough'})` : fix ? `R  ·  Repair the car ($${g.cash >= 150 ? 150 : 'not enough'})` : '');
+      if (hot && g.cash >= 250 && g.consume('KeyR')) {
+        g.spraying = true;
+        g.addMoney(-250); sfx.cash();
+        g.pardon();                                           // the doors are down behind him: they have lost him
+        const PAINT = [0x2f56c8, 0x1f6b4a, 0x8a1c2a, 0xf4f4f0, 0x23232b, 0xd9a520, 0x49e0d0, 0x8a5cff, 0xcdb98a], hex = PAINT[Math.floor(Math.random() * PAINT.length)];
+        const bay = !LA && places.bodyshop ? { x: places.bodyshop.door.x, z: places.bodyshop.door.z + 3 } : null;
+        (bay ? respray(g, car, bay, 0, hex, 'New paint, new plates. Nobody is looking for this car.')
+          : (async () => { p.locked = true; hud.fade(1, 0.6); await g.wait(1.4); sfx.spray?.(); car.repaint(hex); await g.wait(1.2); hud.fade(0, 0.6); p.locked = false; })())
+          .then(() => { car.hp = 100; g.pardon(); }).catch(() => {}).finally(() => { g.spraying = false; p.locked = false; });
+      } else if (fix && g.cash >= 150 && g.consume('KeyR')) { g.addMoney(-150); car.hp = 100; sfx.cash(); }
+      if (g.wanted >= 1 && !g.toldSpray && shop) { g.toldSpray = true; hud.subtitle('', `The ${LA ? 'parts store' : 'body shop'} will respray the car for $250. The police lose you. It is marked on the map.`); g.wait(5).then(() => { if (!g.missionActive) hud.subtitle(); }).catch(() => {}); }
       if (!p.locked && g.consume('KeyF') && Math.abs(car.speed) < 4) g.leaveCar();
       return;
     }
@@ -670,7 +682,7 @@ async function boot() {
   const DENSE = new Set(['tower', 'lots', 'lowrise', 'bank', 'hotel', 'precinct', 'bookstore', 'depository', 'hesh', 'cafe', 'vesuvio', 'satriale', 'melfi', 'bing', 'travel', 'hospital', 'kates', 'truckstop']);
   const ROOM_SOUND = { BAR: 'bar', DINER: 'diner', FASTFOOD: 'diner', VESUVIO: 'diner', VKITCHEN: 'diner', BEAN: 'diner', BANQUET: 'diner', LIQUOR: 'store', PAWN: 'store', STORE: 'store', KIOSK: 'store', BOOKS: 'store', PARTS: 'store',
     LAUNDRY: 'store', SHOWROOM: 'hall', GUNS: 'guns', CHURCH: 'church', BODYSHOP: 'garage', WAREHOUSE: 'garage', HOUSE: 'house', LIVIA: 'house', LIVIA_UP: 'house', NEIL: 'house', UPSTAIRS: 'house', CARDROOM: 'house', SUITE: 'house', MOTEL: 'house',
-    JUSTINE: 'house', VANZANT: 'house', TREJO: 'house', KELSO: 'house', OFFICE: 'office', FNOTE: 'office', HESH: 'office', SCHOOL: 'hall', GROVE: 'hall', BANK: 'hall', HOTEL: 'hall' };
+    JUSTINE: 'house', VANZANT: 'house', TREJO: 'house', KELSO: 'house', OFFICE: 'office', FNOTE: 'office', HESH: 'office', SCHOOL: 'hall', HOSPITAL: 'hall', WARDHALL: 'hall', GROVE: 'hall', BANK: 'hall', HOTEL: 'hall' };
   const roomKinds = new Map();
   const roomKind = q => {
     if (!roomKinds.has(q)) {

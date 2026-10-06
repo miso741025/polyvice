@@ -349,12 +349,12 @@ function step(surface, run) {
 }
 // A bird: a few quick notes that slide. A gull: a cry that falls, twice or three times.
 function bird(pan) {
-  const t = ctx.currentTime, to = spotAt(rnd(0.5, 1), pan), base = rnd(2600, 4600), n = 2 + Math.floor(Math.random() * 4), gap = rnd(0.07, 0.13);
-  for (let k = 0; k < n; k++) tone('sine', base * rnd(0.9, 1.15), t + k * gap, 0.035, 0.008, rnd(0.04, 0.09), { to, slide: base * rnd(0.75, 1.4) });
+  const t = ctx.currentTime, to = spotAt(rnd(0.3, 0.6), pan), base = rnd(2600, 3800), n = 2 + Math.floor(Math.random() * 2), gap = rnd(0.09, 0.14);
+  for (let k = 0; k < n; k++) tone('sine', base * rnd(0.95, 1.08), t + k * gap, 0.018, 0.008, rnd(0.04, 0.09), { to, slide: base * rnd(0.75, 1.4) });
 }
 function gull(pan) {
   const t = ctx.currentTime, to = filter('bandpass', 1900, 2.2, spotAt(rnd(0.5, 1), pan)), n = 2 + Math.floor(Math.random() * 3);
-  for (let k = 0; k < n; k++) tone('sawtooth', rnd(1250, 1500), t + k * rnd(0.26, 0.34), 0.07, 0.03, rnd(0.16, 0.26), { to, slide: rnd(820, 980) });
+  for (let k = 0; k < n; k++) tone('sawtooth', rnd(1250, 1500), t + k * rnd(0.26, 0.34), 0.035, 0.03, rnd(0.16, 0.26), { to, slide: rnd(820, 980) });
 }
 // Something a long way off: a dog, a horn, a siren that is somebody else's trouble, a plane.
 function faraway(kind, pan) {
@@ -471,11 +471,11 @@ export const sfx = {
       if (R.chime) { tone('sine', 1318, now + 0.25, 0.09, 0.005, 0.5); tone('sine', 1046, now + 0.6, 0.09, 0.005, 0.8); } // the bell over a shop door
       st.room = room;
     }
-    if (R.clink && now > st.clink) { st.clink = now + rnd(0.4, 1.6) * R.clink; const f = rnd(2300, 3600), to = spotAt(1, rnd(-0.8, 0.8), rooms); tone('sine', f, now, 0.035, 0.002, 0.12, { to }); if (Math.random() < 0.5) tone('sine', f * 1.19, now + 0.07, 0.03, 0.002, 0.1, { to }); }
-    if (R.clank && now > st.clank) { st.clank = now + rnd(0.6, 2) * R.clank; const to = spotAt(1, rnd(-0.7, 0.7), rooms); if (Math.random() < 0.5) { burst(1100, 5, now, 0.2, 0.002, 0.2, 'bandpass', to); tone('triangle', rnd(320, 520), now, 0.08, 0.002, 0.3, { to }); } else for (let k = 0; k < 9; k++) burst(2400, 3, now + k * 0.045, 0.1, 0.002, 0.025, 'bandpass', to); }
-    if (R.range && now > st.range) { st.range = now + rnd(0.5, 2) * R.range; const to = filter('lowpass', 500, 0.7, spotAt(1, rnd(-0.3, 0.3), rooms)); burst(260, 1.1, now, 0.5, 0.004, 0.2, 'lowpass', to); }
+    if (R.clink && now > st.clink) { st.clink = now + rnd(2.5, 7) * R.clink; const f = rnd(2300, 3600), to = spotAt(1, rnd(-0.8, 0.8), rooms); tone('sine', f, now, 0.035, 0.002, 0.12, { to }); if (Math.random() < 0.5) tone('sine', f * 1.19, now + 0.07, 0.03, 0.002, 0.1, { to }); }
+    if (R.clank && now > st.clank) { st.clank = now + rnd(4, 10) * R.clank; const to = spotAt(1, rnd(-0.7, 0.7), rooms); if (Math.random() < 0.5) { burst(1100, 5, now, 0.2, 0.002, 0.2, 'bandpass', to); tone('triangle', rnd(320, 520), now, 0.08, 0.002, 0.3, { to }); } else for (let k = 0; k < 9; k++) burst(2400, 3, now + k * 0.045, 0.1, 0.002, 0.025, 'bandpass', to); }
+    if (R.range && now > st.range) { st.range = now + rnd(2.5, 7) * R.range; const to = filter('lowpass', 500, 0.7, spotAt(1, rnd(-0.3, 0.3), rooms)); burst(260, 1.1, now, 0.5, 0.004, 0.2, 'lowpass', to); }
     if (R.tick && now > st.tick) { st.tick = now + 1; burst(st.n ? 3300 : 2700, 6, now, 0.03, 0.001, 0.02, 'bandpass', rooms); st.n = !st.n; }
-    if (R.beep && now > st.beep) { st.beep = now + 1.15; tone('sine', 880, now, 0.03, 0.005, 0.09, { to: rooms }); }
+    if (R.beep && now > st.beep) { st.beep = now + 1.6; tone('sine', 880, now, 0.012, 0.005, 0.07, { to: rooms }); }
 
     // Feet. His walk is a brisk one: three steps a second, four at a run.
     if (!inCar && foot > 0.6) {
@@ -486,10 +486,10 @@ export const sfx = {
 
     // Life: birds by day where there are trees, gulls by the water, and now and then something a long way off.
     if (out) {
-      if (now > st.bird) { st.bird = now + rnd(1.2, 5) / (0.25 + green); if (day > 0.5 && synth > 0.5 && Math.random() < 0.35 + green * 0.6) bird(rnd(-1, 1)); }
-      if (now > st.gull) { st.gull = now + rnd(3, 9); if (day > 0.4 && shore > 0.35 && surf) gull(side(seaward.x, seaward.z) * rnd(0.2, 1)); }
+      if (now > st.bird) { st.bird = now + rnd(6, 16) / (0.4 + green * 0.6); if (day > 0.5 && synth > 0.5 && Math.random() < 0.25 + green * 0.4) bird(rnd(-1, 1)); } // (owner: the one-shots were jumping out; they are rarer and quieter now)
+      if (now > st.gull) { st.gull = now + rnd(12, 30); if (day > 0.4 && shore > 0.35 && surf) gull(side(seaward.x, seaward.z) * rnd(0.2, 1)); }
       if (now > st.event && synth > 0.5) {
-        st.event = now + rnd(9, 22);
+        st.event = now + rnd(35, 80);
         const r = Math.random(), pan = rnd(-0.9, 0.9);
         if (la && r < 0.22) faraway('plane', pan);
         else if (green > 0.6 && r < 0.6) faraway('dog', pan);
