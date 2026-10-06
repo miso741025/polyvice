@@ -405,7 +405,8 @@ export class Car {
   }
 
   drive(dt, throttle, steer, handbrake) {
-    const top = { truck: 21, van: 25, ambulance: 27, armored: 19, suv: 29, pickup: 28 }[this.kind] ?? 32;
+    const hp = this.hp ?? 100, top = ({ truck: 21, van: 25, ambulance: 27, armored: 19, suv: 29, pickup: 28 }[this.kind] ?? 32) * (hp < 35 ? 0.55 : hp < 60 ? 0.82 : 1); // a car that has been knocked about is slower
+    if (this.wreck) throttle = 0;
     if (throttle > 0) this.speed += (this.speed < 0 ? 30 : 15 * (1 - this.speed / top)) * dt;
     else if (throttle < 0) this.speed -= (this.speed > 0.5 ? 30 : 9 * (1 + this.speed / 11)) * dt;
     else this.speed -= Math.sign(this.speed) * Math.min(Math.abs(this.speed), 3.5 * dt);

@@ -35,7 +35,39 @@ export class Hud {
   subtitle(who, text) {
     $('subtitle').innerHTML = !text ? '' : who ? `<span class="who">${who}:</span> ${text}` : `<i>${text}</i>`;
   }
-  objective(html) { $('objective').innerHTML = html || ''; }
+  objective(html) { $('objective').innerHTML = html || ''; if (!html) $('dist').textContent = ''; }
+  // How far to the marker and which way, shown beside the objective.
+  distance(text) { const el = $('dist'); if (el.textContent !== text) el.textContent = text; }
+  // The car he is driving: five pips, fewer as it takes damage. null hides it.
+  car(hp) {
+    const el = $('carhp'), on = hp !== null && hp < 97;
+    if (!on) { if (el.textContent) el.textContent = ''; return; }
+    const pips = Math.max(0, Math.ceil(hp / 20)), text = 'CAR ' + '▮'.repeat(pips) + '▯'.repeat(5 - pips);
+    if (el.textContent !== text) { el.textContent = text; el.className = hp < 35 ? 'bad' : hp < 60 ? 'worn' : ''; }
+  }
+  // What he is carrying, for a moment: [{ key, name, has, on, rounds }].
+  weapons(list) {
+    const el = $('weapons');
+    el.innerHTML = list.map(w => `<span class="${w.on ? 'on' : w.has ? '' : 'none'}"><b>${w.key}</b> ${w.name}${w.has && w.rounds !== null ? ` <i>${w.rounds}</i>` : ''}</span>`).join('');
+    el.classList.add('on');
+    clearTimeout(this.weaponsTimer);
+    this.weaponsTimer = setTimeout(() => el.classList.remove('on'), 2600);
+  }
+  // Somebody new: a name and who he is, low on the screen, the first time he speaks.
+  intro(name, role) {
+    const el = $('intro');
+    el.innerHTML = `<b>${name}</b><span>${role}</span>`;
+    el.classList.add('on');
+    clearTimeout(this.introTimer);
+    this.introTimer = setTimeout(() => el.classList.remove('on'), 4200);
+  }
+  checkpoint() {
+    const el = $('intro');
+    el.innerHTML = '<b>Checkpoint</b><span>Back to where the trouble started</span>';
+    el.classList.add('on');
+    clearTimeout(this.introTimer);
+    this.introTimer = setTimeout(() => el.classList.remove('on'), 3000);
+  }
   prompt(text) { if ($('prompt').textContent !== (text || '')) $('prompt').textContent = text || ''; }
 
   card(title, sub) {
@@ -43,9 +75,10 @@ export class Hud {
     $('cardTitle').textContent = title; $('cardSub').textContent = sub || '';
     $('card').classList.add('on');
   }
-  passed(reward) {
+  passed(reward, title, total) {
     if (reward === undefined) { $('passed').classList.remove('on'); return; }
     $('reward').textContent = reward;
+    $('earned').textContent = title ? `${title}${total ? `   ·   earned so far $${total.toLocaleString('en-US')}` : ''}` : '';
     $('passed').classList.add('on');
   }
 
@@ -94,6 +127,8 @@ export class Hud {
     }
     c.textAlign = 'center';
     for (const b of blips) { c.fillStyle = b.color; c.strokeStyle = '#000'; c.lineWidth = 2; c.beginPath(); c.rect(X(b.x) - 6, Z(b.z) - 6, 12, 12); c.fill(); c.stroke(); }
+    c.font = 'bold 14px sans-serif'; c.textAlign = 'left';
+    for (const b of blips) if (b.name) { c.lineWidth = 3; c.strokeStyle = '#000'; c.strokeText(b.name, X(b.x) + 11, Z(b.z) + 1); c.fillStyle = b.color; c.fillText(b.name, X(b.x) + 11, Z(b.z) + 1); }
     c.save(); c.translate(X(focus.x), Z(focus.z)); c.rotate(Math.PI - heading);
     c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 2;
     c.beginPath(); c.moveTo(0, -11); c.lineTo(8, 9); c.lineTo(0, 4); c.lineTo(-8, 9); c.closePath(); c.fill(); c.stroke();

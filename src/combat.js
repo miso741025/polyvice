@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { pushOut, groundAt, clamp, wrapAngle, near, NX, NZ } from './grid.js';
+import { pushOut, groundAt, clamp, wrapAngle, near, NX, NZ, colliders, roomAt } from './grid.js';
 import { makeLook, makeHuman, randomPedLook, roam, driveAI, nearestNode } from './entities.js';
 
 // Fists, a pistol, health, the people who get hurt and the police who turn up.
@@ -17,6 +17,20 @@ export const WEAPONS = {
   rifle: { name: 'Carbine', dmg: 36, range: 95, rate: 0.11, mag: 30, spread: 0.028, auto: true, price: 2600, ammoPrice: 180, pack: 60 },
 };
 const GUNS = ['pistol', 'smg', 'shotgun', 'rifle'];
+// Who carries what, the first time the story puts the player in their shoes: [rounds in the gun, rounds spare].
+// Anyone not listed carries nothing: a wife, a schoolboy, a boy of eleven, a waiter with a camera in his buttonhole.
+const LOADOUTS = {
+  tony: { pistol: [12, 48] }, neil: { pistol: [12, 48] }, hanna: { pistol: [12, 36], shotgun: [6, 18] },
+  christopher: { pistol: [12, 36] }, pussy: { pistol: [12, 24] }, mikey: { pistol: [12, 24] },
+  shiherlis: { pistol: [12, 36] }, cheritto: { pistol: [12, 24] }, trejo: { pistol: [12, 12] },
+};
+// And what is in their pockets.
+const POCKET = { tony: 0, neil: 0, hanna: 340, christopher: 800, pussy: 450, mikey: 600, carmela: 220, aj: 6, tonyboy: 0, shiherlis: 300, cheritto: 900, trejo: 120, waiter: 40 };
+const fresh = who => {
+  const L = LOADOUTS[who] || {}, s = { weapon: 'fist', weapons: { fist: true }, mag: {}, ammo: {}, health: 100, armour: 0, cash: POCKET[who] ?? 50, wanted: 0 };
+  for (const w of GUNS) { s.weapons[w] = !!L[w]; s.mag[w] = L[w]?.[0] || 0; s.ammo[w] = L[w]?.[1] || 0; }
+  return s;
+};
 const cashMat = new THREE.MeshLambertMaterial({ color: 0x4fd36a });
 const bandMat = new THREE.MeshLambertMaterial({ color: 0xe9e2cf });
 const tracerMat = new THREE.LineBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.8 });
@@ -31,6 +45,30 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   const tmp = new THREE.Vector3();
   const isGun = w => GUNS.includes(w);
   const showAmmo = () => hud.ammo(isGun(p.weapon) ? `${p.mag[p.weapon]} / ${p.ammo[p.weapon]}` : '');
+  // The row of what he is carrying, shown for a moment whenever he changes weapon (or tries to).
+  const showBar = () => hud.weapons?.(['fist', ...GUNS].map((k, i) => ({ key: i + 1, name: WEAPONS[k].name, has: !!p.weapons[k] && !(p.fistsOnly && k !== 'fist'), on: k === p.weapon, rounds: isGun(k) && p.weapons[k] ? p.mag[k] + p.ammo[k] : null })));
+
+  // ----- One set of pockets each -----
+  // Every character the player becomes has his own guns, rounds, money, health and trouble with the police, and gets
+  // them back as he left them. `g.become(name)` is called whenever the body changes.
+  const profiles = {};
+  let current = null;
+  const stash = () => { if (current) profiles[current] = { weapon: p.weapon, weapons: { ...p.weapons }, mag: { ...p.mag }, ammo: { ...p.ammo }, health: p.health, armour: p.armour, cash: g.cash, wanted: Math.floor(g.wanted) }; };
+  g.become = name => {
+    if (name === current) return;
+    stash();
+    const s = profiles[name] || fresh(name);
+    current = g.playing = name;
+    Object.assign(p, { weapons: { ...s.weapons }, mag: { ...s.mag }, ammo: { ...s.ammo }, health: Math.max(25, s.health), armour: s.armour, fistsOnly: false });
+    g.cash = s.cash; hud.cash = g.cash; hud.money(g.cash);                                 // his money, without a "+$" beside it
+    hud.health(p.health); hud.armour(p.armour);
+    callOff(); g.wanted = 0; calm = 0; hud.wanted(0);
+    if (s.wanted) g.heat(s.wanted);                                                        // they have not forgotten him
+    p.weapon = 'fist'; g.setWeapon(p.weapons[s.weapon] ? s.weapon : 'fist', true);
+  };
+  // For the save file, and back from it.
+  g.profilesOut = () => { stash(); return profiles; };
+  g.profilesIn = data => { for (const k in data || {}) if (k !== current) profiles[k] = data[k]; };
 
   // A bar over the locked target's head, red for what is left.
   const barCanvas = document.createElement('canvas'); barCanvas.width = 64; barCanvas.height = 10;
@@ -48,14 +86,38 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     barTex.needsUpdate = true;
   };
 
+  // ----- Walls stop bullets -----
+  // How far a shot from (x, z) along (fx, fz) goes before something solid and tall enough stops it, up to `range`.
+  const wallAt = (x, z, fx, fz, range) => {
+    let best = range;
+    for (const c of colliders) {
+      if (c.thin || c.h < 1.3) continue;
+      if (Math.min(c.minX, c.maxX) - x > best && fx <= 0) continue;
+      let t0 = 0, t1 = best;
+      if (Math.abs(fx) < 1e-6) { if (x < c.minX || x > c.maxX) continue; }
+      else { let a = (c.minX - x) / fx, b = (c.maxX - x) / fx; if (a > b) { const k = a; a = b; b = k; } t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) continue; }
+      if (Math.abs(fz) < 1e-6) { if (z < c.minZ || z > c.maxZ) continue; }
+      else { let a = (c.minZ - z) / fz, b = (c.maxZ - z) / fz; if (a > b) { const k = a; a = b; b = k; } t0 = Math.max(t0, a); t1 = Math.min(t1, b); if (t0 > t1) continue; }
+      if (t0 > 0.05 && t0 < best) best = t0; // t0 of nought: the shooter is standing in it (a doorway, a porch), which does not count
+    }
+    return best;
+  };
+  // Can a see b: the same room (or both out of doors), and no wall between.
+  const sees = (a, b) => {
+    if (roomAt(a.x, a.z, 0) !== roomAt(b.x, b.z, 0)) return false;
+    const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
+    return d < 0.5 || wallAt(a.x, a.z, dx / d, dz / d, d) >= d - 0.45;
+  };
+  g.sees = sees;
+
   // ----- Lock-on -----
   // Hold the right mouse button (or tap Q / Tab) to lock onto the best target in front of the camera:
   // Tony faces them, the camera swings round, and shots and punches go their way. Q / Tab cycles.
   const ringTex = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 64;
     const x = c.getContext('2d');
-    x.strokeStyle = '#ff3b4a'; x.lineWidth = 5; x.beginPath(); x.arc(32, 32, 22, 0, Math.PI * 2); x.stroke();
-    x.fillStyle = '#ff3b4a'; x.beginPath(); x.moveTo(32, 2); x.lineTo(40, 14); x.lineTo(24, 14); x.fill();
+    x.strokeStyle = '#ffffff'; x.lineWidth = 5; for (let k = 0; k < 4; k++) { x.beginPath(); x.arc(32, 32, 23, k * Math.PI / 2 + 0.3, (k + 1) * Math.PI / 2 - 0.3); x.stroke(); } // four brackets, tinted red for an enemy
+    x.fillStyle = '#ffffff'; x.beginPath(); x.moveTo(32, 2); x.lineTo(40, 14); x.lineTo(24, 14); x.fill();
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map: ringTex, depthTest: false, transparent: true }));
@@ -70,16 +132,20 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       const dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z, d = Math.hypot(dx, dz);
       if (d > range || d < 0.3) continue;
       const ahead = (dx * fx + dz * fz) / d;
-      if (ahead < -0.2) continue;
-      list.push({ t, score: d + (1 - ahead) * 12 });
+      if (ahead < -0.2 || !sees(p.pos, t.pos)) continue;
+      list.push({ t, score: d + (1 - ahead) * 12 + (hostile(t) ? 0 : 40) }); // whoever is trying to kill him comes first
     }
     return list.sort((a, b) => a.score - b.score).map(c => c.t);
   };
-  g.lockOn = (cycle = false) => {
+  // `auto` is a lock taken for him because he attacked: it only ever picks someone who is in the fight (or, bare-handed,
+  // whoever is in front of him), so a gun out on a crowded street does not snap onto a passer-by.
+  g.lockOn = (cycle = false, auto = false) => {
     if (p.locked || p.hidden || (p.car && !isGun(p.weapon))) return;
-    const list = candidates();
+    let list = candidates();
+    if (auto && isGun(p.weapon)) list = list.filter(hostile);
     if (!list.length) { lock = null; return; }
     const i = cycle && lock ? (list.indexOf(lock) + 1) % list.length : 0;
+    if (list[i] !== lock) g.sfx?.click();
     lock = list[i]; lockAt = g.time;
   };
   const faceLock = () => { if (lock) p.heading = Math.atan2(lock.pos.x - p.pos.x, lock.pos.z - p.pos.z); };
@@ -111,6 +177,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       },
     };
     g.npcs.push(npc);
+    if (ai === 'shooter' || ai === 'brawler') g.setCheckpoint?.(); // trouble starts here: so does the checkpoint
     return npc;
   };
   g.removeNpc = human => { const i = g.npcs.findIndex(n => n.human === human); if (i >= 0) g.npcs.splice(i, 1); };
@@ -141,6 +208,8 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     if (!p.car && !p.dying) g.enterCar(car);
   };
   const targets = () => [...peds, ...g.npcs];
+  // In the fight: coming at him, shooting at him, or the man a mission has sent him after.
+  const hostile = t => t.ai === 'shooter' || t.ai === 'brawler' || !!t.stays;
   // Bystanders: hurting them is what the police mind. Enemies and scripted victims are the mission's business.
   const innocent = t => !t.ai && !t.stays;
 
@@ -156,7 +225,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
 
   // ----- Damage to the player -----
   g.damagePlayer = (dmg, from) => {
-    if (p.locked || p.hidden || p.dying || p.car || g.time - p.hitAt < 0.35) return; // blows do not stack within a beat
+    if (p.locked || p.hidden || p.dying || p.car || g.time - p.hitAt < 0.35 || g.time < (p.safeUntil || 0)) return; // blows do not stack within a beat
     if (p.armour > 0) { const a = Math.min(p.armour, dmg * 0.75); p.armour -= a; dmg -= a; hud.armour(p.armour); } // the vest takes most of it
     p.health = Math.max(0, p.health - dmg);
     p.hitAt = g.time;
@@ -178,10 +247,10 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   const muzzleOf = (human, out) => { human.pistol.getWorldPosition(out); return out; };
   // A shot from `from` along `heading`; hits the first target within the cylinder of fire. Returns it.
   const fire = (from, heading, by, range = 70) => {
-    const fx = Math.sin(heading), fz = Math.cos(heading);
-    let hit = null, best = range;
+    const fx = Math.sin(heading), fz = Math.cos(heading), room = roomAt(from.x, from.z, 0);
+    let hit = null, best = wallAt(from.x, from.z, fx, fz, range);
     for (const t of targets()) {
-      if (t.dead || t.human === by) continue;
+      if (t.dead || t.human === by || roomAt(t.pos.x, t.pos.z, 0) !== room) continue;
       const dx = t.pos.x - from.x, dz = t.pos.z - from.z, ahead = dx * fx + dz * fz;
       if (ahead < 0.5 || ahead > best || Math.abs(dx * fz - dz * fx) > 0.75) continue;
       best = ahead; hit = t;
@@ -194,7 +263,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   const shoot = () => {
     const w = WEAPONS[p.weapon];
     if (p.mag[p.weapon] <= 0) { if (p.ammo[p.weapon] > 0) g.reload(); else g.sfx?.click(); return; }
-    if (p.reloading > g.time) return;
+    if (p.reloading > g.time || p.drawing > g.time) return;
     lastShot = g.time;
     p.mag[p.weapon]--; showAmmo();
     if (!p.car) p.human.layer('shoot', { once: true, speed: 1.5 }); // the arms fire; the legs keep doing what they were doing
@@ -204,7 +273,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     const heading = lock ? Math.atan2(lock.pos.x - p.pos.x, lock.pos.z - p.pos.z) : (p.car ? g.cam.yaw : p.heading);
     for (let n = 0; n < (w.pellets || 1); n++) {
       const aim = heading + (Math.random() - 0.5) * 2 * w.spread * (lock ? 0.5 : 1);
-      const hit = lock && n === 0 && Math.random() > w.spread * 3 ? (tracer(from, tmp.set(lock.pos.x, from.y, lock.pos.z)), lock) : fire(from, aim, p.human, w.range);
+      const hit = lock && n === 0 && Math.random() > w.spread * 3 && sees(p.car ? p.car.pos : p.pos, lock.pos) ? (tracer(from, tmp.set(lock.pos.x, from.y, lock.pos.z)), lock) : fire(from, aim, p.human, w.range);
       if (hit) { hit.hurt(w.dmg, p.pos); if (innocent(hit)) g.heat(hit.dead ? 2 : 1); } else if (n === 0) g.heat(0.4);
     }
     for (const ped of peds) if (!ped.dead && Math.hypot(ped.pos.x - p.pos.x, ped.pos.z - p.pos.z) < 26) ped.flee(p.pos, 7);
@@ -231,7 +300,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     if (p.locked || p.dying || (p.human.busy && p.weapon === 'fist' && g.time - lastHit < 0.3)) return;
     if (p.car) { if (isGun(p.weapon) && g.time - lastShot >= WEAPONS[p.weapon].rate) shoot(); return; } // out of the window
     lastAttack = g.time;
-    if (!lock) g.lockOn();
+    if (!lock) g.lockOn(false, true);
     if (lock && (lock.dead || !near(lock.pos, p.pos, lockRange() * 1.2))) lock = null;
     faceLock();
     if (isGun(p.weapon)) {
@@ -265,7 +334,18 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       if (innocent(victim)) g.heat(victim.dead ? 1.5 : 0.35);
     }
   };
-  g.setWeapon = w => { if (!p.weapons[w]) return; p.weapon = w; p.human.arm(isGun(w) ? w : false); hud.weapon(WEAPONS[w].name); showAmmo(); };
+  // Change what is in his hand. A long gun he owns but is not holding hangs across his back; drawing takes a moment.
+  g.setWeapon = (w, quiet = false) => {
+    if (!p.weapons[w] || (p.fistsOnly && w !== 'fist')) { if (!quiet) { showBar(); g.sfx?.click(); } return; }
+    const changed = p.weapon !== w;
+    p.weapon = w;
+    p.human.arm(isGun(w) ? w : false);
+    p.human.sling?.(GUNS.filter(k => k !== 'pistol' && k !== w && p.weapons[k] && !p.fistsOnly));
+    hud.weapon(WEAPONS[w].name); showAmmo();
+    if (changed && !quiet) { p.drawing = g.time + (isGun(w) ? 0.32 : 0.1); g.sfx?.click(); showBar(); }
+  };
+  // Hands only, for a beating that must not end in a shooting: every gun stays where it is until this is lifted.
+  g.fistsOnly = on => { p.fistsOnly = !!on; if (on) g.setWeapon('fist', true); else p.human.sling?.(GUNS.filter(k => k !== 'pistol' && k !== p.weapon && p.weapons[k])); };
 
   // ----- Wanted level and the police -----
   // n is how much attention an act draws; a star is a whole unit.
@@ -366,7 +446,8 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     } else if (npc.ai === 'shooter') {
       if (p.hidden) { h.set('aim'); return; }
       h.arm(true);
-      if (d > 14) { move(1, 5); h.set('run'); face(); }
+      if (g.time > (npc.lookAt || 0)) { npc.lookAt = g.time + 0.35; npc.sight = sees(npc.pos, p.pos); } // a look a few times a second is enough
+      if (d > 14 || !npc.sight) { if (d > 2.5) { move(1, 5); h.set('run'); } else h.set('aim'); face(); }
       else {
         face(); h.set('aim');
         if (g.time > npc.nextHit) {
@@ -375,16 +456,34 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
           const from = muzzleOf(h, tmp).clone();
           const miss = (Math.random() - 0.5) * 0.3;
           const hit = fire(from, Math.atan2(dx, dz) + miss, h);
-          const toPlayer = Math.abs(miss) < 0.07 && !p.car && (!hit || hit.pos === p.pos);
-          if (toPlayer) g.damagePlayer(npc.damage, npc.pos);
+          const onTarget = Math.abs(miss) < 0.07 && (!hit || hit.pos === p.pos);
+          if (onTarget && p.car) g.hurtCar?.(p.car, npc.damage * 0.9);                      // the car takes it for him
+          else if (onTarget) g.damagePlayer(npc.damage, npc.pos);
         }
       }
     }
   };
   g.makeEnemy = (human, opts) => g.addNpc(human, { ai: 'brawler', cash: 60, ...opts });
 
+  // A small red mark over everyone who is in the fight, so it is plain who to shoot; and their places for the radar.
+  const markTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d'); x.fillStyle = '#ff3b4a'; x.strokeStyle = '#000'; x.lineWidth = 3; x.beginPath(); x.moveTo(4, 6); x.lineTo(28, 6); x.lineTo(16, 28); x.closePath(); x.fill(); x.stroke(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const marks = Array.from({ length: 14 }, () => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: markTex, depthTest: false, transparent: true })); m.visible = false; m.renderOrder = 5; scene.add(m); return m; });
+  g.hostiles = [];
+  const markHostiles = () => {
+    let k = 0; g.hostiles.length = 0;
+    for (const n of g.npcs) {
+      if (n.dead || (n.ai !== 'shooter' && n.ai !== 'brawler') || n.human.state === 'down' || !n.human.group.visible) continue;
+      const d = Math.hypot(n.pos.x - p.pos.x, n.pos.z - p.pos.z);
+      if (d > 90) continue;
+      g.hostiles.push({ x: n.pos.x, z: n.pos.z, color: '#ff3b4a' });
+      if (k < marks.length && n !== lock) { const m = marks[k++], s = 0.22 + d * 0.012; m.visible = true; m.position.set(n.pos.x, n.pos.y + 2.15 + d * 0.006, n.pos.z); m.scale.set(s, s, 1); }
+    }
+    for (; k < marks.length; k++) marks[k].visible = false;
+  };
+
   // ----- Per frame -----
   const update = dt => {
+    markHostiles();
     // Weapons and the aim stance.
     if (g.consume('Digit1')) g.setWeapon('fist');
     if (g.consume('Digit2')) g.setWeapon('pistol');
@@ -399,11 +498,12 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     if (lock) {
       const far = !near(lock.pos, p.pos, lockRange() * 1.3);
       const idle = !keys.Mouse2 && g.time - lastAttack > 3 && g.time - lockAt > 3;
-      if (lock.dead || (lock.human.state === 'down' && !lock.stunned) || far || idle || (p.car && !isGun(p.weapon)) || p.locked || p.hidden) { lock = null; if (keys.Mouse2) g.lockOn(); }
+      if (lock.dead || (lock.human.state === 'down' && !lock.stunned) || far || idle || (p.car && !isGun(p.weapon)) || p.locked || p.hidden) { const fell = lock.dead; lock = null; if (keys.Mouse2) g.lockOn(); else if (fell && g.time - lastAttack < 2.5) g.lockOn(false, true); } // one down: on to the next who is still shooting
     }
     if (lock) {
       if (!p.car) { faceLock(); g.cam.yaw += wrapAngle(p.heading - g.cam.yaw) * (1 - Math.exp(-5 * dt)); }
       ring.visible = bar.visible = true;
+      ring.material.color.set(hostile(lock) ? 0xff3b4a : 0xf4f4f0);
       ring.position.set(lock.pos.x, lock.pos.y + 2, lock.pos.z);
       const d = Math.hypot(lock.pos.x - p.pos.x, lock.pos.z - p.pos.z), s = 0.4 + d * 0.03;
       ring.scale.set(s, s, 1);
@@ -458,7 +558,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     lock = null; ring.visible = false;
     g.wanted = 0; hud.wanted(0); callOff();
     for (const n of g.npcs) scene.remove(n.human.group);
-    g.npcs.length = 0;
+    g.npcs.length = 0; p.fistsOnly = false; p.safeUntil = 0;
     for (const k of pickups) scene.remove(k.mesh);
     pickups.length = 0;
     p.health = 100; hud.health(100); p.armour = 0; hud.armour(0); p.dying = false; p.reloading = 0;

@@ -3,7 +3,7 @@ import { CITY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, blockCenter, col
 import { buildWorld } from './world.js';
 import { makeLook, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
-import { runStory, savedMission, clearSave, storyList, jumpTo } from './missions.js';
+import { runStory, savedMission, clearSave, storyList, jumpTo, explode, people } from './missions.js';
 import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
 import { installSideJobs } from './sidejobs.js';
@@ -163,6 +163,45 @@ async function boot() {
       p.human.group.visible = false;
       p.human = human;
       scene.add(human.group);
+      g.become?.(human.look || 'someone'); // his own guns, his own money, his own trouble
+    },
+    // Where the player comes back to if he is killed during a mission: here, as he is now. Set whenever an objective
+    // is given or met, and whenever somebody starts shooting.
+    setCheckpoint() {
+      if (!g.missionActive || p.dying) return;
+      const at = p.car ? p.car.pos : p.pos;
+      g.checkpoint = { x: at.x, z: at.z, h: p.car ? p.car.heading : p.heading, car: p.car, inside: p.inside, mag: { ...p.mag }, ammo: { ...p.ammo }, armour: p.armour };
+    },
+    // Killed in a mission that has a checkpoint: a moment of black, and he is back there, whole. The mission never knew.
+    async revive() {
+      const cp = g.checkpoint, wasLocked = p.locked;
+      try {
+        await g.wait(1.9);
+        hud.wasted(true);
+        await fade(1, 0.9);
+        await g.wait(0.7);
+        hud.wasted(false);
+        if (p.inside !== cp.inside) { for (const h of p.inside?.hide || []) h.group.visible = true; for (const h of cp.inside?.hide || []) h.group.visible = false; p.inside = cp.inside; }
+        if (cp.car && cars.includes(cp.car) && !cp.car.wreck) { cp.car.pos.set(cp.x, 0, cp.z); cp.car.heading = cp.h; cp.car.speed = 0; cp.car.hp = Math.max(cp.car.hp ?? 100, 60); cp.car.sync?.(); p.car = cp.car; p.pos.copy(cp.car.pos); }
+        else { p.car = null; p.pos.set(cp.x, 0, cp.z); }
+        p.heading = g.cam.yaw = cp.h;
+        p.health = 100; p.armour = Math.max(p.armour, cp.armour); hud.health(100); hud.armour(p.armour);
+        for (const w in cp.mag) { p.mag[w] = Math.max(p.mag[w], cp.mag[w]); p.ammo[w] = Math.max(p.ammo[w], cp.ammo[w]); } // never back with less than he had
+        g.setWeapon(p.weapon, true);
+        g.pardon();
+        g.addMoney(-Math.min(g.cash, 100));
+        Object.assign(p, { down: 0, dying: false, safeUntil: g.time + 3.5 });
+        hud.checkpoint?.();
+        await fade(0, 0.9);
+      } catch { /* the mission ended under him */ }
+      if (!wasLocked) p.locked = false;
+    },
+    // A car takes damage. One the story needs limps on at its worst; any other can be killed.
+    hurtCar(car, dmg) {
+      if (car.wreck || dmg <= 0) return;
+      const floor = car.mission || car === tonyCar ? 14 : 0;
+      car.hp = Math.max(floor, (car.hp ?? 100) - dmg);
+      if (car.hp <= 0) { car.wreck = true; car.dieAt = g.time + 5.5; car.nav = null; car.speed *= 0.5; if (car === p.car) hud.flash('#ff8a30', 0.4); }
     },
     // 0 = the usual sunset, 1 = night. Lights, fog, sky and sea follow.
     setNight(k) {
@@ -178,7 +217,9 @@ async function boot() {
     wasted() {
       if (p.dying) return;
       sfx.wasted();
-      p.dying = true; p.down = 1; p.car = null;
+      p.dying = true; p.down = 1;
+      if (g.missionActive && g.checkpoint) { p.car = null; g.revive(); return; }
+      p.car = null;
       const waiting = g.waiters;
       g.waiters = [];
       for (const w of waiting) w.reject(g.WASTED);
@@ -205,7 +246,7 @@ async function boot() {
       combat.reset();
       g.addMoney(-Math.min(g.cash, 500));
       p.pos.set(places.home.wake.x, 0, places.home.wake.z);
-      tonyCar.pos.set(places.home.car.x, 0, places.home.car.z); tonyCar.heading = places.home.car.h; tonyCar.speed = 0;
+      tonyCar.pos.set(places.home.car.x, 0, places.home.car.z); tonyCar.heading = places.home.car.h; tonyCar.speed = 0; tonyCar.hp = 100;
       await fade(0, 1.2);
     },
     // Through a door, in or out. The rooms are built far out over the water.
@@ -258,6 +299,7 @@ async function boot() {
   const fade = (to, seconds) => { hud.fade(to, seconds); return g.wait(seconds + 0.05); };
   const combat = installCombat(g, { scene, hud, peds, cars, keys });
   const sideJobs = installSideJobs(g);
+  g.become(who);
   applySettings();
   g.who = who; g.visitor = who !== local; g.arrived = arrived;
   if (carry) { // the money, the guns and the bruises came too
@@ -368,11 +410,12 @@ async function boot() {
   function updatePlayer(dt) {
     const car = p.car;
     if (car) {
-      if (p.locked) car.drive(dt, 0, 0, true);
+      if (p.locked || car.wreck) car.drive(dt, 0, 0, true);
       else car.drive(dt, (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), keys.Space);
       const wasGoing = car.speed;
       car.collide();
-      if (Math.abs(wasGoing - car.speed) > 2.5) sfx.crash(Math.abs(wasGoing - car.speed) / 12);
+      const jolt = Math.abs(wasGoing - car.speed);
+      if (jolt > 2.5) { sfx.crash(jolt / 12); g.hurtCar(car, (jolt - 2.5) * 2.6); }
       if (!p.locked && g.consume('KeyH')) sfx.horn();
       // Shove other cars out of the way.
       for (const o of cars) {
@@ -386,10 +429,13 @@ async function boot() {
           o.pos.x -= dx * push * 0.4; o.pos.z -= dz * push * 0.4;
           hit = true;
         }
-        if (hit) { if (Math.abs(car.speed) > 6 && g.time - (car.bumpAt || -9) > 0.6) { car.bumpAt = g.time; sfx.crash(Math.abs(car.speed) / 25); } car.speed *= 0.93; if (!o.nav) o.collide(); }
+        if (hit) { if (Math.abs(car.speed) > 6 && g.time - (car.bumpAt || -9) > 0.6) { car.bumpAt = g.time; sfx.crash(Math.abs(car.speed) / 25); g.hurtCar(car, Math.abs(car.speed) * 0.45); g.hurtCar(o, Math.abs(car.speed) * 0.6); } car.speed *= 0.93; if (!o.nav) o.collide(); }
       }
       p.pos.copy(car.pos);
-      hud.prompt('');
+      // The body shop puts it right.
+      const shop = LA ? places.parts?.kerb : places.bodyshop?.kerb, fix = shop && (car.hp ?? 100) < 95 && !car.wreck && near(car.pos, shop, 9) && Math.abs(car.speed) < 3 && !g.missionActive;
+      hud.prompt(car.wreck ? 'The engine is dead.   F  ·  Get out' : fix ? `R  ·  Repair the car ($${g.cash >= 150 ? 150 : 'not enough'})` : '');
+      if (fix && g.cash >= 150 && g.consume('KeyR')) { g.addMoney(-150); car.hp = 100; sfx.cash(); }
       if (!p.locked && g.consume('KeyF') && Math.abs(car.speed) < 4) g.leaveCar();
       return;
     }
@@ -426,7 +472,7 @@ async function boot() {
       }
     }
 
-    const door = !p.locked && places.doors.find(d => (p.inside ? d === p.inside && near(p.pos, d.inside, 1.8) : near(p.pos, d.outside, 1.8)));
+    const door = !p.locked && places.doors.find(d => !d.closed?.() && (p.inside ? d === p.inside && near(p.pos, d.inside, 1.8) : near(p.pos, d.outside, 1.8)));
     if (door) {
       hud.prompt(p.inside ? 'F  ·  Leave' : `F  ·  Enter ${door.name}`);
       if (g.consume('KeyF')) g.useDoor(door);
@@ -445,7 +491,7 @@ async function boot() {
     let nearest = null, best = 4.2;
     if (!p.locked && !p.inside) for (const o of cars) {
       const d = Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z);
-      if (d < best) { best = d; nearest = o; }
+      if (d < best && !o.wreck) { best = d; nearest = o; }
     }
     hud.prompt(nearest ? (nearest.nav || nearest.ai ? 'F  ·  Take vehicle' : 'F  ·  Enter vehicle') : '');
     if (nearest && g.consume('KeyF')) { hud.prompt(''); if (nearest.nav || nearest.ai) g.carjack(nearest); else g.enterCar(nearest); }
@@ -462,6 +508,41 @@ async function boot() {
       car.spinWheels(dt);
       car.sync();
     }
+  }
+
+  // Smoke from a car that has been knocked about, fire from one that is finished, and then the bang.
+  const smokeGeo = new THREE.SphereGeometry(0.5, 7, 5), smokers = new Map();
+  function updateDamage(dt) {
+    for (const car of cars) {
+      const hp = car.hp ?? 100;
+      if (hp >= 60 || Math.abs(car.pos.x - p.pos.x) > 110 || Math.abs(car.pos.z - p.pos.z) > 110) { const old = smokers.get(car); if (old) { scene.remove(old); smokers.delete(car); } continue; }
+      let puffs = smokers.get(car);
+      if (!puffs) {
+        puffs = new THREE.Group();
+        for (let k = 0; k < 5; k++) { const m = new THREE.Mesh(smokeGeo, new THREE.MeshBasicMaterial({ color: 0x8d8a8e, transparent: true, opacity: 0.4, depthWrite: false })); m.userData.t = k / 5; puffs.add(m); }
+        scene.add(puffs); smokers.set(car, puffs);
+      }
+      const nose = car.reach * 0.8, dark = hp < 35 ? 0x2a2630 : 0x9a968e;
+      puffs.position.set(car.pos.x + Math.sin(car.heading) * nose, groundAt(car.pos.x, car.pos.z) + 1, car.pos.z + Math.cos(car.heading) * nose);
+      for (const m of puffs.children) {
+        m.userData.t = (m.userData.t + dt * (car.wreck ? 0.9 : 0.55)) % 1;
+        const t = m.userData.t;
+        m.position.set(Math.sin(t * 9 + m.id) * 0.25 * t, t * (car.wreck ? 3.4 : 2.2), -t * Math.min(2, Math.abs(car.speed) * 0.12));
+        m.scale.setScalar(0.35 + t * (hp < 35 ? 1.5 : 0.9));
+        m.material.opacity = (1 - t) * (hp < 35 ? 0.6 : 0.34);
+        m.material.color.set(car.wreck && t < 0.25 ? 0xff8a30 : dark);
+      }
+    }
+    for (const car of [...cars]) {
+      if (!car.wreck || !car.dieAt || g.time < car.dieAt) continue;
+      car.dieAt = 0; car.goneAt = g.time + 45;
+      explode(g, car.pos);
+      const d = Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z);
+      if (p.car === car) { g.leaveCar(); p.health = Math.max(0, p.health - 80); hud.health(p.health); hud.flash('#ff8a30', 0.6); if (p.health <= 0) g.wasted(); }
+      else if (d < 8) g.damagePlayer(70 * (1 - d / 8), car.pos);
+      for (const ped of peds) if (!ped.dead && Math.hypot(ped.pos.x - car.pos.x, ped.pos.z - car.pos.z) < 7) ped.hurt(200, car.pos, { knock: 1.5, down: true });
+    }
+    for (const car of [...cars]) if (car.wreck && car.goneAt && g.time > car.goneAt && car !== p.car && Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) > 60) { const old = smokers.get(car); if (old) { scene.remove(old); smokers.delete(car); } g.removeCar(car); }
   }
 
   // Pull the camera in when a building is between it and the player.
@@ -528,9 +609,19 @@ async function boot() {
         if (code === 'KeyQ' && page > 0) { page--; show(); }
         else if (code === 'KeyE' && page < story.length - 1) { page++; show(); }
         else if (code === 'Escape') openSettings();
-        else if (k >= 0 && k < e.titles.length) { jumpTo(starts[page] + k, g.cash); sessionStorage.setItem('jump', '1'); location.reload(); }
+        else if (k >= 0 && k < e.titles.length) { jumpTo(starts[page] + k, g.cash); sessionStorage.setItem('jump', '1'); sessionStorage.setItem('straight', '1'); location.reload(); }
       });
     };
+    show();
+  };
+  // A list too long for one screen, a page at a time: the people met so far, or what each mission paid.
+  const pages = (title, rows, empty) => {
+    let page = 0;
+    const per = 9, n = Math.max(1, Math.ceil(rows.length / per));
+    const show = () => hud.menu(`${title}${n > 1 ? `  ·  ${page + 1} of ${n}` : ''}`, [
+      ...(rows.length ? rows.slice(page * per, page * per + per) : [{ label: empty }]),
+      ...(page > 0 ? [{ key: 'KeyQ', label: 'Previous page' }] : []), ...(page < n - 1 ? [{ key: 'KeyE', label: 'Next page' }] : []), { key: 'Escape', label: 'Back' },
+    ], code => { if (code === 'KeyQ' && page > 0) { page--; show(); } else if (code === 'KeyE' && page < n - 1) { page++; show(); } else if (code === 'Escape') openSettings(); });
     show();
   };
   const openSettings = () => {
@@ -547,6 +638,8 @@ async function boot() {
       { key: 'KeyR', label: 'Radio', hint: sfx.radio.count ? `${sfx.radio.count} songs  ·  ${['off', 'quiet', 'normal', 'loud'][settings.radio]}  ·  in the car: N next, B back, V off` : 'no songs yet: put audio files in the music folder' },
       { key: 'KeyT', label: 'Test the sound', hint: settings.volume === 0 ? 'the volume is at 0%' : sfx.state === 'running' ? 'plays a chime: if you hear nothing, it is the browser or the computer' : 'the browser is holding the sound back: click the page once' },
       { key: 'Digit8', label: 'Missions', hint: 'play any mission again, or skip ahead' },
+      { key: 'KeyP', label: 'People', hint: `${people(g).length} met so far` },
+      { key: 'KeyL', label: 'Earnings', hint: `$${Object.values(g.ledger || {}).reduce((a, r) => a + r.m, 0).toLocaleString('en-US')} from ${Object.keys(g.ledger || {}).length} missions` },
       { key: 'Escape', label: 'Resume' },
       { key: 'Digit0', label: 'Quit to the title screen', hint: 'progress is saved after each mission' },
     ].filter(i => i.label), code => {
@@ -561,6 +654,8 @@ async function boot() {
       else if (code === 'KeyT') { sfx.unlock(); sfx.passed(); }
       else if (code === 'KeyR') settings.radio = (settings.radio + 1) % 4;
       else if (code === 'Digit8') { applySettings(); missionMenu(pr && !pr.done ? pr.n - 1 : 0); return; }
+      else if (code === 'KeyP') { pages('People', people(g).map(x => ({ label: x.name, hint: x.role })), 'Nobody yet.'); return; }
+      else if (code === 'KeyL') { pages('Earnings', Object.entries(g.ledger || {}).sort((a, b) => a[0] - b[0]).map(([n, r]) => ({ label: `${n}.  ${r.t}`, hint: '$' + r.m.toLocaleString('en-US') })), 'Nothing yet: every mission pays when it is passed.'); return; }
       else if (code === 'Digit0') { applySettings(); location.reload(); return; }
       else if (code === 'Escape' || code === 'Enter') { applySettings(); hud.menu(); g.paused = false; for (const k in keys) keys[k] = false; return; }
       else return;
@@ -604,6 +699,7 @@ async function boot() {
 
     updatePlayer(dt);
     updateCars(dt);
+    updateDamage(dt);
     combat.update(dt);
     sideJobs.update();
     const scare = g.time - g.scare < 1 && !p.hidden ? p.pos : null;
@@ -692,8 +788,16 @@ async function boot() {
     }
     muteEl.classList.toggle('on', g.started && sfx.state !== 'running'); // say so, rather than leave him wondering
     hud.clock(g.time + (g.clockOffset || 0));
-    hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips], landmarks);
+    hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips, ...(g.hostiles || [])], landmarks);
     hud.map(g.mapOpen, { focus: p.pos, heading: p.car ? p.car.heading : p.heading, blips: [...g.markers, ...g.blips], landmarks });
+    { // How far to where he is going, and which way, beside the objective. And the state of the car he is in.
+      const m = g.markers[0];
+      if (m && !p.hidden && !g.cam.fixed) {
+        const dx = m.x - p.pos.x, dz = m.z - p.pos.z, d = Math.hypot(dx, dz), turn = wrapAngle(Math.atan2(dx, dz) - g.cam.yaw);
+        hud.distance(d < m.r + 1 ? '' : `${'↑↖←↙↓↘→↗'[(Math.round(turn / (Math.PI / 4)) + 8) % 8]} ${d < 1000 ? Math.round(d / 5) * 5 + ' m' : (d / 1000).toFixed(1) + ' km'}`);
+      } else hud.distance('');
+      hud.car(p.car ? p.car.hp ?? 100 : null);
+    }
 
     if (!g.skipRender) renderer.render(scene, camera);
     pressed.clear();

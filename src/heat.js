@@ -3,7 +3,7 @@ import { near, groundAt, nodeX, nodeZ, blockCenter } from './grid.js';
 import { makeLook, makeHuman, randomPedLook } from './entities.js';
 import {
   say, talk, phone, fade, cut, titleCard, passed, actor, dismiss, spot, toward, place, approach, shot, frame, reach, follower,
-  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, quarry, tail, careful, smoke, lying, playing, photograph, enter, leave, walkOut, NORTH, SOUTH, EAST, WEST,
+  punch, fistsOnly, allDown, roomScene, inRoom, roomSpot, explode, dispatch, quarry, tail, careful, smoke, lying, playing, photograph, enter, leave, walkOut, wantCar, gauge, NORTH, SOUTH, EAST, WEST,
 } from './missions.js';
 
 // Los Angeles. The story follows the plot of Michael Mann's "Heat"; every line of dialogue is written for the game.
@@ -126,8 +126,7 @@ async function armoured(g) {
   g.cam.fixed = null;
   const riders = [follower(g, waingro), follower(g, cheritto)];
   p.locked = false;
-  g.hud.objective('Get in the <b>tow truck</b>.');
-  await g.until(() => p.car === rig);
+  await wantCar(g, rig, 'Get in the <b>tow truck</b>.');
   await reach(g, freeway.north, 'Drive to the <b>freeway</b> and wait under it.', { how: 'car', r: 8 });
 
   // The armoured car comes down the avenue. Put the rig through its side.
@@ -214,8 +213,7 @@ async function armoured(g) {
   g.heat(2.2);
   const crew = [follower(g, waingro), follower(g, cheritto)];
   p.locked = false;
-  g.hud.objective('Get in the <b>ambulance</b>.');
-  await g.until(() => p.car === van);
+  await wantCar(g, van, 'Get in the <b>ambulance</b>.');
   await reach(g, yard.gate, 'Lose them. Drive back to the <b>yard</b>.', { how: 'car', r: 8 });
   g.pardon();
 
@@ -1479,8 +1477,7 @@ async function farEastPacific(g) {
   p.armour = 100; g.hud.armour(100);
   await fade(g, 0, 1);
   p.locked = false;
-  g.hud.objective('Get in the <b>grey sedan</b>.');
-  await g.until(() => p.car === car);
+  await wantCar(g, car, 'Get in the <b>grey sedan</b>.');
   car.driverless = false;
   await say(g, NEIL, 'Donald takes the wheel at the bank and keeps it running. Vests on. Nobody says a name.');
   await reach(g, bank.kerb, '<b>Drive</b> to the bank.', { how: 'car', r: 8 });

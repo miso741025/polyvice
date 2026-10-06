@@ -24,11 +24,40 @@ export function clearSave() { try { localStorage.removeItem(SAVE); } catch { /* 
 // For the settings menu: every chapter with its mission titles, and a way to put the save at any one of them.
 export const storyList = () => (CITY === 'la' ? HEAT : EPISODES).map(e => ({ name: e.name, title: e.title, titles: e.titles }));
 export function jumpTo(n, cash) { save(n, cash); }
-function save(mission, cash) { try { localStorage.setItem(SAVE, JSON.stringify({ mission, cash })); } catch { /* play on without saving */ } }
+function save(mission, cash, more = {}) { try { localStorage.setItem(SAVE, JSON.stringify({ ...readSave(), mission, cash, ...more })); } catch { /* play on without saving */ } }
+// Everything beside the mission number: each character's pockets, what each mission paid, who has been introduced.
+const keep = g => ({ chars: g.profilesOut?.(), earned: g.ledger || {}, met: [...(g.met || [])] });
+
+// ---------- Who is who ----------
+// A line for each person, shown the first time they speak and kept on the People page. Written for the game.
+const BIOS = {
+  'Tony': 'Waste management consultant. Captain of a crew, father of two', 'Dr. Melfi': 'Psychiatrist. Thursdays at four', 'Christopher': "Tony's nephew. Wants his name in the book",
+  'Carmela': "Tony's wife", 'AJ': "Tony's son. Thirteen", 'Meadow': "Tony's daughter. College next year", 'Uncle Junior': "Tony's uncle. Thinks it is his turn",
+  'Livia': "Tony's mother. Nobody visits", 'Artie': 'Chef. Owns Vesuvio. A friend since school', 'Charmaine': "Artie's wife. Wants no favours", 'Silvio': "Runs the Bada Bing. Tony's right hand",
+  'Big Pussy': 'Soldier. A body shop on the side', 'Paulie': 'Soldier. Takes everything personally', 'Hesh': "Lends money. Advised Tony's father", 'Emil Kolar': 'Kolar Brothers Sanitation',
+  'Brendan': "Christopher's friend. Takes trucks he should leave alone", 'Jackie Aprile': 'Acting boss of the family. Ill', 'Georgie': 'Tends bar at the Bing', 'Mr. Miller': "AJ's science teacher",
+  'Rosalie': "Jackie's wife", 'Hunter': "Meadow's friend", 'Mikey Palmice': "Junior's driver, and his right hand", 'Father Phil': 'Parish priest. Likes a baked ziti',
+  'Febby': 'Once a made man. Now a travel agent with another name', 'Vin Makazian': 'Detective. Owes Tony money', 'Mrs. Gaetano': 'Principal of Verbum Dei', 'Adriana': "Christopher's girlfriend",
+  'Jimmy Altieri': 'Captain. His card game is at the motor lodge', 'Larry Boy': 'Captain', 'Raymond Curto': 'Captain. The quiet one', 'Sammy Grigio': "Deals Jimmy's card game", 'Rusty Irish': 'Sells by the pond in the park',
+  'Johnny Sack': 'Underboss, across the river', 'Johnny Boy': "Tony's father, in 1967", 'Anthony': 'Tony, at eleven',
+  'Neil': 'Takes scores. Owns nothing he would turn around for', 'Chris': 'Boxman. Married to Charlene, more or less', 'Cheritto': 'Ten years in the crew. Eats like it is a sport', 'Trejo': 'The driver',
+  'Waingro': 'New. Recommended by a man somebody trusts', 'Nate': 'Sells what Neil takes, and finds the next one', 'Hanna': 'Lieutenant, Major Crimes. On his third marriage', 'Eady': 'Works in a bookstore. Draws letters',
+  'Van Zant': 'Whose bonds they were', 'Drucker': 'Sergeant, Major Crimes', 'Casals': 'Detective, Major Crimes', 'Justine': "Hanna's wife", 'Lauren': "Justine's daughter", 'Charlene': "Chris's wife",
+  'Kelso': 'Listens to what banks say to each other', 'Breedan': 'Out eight months. Works a grill',
+};
+const introduce = (g, who) => {
+  const name = who.replace(/ \((phone|radio)\)$/, '');
+  if (!BIOS[name] || (g.met ??= new Set()).has(name)) return;
+  g.met.add(name);
+  g.hud.intro?.(name, BIOS[name]);
+};
+// Everybody met so far, for the People page.
+export const people = g => [...(g.met || [])].map(name => ({ name, role: BIOS[name] }));
 
 // ---------- Building blocks for scenes ----------
 
 export async function say(g, who, text, dur = Math.max(2.4, text.length * 0.065)) {
+  if (who) introduce(g, who);
   g.hud.subtitle(who, text);
   const t0 = g.time;
   await g.until(() => g.time - t0 >= dur || (g.time - t0 > 0.3 && g.consume('Enter')));
@@ -136,6 +165,7 @@ export async function cut(g, arrange, seconds = 0.8) {
   await fade(g, 1, seconds);
   await arrange();
   await fade(g, 0, seconds);
+  g.setCheckpoint?.();
 }
 
 export async function titleCard(g, title, sub) {
@@ -144,11 +174,16 @@ export async function titleCard(g, title, sub) {
   g.hud.card();
 }
 
+// A mission is done. It always pays: `money` if the mission names a sum, otherwise a fee that grows as the story goes on.
+// What it paid is written in the ledger (Settings > Earnings), so it can be looked up after the banner has gone.
 export async function passed(g, reward, money = 0) {
-  g.hud.passed(reward);
+  const pr = g.progress || {}, n = pr.n || 1, pay = money || Math.round((700 + n * 110) / 50) * 50;
+  const sum = '$' + pay.toLocaleString('en-US'), label = /^Respect/.test(reward) || /^\$/.test(reward) ? sum : `${reward}  ·  ${sum}`;
+  (g.ledger ??= {})[n] = { t: pr.mission || '', m: pay };
+  g.hud.passed(label, pr.mission, Object.values(g.ledger).reduce((a, r) => a + r.m, 0));
   g.sfx?.passed();
-  if (money) g.addMoney(money);
-  await g.wait(4);
+  g.addMoney(pay);
+  await g.wait(6);
   g.hud.passed();
 }
 
@@ -224,8 +259,32 @@ export function frame(g, a, b, { dist = 4.8, height = 1.7, lift = 1.3, side = 1 
 export async function reach(g, at, text, { r = 6, how } = {}) {
   g.hud.objective(text);
   const m = g.addMarker(at.x, at.z, r), p = g.player;
+  if (!p.locked) g.setCheckpoint?.();   // killed on the way: back to where the errand was given
   await g.until(() => near(p.pos, m, r + 0.4) && (how === 'car' ? p.car && Math.abs(p.car.speed) < 6 : how === 'foot' ? !p.car : true));
   g.removeMarker(m);
+  g.hud.objective();
+  g.setCheckpoint?.();                  // and from here on, back to here
+}
+// Get into one particular car: it is marked on the radar and has an arrow over it until he does.
+export async function wantCar(g, car, text) {
+  const p = g.player;
+  g.hud.objective(text);
+  if (p.car === car) { g.hud.objective(); return; }
+  const blip = { x: car.pos.x, z: car.pos.z, color: '#49e0d0' };
+  g.blips.push(blip);
+  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.75, 4).rotateX(Math.PI), new THREE.MeshBasicMaterial({ color: 0x49e0d0, depthTest: false, transparent: true, opacity: 0.95 }));
+  arrow.renderOrder = 6;
+  g.track(arrow);
+  let on = true;
+  g.updaters.push(() => {
+    if (!on) return false;
+    blip.x = car.pos.x; blip.z = car.pos.z;
+    const k = 1 + Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) * 0.05;
+    arrow.scale.setScalar(k); arrow.position.set(car.pos.x, groundAt(car.pos.x, car.pos.z) + 2.6 + k * 0.4 + Math.sin(g.time * 5) * 0.12, car.pos.z); arrow.rotation.y = g.time * 2;
+    return true;
+  });
+  try { await g.until(() => p.car === car); }
+  finally { on = false; g.untrack(arrow); const i = g.blips.indexOf(blip); if (i >= 0) g.blips.splice(i, 1); }
   g.hud.objective();
 }
 
@@ -294,10 +353,7 @@ export function quarry(g, npc) {
   return () => { on = false; g.untrack(arrow); const i = g.blips.indexOf(blip); if (i >= 0) g.blips.splice(i, 1); };
 }
 // Only fists for a while: for beatings that must not end in a shooting.
-export function fistsOnly(g, on) {
-  const p = g.player;
-  if (on) { g.setWeapon('fist'); p.weapons.pistol = false; } else p.weapons.pistol = true;
-}
+export function fistsOnly(g, on) { g.fistsOnly(on); }
 // Wait until every one of these fighters is down.
 export const allDown = (g, npcs) => g.until(() => npcs.every(n => n.dead || n.human.state === 'down'));
 
@@ -657,8 +713,7 @@ async function starterMotor(g) {
   g.cam.fixed = null;
   await fade(g, 0, 1);
   p.locked = false;
-  g.hud.objective("Get in <b>Dr. Melfi's car</b>, the dark red sedan.");
-  await g.until(() => p.car === hers);
+  await wantCar(g, hers, "Get in <b>Dr. Melfi's car</b>, the dark red sedan.");
   hers.driverless = false;
   g.hud.objective();
   await say(g, '', 'It caught on the fourth try.', 2.2);
@@ -685,8 +740,7 @@ async function starterMotor(g) {
   dismiss(g, pussy);
   g.cam.fixed = null;
   await leave(g);
-  g.hud.objective("Get in <b>Dr. Melfi's car</b>.");
-  await g.until(() => p.car === hers);
+  await wantCar(g, hers, "Get in <b>Dr. Melfi's car</b>.");
   const home = careful(g, 'Her car', 'A scrape down the door would take some explaining. He went back to Pussy and they did it again.', back(bodyshop.kerb));
   await home.to(space, '<b>Drive</b> it back and put it in her space. Exactly as it was.', hers);
   home.stop();
@@ -1040,8 +1094,7 @@ async function anniversary(g) {
   g.hud.fade(0, 1.2);
   await titleCard(g, 'Anniversary', 'North Shore');
   p.locked = false;
-  g.hud.objective('Get in the <b>station wagon</b>.');
-  await g.until(() => p.car === wagon);
+  await wantCar(g, wagon, 'Get in the <b>station wagon</b>.');
   wagon.driverless = false;
   await reach(g, church.kerb, '<b>Drive</b> to the church.', { how: 'car', r: 7 });
   await reach(g, church.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
@@ -1796,12 +1849,51 @@ const EPISODES = [
     titles: ['Sacramental Wine', "The Principal's Office", '1967', 'Rideland', 'Loose Lips', 'Sundaes'] },
 ];
 
+// ---------- Between missions ----------
+// The story waits for the player. When one mission is done the next is a yellow marker somewhere that makes sense
+// for it (home, the Bing, the doctor's, the precinct), and it starts when he walks or drives into it.
+const HUBS = {
+  home: g => spot(g.places.home.spawn, 0, 4), bing: g => g.places.bing?.door, melfi: g => g.places.melfi?.kerb, school: g => g.places.school?.gate, hospital: g => g.places.hospital?.kerb,
+  satriale: g => g.places.satriale?.kerb, grove: g => g.places.grove?.kerb, bar: g => g.places.bar?.kerb, precinct: g => g.places.precinct?.kerb, kates: g => g.places.kates?.kerb, yard: g => g.places.yard?.gate, truckstop: g => g.places.truckstop?.kerb,
+};
+const STARTS = {
+  familyBusiness: 'bing', garbage: 'bing', insurance: 'bing', backRoom: 'bing', hijack: 'bing', sitDown: 'satriale', fortySixLong: 'bing', closingTime: 'bing', visitingHours: 'hospital', theMotel: 'bing', acceptance: 'bing',
+  messageJob: 'bing', theTail: 'melfi', schoolyard: 'school', figurehead: 'bing', starterMotor: 'melfi', juniorsWeek: 'bing', complaints: 'bing', theBoard: 'melfi', sacramentalWine: 'school', principalsOffice: 'school',
+  nineteenSixtySeven: 'melfi', looseLips: 'home', sundaes: 'melfi', greenGrove: 'home',
+  armoured: 'yard', bearerBonds: 'bar', slick: 'precinct', eyesOn: 'precinct', theNextOne: 'bar', justine: 'precinct', coffee: 'precinct', kelso: 'bar', wheels: 'yard', hardware: 'yard', farEastPacific: 'kates',
+  charleneSign: 'bar', laurenNight: 'precinct', theCrew: 'home',
+};
+const CHAIN = new Set(['fredPeters', 'theStreet', 'theRunway', 'ridelandSunday']); // these follow straight on from the one before
+async function offer(g, mission, title, straight) {
+  if (straight || CHAIN.has(mission.name)) return;
+  const p = g.player, at = (HUBS[STARTS[mission.name] || 'home'] || HUBS.home)(g) || HUBS.home(g);
+  // Some missions end in the dark with the player held still, for the next one to pick up. Between missions he is free.
+  Object.assign(p, { locked: false, hidden: false, pose: null, topPose: null });
+  g.cam.fixed = null; g.cam.sway = 0;
+  g.hud.panic(0); g.hud.era?.(false); g.hud.subtitle(); g.hud.card();
+  g.hud.fade(0, 1);
+  for (;;) {
+    const m = g.addMarker(at.x, at.z, 3.2, 0xffe066);
+    m.color = '#ffe066'; m.name = title;
+    g.hud.objective(`Next: <b>${title}</b>. Go to the <span style="color:#ffe066">yellow marker</span> when you are ready.`);
+    let armed = false;
+    try {
+      await g.until(() => { const d = Math.hypot(p.pos.x - at.x, p.pos.z - at.z); if (d > 7) armed = true; return armed && d < 3.8 && !p.locked && !p.inside && (!p.car || Math.abs(p.car.speed) < 9); });
+      g.removeMarker(m); g.hud.objective();
+      return;
+    } catch (err) {
+      if (err !== g.WASTED) throw err;
+      while (p.dying) await new Promise(r => setTimeout(r, 250)); // killed between missions: home, and the marker is put back
+    }
+  }
+}
 export async function runStory(g) {
   const STORY = CITY === 'la' ? HEAT : EPISODES; // each city tells its own
   const total = STORY.reduce((n, e) => n + e.missions.length, 0);
   const saved = readSave(), from = clamp(saved.mission || 0, 0, total);
   if (from > 0) { // pick up a saved game at home
     const { home, vesuvio } = g.places, p = g.player;
+    g.profilesIn?.(saved.chars); g.ledger = saved.earned || {}; g.met = new Set(saved.met || []);
     if (saved.cash && !g.arrived) { g.hud.cash = g.cash + saved.cash; g.addMoney(saved.cash); } // what was saved is not a windfall: no "+$" beside the counter // over the bridge, the money in hand is the money
     if (from > 5) vesuvio?.burn();
     for (const d of home.ducks) d.group.visible = false;
@@ -1818,13 +1910,17 @@ export async function runStory(g) {
       if (n++ < from) continue;
       g.progress = { episode: episode.name, title: episode.title, mission: episode.titles[k], k: k + 1, of: episode.missions.length, n, total };
       if (k === 0 && e > 0) { await g.wait(1.5); await titleCard(g, episode.title, episode.name); }
-      for (;;) { // a mission is played again from the start if Tony is killed during it
-        g.missionActive = true; g.topUp?.();
+      await offer(g, mission, episode.titles[k], n === 1 || (n - 1 === from && sessionStorage.getItem('straight')));
+      sessionStorage.removeItem('straight');
+      for (;;) { // a mission is played again from the start if he is killed before its first checkpoint
+        g.missionActive = true; g.checkpoint = null; g.topUp?.();
+        if (g.tonyCar) g.tonyCar.hp = Math.max(g.tonyCar.hp ?? 100, 70);
         try { await mission(g); break; } catch (err) { if (err !== g.WASTED) throw err; }
         finally { g.missionActive = false; }
         await g.respawn();
       }
-      save(n, g.cash);
+      g.checkpoint = null;
+      save(n, g.cash, keep(g));
       await g.wait(1.5);
       if (k === episode.missions.length - 1) {
         g.hud.card(`End of ${episode.name}`, e === STORY.length - 1 ? (CITY === 'la' ? 'Los Angeles is yours until the next one.' : 'Vice City is yours until the next one.') : '');
@@ -2794,8 +2890,7 @@ async function hijack(g) {
   await say(g, '', 'Christopher obliged him. It seemed only polite.');
   g.cam.fixed = null;
   p.locked = false;
-  g.hud.objective('Get in the <b>truck</b>.');
-  await g.until(() => p.car === truck);
+  await wantCar(g, truck, 'Get in the <b>truck</b>.');
   g.hud.objective('Drive the truck to the <b>Bada Bing</b> car park.');
   const m = g.addMarker(bing.door.x, bing.door.z + 2, 6);
   await g.until(() => p.car === truck && near(p.pos, m, 7) && Math.abs(truck.speed) < 6);
@@ -3154,8 +3249,7 @@ async function fortySixLong(g) {
   });
   const nephew = follower(g, cast.chris);
   p.locked = false;
-  g.hud.objective('Get in the <b>truck</b>.');
-  await g.until(() => p.car === truck);
+  await wantCar(g, truck, 'Get in the <b>truck</b>.');
   const load = careful(g, 'Cargo', "Suits all over the road, and a patrol car slowing down to look. Tony had it loaded again.", () => {
     if (p.car) g.leaveCar();
     truck.pos.set(lot.x, 0, lot.z); truck.heading = EAST; truck.speed = 0;
@@ -3799,6 +3893,7 @@ export async function tail(g, car, goal, text, { far = 95, close = 12 } = {}) {
   g.updaters.push(dt => {
     blip.x = car.pos.x; blip.z = car.pos.z;
     const d = Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z);
+    g.hud.objective(text + gauge(d, close, far));
     if (near(car.pos, goal, 20)) { result = true; car.nav = null; car.speed = 0; return false; }
     if (d > far) { lost += dt; if (lost > 6) { result = false; return false; } } else lost = 0;
     if (car.nav) car.nav.cruise = d < close ? 13 : 8.5; // she speeds up when something is on her bumper
@@ -3808,6 +3903,12 @@ export async function tail(g, car, goal, text, { far = 95, close = 12 } = {}) {
   g.blips.splice(g.blips.indexOf(blip), 1);
   g.hud.objective();
   return result;
+}
+// How a tail is going: a pip on a line between "on his bumper" and "gone", and a word for it.
+export function gauge(d, close, far) {
+  const k = clamp((d - close) / (far - close), 0, 1), at = Math.round(k * 8), line = Array.from({ length: 9 }, (_, i) => (i === at ? '◆' : '·')).join('');
+  const [word, hex] = d < close ? ['TOO CLOSE', '#ff3b4a'] : k > 0.72 ? ['LOSING HIM', '#ffd23f'] : ['GOOD', '#3fd16b'];
+  return ` &nbsp; <span style="color:${hex}">${word}</span> <span style="letter-spacing:2px">${line}</span>`;
 }
 // Send a car out as traffic from the node nearest `from`, heading for `goal`.
 export function dispatch(g, car, from, goal, cruise = 8.5) {

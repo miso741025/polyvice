@@ -927,6 +927,20 @@ export function makeHuman(opts = {}) {
   gun('shotgun', [[0.028, 0.028, 0.5, 0, 0.03, 0.22, 0], [0.034, 0.034, 0.22, 0, 0.0, 0.2, 0, woodMat], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3, woodMat], [0.03, 0.07, 0.18, 0, -0.01, -0.12, 0.15, woodMat]]);
   gun('rifle', [[0.03, 0.05, 0.36, 0, 0.02, 0.12, 0], [0.018, 0.018, 0.26, 0, 0.03, 0.42, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3], [0.026, 0.15, 0.04, 0, -0.06, 0.14, 0.25], [0.028, 0.06, 0.24, 0, 0.0, -0.2, 0], [0.012, 0.03, 0.03, 0, 0.06, 0.3, 0]]);
   const pistol = guns.pistol;
+  // A long gun he owns but is not holding hangs across his back, on its sling.
+  let spineBone = null;
+  root.traverse(n => { if (n.isBone && !spineBone && /spine_0?3|spine3|chest|upperchest/i.test(n.name)) spineBone = n; });
+  if (!spineBone) root.traverse(n => { if (n.isBone && /spine/i.test(n.name)) spineBone = n; });
+  const slung = {};
+  for (const kind of ['smg', 'shotgun', 'rifle']) {
+    const copy = guns[kind].clone(true);
+    copy.visible = false;
+    const holder = new THREE.Group();
+    holder.add(copy); copy.position.set(0, 0, 0); copy.rotation.set(0, 0, 0);
+    holder.position.set(0.02, 0.1, -0.16); holder.rotation.set(Math.PI / 2 - 0.5, 0, 0.5); // barrel down, across the shoulder blades
+    spineBone?.add(holder);
+    slung[kind] = copy;
+  }
 
   const mixer = new THREE.AnimationMixer(root), actions = {};
   // 'run', or one half of it: 'run|legs', 'aim|top'.
@@ -984,6 +998,8 @@ export function makeHuman(opts = {}) {
     },
     get busy() { return this.after !== null; },
     arm(on) { for (const k in guns) guns[k].visible = on === true ? k === 'pistol' : on === k; },
+    // Which long guns hang on his back: a list of kinds (the one in his hands is never among them).
+    sling(kinds = []) { let n = 0; for (const k in slung) { slung[k].visible = kinds.includes(k) && n === 0; if (slung[k].visible) n++; } },
   };
   mixer.addEventListener('finished', e => {
     if (person.topOnce && e.action === actions[person.topOnce.key]) { const back = person.topOnce.back; person.topOnce = null; person.layer(back); return; }
@@ -1132,5 +1148,5 @@ Object.assign(LOOKS, {
   manager: { jacket: 0x3d4658, shirt: 0xf4f4f4, tie: 0x8a1c1c, tucked: true, pants: 0x3d4658, hair: 0x6f6a66, hairStyle: 'balding', glasses: 'clear', bulk: 1.1, age: 0.6 },
   snitch: { shirt: 0xffe066, tee: true, jacket: 0x5b53c9, pants: 0x23232b, shoes: 0xf2efe8, hair: 0x111111, hairMesh: 'buzzed', dark: true, chain: true, bulk: 0.95, goatee: 0x141110 },
 });
-export const makeLook = name => makeHuman(LOOKS[name]);
+export const makeLook = name => { const h = makeHuman(LOOKS[name]); h.look = name; return h; }; // `look` says who this is, for whoever keeps his pockets
 export const makeTony = () => makeLook('tony');

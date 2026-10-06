@@ -140,3 +140,22 @@ body.la .logo .vc { color: #6fb0ff; text-shadow: 3px 3px 0 #10204a; }
 #radio { position: absolute; left: 32px; top: 26px; max-width: 46vw; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 26px; letter-spacing: 2px; color: #ffe066;
   text-shadow: 3px 3px 0 #000, -1px -1px 0 #000; opacity: 0; transform: translateX(-12px); transition: opacity .4s, transform .4s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #radio.on { opacity: 1; transform: none; }
+
+/* The car's condition, under the weapon. */
+#carhp { position: absolute; right: 32px; top: 232px; font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; color: #9ff3ff; text-shadow: 2px 2px 0 #000; }
+#carhp.worn { color: #ffd23f; } #carhp.bad { color: #ff3b4a; }
+/* What he is carrying: a row along the top, while he is changing weapon. */
+#weapons { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); display: flex; gap: 6px; opacity: 0; transition: opacity .3s; font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1.5px; white-space: nowrap; }
+#weapons.on { opacity: 1; }
+#weapons span { padding: 4px 10px; background: rgba(20, 8, 15, .7); border: 2px solid #3a3440; color: #f0ecff; text-shadow: 1px 1px 0 #000; }
+#weapons span b { color: #9ff3ff; margin-right: 4px; } #weapons span i { color: #ffe066; font-style: normal; margin-left: 4px; }
+#weapons span.on { border-color: #ff5fd2; background: rgba(90, 20, 70, .85); }
+#weapons span.none { opacity: .35; }
+/* Distance to the marker. */
+#dist { position: absolute; left: 0; right: 0; bottom: 92px; text-align: center; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; color: #ffe066; text-shadow: 2px 2px 0 #000; }
+/* A lower third: who this is. */
+#intro { position: absolute; left: 6vw; bottom: 232px; opacity: 0; transform: translateX(-16px); transition: opacity .4s, transform .4s; border-left: 5px solid #ff5fd2; padding: 4px 14px; background: linear-gradient(90deg, rgba(20, 8, 15, .8), rgba(20, 8, 15, 0)); min-width: 260px; }
+#intro.on { opacity: 1; transform: none; }
+#intro b { display: block; font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 2px; color: #fff; text-shadow: 2px 2px 0 #000; }
+#intro span { font-family: 'Rubik', sans-serif; font-size: 15px; color: #9ff3ff; text-shadow: 1px 1px 0 #000; }
+#passed #earned { font-family: 'Rubik', sans-serif; font-weight: 700; font-size: 17px; color: #f0ecff; text-shadow: 2px 2px 0 #000; margin-top: 6px; }
