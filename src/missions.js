@@ -39,7 +39,7 @@ const BIOS = {
   'Rosalie': "Jackie's wife", 'Hunter': "Meadow's friend", 'Mikey Palmice': "Junior's driver, and his right hand", 'Father Phil': 'Parish priest. Likes a baked ziti',
   'Febby': 'Once a made man. Now a travel agent with another name', 'Vin Makazian': 'Detective. Owes Tony money', 'Mrs. Gaetano': 'Principal of Verbum Dei', 'Adriana': "Christopher's girlfriend",
   'Jimmy Altieri': 'Captain. His card game is at the motor lodge', 'Larry Boy': 'Captain', 'Raymond Curto': 'Captain. The quiet one', 'Sammy Grigio': "Deals Jimmy's card game", 'Rusty Irish': 'Sells by the pond in the park',
-  'Johnny Sack': 'Underboss, across the river', 'Johnny Boy': "Tony's father, in 1967", 'Anthony': 'Tony, at eleven',
+  'Johnny Sack': 'Underboss, across the river', 'Agent Harris': 'F.B.I. Polite about it', 'Johnny Boy': "Tony's father, in 1967", 'Anthony': 'Tony, at eleven',
   'Neil': 'Takes scores. Owns nothing he would turn around for', 'Chris': 'Boxman. Married to Charlene, more or less', 'Cheritto': 'Ten years in the crew. Eats like it is a sport', 'Trejo': 'The driver',
   'Waingro': 'New. Recommended by a man somebody trusts', 'Nate': 'Sells what Neil takes, and finds the next one', 'Hanna': 'Lieutenant, Major Crimes. On his third marriage', 'Eady': 'Works in a bookstore. Draws letters',
   'Van Zant': 'Whose bonds they were', 'Drucker': 'Sergeant, Major Crimes', 'Casals': 'Detective, Major Crimes', 'Justine': "Hanna's wife", 'Lauren': "Justine's daughter", 'Charlene': "Chris's wife",
@@ -1831,6 +1831,449 @@ async function sundaes(g) {
   await passed(g, 'Episode seven complete', 5000);
 }
 
+// ========== Episode Eight: The Legend of Tennessee Moltisanti ==========
+// Word comes that a grand jury has finished its work. Everybody cleans house. Christopher, who is in nobody's
+// newspaper, cannot sleep. Follows the plot of the eighth episode; every line is written for the game.
+
+const LARRYB = 'Larry Boy', AGENT = 'Agent Harris';
+// A house some way from a place: the suburbs are full of them.
+const aHouse = (g, to, want) => g.places.flats.slice().sort((a, b) => Math.abs(Math.hypot(a.kerb.x - to.x, a.kerb.z - to.z) - want) - Math.abs(Math.hypot(b.kerb.x - to.x, b.kerb.z - to.z) - want))[0];
+// Indoors at the Sopranos': the player walks about the kitchen and the den.
+function intoHome(g) {
+  const p = g.player, door = g.places.doors.find(d => d.name === 'home');
+  for (const h of door.hide || []) h.group.visible = false;
+  p.inside = door;
+  p.pos.set(door.inside.x, 0, door.inside.z); p.heading = g.cam.yaw = door.inside.h;
+  g.cam.fixed = null;
+  return door;
+}
+
+// ---------- 1. The Wedding ----------
+// A reception at the Manor, a telephone call, and eleven empty tables.
+
+async function theWedding(g) {
+  const { manor, home } = g.places, p = g.player, HALL = g.places.rooms.BANQUET, T = HALL.rounds[4], T2 = HALL.rounds[5];
+
+  await g.wait(1);
+  g.hud.card('The Wedding', 'The Manor');
+  await phone(g, CARMELA, "Larry Boy's daughter is getting married in forty minutes and you are not dressed. The Manor. I am leaving without you.");
+  g.hud.card();
+  const larry = actor(g, 'larry', T.seats[0], T.seats[0].h, 'sit'), jimmy = actor(g, 'jimmy', T.seats[1], T.seats[1].h, 'sit'), pussy = actor(g, 'pussy', T.seats[3], T.seats[3].h, 'sit');
+  const wife = actor(g, 'carmela', T2.seats[0], T2.seats[0].h, 'sit'), guests = HALL.rounds.slice(0, 4).flatMap(t => [0, 2].map(k => extraAt(g, t.seats[k], t.seats[k].h, 'sit')));
+  await reach(g, manor.kerb, 'Drive to <b>the Manor</b>.', { how: 'car', r: 7 });
+  await reach(g, manor.door, 'Go <b>in</b>.', { r: 2, how: 'foot' });
+  await enter(g, HALL);
+  const stand = { x: T.x + 0.2, y: HALL.Y, z: T.z + 2.5 };
+  await reach(g, stand, 'Find <b>Larry Boy</b>. He is at a round table, not eating.', { r: 1.5, how: 'foot' });
+  p.locked = true;
+  p.pos.set(stand.x, 0, stand.z); p.heading = NORTH;
+  g.cam.fixed = { pos: new THREE.Vector3(T.x + 4.2, HALL.Y + 1.7, T.z + 3.6), look: new THREE.Vector3(T.x, HALL.Y + 1.1, T.z) };
+  await talk(g, [
+    [LARRYB, 'Sit. Smile. My girl is cutting a cake over there. ...I got a call an hour ago. The grand jury is finished.', larry],
+    [TONY, 'Finished on who?', p],
+    [JIMMY, 'Nobody knows on who. That is the beauty of it. It could be every man at this table by Friday.', jimmy],
+    [PUSSY, "I have a guy in the clerk's office. He says boxes. They have ordered boxes.", pussy],
+    [TONY, 'Then by tonight nobody has anything in the house. Not a gun, not a receipt, not a matchbook. Kiss the bride and go home.', p],
+    [LARRYB, 'I paid for two hundred dinners.', larry],
+    [TONY, 'Then they are going to be very good dinners for the hundred and sixty who stay.', p],
+  ]);
+  g.cam.fixed = null;
+  p.locked = false;
+  await walkOut(g, HALL, 'Go. <b>Home</b>, before a man with a warrant gets there first.');
+  dismiss(g, larry, jimmy, pussy, wife, ...guests);
+  for (;;) {
+    if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+    if (await against(g, home.road, '<b>Drive</b> home.', 110, { r: 7 })) break;
+    p.locked = true;
+    await fade(g, 1, 0.8);
+    await say(g, '', 'There were two grey sedans in the drive when he got there. That is the version he was driving to avoid. Again.');
+    const c = p.car || g.tonyCar; g.enterCar(c); c.pos.set(manor.kerb.x, 0, manor.kerb.z); c.heading = manor.kerb.h; c.speed = 0;
+    await fade(g, 0, 0.8);
+    p.locked = false;
+  }
+  // Twenty years of things a man keeps.
+  const spots = [spot(home.car, 0.5, -25), home.grill, home.pool], notes = [
+    'Behind the paint cans in the garage: two shoe boxes, heavier than shoes.',
+    'Under the gas grill, in an oven glove: a pistol he had forgotten he owned.',
+    'In the housing of the pool filter: the jewellery Carmela pretended not to know the price of.'];
+  await rounds(g, spots, 'Go round the house. <b>Get everything out.</b>', async k => {
+    p.locked = true;
+    p.human.play('pickup', 'idle');
+    await say(g, '', notes[k]);
+    p.locked = false;
+  }, { r: 2.6 });
+  await reach(g, home.car, 'Put it all in the <b>car</b>.', { r: 3 });
+  await say(g, TONY, 'It cannot stay in the car. And it cannot go to anybody who has ever been fingerprinted.', 3.6);
+  await passed(g, 'Respect +');
+}
+
+// ---------- 2. Spring Cleaning ----------
+// Everybody is burning something. Tony's goes on a shelf above his mother's good coat.
+
+async function springCleaning(g) {
+  const { bing, satriale, bodyshop, grove } = g.places, p = g.player, GROVE = g.places.rooms.GROVE;
+
+  await g.wait(1);
+  g.hud.card('Spring Cleaning', 'Thursday');
+  await phone(g, SILVIO, 'Everybody is asking me what to do. I am telling them to do what you are doing. What are you doing?');
+  await say(g, TONY, 'Going round to see that they do it.', 2.6);
+  g.hud.card();
+  const lines = [
+    [SILVIO, 'The books are in the dumpster and the dumpster is on fire. Georgie is toasting a roll on it.'],
+    [PAULIE, 'I am cutting up my credit cards. I do not know why. It feels right.'],
+    [PUSSY, 'I have three cars in here with no papers. By tonight I will have one car, and a lot of spare parts.'],
+  ];
+  const fire = [];
+  await rounds(g, [bing.park, satriale.kerb, bodyshop.kerb], '<b>Drive</b> round the crew. See that every one of them is cleaning house.', async k => {
+    if (k === 0) fire.push(smoke(g, spot(bing.park, 6, -6), 2));
+    await say(g, lines[k][0], lines[k][1]);
+  });
+  await say(g, TONY, 'And now mine. ...There is one closet in this state no federal judge will sign for.', 3.6);
+  await shake(g, '<b>Drive.</b> Two antennas on a grey sedan. Lose it before you go anywhere near Green Grove.', { color: 0x8d8a8e });
+  const ma = actor(g, 'livia', roomSpot(GROVE, -4.68, -2), EAST, 'sit');
+  await reach(g, grove.kerb, 'Drive to <b>Green Grove</b>.', { how: 'car', r: 7 });
+  await reach(g, grove.door, 'Carry the box <b>in</b>.', { r: 1.8, how: 'foot' });
+  await enter(g, GROVE);
+  await reach(g, roomSpot(GROVE, -3.4, -0.9), 'Find <b>your mother</b>.', { r: 1.6, how: 'foot' });
+  p.locked = true;
+  p.pos.set(GROVE.X - 3.2, 0, GROVE.Z - 1.2); p.heading = toward(p.pos, ma.group.position);
+  g.cam.fixed = inRoom(GROVE, [-0.9, 0.7], [-4, -2.3], 1.5, 1.1).cam;
+  await talk(g, [
+    [TONY, 'Ma. I need to leave a few things in your closet. Winter clothes.', p],
+    [LIVIA, 'In May.', ma],
+    [TONY, "They are Carmela's. She has no room.", p],
+    [LIVIA, 'Put them where you like. Nobody asks me. What is in the box?', ma],
+    [TONY, 'Shoes.', p],
+    [LIVIA, 'It is very heavy, for shoes.', ma],
+  ]);
+  await say(g, '', 'He put forty thousand dollars and a pistol on the shelf above her good coat, and kissed her on the top of the head.');
+  g.cam.fixed = null;
+  p.locked = false;
+  await walkOut(g, GROVE, 'Go back out to the <b>car</b>.');
+  dismiss(g, ma);
+  for (const f of fire) f?.stop?.();
+  await passed(g, 'Respect +');
+}
+
+// ---------- 3. Bad Dreams ----------
+// Played as Christopher. A man he buried in the winter keeps coming back to say where the bullet is.
+
+async function badDreams(g) {
+  const { satriale, bing, marsh } = g.places, p = g.player, tony = p.human;
+  const lane = { x: nodeX(0), z: marsh.z }, north = { x: nodeX(NX) + 3.6, z: bounds.minZ + 34 }, sand = g.places.chop;
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'Christopher had not slept through a night in a week.');
+  if (p.car) g.leaveCar();
+  g.setNight(1);
+  asOther(g, 'christopher', spot(satriale.back, 0, 2), NORTH);
+  const emil = actor(g, 'kolar', spot(satriale.back, -0.6, -1.6), SOUTH);
+  g.hud.panic(0.35); g.cam.sway = 0.5;
+  shot(g, spot(satriale.back, 3, 4), spot(satriale.back, -0.4, -0.6), 1.6, 1.3);
+  await fade(g, 0, 1.2);
+  await talk(g, [
+    ['Emil Kolar', 'You left one in the table, Christopher. A bullet. They will dig it out of the wood, and it will have your name on it.', emil],
+    [CHRIS, 'You are dead. I did it myself.', p],
+    ['Emil Kolar', 'So come and look.', emil],
+  ]);
+  await fade(g, 1, 0.8);
+  g.hud.panic(0); g.cam.sway = 0;
+  dismiss(g, emil);
+  // Awake, at the Bing, at two in the morning.
+  place(g, spot(bing.door, 0, 1.6), SOUTH);
+  const car = propCar(g, bing.park, bing.park.h, 0x8a1c2a, 'coupe'), georgie = actor(g, 'georgie', spot(bing.door, 1.6, 2.4), WEST);
+  frame(g, p.pos, georgie.group.position, { dist: 4.2 });
+  await playing(g, 'Christopher Moltisanti', "Tony's nephew. You play him in this one");
+  g.hud.fade(0, 1.2);
+  await titleCard(g, 'Bad Dreams', 'The Bada Bing, 2 a.m.');
+  await talk(g, [
+    [CHRIS, 'Georgie. Get a shovel. Get two shovels.', p],
+    [GEORGIE, 'For what?', georgie],
+    [CHRIS, 'We planted something in the marsh in the winter. I want to see that it is still planted.', p],
+    [GEORGIE, 'Now? It is two in the morning.', georgie],
+    [CHRIS, 'When did you want to do it, lunch?', p],
+  ]);
+  g.cam.fixed = null;
+  const with_ = follower(g, georgie);
+  p.locked = false;
+  await wantCar(g, car, 'Get in the <b>red coupe</b>.');
+  car.driverless = false;
+  await reach(g, lane, '<b>Drive</b> out to the marsh road.', { how: 'car', r: 7 });
+  await reach(g, marsh, 'Walk out into the <b>reeds</b>.', { r: 2.6, how: 'foot' });
+  // Digging, and a pair of headlamps.
+  const dig = async (n, of) => { g.hud.objective(`Dig. &nbsp; <b>${n} of ${of}</b>`); p.locked = true; p.human.play('kneel', 'idle'); await g.wait(2.3); g.sfx?.punch?.(false); p.locked = false; };
+  await dig(1, 3);
+  await dig(2, 3);
+  const patrol = propCar(g, { x: lane.x + 3.6, z: lane.z - 120 }, SOUTH, 0xf4f4f0, 'police');
+  for (;;) {
+    patrol.pos.set(lane.x + 3.6, 0, lane.z - 120); patrol.speed = 0;
+    let moved = false, gone = false;
+    g.hud.objective('Headlamps on the marsh road. <b>Keep still</b> until they have gone by.');
+    g.updaters.push(dt => { if (gone) return false; patrol.pos.z += 13 * dt; patrol.sync?.(); if (patrol.pos.z > lane.z + 130) gone = true; return true; });
+    await g.wait(1.2);
+    await g.until(() => { if (p.motion !== 'idle' || p.car) moved = true; return gone || moved; });
+    g.hud.objective();
+    if (!moved) break;
+    gone = true;
+    p.locked = true;
+    await fade(g, 1, 0.8);
+    await say(g, '', 'The car slowed. A torch came over the reeds. They lay in six inches of water for ten minutes, and then started again.');
+    await fade(g, 0, 0.8);
+    p.locked = false;
+  }
+  g.removeCar(patrol);
+  await dig(3, 3);
+  p.locked = true;
+  await talk(g, [
+    [GEORGIE, 'Oh, Madonna. He has still got his watch on.', georgie],
+    [CHRIS, 'Take the feet.', p],
+  ]);
+  p.locked = false;
+  await wantCar(g, car, 'Carry him to the <b>car</b>.');
+  const trunk = careful(g, 'The trunk', 'The trunk came up at a bump. They stopped under a street lamp to shut it, which is not where anybody wants to shut a trunk. Again.', () => { if (p.car) g.leaveCar(); car.pos.set(lane.x, 0, lane.z); car.heading = NORTH; car.speed = 0; g.enterCar(car); });
+  await trunk.to(north, '<b>Drive</b> to the north end of the beach. Nothing that makes anybody look.', car);
+  trunk.stop();
+  await reach(g, sand, 'Out on the <b>sand</b>, past the last lamp.', { r: 2.6, how: 'foot' });
+  await dig(1, 2);
+  await dig(2, 2);
+  p.locked = true;
+  with_.on = false;
+  shot(g, spot(sand, -4, 3), sand, 1.5, 1);
+  await talk(g, [
+    [CHRIS, 'Now nobody knows where he is but us.', p],
+    [GEORGIE, 'And him.', georgie],
+    [CHRIS, '...Do not say things like that to me this week.', p],
+  ]);
+  await fade(g, 1, 1);
+  dismiss(g, georgie);
+  g.removeCar(car);
+  g.cam.fixed = null;
+  homeAsTony(g, tony);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 4. The Bakery ----------
+// Played as Christopher. Tony sends him for pastry. There is a line.
+
+async function theBakery(g) {
+  const { cafe, bing } = g.places, p = g.player, tony = p.human, SHOP = g.places.rooms.BEAN, clerk = SHOP.clerk;
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'Tony sent him for pastry. It was that kind of week.');
+  if (p.car) g.leaveCar();
+  g.setNight(0);
+  asOther(g, 'christopher', between(cafe.kerb, cafe.door, 0.4), toward(cafe.kerb, cafe.door));
+  await playing(g, 'Christopher Moltisanti', 'You play him in this one');
+  const car = propCar(g, cafe.kerb, cafe.kerb.h, 0x8a1c2a, 'coupe');
+  const line = [extraAt(g, { x: SHOP.till.x, y: SHOP.Y, z: SHOP.till.z + 0.2 }, NORTH), extraAt(g, { x: SHOP.till.x + 0.2, y: SHOP.Y, z: SHOP.till.z + 1.5 }, NORTH)];
+  g.cam.fixed = null;
+  g.hud.fade(0, 1.2);
+  await titleCard(g, 'The Bakery', 'A box of sfogliatelle, for the Bing');
+  p.locked = false;
+  await reach(g, cafe.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  await enter(g, SHOP);
+  const queue = { x: SHOP.till.x - 0.1, y: SHOP.Y, z: SHOP.till.z + 2.9 };
+  await reach(g, queue, 'There is a line. <b>Stand in it.</b>', { r: 1.2, how: 'foot' });
+  p.locked = true;
+  p.pos.set(queue.x, 0, queue.z); p.heading = NORTH;
+  clerk.group.rotation.y = SOUTH;
+  g.cam.fixed = { pos: new THREE.Vector3(SHOP.till.x + 3.4, SHOP.Y + 1.9, SHOP.till.z + 3.4), look: new THREE.Vector3(SHOP.till.x, SHOP.Y + 1.3, SHOP.till.z - 0.4) };
+  await say(g, '', 'Four minutes. Six. A woman who had come in after him was served a loaf.');
+  await talk(g, [
+    ['Clerk', 'Thirty-four.', clerk],
+    [CHRIS, 'I have been standing here ten minutes.', p],
+    ['Clerk', 'You have to take a number, sir. Thirty-four?', clerk],
+    [CHRIS, 'Do you know who I am?', p],
+    ['Clerk', 'A man with no number.', clerk],
+    [CHRIS, '...Christopher Moltisanti. Remember it. You will want to write it on a cake.', p],
+  ]);
+  g.cam.fixed = null;
+  dismiss(g, ...line);
+  g.noHeat = true;
+  g.giveWeapon('pistol');
+  const mark = g.addNpc(clerk, { health: 600, cash: 0, stays: true });
+  p.locked = false;
+  g.hud.objective('<b>Do it.</b> One, in the floor, by his foot.');
+  await g.until(() => mark.health < 600);
+  g.hud.objective();
+  g.removeNpc(clerk);
+  p.locked = true;
+  g.sfx?.scream();
+  clerk.after = null; clerk.set('crouch');
+  await talk(g, [
+    ['Clerk', 'My foot! You shot me in the foot!', clerk],
+    [CHRIS, 'It will heal. A box of the sfogliatelle. And the cannoli, the ones at the back you were keeping.', p],
+  ]);
+  g.sfx?.cash();
+  p.locked = false;
+  await walkOut(g, SHOP, 'Take the box and <b>go</b>.');
+  clerk.set('idle'); clerk.group.rotation.y = SOUTH;
+  await loseHeat(g, 2, 'Somebody has telephoned. <b>Lose the police</b> before you go near the Bing.');
+  await reach(g, bing.park, '<b>Drive</b> the box to the Bada Bing.', { how: 'car', r: 7 });
+  p.locked = true;
+  let boss;
+  await cut(g, () => {
+    boss = actor(g, 'tony', spot(bing.door, 0, 1.4), SOUTH);
+    place(g, spot(bing.door, 0.4, 3.4), NORTH, bing.park);
+    frame(g, p.pos, boss.group.position, { dist: 4.2 });
+  });
+  await talk(g, [
+    [TONY, 'Forty minutes, for pastry.', boss],
+    [CHRIS, 'There was a line.', p],
+    [TONY, 'Why is there a hole in the box?', boss],
+  ]);
+  await fade(g, 1, 1);
+  dismiss(g, boss);
+  g.removeCar(car);
+  g.noHeat = false;
+  g.pardon();
+  g.cam.fixed = null;
+  homeAsTony(g, tony);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 5. The Raid ----------
+// Played as an agent with a warrant, in a house where there is nothing left to find.
+
+async function theRaid(g) {
+  const { home } = g.places, p = g.player, tony = p.human, R = kitchen(g), front = g.places.doors.find(d => d.name === 'home');
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'Thursday, six in the evening. The Sopranos were sitting down to eat when the bell went.');
+  if (p.car) g.leaveCar();
+  g.setNight(0);
+  asOther(g, 'agent', spot(front.outside, 0.9, 1.6), NORTH);
+  await playing(g, 'Agent Grasso', 'F.B.I. You play him in this one');
+  const cars = [propCar(g, home.road, EAST, 0x8d8a8e), propCar(g, spot(home.road, 9, 0), EAST, 0x23232b)];
+  const harris = actor(g, 'agent', spot(front.outside, -0.6, 0.9), NORTH), wife = actor(g, 'carmela', spot(front.outside, 0, -0.9), SOUTH);
+  shot(g, spot(front.outside, 4, 4.6), spot(front.outside, 0, 0), 1.6, 1.4);
+  g.hud.fade(0, 1.2);
+  await titleCard(g, 'The Raid', 'North Shore, 6:04 p.m.');
+  await talk(g, [
+    [AGENT, 'Mrs. Soprano. We have a warrant for the house and the garage. We will try not to be long.', harris],
+    [CARMELA, 'You have a warrant, you wipe your feet.', wife],
+  ]);
+  await fade(g, 1, 0.6);
+  dismiss(g, harris, wife);
+  intoHome(g);
+  const at = (x, z) => roomSpot(R, x, z);
+  const fam = { tony: actor(g, 'tony', at(-1.7, -1.5), WEST), carmela: actor(g, 'carmela', at(-6.2, -1.5), EAST), aj: actor(g, 'aj', at(-5.4, 0.9), EAST), meadow: actor(g, 'meadow', at(-2.6, 0.9), WEST) };
+  const boss = actor(g, 'agent', at(-0.4, 2.4), WEST);
+  await fade(g, 0, 0.6);
+  p.locked = false;
+  const finds = [
+    'The kitchen drawers: takeaway menus, batteries, a rosary, and the instructions for a bread machine.',
+    'The freezer: steaks. Forty pounds of steaks, and nothing under them.',
+    'The den: a computer. It goes in a box. It will turn out to be full of homework.',
+    'The hall cupboard. A bowl comes off the shelf with the coats, and breaks on the tile.'];
+  await rounds(g, [at(-4, -3.6), at(-6.1, 1.4), at(3, -1.6), at(-3.4, 3.4)], 'Search the house. <b>Everything.</b>', async k => {
+    p.locked = true;
+    p.human.play('pickup', 'idle');
+    if (k === 3) g.sfx?.crash?.(0.4);
+    await say(g, '', finds[k]);
+    p.locked = false;
+  }, { r: 1.5 });
+  p.locked = true;
+  g.cam.fixed = inRoom(R, [-3.6, 3.4], [-3.2, -0.6], 1.6, 1.2).cam;
+  await talk(g, [
+    [TONY, "That was my mother-in-law's.", fam.tony],
+    [AGENT, 'Grasso. Pick it up.', boss],
+  ]);
+  p.human.play('pickup', 'idle');
+  await say(g, '', 'Agent Grasso picked up the pieces of a bowl while a gangster watched him do it. It was the only thing the Bureau took out of that house all week that it was sorry about.');
+  await fade(g, 1, 1);
+  dismiss(g, boss, ...Object.values(fam));
+  for (const h of p.inside?.hide || []) h.group.visible = true;
+  p.inside = null;
+  for (const c of cars) g.removeCar(c);
+  g.cam.fixed = null;
+  homeAsTony(g, tony);
+  // Afterwards, at the table.
+  await roomScene(g, inRoom(R, [-3.6, 2.8], [-4, -1.5], 1.6, 1.15), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    aj: actor(g, 'aj', roomSpot(q, -4.6, 0.7), NORTH),
+    meadow: actor(g, 'meadow', roomSpot(q, -3.2, 0.7), NORTH),
+    tony: actor(g, 'tony', roomSpot(q, -1.7, -1.5), WEST),
+  }), async cast => {
+    await talk(g, [
+      [AJ, 'Why do they hate us?', cast.aj],
+      [TONY, 'They do not hate us. It is a job. They get a pension out of it.', cast.tony],
+      [MEADOW, 'One of them was Italian. Grasso.', cast.meadow],
+      [TONY, 'He was. And somewhere his mother tells the neighbours he is in insurance.', cast.tony],
+      [CARMELA, 'Eat. It has been in and out of the oven twice.', cast.carmela],
+    ]);
+  });
+  place(g, home.drive, EAST, home.car);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 6. In the Paper ----------
+// A man wants his name known. Then it is.
+
+async function inThePaper(g) {
+  const { bing, cafe, diner, gas } = g.places, p = g.player, tony = p.human, his = g.places.flat || aHouse(g, bing.door, 260);
+
+  await g.wait(1);
+  g.hud.card('In the Paper', "Christopher's place");
+  await phone(g, ADRIANA, 'He will not get off the couch. He says he has no arc. I do not know what that is, and I do not think he does.');
+  g.hud.card();
+  const chris = actor(g, 'christopher', spot(his.door, 0.2, 1.3), SOUTH);
+  await reach(g, his.kerb, "Drive to <b>Christopher's place</b>.");
+  await reach(g, spot(his.door, 0.2, 3.2), 'He is on the <b>step</b>.', { r: 1.5, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, chris.group.position);
+  frame(g, p.pos, chris.group.position, { dist: 4 });
+  await talk(g, [
+    [TONY, 'You shot a man in a bakery.', p],
+    [CHRIS, 'In the foot.', chris],
+    [TONY, 'What is the matter with you?', p],
+    [CHRIS, 'Brendan is dead, and he is in the newspaper. A soldier, they called him. I am alive and I am nobody. Where is my name?', chris],
+    [TONY, 'Your name. The whole point of the thing is that nobody knows your name.', p],
+    [CHRIS, 'I dream about a man I put in the ground. I think I have the cancer.', chris],
+    [TONY, 'You have self-pity. There is a lot of it going round. Go to work.', p],
+  ]);
+  await fade(g, 1, 1);
+  dismiss(g, chris);
+  g.cam.fixed = null;
+  // The next morning.
+  await say(g, '', 'At seven the next morning his mother telephoned. She had seen the newspaper.');
+  asOther(g, 'christopher', spot(his.door, 0.2, 1.6), SOUTH);
+  await playing(g, 'Christopher Moltisanti', 'You play him in this one');
+  const car = propCar(g, his.kerb, his.kerb.h, 0x8a1c2a, 'coupe');
+  await fade(g, 0, 1);
+  p.locked = false;
+  await wantCar(g, car, 'Get in the <b>red coupe</b>.');
+  car.driverless = false;
+  const said = ['Page eleven, under the furniture sale. He read it standing in the road.', '"Christopher Moltisanti, reputed associate of the Soprano crew." Spelled right.', 'He took every copy in the box, and left the quarter.'];
+  await rounds(g, [cafe.kerb, (diner || gas).kerb, bing.park], '<b>Drive</b> round the newspaper boxes. Take every copy.', async k => { p.human.play?.('pickup', 'idle'); await say(g, '', said[k]); });
+  p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  const passer = extraAt(g, spot(p.pos, 2, 1.2), toward(spot(p.pos, 2, 1.2), p.pos));
+  frame(g, p.pos, passer.group.position, { dist: 4 });
+  await talk(g, [
+    [CHRIS, 'Hey. You. That is me. Moltisanti. With an S in the middle.', p],
+    ['Passer-by', 'Congratulations?', passer],
+  ]);
+  await fade(g, 1, 1);
+  g.untrack(passer.group);
+  g.removeCar(car);
+  g.cam.fixed = null;
+  await say(g, '', 'At Green Grove that afternoon Livia Soprano mentioned to her brother-in-law, in passing, the way one mentions the weather, that her son was seeing a psychiatrist.');
+  homeAsTony(g, tony);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Episode eight complete', 5000);
+}
+
 // ---------- The episodes ----------
 
 const EPISODES = [
@@ -1848,6 +2291,8 @@ const EPISODES = [
     titles: ['Starter Motor', "Junior's Week", 'Complaints', 'Pax Soprana', 'Anniversary', 'The Board'] },
   { name: 'Episode Seven', title: 'Down Neck', missions: [sacramentalWine, principalsOffice, nineteenSixtySeven, ridelandSunday, looseLips, sundaes],
     titles: ['Sacramental Wine', "The Principal's Office", '1967', 'Rideland', 'Loose Lips', 'Sundaes'] },
+  { name: 'Episode Eight', title: 'The Legend of Tennessee Moltisanti', missions: [theWedding, springCleaning, badDreams, theBakery, theRaid, inThePaper],
+    titles: ['The Wedding', 'Spring Cleaning', 'Bad Dreams', 'The Bakery', 'The Raid', 'In the Paper'] },
 ];
 
 // ---------- Things to do ----------
@@ -1855,12 +2300,12 @@ const EPISODES = [
 // a tail to shake, the police to lose, a conversation that happens while he drives.
 
 // Several places to call at, in any order: a marker at each and a count in the objective. `each(k)` runs at stop k.
-export async function rounds(g, stops, text, each) {
-  const p = g.player, left = stops.map((s, k) => ({ x: s.x, z: s.z, k, m: g.addMarker(s.x, s.z, 5) }));
+export async function rounds(g, stops, text, each, { r = 5 } = {}) {
+  const p = g.player, left = stops.map((s, k) => ({ x: s.x, z: s.z, k, m: g.addMarker(s.x, s.z, r) }));
   while (left.length) {
     g.hud.objective(`${text} &nbsp; <b>${stops.length - left.length} of ${stops.length}</b>`);
-    await g.until(() => left.some(s => near(p.pos, s, 5.8) && (!p.car || Math.abs(p.car.speed) < 6)));
-    const s = left.find(st => near(p.pos, st, 5.8));
+    await g.until(() => left.some(s => near(p.pos, s, r + 0.8) && (!p.car || Math.abs(p.car.speed) < 6)));
+    const s = left.find(st => near(p.pos, st, r + 0.8));
     g.removeMarker(s.m); left.splice(left.indexOf(s), 1);
     g.hud.objective();
     g.setCheckpoint?.();
@@ -1947,7 +2392,7 @@ const HUBS = {
 const STARTS = {
   familyBusiness: 'bing', garbage: 'bing', insurance: 'bing', backRoom: 'bing', hijack: 'bing', sitDown: 'satriale', fortySixLong: 'bing', closingTime: 'bing', visitingHours: 'hospital', theMotel: 'bing', acceptance: 'bing',
   messageJob: 'bing', theTail: 'melfi', schoolyard: 'school', figurehead: 'bing', starterMotor: 'melfi', juniorsWeek: 'bing', complaints: 'bing', theBoard: 'melfi', sacramentalWine: 'school', principalsOffice: 'school',
-  nineteenSixtySeven: 'melfi', looseLips: 'home', sundaes: 'melfi', greenGrove: 'home',
+  nineteenSixtySeven: 'melfi', looseLips: 'home', sundaes: 'melfi', greenGrove: 'home', badDreams: 'bing', theBakery: 'bing', inThePaper: 'bing',
   armoured: 'yard', bearerBonds: 'bar', slick: 'precinct', eyesOn: 'precinct', theNextOne: 'bar', justine: 'precinct', coffee: 'precinct', kelso: 'bar', wheels: 'yard', hardware: 'yard', farEastPacific: 'kates',
   charleneSign: 'bar', laurenNight: 'precinct', theCrew: 'home',
 };

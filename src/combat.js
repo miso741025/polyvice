@@ -22,6 +22,7 @@ const GUNS = ['pistol', 'smg', 'shotgun', 'rifle'];
 const LOADOUTS = {
   tony: { pistol: [12, 48] }, neil: { pistol: [12, 48] }, hanna: { pistol: [12, 36], shotgun: [6, 18] },
   christopher: { pistol: [12, 36] }, pussy: { pistol: [12, 24] }, mikey: { pistol: [12, 24] },
+  paulie: { pistol: [12, 36] }, silvio: { pistol: [12, 24] }, agent: { pistol: [12, 24] },
   shiherlis: { pistol: [12, 36] }, cheritto: { pistol: [12, 24] }, trejo: { pistol: [12, 12] },
 };
 // And what is in their pockets.
