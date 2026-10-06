@@ -128,6 +128,9 @@ async function boot() {
     untrack(obj) { scene.remove(obj); g.tracked.delete(obj); },
     wait(seconds) { const t0 = g.time; return g.until(() => g.time - t0 >= seconds); },
     consume(code) { return pressed.delete(code); },
+    // The calendar: a minute of the clock is a second of play, and each finished job moves it on (`dayBase`).
+    dayBase: 0,
+    day() { return Math.floor(g.dayBase + (18 * 60 + 30 + g.time + (g.clockOffset || 0)) / 1440); },
     addMoney(n) { g.cash += n; hud.money(g.cash); },
 
     addMarker(x, z, r, color = 0xff5fd2) {
@@ -687,7 +690,7 @@ async function boot() {
   const roomKind = q => {
     if (!roomKinds.has(q)) {
       const key = Object.keys(places.rooms).find(k => places.rooms[k] === q), at = o => o && roomAt(o.inside?.x ?? o.x, o.inside?.z ?? o.z, 1) === q;
-      roomKinds.set(q, key ? ROOM_SOUND[key] || 'plain' : at(places.bingRoom) ? 'bar' : at(places.office) ? 'office' : at(places.houseRoom) ? 'house' : at(places.wardRoom) ? 'ward' : 'plain');
+      roomKinds.set(q, key ? ROOM_SOUND[key] || 'plain' : at(places.bingRoom) || at(places.bingVip) ? 'bar' : at(places.office) ? 'office' : at(places.houseRoom) ? 'house' : at(places.wardRoom) ? 'ward' : 'plain');
     }
     return roomKinds.get(q);
   };
@@ -799,7 +802,7 @@ async function boot() {
       });
     }
     muteEl.classList.toggle('on', g.started && sfx.state !== 'running'); // say so, rather than leave him wondering
-    hud.clock(g.time + (g.clockOffset || 0));
+    hud.clock(g.time + (g.clockOffset || 0), g.day());
     hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips, ...(g.hostiles || [])], landmarks);
     hud.map(g.mapOpen, { focus: p.pos, heading: p.car ? p.car.heading : p.heading, blips: [...g.markers, ...g.blips], landmarks });
     { // How far to where he is going, and which way, beside the objective. And the state of the car he is in.

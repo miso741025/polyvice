@@ -9,7 +9,9 @@ import { evening } from './missions.js';
 
 // ----- His end. Places he has a piece of put money by for him every time a job is finished; he goes and gets it.
 // A green ring on the pavement outside, a green dot on the map; between jobs only. `from` is how many jobs must be
-// behind him before it pays, `rate` what it puts by per job, `cap` the most it will hold for him. -----
+// behind him before it pays, `rate` x 3 what it puts by each WEEK of the calendar, `cap` the most it will hold. The
+// ring is only there when a week has gone by since he last collected (owner: it comes round weekly, not all the time).
+// The calendar: a second of play is a minute; every finished job moves it on two days; a night's sleep, eight hours. -----
 const STAKES = [
   { key: 'bing', door: 'the Bada Bing', name: 'The Bada Bing', from: 0, rate: 400, cap: 2400, who: 'Floor manager', look: { jacket: 0x2a2a30, shirt: 0x8a1c2a, tee: true, pants: 0x23232b, hair: 0x111111, hairMesh: 'parted', bulk: 1.1 },
     lines: ['The week, Mr. Soprano. Silvio counted it twice.', 'It was a good week. The conventions are in town.', 'All there. The girls send their love.'] },
@@ -68,7 +70,11 @@ function installDates(g) {
 function installStakes(g) {
   const { hud, places, player: p } = g, live = [];
   if (CITY === 'la') return { update() {}, pay() {}, load() {}, out: () => ({}) };
-  let due = {}, shown = false, busy = false;
+  let last = {}, done = 0, shown = false, busy = false, tick = 0, sig = '';
+  const WEEK = 7, now = () => g.dayBase + (18 * 60 + 30 + g.time + (g.clockOffset || 0)) / 1440;
+  // What is waiting at a place: nothing until a week after the last envelope, then a week's worth for every week gone by.
+  const owed = s2 => done < s2.from || last[s2.key] === undefined ? 0 : Math.min(s2.cap, Math.floor((now() - last[s2.key]) / WEEK) * s2.rate * 3);
+  const due = new Proxy({}, { get: (_, k) => { const s2 = STAKES.find(x => x.key === k); return s2 ? owed(s2) : 0; }, set: () => true });
   const spotOf = st => { const d = places.doors.find(x => x.name === st.door); return d && { x: d.outside.x + 2.8, z: d.outside.z + 1.2, face: d.outside }; };
   const clear = () => { for (const m of live.splice(0)) { g.scene.remove(m.mesh); if (m.man) g.scene.remove(m.man.group); const i = g.blips.indexOf(m.blip); if (i >= 0) g.blips.splice(i, 1); } shown = false; };
   const show = () => {
@@ -102,7 +108,8 @@ function installStakes(g) {
       g.scene.remove(env);
       g.sfx?.cash();
       g.addMoney(sum);
-      due[m.st.key] = 0;
+      g.wait(2.2).then(() => { if (!g.missionActive) hud.subtitle('', 'The next envelope will be ready in a week.'); return g.wait(3); }).then(() => { if (!g.missionActive) hud.subtitle(); }).catch(() => {});
+      last[m.st.key] = now();                          // the week starts again from today
       await g.wait(1.6);
       if (!g.missionActive) hud.subtitle();
       // He goes back to his door; the ring is gone until there is something in it again.
@@ -113,11 +120,21 @@ function installStakes(g) {
     p.locked = false; busy = false; g.sideBusy = false;
   }
   return {
-    out: () => due,
-    load(saved, done) { due = { ...(saved || {}) }; if (!saved) for (const st of STAKES) if (done >= st.from) due[st.key] = st.rate * 2; clear(); },   // an old save: two weeks are waiting for him
-    pay(done) { for (const st of STAKES) if (done >= st.from) due[st.key] = Math.min(st.cap, (due[st.key] || 0) + st.rate); clear(); },
+    out: () => ({ last, day: now() }),
+    load(saved, n) {
+      done = n; last = saved && typeof saved.last === 'object' ? { ...saved.last } : {};
+      g.dayBase = Math.max(0, (saved?.day || 0) - (18 * 60 + 30) / 1440);
+      for (const s2 of STAKES) if (done >= s2.from && last[s2.key] === undefined) last[s2.key] = now() - WEEK;   // the first envelope is waiting
+      clear();
+    },
+    pay(n) { // a job is finished: two days have gone by, and anything newly his starts paying
+      done = n; g.dayBase += 2;
+      for (const s2 of STAKES) if (done >= s2.from && last[s2.key] === undefined) last[s2.key] = now() - WEEK;
+      clear();
+    },
     update() {
       if (g.missionActive && !g.offering) { if (shown) clear(); return; }
+      if (g.time > tick) { tick = g.time + 2; const was = sig; sig = STAKES.map(s2 => owed(s2)).join(); if (shown && was !== sig) clear(); } // a week has turned over somewhere
       if (!shown) show();
       if (busy || p.inside) return;
       for (const m of live) {
@@ -140,6 +157,7 @@ const REFUSAL = ['Get out of my store!', 'You picked the wrong place, pal.', 'I 
 export function installSideJobs(g) {
   const { hud, places, player: p } = g;
   const stakes = g.stakes = installStakes(g), dates = g.dates = installDates(g);
+  stakes.load(null, 0);                                // a new game: the two places he starts with are ready
   const rooms = places.rooms;
   const cooldown = new Map(); // room -> time the register was last emptied
   let busy = false;
@@ -193,9 +211,53 @@ export function installSideJobs(g) {
     show();
   }
 
+  // A dance in the private room: asked for on the floor in front of the stage, between jobs. One song. She dances, he
+  // sits; F when he has had enough. Nothing more to it than that.
+  const DANCE = 100, GIRLS = ['Crystal', 'Jasmine', 'Roxy', 'Tiffany', 'Amber'];
+  async function privateDance() {
+    const club = places.bingRoom, vip = places.bingVip, girl = club.dancers[0], name = GIRLS[Math.floor(g.time) % GIRLS.length];
+    const was = { pos: girl.group.position.clone(), turn: girl.group.rotation.y, at: p.pos.clone(), head: p.heading };
+    busy = true; g.sideBusy = true; p.locked = true;
+    try {
+      hud.subtitle(name, 'The private room is a hundred, honey, and the hands stay on the couch. Come on.');
+      await g.wait(2.6);
+      hud.subtitle();
+      hud.fade(1, 0.5); await g.wait(0.7);
+      g.addMoney(-DANCE); g.sfx?.cash();
+      p.pos.set(vip.seat.x, 0, vip.seat.z); p.heading = vip.seat.h; p.pose = 'sit';
+      girl.group.position.set(vip.stage.x + 0.35, vip.stage.y, vip.stage.z + 0.2); girl.group.rotation.y = Math.PI; girl.set('dance');
+      g.cam.fixed = vip.cam;
+      hud.fade(0, 0.6); await g.wait(0.8);
+      const t0 = g.time, LINES = [[3, name, 'You are the quiet one. Paulie talks the whole song.'], [9, 'Tony', 'Paulie talks through funerals.'], [15, name, 'You want to tell me about your week? Everybody does, in here.'], [21, 'Tony', 'I pay somebody for that already. Just dance.']];
+      let said = 0;
+      g.consume('KeyF');
+      await g.until(() => {
+        const t = g.time - t0;
+        girl.group.rotation.y = Math.PI + Math.sin(t * 0.5) * 0.9;
+        if (said < LINES.length && t > LINES[said][0]) { hud.subtitle(LINES[said][1], LINES[said][2]); said++; }
+        hud.prompt('F  ·  That will do');
+        return t > 30 || g.consume('KeyF');
+      });
+      hud.prompt(''); hud.subtitle();
+      hud.fade(1, 0.5); await g.wait(0.7);
+    } catch { /* a job began, or worse */ }
+    girl.group.position.copy(was.pos); girl.group.rotation.y = was.turn; girl.set('dance');
+    p.pose = null; p.pos.copy(was.at); p.heading = was.head; g.cam.fixed = null;
+    p.health = Math.min(100, p.health + 25); hud.health(p.health);
+    hud.fade(0, 0.6);
+    p.locked = false; busy = false; g.sideBusy = false;
+    hud.subtitle('', 'He left a twenty on the table on the way out. It had been that kind of week.');
+    g.wait(3.4).then(() => { if (!g.missionActive) hud.subtitle(); }).catch(() => {});
+  }
+
   const update = () => {
     if (!g.sideBusy) stakes.update();
     dates.update();
+    if (!busy && !g.missionActive && !g.sideBusy && !p.locked && p.inside && places.bingRoom?.front && near(p.pos, places.bingRoom.front, 1.8)) { // on the floor, in front of the girl at the middle pole
+      hud.prompt(`G  ·  Ask her for a private dance ($${g.cash >= DANCE ? DANCE : 'not enough'})`);
+      if (g.cash >= DANCE && g.consume('KeyG')) { hud.prompt(''); privateDance(); }
+      return;
+    }
     if (busy || !p.inside || p.locked) return;
     const bed = (places.beds || []).find(b => near(p.pos, b, 2));
     if (bed) { // a night in your own bed: eight hours, and whole again

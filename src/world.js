@@ -2033,8 +2033,8 @@ export function buildWorld(scene) {
     // What is written on the walls.
     sign('A GO-GO', X + 4.6, Y + 2.9, Z + 6.96, Math.PI, { w: 3.6, h: 1, color: '#ff3fe0', bg: '#1a0c20', font: '"Mr Dafoe", cursive', size: 0.8 });
     sign('HAPPY HOUR  6 - 9', X + 0.6, Y + 3.1, Z + 6.96, Math.PI, { w: 3, h: 0.6, color: '#ffe066', bg: '#1a0c20', size: 0.66 });
-    sign('COLD BEER', X + 9.96, Y + 3.2, Z - 2, -Math.PI / 2, { w: 3, h: 0.7, color: '#49e0d0', bg: '#1a0c20', size: 0.7 });
-    sign('NO PHOTOS', X + 9.96, Y + 2.3, Z - 2, -Math.PI / 2, { w: 1.8, h: 0.4, color: '#ff2a4a', bg: '#1a0c20', size: 0.62 });
+    sign('COLD BEER', X + 9.96, Y + 3.2, Z - 3.2, -Math.PI / 2, { w: 3, h: 0.7, color: '#49e0d0', bg: '#1a0c20', size: 0.7 });
+    sign('NO PHOTOS', X + 9.96, Y + 2.3, Z - 3.2, -Math.PI / 2, { w: 1.8, h: 0.4, color: '#ff2a4a', bg: '#1a0c20', size: 0.62 });
     sign('LADIES NIGHT  EVERY NIGHT', X - 9.96, Y + 3.62, Z + 2.4, Math.PI / 2, { w: 5.4, h: 0.5, color: '#ff8ad8', bg: '#1a0c20', size: 0.62 });
     sign('PRIVATE', X + 2.4, Y + 2.5, Z + 6.96, Math.PI, { w: 1.3, h: 0.34, color: '#e9e2cf', bg: '#14080f', size: 0.6, glow: false });
     slab(0x241018, 1.1, 2.3, 0.08, X + 2.4, Y, Z + 6.95, M.wood, 1); slab(0xd9a520, 0.06, 0.06, 0.06, X + 2.85, Y + 1.1, Z + 6.88);   // the office: his door
@@ -2069,11 +2069,40 @@ export function buildWorld(scene) {
     const TRADE = [{ shirt: 0xf4f4f0, pants: 0x3b4a66, hair: 0x8d8a8e, bulk: 1.15 }, { shirt: 0x2f7d46, tee: true, pants: 0xd9c7a0, hair: 0x2b1b12 }, { shirt: 0x9fd0f5, pants: 0x23232b, hair: 0xc9a14a, bulk: 1.08 }, { shirt: 0xd8342c, tee: true, pants: 0x3b6ea8, hair: 0x111111, dark: true }, { shirt: 0xffe066, pants: 0x23232b, hair: 0x3a2a1c, bulk: 1.2 }, { shirt: 0x16161c, tee: true, pants: 0x3b4a66, hair: 0x2b1b12, bulk: 0.95 }];
     [[-9.42, -0.9, Math.PI / 2], [-9.42, 1.1, Math.PI / 2], [-9.42, 3.0, Math.PI / 2], [-7.6, 6.42, Math.PI], [-5.6, 6.42, Math.PI]].forEach(([x, z, turn], n) => stand(makeHuman(TRADE[n]), X + x, Y, Z + z, turn, 'sit'));
     stand(makeHuman({ body: 'female', shirt: 0xff8ad8, tee: true, pants: 0x16161c, hair: 0x111111, hairMesh: 'long', height: 0.95 }), X - 9.42, Y, Z + 4.6, Math.PI / 2, 'sit');
+    // ----- The private room, through the curtain on the east wall: a couch on three sides, a small round stage with its
+    // own pole, mirrors, a bucket with something in it. One girl, one song, a hundred dollars. -----
+    const VX = X + 15.2, VZ = Z - 1.2, v = { minX: VX - 3.4, maxX: VX + 3.4, minZ: VZ - 2.9, maxZ: VZ + 2.9, lights: [] };
+    interiors.push(v);
+    slab(0x120c18, 7.4, 0.2, 6.4, VX, Y - 0.2, VZ); { const m = new THREE.Mesh(new THREE.PlaneGeometry(6.8, 5.8).rotateX(-Math.PI / 2), new THREE.MeshPhongMaterial({ map: gloss, shininess: 110, specular: 0x8a6ab0 })); m.position.set(VX, Y + 0.005, VZ); scene.add(m); }
+    slab(0x0c0812, 7.4, 0.2, 6.4, VX, Y + 3.2, VZ);
+    for (const s of [-1, 1]) { slab(0x3a1230, 7.4, 3.4, 0.3, VX, Y, VZ + s * 3.15); slab(0x3a1230, 0.3, 3.4, 6.4, VX + s * 3.65, Y, VZ); }
+    glass(6.6, 1.7, VX, Y + 2.2, VZ - 2.98, 0); glass(5.6, 1.7, VX + 3.48, Y + 2.2, VZ, -Math.PI / 2);
+    for (const s of [-1, 1]) tube(s > 0 ? PINK : VIOLET, 6.8, 0.04, 0.04, VX, Y + 3.1, VZ + s * 2.94); tube(PINK, 0.04, 0.04, 5.8, VX + 3.44, Y + 1.25, VZ); tube(VIOLET, 6.8, 0.04, 0.04, VX, Y + 1.25, VZ - 2.94);
+    // The couch: along the north wall and down the east one.
+    slab(VINYL, 5.6, 0.45, 0.8, VX + 0.4, Y, VZ - 2.5); slab(0x6a0e20, 5.6, 0.7, 0.2, VX + 0.4, Y + 0.45, VZ - 2.86); slab(VINYL, 0.8, 0.45, 3.6, VX + 2.9, Y, VZ - 0.3); slab(0x6a0e20, 0.2, 0.7, 3.6, VX + 3.26, Y + 0.45, VZ - 0.3);
+    for (let n = 0; n < 7; n++) ball(0x4a0a18, 0.03, VX - 2 + n * 0.8, Y + 0.85, VZ - 2.75);
+    collide(VX + 0.4, VZ - 2.5, 5.7, 0.9, 1.1); collide(VX + 2.9, VZ - 0.3, 0.9, 3.7, 1.1);
+    // The stage: knee high, lit from inside, a ring of bulbs.
+    const px2 = VX - 0.2, pz2 = VZ + 0.5;
+    put(M.plain, new THREE.CylinderGeometry(1.15, 1.15, 0.4, 22).translate(px2, Y + 0.2, pz2), BLACK); put(M.glow, new THREE.TorusGeometry(1.15, 0.04, 6, 28).rotateX(Math.PI / 2).translate(px2, Y + 0.41, pz2), PINK); put(M.glow, new THREE.TorusGeometry(1.17, 0.04, 6, 28).rotateX(Math.PI / 2).translate(px2, Y + 0.04, pz2), VIOLET);
+    post(CHROME, 0.035, 2.8, px2, Y + 0.4, pz2, 10); for (let n = 0; n < 10; n++) { const a = n / 10 * Math.PI * 2; ball(0xfff2c0, 0.03, px2 + Math.sin(a) * 1.18, Y + 0.22, pz2 + Math.cos(a) * 1.18, M.glow); }
+    { const m = new THREE.Mesh(new THREE.CircleGeometry(1.05, 22).rotateX(-Math.PI / 2), LED[1]); m.position.set(px2, Y + 0.406, pz2); scene.add(m); }
+    collide(px2, pz2, 2.2, 2.2, 0.6);
+    // The table: an ice bucket, two glasses, the cup with the bill in it. A curtain where the door is, and the word.
+    lowTable(VX + 1.6, VZ - 1.4, 1); put(M.plain, new THREE.CylinderGeometry(0.12, 0.1, 0.2, 10).translate(VX + 1.6, Y + 0.68, VZ - 1.4), CHROME); post(0x2f5a3f, 0.035, 0.26, VX + 1.6, Y + 0.72, VZ - 1.4, 6);
+    for (let n = 0; n < 6; n++) post(n % 2 ? 0x8a1228 : 0x6a0e20, 0.09, 2.7, VX - 3.42, Y, VZ + 1.4 - 0.45 + n * 0.18, 6);
+    slab(0xd9a520, 0.05, 0.05, 1.3, VX - 3.42, Y + 2.7, VZ + 1.4);
+    // And on the club's side of the wall.
+    for (let n = 0; n < 6; n++) post(n % 2 ? 0x5a1a8a : 0x3a1260, 0.09, 2.7, X + 9.86, Y, Z + 0.2 - 0.45 + n * 0.18, 6);
+    slab(0xd9a520, 0.05, 0.05, 1.3, X + 9.86, Y + 2.7, Z + 0.2); sign('PRIVATE ROOMS', X + 9.92, Y + 2.95, Z + 0.2, -Math.PI / 2, { w: 1.6, h: 0.3, color: '#c85cff', bg: '#1a0c20', size: 0.72 });
+    roomLamp(v, px2, Y + 2.8, pz2, 0xff5fd2, 46, 9); roomLamp(v, VX + 2, Y + 2.4, VZ - 1.6, 0x8a5cff, 26, 7);
+    (places.stairs ??= []).push({ a: { x: X + 9.0, z: Z + 0.2, h: -Math.PI / 2 }, b: { x: VX - 2.6, z: VZ + 1.4, h: Math.PI / 2 }, up: 'Go through the curtain', down: 'Back out to the floor' });
+    places.bingVip = { inside: { x: VX, z: VZ }, y: Y, stage: { x: px2, y: Y + 0.4, z: pz2 }, seat: { x: VX + 0.4, y: Y, z: VZ - 2.55, h: 0 }, way: { x: VX - 2.6, z: VZ + 1.4 }, cam: { pos: new THREE.Vector3(VX - 2.7, Y + 1.5, VZ - 1.7), look: new THREE.Vector3(VX + 0.5, Y + 1.1, VZ - 1) } };
     q.lights.length = 0;
     roomLamp(q, tx, Y + 3.1, tz, 0xffd9a8, 62, 15); roomLamp(q, sx, Y + 3.5, sz + 0.8, 0xff5fd2, 85, 20); roomLamp(q, X + 4, Y + 2.9, Z - 3.6, 0xffb060, 38, 12);
     roomLamp(q, sx, Y + 3.3, Z + 3, 0x6a8cff, 60, 15); roomLamp(q, X + 7, Y + 3.2, Z + 4.4, 0xff4a6a, 30, 12); roomLamp(q, X - 8.2, Y + 2.6, Z + 5, 0xc85cff, 36, 11);
     places.bingRoom = {
-      ambient: [georgie], crowd, inside: { x: X + 7, z: Z + 4, h: -Math.PI / 2 },
+      ambient: [georgie], crowd, dancers: crowd.slice(0, 5), front: { x: X - 3.1, z: Z - 3.3 }, inside: { x: X + 7, z: Z + 4, h: -Math.PI / 2 },
       y: Y, seats, table: { x: tx, y: Y, z: tz },
       bar: { x: X + 1.3, y: Y, z: Z - 4.0 }, tender: { x: X + 1.9, y: Y, z: Z - 6.1 }, stool: { x: X + 3.4, y: Y, z: Z - 3.6 },
       stools: [2, 1, 3, 0, 4].map(n => ({ x: X + 0.8 + n * 1.6, y: Y + 0.27, z: Z - 4.2 })), // the middle ones first

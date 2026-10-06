@@ -27,9 +27,9 @@ export class Hud {
     clearTimeout(this.gainTimer);
     this.gainTimer = setTimeout(() => { gain.className = ''; }, 3200);
   }
-  clock(seconds) {
+  clock(seconds, day) {
     const m = (18 * 60 + 30 + Math.floor(seconds)) % 1440;
-    $('clock').textContent = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+    $('clock').textContent = (day === undefined ? '' : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'][((day % 7) + 7) % 7] + ' ') + String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
   }
 
   subtitle(who, text) {
