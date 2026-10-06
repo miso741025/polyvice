@@ -3301,7 +3301,8 @@ export function buildWorld(scene) {
     }
     for (const s of [-1, 1]) for (const h of [0.55, 1]) slab(0xffffff, end - deck, 0.07, 0.07, (deck + end) / 2, dy + h, pierZ + s * 2.5);
     for (let x = deck + 8; x < end; x += 16) { post(STEEL, 0.07, 3.6, x, dy, pierZ - 2.4); ball(0xffe2a6, 0.2, x, dy + 3.7, pierZ - 2.4, M.glow); halo(x, dy + 3.7, pierZ - 2.4, 0xffb860, 4); }
-    slab(0xffffff, 0.07, 1, 5, end, dy, pierZ); bench(end - 1.2, pierZ, -Math.PI / 2);
+    for (const h of [0.55, 1]) slab(0xffffff, 0.07, 0.07, 5, end, dy + h, pierZ); for (let k = 0; k < 5; k++) post(0xffffff, 0.05, 1, end, dy, pierZ - 2.5 + k * 1.25, 5); // the end rail: bars, so the sea shows through
+    bench(end - 1.2, pierZ, -Math.PI / 2);
     places.pier = { start: { x: ramp - 3, z: pierZ }, end: { x: end - 5, z: pierZ } };
     { // The pier, used: benches, more lamps, tackle left along the rail, a ring to throw, crates at the head, a shack for bait,
       // a boat on a mooring, a buoy with a light on it, gulls going round.
