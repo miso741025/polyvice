@@ -294,7 +294,7 @@ export function buildWorld(scene) {
   const flat = (mat, hex, w, d, x, y, z, s = 0) => {
     const geo = new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2).translate(x, y, z), uv = geo.attributes.uv;
     if (s) for (let i = 0; i < 4; i++) uv.setXY(i, uv.getX(i) * w / s, uv.getY(i) * d / s);
-    if ((mat === M.grass || mat === M.paint) && y > CURB && y < CURB + 0.2) raise(x, z, w, d, y); // a lawn or a patio: people stand on it, not in it
+    if ((mat === M.grass || mat === M.paint) && y > CURB && y < CURB + 0.2) raise(x, z, w, d, y, mat === M.grass ? 'grass' : 'pave'); // a lawn or a patio: people stand on it, not in it
     return put(mat, geo, hex);
   };
   const post = (hex, r, h, x, y0, z, sides = 6) => put(M.plain, new THREE.CylinderGeometry(r, r, h, sides).translate(x, y0 + h / 2, z), hex);
@@ -647,6 +647,7 @@ export function buildWorld(scene) {
         slab(0xffffff, 5, CURB, BLOCK - 10, c.x + s * (BLOCK / 2 - 2.5), 0, c.z, M.paver, 6);
       }
     } else if (kind !== 'river' && kind !== 'home') slab(LA ? 0xcfcfd2 : 0xffffff, BLOCK, CURB, BLOCK, c.x, 0, c.z, M.paver, 6); // the house lays its own, around the pool
+    (places.kinds ??= {})[i + ',' + j] = kind; // what each block is, for whoever needs to know (the sound of the place, for one)
     if (kind !== 'river') {
       for (const sx of [-1, 1]) for (const sz of LA ? [0] : [-14, 14]) palms.push({ x: c.x + sx * 28.8, z: c.z + sz }); // one tall palm a side in Los Angeles, two in Vice City
       furniture(c, i, j);
@@ -2568,6 +2569,18 @@ export function buildWorld(scene) {
   if (LA) { const d = nearestShop('PARTS', places.airport.kerb, 150, 420); places.parts = { door: d.outside, kerb: d.kerb }; } // where a stolen car gets other plates
   places.gunShops = shopDoors.filter(d => d.shop === 'GUNS').map(d => d.outside).filter((d, n) => n % 3 === 0); // the map marks a few; the rest are found by their neon
 
+  // Where the world makes a noise of its own: { kind, x, z, r (how far it carries) }.
+  places.sounds = [];
+  const sound = (kind, at, r, vol = 1) => { if (at) places.sounds.push({ kind, x: at.x, z: at.z, r, vol }); };
+  if (!LA) {
+    sound('club', { x: places.bing.door.x, z: places.bing.door.z - 9 }, 62);
+    sound('water', places.grove.fountain, 28); sound('water', { x: places.home.pool.x + 7.6, z: places.home.pool.z }, 22, 0.6); sound('water', places.park?.pond, 26, 0.7);
+  } else {
+    sound('jets', places.airport?.runway, 280); sound('harbour', places.containers?.centre, 130); sound('film', places.drivein?.screen, 80);
+    for (const k of ['north', 'under', 'south']) sound('freeway', places.freeway?.[k], 120);
+  }
+  for (const d of shopDoors) { if (d.shop === 'CHURCH') sound('bell', d.outside, 340); else if (d.shop === 'BAR') sound('club', d.outside, 20, 0.6); }
+
   places.chop = { x: SHORE + 18, z: bounds.minZ + 16 }; // the north end of the beach, where stolen cars get stripped
 
   // ----- Beach: boardwalk, palms along Ocean Drive, umbrellas and lifeguard huts on the sand -----
@@ -2658,6 +2671,7 @@ export function buildWorld(scene) {
       for (let k = 0; k < 5; k++) ball([RED, 0xffe066, 0x49a0d0, 0xf4f4f0, 0x2f7d46][(k + n) % 5], 0.16, sx - 1.2 + k * 0.6, y + 1.7, sz - 0.2); }
     for (let n = 0; n < 14; n++) { ball([0xffe066, 0xff5fd2, 0x49e0d0, 0xff8a5c][n % 4], 0.09, x - 12 + n * 1.6, y + 3.6 - Math.sin(n / 13 * Math.PI) * 0.5, z + 3, M.glow); if (n % 4 === 0) halo(x - 12 + n * 1.6, y + 3.4, z + 3, 0xffd9a8, 4); }
     for (const s of [0, 1]) post(CREAM, 0.06, 3.7, x - 12 + s * 20.8, y, z + 3, 6);
+    places.sounds.push({ kind: 'carousel', x: cx, z: cz, r: 110, vol: 1 });
     places.rideland = { gate: { x: x - 13, z }, carousel: { x: cx, z: cz }, horses, wheel: { x: wx, z: wz }, booth: { x: x - 9, z: z + 6 }, hide: { x: x - 7.4, z: z + 7.6 }, stop: { x: SHORE - 5, z }, kerb: { x: nodeX(NX) + 3.6, z, h: 0 } };
   }
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CITY, NX, NZ, ROAD, CELL, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
+import { CITY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, surfaceAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
 import { makeLook, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
@@ -49,10 +49,10 @@ async function boot() {
   const hud = new Hud();
   // Settings, kept in the browser: volume, mouse, the crowd, shadows.
   const SETTINGS = 'sopranos-vice.settings';
-  const settings = { volume: 0.7, sens: 1, invert: false, crowd: 1, shadows: true };
+  const settings = { volume: 0.7, ambience: 2, sens: 1, invert: false, crowd: 1, shadows: true };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS)) || {}); } catch { /* defaults */ }
   const applySettings = () => {
-    sfx.setVolume(settings.volume);
+    sfx.setVolume(settings.volume); sfx.setAmbience([0, 0.5, 1, 1.6][settings.ambience] ?? 1);
     renderer.shadowMap.enabled = settings.shadows; sun.castShadow = settings.shadows;
     scene.traverse(o => { if (o.material) { for (const m of [].concat(o.material)) m.needsUpdate = true; } });
     try { localStorage.setItem(SETTINGS, JSON.stringify(settings)); } catch { /* play on */ }
@@ -543,6 +543,7 @@ async function boot() {
       { key: 'Digit5', label: 'Invert mouse Y', hint: settings.invert ? 'on' : 'off' },
       { key: 'Digit6', label: 'Crowd', hint: ['light', 'normal', 'heavy'][settings.crowd] },
       { key: 'Digit7', label: 'Shadows', hint: settings.shadows ? 'on' : 'off' },
+      { key: 'Digit9', label: 'Ambient sound', hint: ['off', 'quiet', 'normal', 'loud'][settings.ambience] },
       { key: 'Digit8', label: 'Missions', hint: 'play any mission again, or skip ahead' },
       { key: 'Escape', label: 'Resume' },
       { key: 'Digit0', label: 'Quit to the title screen', hint: 'progress is saved after each mission' },
@@ -554,6 +555,7 @@ async function boot() {
       else if (code === 'Digit5') settings.invert = !settings.invert;
       else if (code === 'Digit6') { settings.crowd = (settings.crowd + 1) % 3; crowdLimit(); }
       else if (code === 'Digit7') settings.shadows = !settings.shadows;
+      else if (code === 'Digit9') settings.ambience = (settings.ambience + 1) % 4;
       else if (code === 'Digit8') { applySettings(); missionMenu(pr && !pr.done ? pr.n - 1 : 0); return; }
       else if (code === 'Digit0') { applySettings(); location.reload(); return; }
       else if (code === 'Escape' || code === 'Enter') { applySettings(); hud.menu(); g.paused = false; for (const k in keys) keys[k] = false; return; }
@@ -563,6 +565,22 @@ async function boot() {
     show();
   };
   g.openSettings = openSettings;
+
+  // ----- Sound: what kind of place the listener is in -----
+  const GREEN = new Set(['houses', 'park', 'church', 'home', 'livia', 'grove', 'neil', 'college', 'school', 'manor', 'motel', 'drivein']);
+  const DENSE = new Set(['tower', 'lots', 'lowrise', 'bank', 'hotel', 'precinct', 'bookstore', 'depository', 'hesh', 'cafe', 'vesuvio', 'satriale', 'melfi', 'bing', 'travel', 'hospital', 'kates', 'truckstop']);
+  const ROOM_SOUND = { BAR: 'bar', DINER: 'diner', FASTFOOD: 'diner', VESUVIO: 'diner', BEAN: 'diner', BANQUET: 'diner', LIQUOR: 'store', PAWN: 'store', STORE: 'store', KIOSK: 'store', BOOKS: 'store', PARTS: 'store',
+    LAUNDRY: 'store', SHOWROOM: 'hall', GUNS: 'guns', CHURCH: 'church', BODYSHOP: 'garage', WAREHOUSE: 'garage', HOUSE: 'house', LIVIA: 'house', NEIL: 'house', UPSTAIRS: 'house', CARDROOM: 'house', SUITE: 'house', MOTEL: 'house',
+    OFFICE: 'office', FNOTE: 'office', SCHOOL: 'hall', GROVE: 'hall', BANK: 'hall', HOTEL: 'hall' };
+  const roomKinds = new Map();
+  const roomKind = q => {
+    if (!roomKinds.has(q)) {
+      const key = Object.keys(places.rooms).find(k => places.rooms[k] === q), at = o => o && roomAt(o.inside?.x ?? o.x, o.inside?.z ?? o.z, 1) === q;
+      roomKinds.set(q, key ? ROOM_SOUND[key] || 'plain' : at(places.bingRoom) ? 'bar' : at(places.office) ? 'office' : at(places.houseRoom) ? 'house' : at(places.wardRoom) ? 'ward' : 'plain');
+    }
+    return roomKinds.get(q);
+  };
+  sfx.place(places.sounds || []);
 
   function step(dt) {
     if (g.paused) { if (!g.skipRender) renderer.render(scene, camera); pressed.clear(); return; }
@@ -633,11 +651,32 @@ async function boot() {
       const want = minute > dusk ? Math.min(1, (minute - dusk) / 30) : minute < dawn ? 1 : Math.max(0, 1 - (minute - dawn) / 30);
       if (Math.abs(want - g.night) > 0.003) g.setNight(g.night + (want - g.night) * (1 - Math.exp(-dt * 0.6)));
     }
-    sfx.ambience({
-      inCar: !!p.car, speed: p.car ? p.car.speed : 0, throttle: p.car && !p.locked ? (keys.KeyW ? 1 : keys.KeyS ? 0.5 : 0) : 0,
-      sliding: p.car && !p.locked ? (keys.Space && Math.abs(p.car.speed) > 5 ? 1 : (keys.KeyA || keys.KeyD) && Math.abs(p.car.speed) > 17 ? 0.5 : 0) : 0,
-      shore: clamp(1 - (SHORE - p.pos.x) / 140, 0, 1), police: g.sirenLevel || 0, inside: !!p.inside, night: g.night,
-    });
+    { // What the listener hears: he stands where the player does, or at the camera when a scene has put it somewhere else.
+      const room = roomAt(camera.position.x, camera.position.z, 3) || (p.inside ? roomAt(p.pos.x, p.pos.z, 1) : undefined), look = camera.getWorldDirection(tmp), ll = Math.hypot(look.x, look.z) || 1;
+      // The rooms are built out over the water, a long way from their doors: what comes through a room's wall is the street its door is on.
+      const ear = room ? p.inside?.outside || (roomAt(p.pos.x, p.pos.z, 3) ? places.home.spawn : p.pos) : g.cam.fixed ? camera.position : p.pos;
+      // The nearest water: the island has a shore on every side.
+      const edges = [[SHORE - ear.x, 1, 0, 1], [ear.x - (OX - ROAD / 2), -1, 0, 0.4], [ear.z - (OZ - ROAD / 2), 0, -1, 0.4], [OZ + NZ * CELL + ROAD / 2 - ear.z, 0, 1, 0.4]].sort((a, b) => a[0] / a[3] - b[0] / b[3])[0]; // the surf is on the east; the other three sides are quiet water
+      const surface = surfaceAt(ear.x, ear.z), deck = groundAt(ear.x, ear.z) > 0.3 && (surface === 'wood' || ear.x > SHORE + 30 || ear.x < OX - 40);
+      const kind = places.kinds?.[Math.floor((ear.x - OX) / CELL) + ',' + Math.floor((ear.z - OZ) / CELL)];
+      const near4 = [];
+      for (const c of cars) {
+        if (c === p.car || Math.abs(c.speed) < 1.5) continue;
+        const dx = c.pos.x - ear.x, dz = c.pos.z - ear.z, d2 = dx * dx + dz * dz;
+        if (d2 < 4900) near4.push({ dx, dz, d2, speed: c.speed, heavy: c.kind === 'truck' || c.kind === 'van' || c.kind === 'armored' || c.kind === 'ambulance' });
+      }
+      near4.sort((a, b) => a.d2 - b.d2); near4.length = Math.min(4, near4.length);
+      sfx.ambience({
+        inCar: !!p.car, speed: p.car ? p.car.speed : 0, throttle: p.car && !p.locked ? (keys.KeyW ? 1 : keys.KeyS ? 0.5 : 0) : 0,
+        sliding: p.car && !p.locked ? (keys.Space && Math.abs(p.car.speed) > 5 ? 1 : (keys.KeyA || keys.KeyD) && Math.abs(p.car.speed) > 17 ? 0.5 : 0) : 0,
+        police: g.sirenLevel || 0, night: g.night, la: LA,
+        ear, right: { x: -look.z / ll, z: look.x / ll }, room: room ? roomKind(room) : null,
+        surface, foot: !p.car && !p.hidden && !p.locked && p.motion && p.motion !== 'idle' ? (p.motion === 'sprint' ? 7.6 : 3.7) : 0,
+        shore: clamp(1 - edges[0] / 140, 0, 1) * edges[3], seaward: { x: edges[1], z: edges[2] }, exposed: deck ? 1 : 0,
+        green: GREEN.has(kind) ? 1 : kind ? 0.15 : 0.4, dense: kind ? (DENSE.has(kind) ? 1 : GREEN.has(kind) ? 0.25 : 0.55) : 0.1,
+        hour: Math.floor(((18 * 60 + 30 + g.time + (g.clockOffset || 0)) % 1440) / 60), cars: near4,
+      });
+    }
     hud.clock(g.time + (g.clockOffset || 0));
     hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips], landmarks);
     hud.map(g.mapOpen, { focus: p.pos, heading: p.car ? p.car.heading : p.heading, blips: [...g.markers, ...g.blips], landmarks });

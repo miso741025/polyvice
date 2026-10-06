@@ -26,10 +26,21 @@ export const colliders = [];
 export const lowGround = [], piers = [], interiors = [];
 // Lawns, patios and paths laid a little above the sidewalk, by block: { x, z, hx, hz, y }. Feet stand on the highest one under them.
 export const raised = new Map();
-export function raise(x, z, w, d, y) {
+export function raise(x, z, w, d, y, kind = 'pave') {
   const key = Math.floor((x - OX) / CELL) + ',' + Math.floor((z - OZ) / CELL);
   if (!raised.has(key)) raised.set(key, []);
-  raised.get(key).push({ x, z, hx: w / 2, hz: d / 2, y });
+  raised.get(key).push({ x, z, hx: w / 2, hz: d / 2, y, kind });
+}
+// What is underfoot at (x, z), for the sound of a step: 'sand' | 'wood' | 'road' | 'grass' | 'pave'.
+export function surfaceAt(x, z) {
+  for (const p of piers) { const s = p.dir || 1; if (z > p.minZ && z < p.maxZ && (x - p.ramp) * s > 0) return p.dir ? 'road' : 'wood'; } // the bridge is a road; the pier is boards
+  if (x > SHORE + 4.6 || x < OX - ROAD / 2 || z < OZ - ROAD / 2 || z > OZ + NZ * CELL + ROAD / 2) return 'sand';
+  const u = ((x - OX) % CELL + CELL) % CELL, v = ((z - OZ) % CELL + CELL) % CELL;
+  if (u < ROAD / 2 || u > CELL - ROAD / 2 || v < ROAD / 2 || v > CELL - ROAD / 2) return 'road';
+  let y = 0.14, kind = 'pave';
+  const beds = raised.get(Math.floor((x - OX) / CELL) + ',' + Math.floor((z - OZ) / CELL));
+  if (beds) for (const b of beds) if (b.y > y && Math.abs(x - b.x) < b.hx && Math.abs(z - b.z) < b.hz) { y = b.y; kind = b.kind; }
+  return kind;
 }
 export const roomAt = (x, z, margin = 1) => interiors.find(q => x > q.minX - margin && x < q.maxX + margin && z > q.minZ - margin && z < q.maxZ + margin);
 export function groundAt(x, z) {
