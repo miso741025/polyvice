@@ -197,9 +197,9 @@ async function boot() {
       if (!wasLocked) p.locked = false;
     },
     // A car takes damage. One the story needs limps on at its worst; any other can be killed.
-    hurtCar(car, dmg) {
+    hurtCar(car, dmg, bump = false) {
       if (car.wreck || dmg <= 0) return;
-      const floor = car.mission || car === tonyCar ? 14 : 0;
+      const floor = car.mission || car === tonyCar ? 14 : bump ? 22 : 0; // a bystander's car that is only bumped smokes, and does not blow up in the street
       car.hp = Math.max(floor, (car.hp ?? 100) - dmg);
       if (car.hp <= 0) { car.wreck = true; car.dieAt = g.time + 5.5; car.nav = null; car.speed *= 0.5; if (car === p.car) hud.flash('#ff8a30', 0.4); }
     },
@@ -429,7 +429,7 @@ async function boot() {
           o.pos.x -= dx * push * 0.4; o.pos.z -= dz * push * 0.4;
           hit = true;
         }
-        if (hit) { if (Math.abs(car.speed) > 6 && g.time - (car.bumpAt || -9) > 0.6) { car.bumpAt = g.time; sfx.crash(Math.abs(car.speed) / 25); g.hurtCar(car, Math.abs(car.speed) * 0.18); g.hurtCar(o, Math.abs(car.speed) * 0.6); /* the one doing the ramming comes off better */ } car.speed *= 0.93; if (!o.nav) o.collide(); }
+        if (hit) { if (Math.abs(car.speed) > 6 && g.time - (car.bumpAt || -9) > 0.6) { car.bumpAt = g.time; sfx.crash(Math.abs(car.speed) / 25); g.hurtCar(car, Math.abs(car.speed) * 0.18); g.hurtCar(o, Math.abs(car.speed) * 0.6, true); /* the one doing the ramming comes off better */ } car.speed *= 0.93; if (!o.nav) o.collide(); }
       }
       p.pos.copy(car.pos);
       // The body shop puts it right.
@@ -669,8 +669,8 @@ async function boot() {
   const GREEN = new Set(['houses', 'park', 'church', 'home', 'livia', 'grove', 'neil', 'college', 'school', 'manor', 'motel', 'drivein']);
   const DENSE = new Set(['tower', 'lots', 'lowrise', 'bank', 'hotel', 'precinct', 'bookstore', 'depository', 'hesh', 'cafe', 'vesuvio', 'satriale', 'melfi', 'bing', 'travel', 'hospital', 'kates', 'truckstop']);
   const ROOM_SOUND = { BAR: 'bar', DINER: 'diner', FASTFOOD: 'diner', VESUVIO: 'diner', VKITCHEN: 'diner', BEAN: 'diner', BANQUET: 'diner', LIQUOR: 'store', PAWN: 'store', STORE: 'store', KIOSK: 'store', BOOKS: 'store', PARTS: 'store',
-    LAUNDRY: 'store', SHOWROOM: 'hall', GUNS: 'guns', CHURCH: 'church', BODYSHOP: 'garage', WAREHOUSE: 'garage', HOUSE: 'house', LIVIA: 'house', NEIL: 'house', UPSTAIRS: 'house', CARDROOM: 'house', SUITE: 'house', MOTEL: 'house',
-    JUSTINE: 'house', VANZANT: 'house', TREJO: 'house', KELSO: 'house', OFFICE: 'office', FNOTE: 'office', SCHOOL: 'hall', GROVE: 'hall', BANK: 'hall', HOTEL: 'hall' };
+    LAUNDRY: 'store', SHOWROOM: 'hall', GUNS: 'guns', CHURCH: 'church', BODYSHOP: 'garage', WAREHOUSE: 'garage', HOUSE: 'house', LIVIA: 'house', LIVIA_UP: 'house', NEIL: 'house', UPSTAIRS: 'house', CARDROOM: 'house', SUITE: 'house', MOTEL: 'house',
+    JUSTINE: 'house', VANZANT: 'house', TREJO: 'house', KELSO: 'house', OFFICE: 'office', FNOTE: 'office', HESH: 'office', SCHOOL: 'hall', GROVE: 'hall', BANK: 'hall', HOTEL: 'hall' };
   const roomKinds = new Map();
   const roomKind = q => {
     if (!roomKinds.has(q)) {

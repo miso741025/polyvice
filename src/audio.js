@@ -538,6 +538,18 @@ export const sfx = {
     const t = ctx.currentTime;
     tone('square', 1320, t, 0.12, 0.004, 0.07); tone('square', 1760, t + 0.07, 0.12, 0.004, 0.14);
   },
+  // A spray gun: a long hiss with a rasp in it. Also does for sausage on a grill, quieter.
+  spray(v = 1) {
+    if (!live()) return;
+    const t = ctx.currentTime;
+    burst(5200, 0.6, t, 0.13 * v, 0.08, 0.95, 'highpass'); burst(2400, 1.2, t + 0.05, 0.07 * v, 0.1, 0.8);
+  },
+  // A shovel going into wet ground.
+  dig() {
+    if (!live()) return;
+    const t = ctx.currentTime;
+    burst(700, 0.8, t, 0.2, 0.01, 0.16, 'lowpass'); burst(2600, 1.4, t + 0.02, 0.07, 0.004, 0.09); tone('sine', 110, t, 0.14, 0.004, 0.12, { slide: 60 });
+  },
   door() {
     if (!live()) return;
     const t = ctx.currentTime;

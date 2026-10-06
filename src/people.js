@@ -468,10 +468,11 @@ function paint(B, o) {
   const tie = o.tie !== undefined ? rgb(o.tie) : null;
   const beard = o.beard !== undefined ? rgb(o.beard) : null, mustache = o.mustache !== undefined ? rgb(o.mustache) : null;
   const goatee = o.goatee !== undefined ? rgb(o.goatee) : null;
+  const bikini = o.bikini !== undefined ? rgb(o.bikini) : null;                                      // two pieces and nothing else: a dancer, somebody by a pool
   const tint = o.skin || [1, 1, 1], age = o.age || 0, stubble = o.stubble || 0;
   const print = o.pattern ? printData(o.pattern) : null, printOuter = print && !jacket, printInner = print && jacket;
   const jprint = jacket && o.jacketPattern ? printData(o.jacketPattern) : null;
-  const sleeve = o.sleeves === 'long' || jacket ? 0.96 : o.tee ? 0.3 : 0.45;
+  const sleeve = bikini ? 0 : o.sleeves === 'long' || jacket ? 0.96 : o.tee ? 0.3 : 0.45;
   const waistY = J.waistY, hemY = o.tucked && !jacket ? waistY : jacket ? waistY - 0.17 : waistY - 0.1, neck = J.neck;
   const cuffY = J.ankle.y - 0.03;
   const armLen = J.wrist.x - J.shoulder.x, legLen = J.hip.y - J.ankle.y;
@@ -612,7 +613,10 @@ function paint(B, o) {
       if (y < 0.014) set(sole);
       else set(shoe, 1 + 0.5 * clamp01((z - 0.05) / 0.05) * clamp01((y - 0.03) / 0.03));           // shine on the toe cap
     } else if ((leg > 100 && leg >= torso) || (torso > 100 && y < waistY)) {
-      if (!(y > hemY && torso + leg > 100 && top(true))) {
+      if (bikini) {
+        const lo = J.hip.y - 0.1 + ax * 0.9, hi = waistY - 0.05;                                   // cut high on the hip
+        if (y > lo && y < hi) { set(bikini); shade = y > hi - 0.01 || y < lo + 0.01 ? 0.78 : 1; }
+      } else if (!(y > hemY && torso + leg > 100 && top(true))) {
         const t = (J.hip.y - y) / legLen;
         const a = Math.atan2(z - lerp(J.hip.z, J.ankle.z, t), ax - lerp(J.hip.x, J.ankle.x, t));  // 0 = outside, pi/2 = front
         set(pants);
@@ -627,7 +631,12 @@ function paint(B, o) {
         if (o.tucked && Math.abs(y - waistY) < 0.02) belt();
       }
     } else if (torso > 90 && torso >= head) {
-      if (o.tucked && !jacket && Math.abs(y - waistY) < 0.02) belt();
+      if (bikini) {
+        const cy = prof.chestY, band = front ? 0.048 - Math.max(0, ax - 0.1) * 0.25 : 0.011;
+        if (Math.abs(y - cy) < band) { set(bikini); shade = Math.abs(y - cy) > band - 0.008 ? 0.78 : 1; }
+        else if (front && y > cy && y < neck.y - 0.03 && Math.abs(ax - 0.062 + (y - cy) * 0.18) < 0.006) { set(bikini); shade = 0.9; } // the straps, up to the neck
+        else if (front && ax < 0.004 && Math.abs(y - cy) < 0.02) { set(bikini); shade = 0.7; }
+      } else if (o.tucked && !jacket && Math.abs(y - waistY) < 0.02) belt();
       else top(false);
     } else if (arm > 100) {
       const t = (ax - J.shoulder.x) / armLen;

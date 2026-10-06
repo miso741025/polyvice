@@ -278,6 +278,10 @@ export function frame(g, a, b, { dist = 4.8, height = 1.7, lift = 1.3, side = 1 
 
 // Wait until the player reaches a spot. `how` may be 'car' (must drive there) or 'foot' (must walk).
 export async function reach(g, at, text, { r = 6, how } = {}) {
+  { // He took the job standing at a yellow marker. If the first place it sends him is where he already is, he is not sent.
+    const hub = g.hubAt; g.hubAt = null;
+    if (hub && near(hub, at, 18) && near(g.player.pos, at, 26)) { g.setCheckpoint?.(); return; }
+  }
   g.hud.objective(text);
   const m = g.addMarker(at.x, at.z, r), p = g.player;
   if (!p.locked) g.setCheckpoint?.();   // killed on the way: back to where the errand was given
@@ -604,6 +608,14 @@ async function bingRoom(g, cam, arrange, play) {
   g.setNight(night);
 }
 
+// After a scene in the Bing he is still in the Bing: on his feet by the crew's table, the car outside where he left it.
+function stayInBing(g, park) {
+  const { bingRoom } = g.places, p = g.player;
+  if (p.car) { const car = p.car; g.leaveCar(); car.speed = 0; if (park) { car.pos.set(park.x, 0, park.z); car.heading = park.h ?? car.heading; } }
+  p.inside = g.places.doors.find(d => d.inside === bingRoom.inside);
+  p.pos.set(bingRoom.table.x + 2.9, 0, bingRoom.table.z - 1.3); p.heading = g.cam.yaw = WEST; g.cam.pitch = 0.2;
+  g.cam.fixed = null;
+}
 // A scene in a room other than the Bing (the hospital ward): the room gives its own camera.
 export async function roomScene(g, room, arrange, play, { night: dark = 0 } = {}) {
   const p = g.player, night = g.night;
@@ -700,6 +712,8 @@ function extraAt(g, at, heading, state = 'idle', look = randomPedLook()) {
 }
 // A car a mission puts somewhere; it is cleared away with the mission.
 function propCar(g, at, heading, color, kind = 'sedan') {
+  // Whatever is already standing in that space (his own car, left there by an earlier job) is rolled into the next one.
+  for (const o of g.cars) if (!o.nav && o !== g.player.car && Math.hypot(o.pos.x - at.x, o.pos.z - at.z) < 4) { o.pos.x += Math.cos(heading) * 3.4; o.pos.z -= Math.sin(heading) * 3.4; o.speed = 0; o.sync?.(); }
   const car = g.spawnCar(at.x, at.z, heading, color, kind);
   car.driverless = true; car.mission = true; car.speed = 0;
   return car;
@@ -2761,6 +2775,63 @@ const EPISODES = [
 // a tail to shake, the police to lose, a conversation that happens while he drives.
 
 // Several places to call at, in any order: a marker at each and a count in the objective. `each(k)` runs at stop k.
+// The spray bay: the car is driven in one colour and backed out another, seen from across the forecourt. `bay` is the mouth
+// of the bay and `into` the heading that points into it. The player stays at the wheel throughout.
+export async function respray(g, car, bay, into, hex, line) {
+  const p = g.player, fx = Math.sin(into), fz = Math.cos(into), y = groundAt(bay.x, bay.z);
+  const out = { x: bay.x - fx * 10, z: bay.z - fz * 10 }, inn = { x: bay.x + fx * 4.6, z: bay.z + fz * 4.6 };
+  p.locked = true; car.speed = 0; car.nav = null;
+  const roll = (a, b, secs) => new Promise((resolve, reject) => {
+    const t0 = g.time;
+    g.updaters.push(() => { const k = Math.min(1, (g.time - t0) / secs), e = k * k * (3 - 2 * k); car.pos.set(a.x + (b.x - a.x) * e, 0, a.z + (b.z - a.z) * e); car.heading = into; car.speed = 0; car.sync?.(); return k < 1; });
+    g.wait(secs).then(resolve, reject);
+  });
+  await cut(g, () => {
+    car.pos.set(out.x, 0, out.z); car.heading = into; car.sync?.();
+    g.cam.fixed = { pos: new THREE.Vector3(bay.x - fx * 13 + fz * 7.5, y + 2.6, bay.z - fz * 13 - fx * 7.5), look: new THREE.Vector3(bay.x - fx * 2, y + 1.2, bay.z - fz * 2) };
+  }, 0.4);
+  await roll(out, inn, 3);
+  // Inside: the gun hisses, colour drifts out of the mouth of the bay, the light in there stutters.
+  const tint = new THREE.Color(hex), mist = Array.from({ length: 9 }, (_, k) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.4, 7, 5), new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity: 0.3, depthWrite: false })); m.userData.k = k / 9; g.track(m); return m; });
+  const lamp = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 3), new THREE.MeshBasicMaterial({ color: 0xfff6d8, transparent: true, opacity: 0.5 })); lamp.position.set(bay.x - fx * 0.12, y + 1.7, bay.z - fz * 0.12); lamp.rotation.y = into + Math.PI; g.track(lamp);
+  const t1 = g.time; let on = true;
+  g.updaters.push(() => {
+    if (!on) return false;
+    lamp.material.opacity = 0.25 + 0.3 * (Math.sin(g.time * 31) > 0 ? 1 : 0.4);
+    for (const m of mist) { const k = ((g.time - t1) * 0.45 + m.userData.k) % 1; m.position.set(bay.x - fx * (0.4 + k * 3.4) + fz * Math.sin(m.userData.k * 40) * 1.4, y + 0.5 + k * 2 + m.userData.k, bay.z - fz * (0.4 + k * 3.4) - fx * Math.sin(m.userData.k * 40) * 1.4); m.scale.setScalar(0.6 + k * 1.8); m.material.opacity = 0.34 * (1 - k); }
+    return true;
+  });
+  if (line) say(g, '', line, 3.4).catch(() => {});
+  for (let k = 0; k < 3; k++) { g.sfx?.spray?.(); await g.wait(1.1); }
+  car.repaint(hex);
+  await g.wait(0.5);
+  on = false; for (const m of mist) g.untrack(m); g.untrack(lamp);
+  await roll(inn, out, 3.4);
+  g.sfx?.horn?.();
+  await g.wait(0.6);
+  await cut(g, () => { g.cam.fixed = null; g.cam.yaw = into + Math.PI; }, 0.4);
+  p.locked = false;
+}
+// Something small changes hands: the giver reaches out, it crosses the gap, the player pockets it. Without a giver it
+// is picked up from where it lies (`from`).
+export async function handover(g, giver, { hex = 0xe9e2cf, from, sound = true } = {}) {
+  const p = g.player, was = p.locked, a = from || giver.group.position, y0 = from?.y ?? (giver ? giver.group.position.y : groundAt(a.x, a.z)) + (giver ? 1.12 : 0.1), y1 = groundAt(p.pos.x, p.pos.z) + 1.1;
+  p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  if (giver) { giver.group.rotation.y = toward(a, p.pos); giver.play?.('interact', 'idle'); }
+  p.heading = toward(p.pos, a);
+  const env = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.025), new THREE.MeshLambertMaterial({ color: hex }));
+  env.position.set(a.x, y0, a.z); env.rotation.y = p.heading;
+  g.track(env);
+  await g.wait(0.4);
+  p.human.play(giver ? 'interact' : 'pickup', 'idle');
+  const t0 = g.time, ux = p.pos.x - a.x, uz = p.pos.z - a.z;
+  g.updaters.push(() => { const k = Math.min(1, (g.time - t0) / 0.6), e = k * k * (3 - 2 * k); env.position.set(a.x + ux * (0.2 + e * 0.7), y0 + (y1 - y0) * e + Math.sin(k * Math.PI) * 0.14, a.z + uz * (0.2 + e * 0.7)); env.scale.setScalar(1 - e * 0.5); return k < 1; });
+  await g.wait(0.75);
+  g.untrack(env);
+  if (sound) g.sfx?.cash();
+  p.locked = was;
+}
 export async function rounds(g, stops, text, each, { r = 5 } = {}) {
   const p = g.player, left = stops.map((s, k) => ({ x: s.x, z: s.z, k, m: g.addMarker(s.x, s.z, r) }));
   while (left.length) {
@@ -2886,15 +2957,15 @@ export function pit(g, at) {
   return { at, hole, heap, dig: k => set(k, k), fill: k => { set(1 - k, 1 - k); if (k >= 1) { heap.scale.set(1.3, 0.12, 0.8); heap.position.set(at.x, y, at.z); } } };
 }
 // A spell with the shovel, done by hand: each press of F is one stroke. He bends to it, earth flies, `each` is told how far along it is.
-export async function shovel(g, n, of, word = 'Dig', each, heap) {
+export async function shovel(g, n, of, word = 'Dig', each, heap, thud = true) {
   const p = g.player, strokes = 4;
   p.locked = true;                                   // he stands at the hole; F is the shovel and nothing else
   for (let k = 0; k < strokes; k++) {
-    g.hud.objective(`${word}: press <b>F</b>. &nbsp; <b>${n} of ${of}</b> &nbsp; ${'●'.repeat(k)}${'○'.repeat(strokes - k)}`);
+    g.hud.objective(`${word}: press <b>F</b>. &nbsp; ${of > 1 ? `<b>${n} of ${of}</b> &nbsp; ` : ''}${'●'.repeat(k)}${'○'.repeat(strokes - k)}`);
     g.consume('KeyF');
     await g.until(() => g.consume('KeyF'));
     p.human.play('kneel', 'idle');
-    await g.wait(0.3); g.sfx?.punch?.(false);
+    await g.wait(0.3); if (thud) (g.sfx?.dig || g.sfx?.punch)?.call(g.sfx, false); else g.sfx?.spray?.(0.5);
     if (heap) clod(g, p.pos, heap);
     each?.((k + 1) / strokes);
     await g.wait(0.28);
@@ -2937,7 +3008,7 @@ export async function headlamps(g, from, to, text, caught) {
 // The story waits for the player. When one mission is done the next is a yellow marker somewhere that makes sense
 // for it (home, the Bing, the doctor's, the precinct), and it starts when he walks or drives into it.
 const HUBS = {
-  home: g => spot(g.places.home.spawn, 0, 4), bing: g => g.places.bing?.door, melfi: g => g.places.melfi?.kerb, school: g => g.places.school?.gate, hospital: g => g.places.hospital?.kerb,
+  home: g => spot(g.places.home.spawn, 0, 4), bing: g => g.places.bing && spot(g.places.bing.door, -7, 7), melfi: g => g.places.melfi?.kerb, school: g => g.places.school?.gate, hospital: g => g.places.hospital?.kerb,
   satriale: g => g.places.satriale?.kerb, grove: g => g.places.grove?.kerb, bar: g => g.places.bar?.kerb, precinct: g => g.places.precinct?.kerb, kates: g => g.places.kates?.kerb, yard: g => g.places.yard?.gate, truckstop: g => g.places.truckstop?.kerb,
 };
 const STARTS = {
@@ -2947,8 +3018,9 @@ const STARTS = {
   armoured: 'yard', bearerBonds: 'bar', slick: 'precinct', eyesOn: 'precinct', theNextOne: 'bar', justine: 'precinct', coffee: 'precinct', kelso: 'bar', wheels: 'yard', hardware: 'yard', farEastPacific: 'kates',
   charleneSign: 'bar', laurenNight: 'precinct', theCrew: 'home',
 };
-const CHAIN = new Set(['fredPeters', 'theStreet', 'theRunway', 'ridelandSunday']); // these follow straight on from the one before
+const CHAIN = new Set(['fredPeters', 'theStreet', 'theRunway', 'ridelandSunday', 'closingTime']); // these follow straight on from the one before
 async function offer(g, mission, title, straight) {
+  g.hubAt = null;
   if (straight || CHAIN.has(mission.name)) return;
   const p = g.player, at = (HUBS[STARTS[mission.name] || 'home'] || HUBS.home)(g) || HUBS.home(g);
   // Some missions end in the dark with the player held still, for the next one to pick up. Between missions he is free.
@@ -2964,6 +3036,7 @@ async function offer(g, mission, title, straight) {
     try {
       await g.until(() => { const d = Math.hypot(p.pos.x - at.x, p.pos.z - at.z); if (d > 7) armed = true; return armed && d < 3.8 && !p.locked && !p.inside && (!p.car || Math.abs(p.car.speed) < 9); });
       g.removeMarker(m); g.hud.objective();
+      g.hubAt = { x: at.x, z: at.z };
       return;
     } catch (err) {
       if (err !== g.WASTED) throw err;
@@ -3714,73 +3787,145 @@ async function insurance(g) {
 // Mahaffey cannot pay. Hesh sees that his employer can: a clinic on paper, billing scans that never happen.
 
 async function secondOpinion(g) {
-  const { hesh: label, ocean, pier } = g.places, p = g.player;
+  const { hesh: label, ocean, pier } = g.places, p = g.player, FNOTE = g.places.rooms.FNOTE, OFFICE = g.places.rooms.HESH, fdoor = g.places.doors.find(d => d.inside === FNOTE.inside);
   let hesh, pussy;
 
   await g.wait(1);
   g.hud.card('Second Opinion', 'F-Note Records');
   await phone(g, HESH, 'Anthony. Come by the label. I had a thought about your friend the gambler.');
   g.hud.card();
-  hesh = actor(g, 'hesh', spot(label.door, -1, 1.4), NORTH); // there before he arrives
-  pussy = actor(g, 'pussy', spot(label.door, 1.5, 1.2), NORTH);
+  // They are in his office before Tony is through the front door: Hesh behind his desk, Pussy on the couch.
+  hesh = actor(g, 'hesh', OFFICE.chair, SOUTH, 'sit');
+  pussy = actor(g, 'pussy', OFFICE.couch[0], WEST, 'sit');
   await reach(g, label.kerb, "Drive to <b>F-Note Records</b>, Hesh's label.");
-
-  p.locked = true;
-  await cut(g, () => {
-    place(g, spot(label.door, 0, -1.6), SOUTH, label.kerb);
-    frame(g, p.pos, spot(label.door, 0, 1.3), { dist: 5.4 });
-  });
+  await reach(g, fdoor.outside, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  await enter(g, FNOTE);
+  await reach(g, roomSpot(FNOTE, 0, -1.5), 'Find the <b>desk</b>, and ask for Hesh.', { r: 1.4, how: 'foot' });
+  p.locked = true; p.heading = NORTH;
+  g.cam.fixed = inRoom(FNOTE, [2.7, 0.6], [0, -3], 1.6, 1.3).cam;
   await talk(g, [
-    [HESH, 'Your Mahaffey works for a health plan, yes? He approves the claims. He signs, they pay.', hesh],
+    ['Receptionist', 'Mr. Soprano. He said to send you straight through. The door on the left, with his name on it.', FNOTE.clerk],
+    [TONY, 'How long has he had his name on a door?', p],
+    ['Receptionist', 'Since before I was born, he tells me. He tells everybody.', FNOTE.clerk],
+  ]);
+  g.cam.fixed = null; p.locked = false;
+  { // Through the door with the brass plate. (F at the door does it too.)
+    const at = roomSpot(FNOTE, -5.4, -3.7), inOffice = () => p.pos.z < FNOTE.Z - 6;
+    g.hud.objective('Find the door marked <b>H. RABKIN</b>, and go through.');
+    const m = g.addMarker(at.x, at.z, 1.2);
+    await g.until(() => near(p.pos, at, 1.3) || inOffice());
+    g.removeMarker(m); g.hud.objective();
+    if (!inOffice()) { p.locked = true; await fade(g, 1, 0.35); g.sfx?.door(); p.pos.set(OFFICE.inside.x, 0, OFFICE.inside.z + 1); p.heading = g.cam.yaw = NORTH; await fade(g, 0, 0.35); p.locked = false; }
+  }
+  await reach(g, roomSpot(OFFICE, 0.5, -0.2), 'Find <b>Hesh</b>. He is behind his desk.', { r: 1.3, how: 'foot' });
+  p.locked = true;
+  p.pos.set(OFFICE.X + 0.5, 0, OFFICE.Z - 0.2); p.heading = NORTH;
+  g.cam.fixed = inRoom(OFFICE, [-2.8, 1.1], [1.4, -2.5], 1.6, 1.1).cam;
+  await talk(g, [
+    [HESH, 'Sit, stand, as you like. Your Mahaffey works for a health plan, yes? He approves the claims. He signs, they pay.', hesh],
     [TONY, "He can't cover ten grand. With the vig he's into us for twice that.", p],
     [HESH, "He doesn't pay. His company pays. We open a clinic on paper. Scans that never happen, billed to his desk.", hesh],
     [PUSSY, "He's gonna say no. He's scared of his own boss.", pussy],
     [HESH, 'Then we explain it to him somewhere with a view.', hesh],
   ]);
+  // All three, out on the pavement.
+  await fade(g, 1, 0.6);
+  g.sfx?.door();
+  for (const h of fdoor.hide || []) h.group.visible = true;
+  p.inside = null;
+  { const o = fdoor.outside, fx = Math.sin(o.h), fz = Math.cos(o.h);
+    p.pos.set(o.x, 0, o.z); p.heading = g.cam.yaw = o.h;
+    for (const [who, r] of [[hesh, 1.1], [pussy, -1.1]]) { const x = o.x - fx * 0.6 + fz * r, z = o.z - fz * 0.6 - fx * r; who.set('idle'); who.group.position.set(x, groundAt(x, z), z); who.group.rotation.y = o.h; } }
   g.cam.fixed = null;
+  await fade(g, 0, 0.6);
   p.locked = false;
   const a = follower(g, hesh), b = follower(g, pussy, { lead: a });
+  // Mahaffey is on Ocean Drive already, talking to a man about a horse.
+  const alex = actor(g, 'mahaffey', ocean.chris, WEST, 'talk'), tout = extraAt(g, spot(ocean.chris, -1.3, 0.3), EAST, 'idle', { shirt: 0xd9c7a0, pants: 0x4a3324, hair: 0x8d8a8e, hairStyle: 'balding', bulk: 1.1, age: 0.5 });
   g.hud.objective('Get in the <b>car</b> with Hesh and Pussy.');
   await g.until(() => p.car);
   await reach(g, ocean.marker, 'Pick up <b>Mahaffey</b> on Ocean Drive.', { how: 'car' });
 
   p.locked = true;
   if (p.car) p.car.speed = 0;
-  const alex = actor(g, 'mahaffey', ocean.chris, WEST);
+  { // He sees whose car it is, and remembers somewhere else he has to be.
+    const pos = alex.group.position, away = toward(p.pos, pos), t0 = g.time;
+    alex.set('walk', 1.25); alex.group.rotation.y = away;
+    g.updaters.push(dt => { if (g.time - t0 > 2.1 || !g.tracked.has(alex.group)) return false; pos.x += Math.sin(away) * 2.3 * dt; pos.z += Math.cos(away) * 2.3 * dt; pushOut(pos, 0.4); pos.y = groundAt(pos.x, pos.z); return true; });
+    await say(g, PUSSY, 'Alex! Alex. Do not make me get out of this car.', 2.4);
+    alex.set('idle'); alex.group.rotation.y = toward(pos, p.pos);
+    g.untrack(tout.group);
+  }
   await talk(g, [
     [DEBTOR, 'Tony! I was just coming to see you, I swear. I got two hundred on me.', alex],
     [PUSSY, "Keep it. Get in the car, Alex. We're going for a walk."],
   ]);
   const c = follower(g, alex, { lead: b });
   p.locked = false;
+  // The pier has its evening on it before they come: a man fishing off the end, gulls along the rail.
+  const E = pier.end, deckY = groundAt(E.x, E.z);
+  const angler = extraAt(g, spot(E, 2.6, -1.95), NORTH, 'idle', { shirt: 0x5a6a4a, sleeves: 'long', pants: 0x4a4652, hair: 0x8d8a8e, hat: 'cap', hatColor: 0x2f5a3f, bulk: 1.05, age: 0.6 });
+  { const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.014, 2.6, 4).translate(0, 1.3, 0), new THREE.MeshLambertMaterial({ color: 0x3a2a1c })); rod.rotation.x = 0.9; rod.position.set(0.2, 0.9, 0.2); angler.group.add(rod); }
+  const gulls = [0.4, 1.3, 2.1, 3.4].map((dz, k) => {
+    const grp = new THREE.Group(), white = new THREE.MeshLambertMaterial({ color: 0xf4f4f0 }), grey = new THREE.MeshLambertMaterial({ color: 0x9aa0a8 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6).scale(1, 0.9, 1.7), white), head = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 5), white), beak = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.07, 4).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xf2c230 }));
+    head.position.set(0, 0.1, 0.16); beak.position.set(0, 0.09, 0.24);
+    const wings = [-1, 1].map(sd => { const w = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.015, 0.16).translate(sd * 0.21, 0, 0), grey); w.position.set(sd * 0.05, 0.04, 0); w.rotation.z = sd * 1.3; grp.add(w); return w; });
+    grp.add(body, head, beak);
+    grp.position.set(E.x + 5, deckY + 1.12, E.z - 2 + dz); grp.rotation.y = EAST + (k - 1.5) * 0.5;
+    g.track(grp);
+    return { grp, wings, k };
+  });
   await reach(g, pier.start, 'Drive to the <b>pier</b>.', { how: 'car' });
   g.hud.objective('Walk Mahaffey to the <b>end of the pier</b>.');
-  const m = g.addMarker(pier.end.x, pier.end.z, 2.4);
+  const m = g.addMarker(E.x, E.z, 2.4);
+  let flown = 0, packed = false;
+  g.updaters.push(dt => { // the birds go up when the four of them are close; the man with the rod decides he has caught enough
+    if (gulls.every(gl => !gl.grp.parent)) return false;
+    const d = Math.hypot(p.pos.x - E.x - 5, p.pos.z - E.z);
+    if (!flown && d < 13) flown = g.time;
+    if (!packed && d < 22 && g.tracked.has(angler.group)) { packed = true; mill(g, angler, [spot(E, -14, -1.6), spot(pier.start, 4, -1.4), spot(pier.start, -14, -3)], { pace: 1.5 }); g.wait(34).then(() => g.untrack(angler.group)).catch(() => {}); }
+    if (flown) for (const { grp, wings, k } of gulls) {
+      const t = g.time - flown - k * 0.25; if (t < 0 || !grp.parent) continue;
+      grp.position.x += (2.2 + k * 0.4) * dt; grp.position.y += (1.5 - Math.min(1.2, t * 0.2)) * dt; grp.position.z += Math.sin(t * 0.8 + k) * 1.6 * dt; grp.rotation.y = EAST + Math.sin(t * 0.8 + k) * 0.6;
+      for (const [n, w] of wings.entries()) w.rotation.z = (n ? 1 : -1) * Math.sin(g.time * 13 + k) * 0.75;
+      if (t > 9) g.untrack(grp);
+    }
+    return true;
+  });
   await g.until(() => !p.car && near(p.pos, m, 3) && near(c.pos, m, 10));
   g.removeMarker(m);
   g.hud.objective();
 
   p.locked = true;
+  const stand = (who, dx, dz, heading) => { who.group.position.set(E.x + dx, groundAt(E.x + dx, E.z + dz), E.z + dz); who.group.rotation.set(0, heading, 0); who.set('idle'); };
+  // A slow step: somebody moves a little way while the talk goes on.
+  const drift = (who, dx, dz, secs, state = 'walk') => { const pos = who.group.position, x0 = pos.x, z0 = pos.z, t0 = g.time; who.set(state, 0.7); g.updaters.push(() => { const k = Math.min(1, (g.time - t0) / secs); pos.x = x0 + dx * k; pos.z = z0 + dz * k; if (k >= 1) who.set('idle'); return k < 1 && g.tracked.has(who.group); }); };
   await cut(g, () => {
     for (const f of [a, b, c]) f.stay = true;
-    const stand = (who, dx, dz, heading) => { who.group.position.set(pier.end.x + dx, groundAt(pier.end.x + dx, pier.end.z + dz), pier.end.z + dz); who.group.rotation.y = heading; who.set('idle'); };
-    stand(alex, 3.6, 0, WEST); stand(pussy, 2.2, -1.4, EAST); stand(hesh, 1.6, 1.5, EAST);
-    p.pos.set(pier.end.x, 0, pier.end.z); p.heading = EAST;
-    g.cam.fixed = { pos: new THREE.Vector3(pier.end.x - 2.5, groundAt(pier.end.x, pier.end.z) + 2.1, pier.end.z + 6.5), look: new THREE.Vector3(pier.end.x + 2.6, 1.6, pier.end.z) };
+    stand(alex, 3.3, 0, WEST); stand(pussy, 1.4, -1.4, EAST); stand(hesh, 0.8, 1.6, EAST);
+    p.pos.set(E.x - 0.4, 0, E.z); p.heading = EAST;
+    g.cam.fixed = { pos: new THREE.Vector3(E.x - 2.5, deckY + 1.7, E.z + 6.5), look: new THREE.Vector3(E.x + 2.6, deckY + 1.2, E.z) };
   }, 0.6);
+  drift(alex, 1.1, 0.2, 2.6, 'talk');                    // he backs away until the rail is in the small of his back
   await talk(g, [
     [DEBTOR, "Guys. Come on. I can't swim. You know I can't swim.", alex],
+  ]);
+  drift(pussy, 1.5, 0.9, 1.6);
+  await talk(g, [
     [PUSSY, "Nobody's swimming. Long way down, though, when the tide's out.", pussy],
     [DEBTOR, "I'm not signing anything! You can't make me!", alex],
     [PUSSY, 'Tony. Explain it to him.', pussy],
   ]);
   const soft = g.addNpc(alex, { health: 100, cash: 0, stays: true });
   soft.die = () => { soft.health = 1; };
+  const arrow = quarry(g, soft);
   fistsOnly(g, true);
   g.cam.fixed = null;
   p.locked = false;
-  g.hud.objective('<b>Rough him up</b> until he listens.');
+  g.hud.objective('<b>Rough him up</b> until he listens. &nbsp; <b>Click</b> or <b>E</b>.');
   await g.until(() => soft.health < 40);
+  arrow();
   g.hud.objective();
   g.removeNpc(alex);
   fistsOnly(g, false);
@@ -3792,10 +3937,42 @@ async function secondOpinion(g) {
     [DEBTOR, 'Okay! Okay. Jesus. I was listening.', alex],
     [HESH, "Alex. You have a sickness, the gambling. We're your friends, so we found a way for you to pay that costs you nothing.", hesh],
     [DEBTOR, "Phony claims? That's fraud. I could go to prison!", alex],
-    [TONY, 'Look down. Now look at me. Which one scares you more?', p],
-    [DEBTOR, "...Okay. Okay! Send the paperwork. I'll sign whatever comes across my desk.", alex],
-    [HESH, 'A sensible man. Mazel tov.', hesh],
+    [PUSSY, 'He is still doing sums. Show him the view, T.', pussy],
   ]);
+  // Over the rail: Tony has him by the belt, and the camera is out over the water looking back at all four of them.
+  await cut(g, () => {
+    stand(alex, 4.72, -0.2, EAST); alex.group.position.y = deckY + 0.16; alex.group.rotation.x = 0.7; alex.set('talk');
+    p.pos.set(E.x + 3.9, 0, E.z - 0.62); p.heading = EAST + 0.25;
+    stand(pussy, 3.95, 1.0, EAST - 0.6); stand(hesh, 2.3, 1.95, EAST - 0.25);
+    g.cam.fixed = { pos: new THREE.Vector3(E.x + 9.4, deckY + 1.25, E.z - 2.8), look: new THREE.Vector3(E.x + 4.2, deckY + 1.4, E.z - 0.1) };
+  }, 0.5);
+  { let held = 0, last = g.time, said = 0;
+    const yell = ['I am listening! I am LISTENING!', 'There are rocks! Tony, there are rocks down there!', 'My glasses! My glasses went in!'];
+    await g.until(() => {
+      const dt = Math.min(0.1, g.time - last); last = g.time;
+      held = g.keys.KeyF ? held + dt : Math.max(0, held - dt * 0.6);
+      alex.group.rotation.x = 0.7 + Math.min(1, held / 3.2) * 0.55 + Math.sin(g.time * 9) * 0.02 * held;
+      alex.group.position.y = deckY + 0.16 + Math.min(1, held / 3.2) * 0.2;
+      if (said < 3 && held > 0.5 + said * 0.95) { say(g, DEBTOR, yell[said], 1.7).catch(() => {}); said++; }
+      const pips = Math.min(8, Math.floor(held / 3.2 * 8));
+      g.hud.objective(`Tip him out over the rail: press <b>F</b> and hold it. &nbsp; <b>${'▮'.repeat(pips)}${'▯'.repeat(8 - pips)}</b>`);
+      return held >= 3.2;
+    });
+    g.hud.objective(); }
+  await talk(g, [
+    [TONY, 'Look down. Now look at me. Which one scares you more?', p],
+    [DEBTOR, "...Okay. Okay! Send the paperwork. I'll sign whatever comes across my desk. Pull me up!", alex],
+  ]);
+  await cut(g, () => {
+    stand(alex, 3.6, -0.1, WEST); alex.set('kneel');
+    p.pos.set(E.x + 2.4, 0, E.z - 0.5); p.heading = EAST;
+    frame(g, p.pos, alex.group.position, { dist: 4.6, side: -1 });
+  }, 0.4);
+  await talk(g, [
+    [HESH, 'A sensible man. Mazel tov. Somebody find him his glasses.', hesh],
+  ]);
+  for (const gl of gulls) g.untrack(gl.grp);
+  if (g.tracked.has(angler.group)) g.untrack(angler.group);
   await cut(g, () => {
     for (const f of [a, b, c]) f.on = false;
     dismiss(g, hesh, pussy, alex);
@@ -3806,43 +3983,159 @@ async function secondOpinion(g) {
   await passed(g, '$5,000', 5000);
 }
 
+// Somebody with somewhere to be: walks (or runs) a loop of points for as long as he is in the scene. What it returns stops him.
+export function mill(g, who, pts, { pace = 1.4, pause = 0, run = false } = {}) {
+  let k = 0, hold = 0, on = true;
+  const pos = who.group.position, gait = run ? 'run' : 'walk';
+  g.updaters.push(dt => {
+    if (!on || !g.tracked.has(who.group)) return false;
+    if (hold > 0) { hold -= dt; return true; }
+    const to = pts[k], dx = to.x - pos.x, dz = to.z - pos.z, d = Math.hypot(dx, dz);
+    if (d < 0.25) { k = (k + 1) % pts.length; if (pause) { hold = pause * (0.6 + Math.random() * 0.8); who.set(to.state || 'idle'); if (to.h !== undefined) who.group.rotation.y = to.h; } return true; }
+    const step = Math.min(pace * dt, d);
+    pos.x += dx / d * step; pos.z += dz / d * step; pos.y = groundAt(pos.x, pos.z);
+    who.group.rotation.y = Math.atan2(dx, dz);
+    if (who.state !== gait) who.set(gait, run ? 1 : pace / 1.5);
+    return true;
+  });
+  return () => { on = false; };
+}
+// A garden dressed for a thirteenth birthday: balloons, the banner, presents, the cake, paper cups. Returns what clears it away.
+function partyDress(g) {
+  const { home } = g.places, P = home.patio, y = groundAt(P.x, P.z), things = [], at = (dx, dz) => ({ x: P.x + dx, z: P.z + dz });
+  const add = m => { things.push(m); return g.track(m); };
+  const box = (hex, w, h, d, x, yy, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({ color: hex })); m.position.set(x, yy + h / 2, z); return add(m); };
+  const COL = [0xd8342c, 0xffe066, 0x49e0d0, 0xff5fd2, 0x2f56c8, 0xff8a30, 0x8a5cff];
+  const bobs = [];
+  const balloons = (x, z, h = 2.1, n = 3) => {
+    for (let k = 0; k < n; k++) {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8).scale(1, 1.22, 1), new THREE.MeshLambertMaterial({ color: COL[(k + Math.round(x * 3)) % 7] }));
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 1, 3), new THREE.MeshBasicMaterial({ color: 0xf4f4f0 }));
+      add(b); add(s); bobs.push({ b, s, x: x + (k - (n - 1) / 2) * 0.24, z: z + (k % 2) * 0.16, y0: groundAt(x, z) + h + (k % 2) * 0.28, y1: groundAt(x, z) + h - 1.1, ph: k * 1.9 + x });
+    }
+  };
+  g.updaters.push(() => { if (!things.length) return false; for (const o of bobs) { const sw = Math.sin(g.time * 1.3 + o.ph) * 0.07; o.b.position.set(o.x + sw, o.y0 + Math.sin(g.time * 0.9 + o.ph) * 0.04, o.z + sw * 0.5); o.s.position.set(o.x + sw / 2, (o.y0 + o.y1) / 2 - 0.12, o.z + sw / 4); o.s.scale.y = o.y0 - o.y1; } return true; });
+  for (const [dx, dz] of [[-5, 3.6], [7, 3.6], [2.1, -5.3], [7.1, -5.3], [-4.6, 3.5], [-13, 24.3], [-18.3, 23], [10.5, 8], [10.5, 14], [24.4, 6.6]]) balloons(P.x + dx, P.z + dz, dz === 3.6 ? 3.3 : 2.2);
+  // HAPPY BIRTHDAY, strung between the posts of the lights.
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 128; const x2 = c.getContext('2d');
+  x2.fillStyle = '#f4f4f0'; x2.fillRect(0, 0, 1024, 128); for (let k = 0; k < 16; k++) { x2.fillStyle = ['#d8342c', '#ffe066', '#49e0d0', '#ff5fd2'][k % 4]; x2.beginPath(); x2.moveTo(k * 64, 0); x2.lineTo(k * 64 + 64, 0); x2.lineTo(k * 64 + 32, 26); x2.fill(); }
+  x2.fillStyle = '#2f56c8'; x2.font = 'bold 76px "Bebas Neue", Impact, sans-serif'; x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText('HAPPY  BIRTHDAY  A.J.  ·  13', 512, 78);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  for (const turn of [0, Math.PI]) { const banner = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 0.8), new THREE.MeshBasicMaterial({ map: tex })); banner.position.set(P.x + 1, y + 2.3, P.z + 3.62 + (turn ? -0.01 : 0.01)); banner.rotation.y = turn; add(banner); } // read the right way round from the house and from the lawn
+  // The presents, on their own table; the cake, on the long one; cups and plates; a bowl of something orange.
+  const gt = at(-5.6, 3.0);
+  box(0xf4f4f0, 1.7, 0.03, 0.8, gt.x, y + 0.72, gt.z); for (const [dx, dz] of [[-0.75, -0.3], [0.75, -0.3], [-0.75, 0.3], [0.75, 0.3]]) box(0x8a8d96, 0.04, 0.72, 0.04, gt.x + dx, y, gt.z + dz);
+  [[-0.55, 0.36, 0.3, 0xd8342c, 0xffe066], [-0.1, 0.5, 0.22, 0x2f56c8, 0xf4f4f0], [0.4, 0.3, 0.4, 0x49e0d0, 0xff5fd2], [0.62, 0.22, 0.18, 0xffe066, 0xd8342c], [-0.3, 0.2, 0.14, 0x8a5cff, 0xffe066]].forEach(([dx, w, h, hex, rib], k) => {
+    const yy = y + 0.75 + (k === 4 ? 0.22 : 0); box(hex, w, h, w * 0.8, gt.x + dx, yy, gt.z + (k % 2) * 0.1 - 0.05); box(rib, w + 0.01, h + 0.01, 0.04, gt.x + dx, yy, gt.z + (k % 2) * 0.1 - 0.05); box(rib, 0.04, h + 0.012, w * 0.8 + 0.01, gt.x + dx, yy, gt.z + (k % 2) * 0.1 - 0.05);
+  });
+  const ck = at(5.6, -4.1); // on the long table under the pergola
+  const tier = (r, h, yy, hex) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 20), new THREE.MeshLambertMaterial({ color: hex })); m.position.set(ck.x, yy + h / 2, ck.z); add(m); };
+  tier(0.36, 0.02, y + 0.86, 0xc9cbd2); tier(0.3, 0.14, y + 0.88, 0xf4f4f0); tier(0.31, 0.03, y + 0.92, 0x2f56c8);
+  for (let k = 0; k < 13; k++) { const a = k / 13 * Math.PI * 2; const cnd = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.09, 4), new THREE.MeshBasicMaterial({ color: COL[k % 7] })); cnd.position.set(ck.x + Math.sin(a) * 0.22, y + 1.065, ck.z + Math.cos(a) * 0.22); add(cnd); const fl = new THREE.Mesh(new THREE.SphereGeometry(0.014, 5, 4), new THREE.MeshBasicMaterial({ color: 0xffd060 })); fl.position.set(cnd.position.x, y + 1.125, cnd.position.z); add(fl); }
+  for (let k = 0; k < 10; k++) { const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.028, 0.1, 8), new THREE.MeshLambertMaterial({ color: k % 2 ? 0xd8342c : 0x2f56c8 })); cup.position.set(P.x + 3.2 + (k % 5) * 0.14, y + 0.91, P.z - 3.85 - Math.floor(k / 5) * 0.14); add(cup); }
+  for (let k = 0; k < 5; k++) box(0xf4f4f0, 0.24, 0.006, 0.24, P.x + 6.4, y + 0.86 + k * 0.007, P.z - 4.1);
+  // Folding chairs out on the lawn, a few already taken; a ball; a water gun somebody will regret.
+  const seats = [[-7.6, 9.6, 0.4], [-6.3, 10.4, -0.3], [-1.4, 9.2, 2.6], [0, 9.6, -2.8]].map(([dx, dz, h]) => {
+    const s = at(dx, dz); const grp = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ color: 0xf4f4f0 });
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.04, 0.44), mat); seat.position.y = 0.44; const back = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.42, 0.04), mat); back.position.set(0, 0.72, -0.22); grp.add(seat, back);
+    for (const [fx, fz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.44, 4), mat); leg.position.set(fx, 0.22, fz); grp.add(leg); }
+    grp.position.set(s.x, groundAt(s.x, s.z), s.z); grp.rotation.y = h; add(grp); return { ...s, h };
+  });
+  { const m = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshLambertMaterial({ color: 0xf4f4f0 })); m.position.set(P.x - 9, y + 0.2, P.z + 7); add(m); box(0x49e0d0, 0.3, 0.1, 0.06, P.x + 6.6, y + 0.1, P.z + 9.5); }
+  return { seats, clear: () => { for (const m of things) g.untrack(m); things.length = 0; } };
+}
+
 // ---------- 8. The Party ----------
 // AJ's birthday, the second attempt. Everyone comes, including the two people who should not be talking.
 
 async function theParty(g) {
-  const { home } = g.places, p = g.player;
-  const cast = {};
+  const { home, houseRoom } = g.places, p = g.player, UP = g.places.rooms.UPSTAIRS, K = kitchen(g), front = g.places.doors.find(d => d.name === 'home');
+  const cast = {}, crowd = [];
 
-  await g.wait(1);
-  g.hud.card('The Party', "AJ's birthday, take two");
-  await phone(g, CARMELA, "Anthony, people are arriving. Your son's party. Again. Try to stay on your feet for this one.");
-  g.hud.card();
-  await reach(g, home.road, 'Drive <b>home</b>.');
-
+  // He wakes upstairs in his own bed. The garden is already full: everything out there is in place before he comes down.
   p.locked = true;
-  await cut(g, () => {
-    place(g, home.drive, EAST, home.car);
-    const at = (dx, dz) => spot(home.patio, dx, dz);
-    cast.carmela = actor(g, 'carmela', at(2.2, 2.8), WEST);
-    cast.aj = actor(g, 'aj', spot(home.pool, -1.4, 3.5), NORTH);
-    cast.meadow = actor(g, 'meadow', spot(home.pool, -1.8, 5.2), NORTH, 'talk');
-    cast.pussy = actor(g, 'pussy', at(-5, 0), EAST, 'talk');
-    cast.silvio = actor(g, 'silvio', at(-3.4, -0.8), WEST);
-    cast.paulie = actor(g, 'paulie', at(-3.8, 1.2), WEST, 'talk');
-    cast.hesh = actor(g, 'hesh', at(-1, 6.5), EAST);
-    cast.artie = actor(g, 'artie', at(1, 7), WEST);
-    cast.chris = actor(g, 'christopher', spot(home.drive, 5, 5), SOUTH);
-    g.cam.fixed = null;
-  });
+  await fade(g, 1, 0.8);
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  g.tonyCar.pos.set(home.car.x, 0, home.car.z); g.tonyCar.heading = home.car.h; g.tonyCar.speed = 0;
+  g.setNight(0);
+  const at = (dx, dz) => spot(home.patio, dx, dz);
+  cast.carmela = actor(g, 'carmela', at(2.2, 2.8), WEST);
+  cast.aj = actor(g, 'aj', spot(home.pool, -1.4, 3.5), NORTH);
+  cast.meadow = actor(g, 'meadow', spot(home.pool, -1.8, 5.2), NORTH, 'talk');
+  cast.pussy = actor(g, 'pussy', at(-5, 0), EAST, 'talk');
+  cast.silvio = actor(g, 'silvio', at(-3.4, -0.8), WEST);
+  cast.paulie = actor(g, 'paulie', at(-3.8, 1.2), WEST, 'talk');
+  cast.hesh = actor(g, 'hesh', at(-1, 6.5), EAST);
+  cast.artie = actor(g, 'artie', at(1, 7), WEST, 'talk');
+  cast.chris = actor(g, 'christopher', spot(home.drive, 5, 5), SOUTH);
+  const dress = partyDress(g);
+  { // Everybody else: neighbours on the folding chairs, people at the cabana, a couple under the umbrella, children who will not stop running
+    const guest = (where, h, state, look) => { const who = extraAt(g, where, h, state, look); crowd.push(who); return who; };
+    const KID = [{ shirt: 0xd8342c, tee: true, pants: 0x3b6ea8, hair: 0x3a2a1c, height: 0.7, head: 1.26 }, { shirt: 0xffe066, tee: true, pants: 0x23232b, hair: 0x111111, height: 0.66, head: 1.28, dark: true }, { body: 'female', shirt: 0xff8ad8, tee: true, pants: 0xf4f4f0, hair: 0xd9b25a, hairMesh: 'long', height: 0.68, head: 1.24 }];
+    const fo = g.places.fountain, ring = k => Array.from({ length: 8 }, (_, n) => { const a = (n + k) * Math.PI / 4; return { x: fo.x + Math.sin(a) * 3.3, z: fo.z + Math.cos(a) * 3.3 }; });
+    KID.forEach((look, k) => { const kid = guest(ring(k * 3)[0], 0, 'run', look); mill(g, kid, ring(k * 3), { pace: 3.4 + k * 0.3, run: true }); });
+    dress.seats.forEach((st, k) => { if (k !== 2) guest({ x: st.x, z: st.z }, st.h, 'sit'); });
+    guest(at(27.6, 8.5), WEST, 'idle', { shirt: 0xf4f4f0, sleeves: 'long', tucked: true, pants: 0x23232b, hair: 0x2b1b12, hairMesh: 'parted' });       // the man they hired for the bar
+    guest(at(24.5, 7.5), EAST, 'talk'); guest(at(24.5, 9.6), EAST, 'idle');
+    guest(at(18.25, 18.5), EAST, 'sit'); guest(at(20.15, 18.5), WEST, 'sit', { body: 'female', shirt: 0xff8a5c, tee: true, pants: 0xf4f4f0, hair: 0x2a1a14, hairMesh: 'long' });
+    guest(at(-6.2, 13), EAST, 'talk'); guest(at(-4.9, 13.3), WEST, 'idle', { body: 'female', shirt: 0x49e0d0, tee: true, pants: 0x23232b, hair: 0xb5392a, hairMesh: 'long' });
+    crowd.push(actor(g, 'hunter', spot(home.pool, -1, 6.6), NORTH));
+    // And a girl with a tray, round and round: the table, the pool, the lawn, the table.
+    const tray = guest(at(3, -2.6), 0, 'walk', { body: 'female', shirt: 0x16161c, sleeves: 'long', pants: 0x16161c, hair: 0x111111, hairMesh: 'long' });
+    mill(g, tray, [at(3, -2.6), at(-2.6, 2.6), at(-4, 9), at(3, 9.6), spot(home.pool, -1.2, 1), at(6.2, 4)], { pace: 1.3, pause: 2.2 });
+  }
+  for (const a of houseRoom.ambient) a.group.visible = false;   // Carmela is out in the garden with everybody else
+  p.inside = front;
+  p.pos.set(UP.X - 4.2, 0, UP.Z - 2.9); p.heading = g.cam.yaw = SOUTH; g.cam.pitch = 0.22;
+  g.cam.fixed = null;
+  g.hud.card('The Party', "AJ's birthday, take two");
+  await fade(g, 0, 1.2);
+  await say(g, '', 'Saturday. He had lain down for ten minutes at noon. It was a quarter to two now, and there were voices in the garden.');
+  await say(g, CARMELA, "Anthony! People are here! Your son's party. Again. Try to stay on your feet for this one.");
+  g.hud.card();
+  p.locked = false;
+  g.setCheckpoint?.();
+  { // Down the stairs. (F at the stairhead does it too.)
+    const stair = (g.places.stairs || []).find(st => near(st.b, roomSpot(UP, 7.6, 3.8), 1.5));
+    g.hud.objective('Find the <b>stairs</b> at the far end of the landing, and go down.');
+    const m = g.addMarker(stair.b.x, stair.b.z, 1.4);
+    await g.until(() => near(p.pos, stair.b, 1.5) || p.pos.z > UP.Z + 12);
+    g.removeMarker(m); g.hud.objective();
+    if (p.pos.z < UP.Z + 12) { p.locked = true; await fade(g, 1, 0.35); p.pos.set(stair.a.x, 0, stair.a.z); p.heading = g.cam.yaw = stair.a.h; await fade(g, 0, 0.35); p.locked = false; }
+  }
+  // The kitchen: Carmela has left the tray where he cannot miss it.
+  const tray = new THREE.Group();
+  { const steel = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.03, 0.4), new THREE.MeshLambertMaterial({ color: 0xc9cbd2 })); tray.add(steel);
+    for (let k = 0; k < 8; k++) { const sg = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.2, 6).rotateZ(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xc8705a })); sg.position.set(-0.14 + (k % 2) * 0.26, 0.04, -0.14 + Math.floor(k / 2) * 0.09); tray.add(sg); } }
+  tray.position.set(K.X - 4, K.Y + 0.98, K.Z - 1.1); g.track(tray);
+  await reach(g, roomSpot(K, -4, 0.25), 'Find the tray of <b>sausage</b> on the kitchen island.', { r: 1.2, how: 'foot' });
+  p.locked = true; p.heading = NORTH;
+  await say(g, TONY, 'Eight pounds of sweet, eight of hot. For thirteen-year-olds.', 2.8);
+  await handover(g, null, { from: { x: tray.position.x, y: tray.position.y, z: tray.position.z }, hex: 0xc9cbd2, sound: false });
+  g.untrack(tray);
+  p.locked = false;
+  await walkOut(g, houseRoom, 'Go out to the <b>garden</b>: the front door.');
+  for (const a of houseRoom.ambient) a.group.visible = true;
+  p.locked = true;
+  shot(g, spot(front.outside, -3, -0.2), at(1, 4), 2.2, 1.2);       // the whole garden, from the step
+  await say(g, '', 'Balloons on the mailbox. Sixty people. A man he had never seen was running his bar.', 3.4);
+  g.cam.fixed = null;
   p.locked = false;
 
   await reach(g, home.grill, 'Take over at the <b>grill</b>.', { r: 1.4, how: 'foot' });
   p.locked = true; p.heading = NORTH;
+  p.pos.set(home.grill.x, 0, home.grill.z);
+  await say(g, PAULIE, 'There he is. Sleeping Beauty. I been turning these for you, T, they are a little ahead of schedule.', 3.4);
+  p.locked = false;
+  await shovel(g, 1, 1, 'Turn the sausage', null, null, false);
+  p.locked = true;
+  frame(g, p.pos, cast.aj.group.position, { dist: 5.2 });
   await talk(g, [
     [TONY, 'Who wants sausage? AJ! Thirteen years old. Come here.', p],
     [AJ, "Is Grandma coming? She said she's not coming. So that means she's coming, right?", cast.aj],
     [TONY, "That's exactly what it means.", p],
   ]);
+  g.cam.fixed = null;
   p.locked = false;
 
   await reach(g, cast.carmela.group.position, 'Talk to <b>Carmela</b>.', { r: 1.6, how: 'foot' });
@@ -3911,6 +4204,8 @@ async function theParty(g) {
     [TONY, "I don't know. ...But I'll be here next week."],
   ]);
   dismiss(g, ...Object.values(cast));
+  for (const who of crowd) g.untrack(who.group);
+  dress.clear();
   p.pos.set(home.wake.x, 0, home.wake.z);
   g.cam.yaw = p.heading = 0;
   await fade(g, 0, 1.2);
@@ -3932,41 +4227,94 @@ async function backRoom(g) {
   // On the way in: three envelopes that are late.
   await phone(g, SILVIO, 'Before you come in. Three envelopes did not turn up this week: the cafe, the auto body, the motor lodge. You are passing all three.');
   const { cafe, bodyshop, motel } = g.places;
-  let runner = null;
+  let runner = null, got = 0;
+  // The people who owe are where they work, before he gets there.
+  const at0 = between(cafe.kerb, cafe.door, 0.3), at1 = between(bodyshop.kerb, bodyshop.door, 0.3), at2 = spot(motel.kerb, -3, -6);
+  const owner = extraAt(g, at0, toward(at0, cafe.kerb), 'idle', { shirt: 0xf4f4f0, sleeves: 'long', tucked: true, pants: 0x23232b, hair: 0x8d8a8e, hairStyle: 'balding', mustache: 0x8d8a8e, bulk: 1.1, age: 0.6 });
+  const man = extraAt(g, at1, toward(at1, bodyshop.kerb), 'idle', { shirt: 0x2f56c8, sleeves: 'long', tucked: true, pants: 0x2f56c8, hair: 0x4a3324, hairMesh: 'buzzed', bulk: 1.25, stubble: 0.5 });
+  const clerk = extraAt(g, at2, toward(at2, motel.kerb), 'idle', { shirt: 0xd9c7a0, tee: true, pants: 0x3b4a66, hair: 0x2b1b12, hairMesh: 'parted', bulk: 0.9, glasses: 'clear' });
+  const meet = async who => { // he gets out; they have seen the car, and come over to it
+    p.locked = true;
+    if (p.car) { p.car.speed = 0; g.leaveCar(); }
+    const pos = who.group.position;
+    who.set('walk', 1);
+    let last = g.time;
+    await g.until(() => {
+      const dx = p.pos.x - pos.x, dz = p.pos.z - pos.z, d = Math.hypot(dx, dz), dt = Math.min(0.1, g.time - last);
+      last = g.time;
+      if (d < 1.9) return true;
+      const step = Math.min(2.6 * dt, d - 1.8);
+      pos.x += dx / d * step; pos.z += dz / d * step; pushOut(pos, 0.35); pos.y = groundAt(pos.x, pos.z);
+      who.group.rotation.y = Math.atan2(dx, dz);
+      return false;
+    });
+    who.set('idle');
+    p.heading = toward(p.pos, pos); who.group.rotation.y = toward(pos, p.pos);
+    frame(g, p.pos, pos, { dist: 4.2 });
+  };
   await rounds(g, [cafe.kerb, bodyshop.kerb, motel.kerb], '<b>Drive</b> round and collect the three envelopes.', async k => {
     const at = [cafe.kerb, bodyshop.kerb, motel.kerb][k];
     if (k === 0) {
-      await say(g, 'Owner', 'It is all there, Mr. Soprano. I had it ready Tuesday. Nobody came for it.', 3.2);
-      g.sfx?.cash();
+      await meet(owner);
+      await talk(g, [
+        ['Owner', 'It is all there, Mr. Soprano. I had it ready Tuesday. Nobody came for it.', owner],
+        [TONY, 'Then Tuesday was somebody else being lazy. Not you.', p],
+      ]);
+      await handover(g, owner);
+      await say(g, '', `Envelope ${++got} of 3.`, 1.6);
+      g.cam.fixed = null; p.locked = false;
+      g.wait(8).then(() => g.untrack(owner.group)).catch(() => {});
     } else if (k === 1) {
-      if (p.car) { p.car.speed = 0; g.leaveCar(); }
-      const man = extraAt(g, spot(p.pos, 2.2, 0.6), toward(spot(p.pos, 2.2, 0.6), p.pos), 'idle', { shirt: 0x2f56c8, sleeves: 'long', tucked: true, pants: 0x2f56c8, hair: 0x4a3324, hairMesh: 'buzzed', bulk: 1.25, stubble: 0.5 });
+      await meet(man);
       await talk(g, [
         ['Mechanic', 'I pay your uncle now. A man came round. He said the arrangement had changed.', man],
         [TONY, 'Did he. Then let us change it back.', p],
       ]);
+      g.cam.fixed = null; p.locked = false;
       const foe = g.makeEnemy(man, { health: 90, damage: 7, cash: 0 });
       foe.die = () => { foe.health = 1; foe.dead = true; foe.ai = null; man.after = null; man.set('down'); };
+      const mark = quarry(g, foe);                       // an arrow over him: this is who
       fistsOnly(g, true);
-      g.hud.objective('<b>Rough him up</b> until he remembers who he pays.');
+      g.hud.objective('<b>Rough him up</b>: the mechanic, under the yellow arrow, until he remembers who he pays. &nbsp; <b>Click</b> or <b>E</b> to hit.');
       await g.until(() => foe.dead);
+      mark();
       g.hud.objective();
       fistsOnly(g, false);
       g.removeNpc(man);
-      await say(g, 'Mechanic', 'Okay! Okay. It is in the tin under the bench. All of it.', 3);
-      g.sfx?.cash();
+      p.locked = true;
+      frame(g, p.pos, man.group.position, { dist: 4 });
+      await say(g, 'Mechanic', 'Okay! Okay. It is in my shirt. All of it. Take it.', 3);
+      await handover(g, null, { from: { x: man.group.position.x, z: man.group.position.z } });
+      await say(g, '', `Envelope ${++got} of 3.`, 1.6);
+      g.cam.fixed = null; p.locked = false;
       g.pardon();
       g.wait(6).then(() => g.untrack(man.group)).catch(() => {});
     } else {
-      await say(g, '', 'The night man at the motor lodge pointed at the road. Somebody had been in ten minutes before, said he was collecting for the family, and was just now pulling out.');
+      await meet(clerk);
+      clerk.set('talk');
+      await talk(g, [
+        ['Night man', 'You are the second tonight. A fellow was in ten minutes ago. He said he collects for the family now. I gave it to him. That is him, pulling out.', clerk],
+        [TONY, 'Which family did he say.', p],
+      ]);
+      clerk.set('idle');
+      g.cam.fixed = null; p.locked = false;
       runner = propCar(g, spot(at, 26, 0), at.h ?? EAST, 0x2f56c8, 'coupe');
       if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
       await runDown(g, runner, '<b>Stop the</b> blue coupe. Ram it until it gives up.');
-      p.locked = true;
-      await say(g, 'Driver', 'It is on the seat! Take it! I was told nobody was working this side any more!', 3.4);
-      await say(g, TONY, 'Told by who? ...Never mind. I know by who.', 2.8);
-      g.sfx?.cash();
-      p.locked = false;
+      // He gets out with his hands where they can be seen, and the envelope in one of them.
+      const side = { x: runner.pos.x + Math.cos(runner.heading) * 1.9, z: runner.pos.z - Math.sin(runner.heading) * 1.9 };
+      const driver = extraAt(g, side, toward(side, p.pos), 'idle', { jacket: 0x2a2a30, shirt: 0x8a1c1c, tee: true, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', stubble: 0.5 });
+      g.sfx?.carDoor();
+      await meet(driver);
+      await talk(g, [
+        ['Driver', 'It is right here! Take it! I was told nobody was working this side any more!', driver],
+        [TONY, 'Told by who? ...Never mind. I know by who.', p],
+      ]);
+      await handover(g, driver);
+      await say(g, '', `Envelope ${++got} of 3.`, 1.6);
+      g.cam.fixed = null; p.locked = false;
+      g.wait(8).then(() => g.untrack(driver.group)).catch(() => {});
+      g.untrack(clerk.group);
     }
   });
   await reach(g, bing.door, 'Three envelopes. Take them to the <b>Bada Bing</b>.', { r: 4 });
@@ -3990,7 +4338,7 @@ async function backRoom(g) {
       [TONY, 'My uncle thinks a lot of things.'],
     ]);
   });
-  place(g, bing.door, SOUTH, bing.park);
+  stayInBing(g, bing.park);                              // the count is over; he is still in the club, and walks out when he likes
   await fade(g, 0, 1);
   p.locked = false;
   await passed(g, 'Respect +');
@@ -4053,33 +4401,72 @@ async function hijack(g) {
   g.hud.objective();
   truck.nav = null; truck.speed = 0;
 
+  // The stop, staged: the driver down from his cab with his back to it, Christopher in front of him, Brendan off to one
+  // side with the gun on him, their car behind, the truck's flashers going. Nobody stands in anybody.
   p.locked = true;
+  const fw = { x: Math.sin(truck.heading), z: Math.cos(truck.heading) }, rt = { x: Math.cos(truck.heading), z: -Math.sin(truck.heading) };
+  const along = (f, r) => ({ x: truck.pos.x + fw.x * f + rt.x * r, z: truck.pos.z + fw.z * f + rt.z * r });
+  const cab = along(2.2, 2.1), mine = along(2.2, 4.4), his = along(-0.6, 4.6), rear = along(-truck.reach - 0.2, 0);
+  const load = [];
   await cut(g, () => {
-    const side = { x: truck.pos.x + Math.cos(truck.heading) * 2.4, z: truck.pos.z - Math.sin(truck.heading) * 2.4 };
-    if (p.car) { p.car.speed = 0; g.leaveCar(spot(side, Math.cos(truck.heading) * 2.2, -Math.sin(truck.heading) * 2.2)); }
-    driver = actor(g, 'trucker', side, toward(side, p.pos));
-    p.heading = toward(p.pos, side);
-    frame(g, p.pos, side, { dist: 4.6 });
+    const own = p.car && p.car !== truck ? p.car : null;
+    if (p.car) { p.car.speed = 0; g.leaveCar(mine); }
+    if (own) { const at = along(-truck.reach - 8, 0.4); own.pos.set(at.x, 0, at.z); own.heading = truck.heading; own.speed = 0; own.sync?.(); }
+    p.pos.set(mine.x, 0, mine.z); p.heading = toward(mine, cab);
+    driver = actor(g, 'trucker', cab, toward(cab, mine));
+    pal.stay = true; pal.car = null; pal.pos.set(his.x, 0, his.z);
+    brendan.group.visible = true; brendan.group.position.set(his.x, groundAt(his.x, his.z), his.z); brendan.group.rotation.y = toward(his, cab);
+    brendan.arm(true); brendan.set('aim');
+    // Flashers at the four corners.
+    const amber = new THREE.MeshBasicMaterial({ color: 0xffa020 });
+    for (const [f, r] of [[truck.reach, 1.05], [truck.reach, -1.05], [-truck.reach, 1.05], [-truck.reach, -1.05]]) { const at = along(f, r), m = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), amber); m.position.set(at.x, 0.95, at.z); g.track(m); load.push(m); }
+    g.updaters.push(() => { if (!load.length) return false; amber.color.setHex(Math.floor(g.time * 2.4) % 2 ? 0xffa020 : 0x3a2408); return true; });
+    shot(g, along(7.4, 8.2), along(1.2, 3.4), 1.9, 1.25);
   }, 0.5);
   await talk(g, [
-    [BRENDAN, "Out! Keys stay in it! Don't look at us!"],
+    [BRENDAN, "Out! Keys stay in it! Don't look at us!", brendan],
     ['Driver', "Take it, take it. I got two kids. Do me one favour: give me a shot in the face, so my boss believes me.", driver],
     [CHRIS, "You're asking me to hit you.", p],
     ['Driver', 'Not the teeth.', driver],
   ]);
   const poor = g.addNpc(driver, { health: 100, cash: 0, stays: true });
   poor.die = () => { poor.health = 1; };
+  const who = quarry(g, poor);
   fistsOnly(g, true);
   g.cam.fixed = null;
   p.locked = false;
-  g.hud.objective('<b>Hit the driver</b>, like he asked.');
+  g.hud.objective('<b>Hit the driver</b>, like he asked. &nbsp; <b>Click</b> or <b>E</b>.');
   await g.until(() => poor.health < 100);
+  who();
   g.hud.objective();
   g.removeNpc(driver);
   fistsOnly(g, false);
   driver.after = null; driver.set('down');
   await g.wait(1.2);
   await say(g, '', 'Christopher obliged him. It seemed only polite.');
+  // Brendan has the back open: floor to roof.
+  p.locked = true;
+  await cut(g, () => {
+    brendan.arm(false); brendan.set('idle');
+    const bs = along(-truck.reach - 1.6, 1.3), ps = along(-truck.reach - 2.6, -0.5);
+    brendan.group.position.set(bs.x, groundAt(bs.x, bs.z), bs.z); brendan.group.rotation.y = toward(bs, rear); pal.pos.set(bs.x, 0, bs.z);
+    p.pos.set(ps.x, 0, ps.z); p.heading = toward(ps, rear);
+    const doorMat = new THREE.MeshLambertMaterial({ color: 0xe9e6de }), card = new THREE.MeshLambertMaterial({ color: 0xc79a6a }), tape = new THREE.MeshLambertMaterial({ color: 0x2f56c8 });
+    for (const s of [-1, 1]) { const d = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.3, 1.1), doorMat), at = along(-truck.reach - 0.55, s * 1.25); d.position.set(at.x, 2.1, at.z); d.rotation.y = truck.heading + s * 0.25; g.track(d); load.push(d); } // the doors, swung out
+    { const hole = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 2.05), new THREE.MeshBasicMaterial({ color: 0x0a0a0e })), at = along(-truck.reach - 0.03, 0); hole.position.set(at.x, 2.28, at.z); hole.rotation.y = truck.heading + Math.PI; g.track(hole); load.push(hole); } // the back, open
+    for (let k = 0; k < 21; k++) { // cartons to the roof in the mouth of it, and a few that came down when the doors went
+      const inTruck = k < 16, at = inTruck ? along(-truck.reach - 0.06, -0.75 + (k % 4) * 0.5) : along(-truck.reach - 0.9 - (k % 2) * 0.55, -1 + (k - 16) * 0.5);
+      const bx = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.44, 0.47), card); bx.position.set(at.x, inTruck ? 1.5 + Math.floor(k / 4) * 0.46 : 0.24 + groundAt(at.x, at.z), at.z); bx.rotation.y = truck.heading + (inTruck ? 0 : k * 0.7); g.track(bx); load.push(bx);
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.1, 0.48), tape); band.position.copy(bx.position); band.rotation.y = bx.rotation.y; g.track(band); load.push(band);
+    }
+    shot(g, along(-truck.reach - 5.2, 2.6), along(-truck.reach, 0), 1.7, 1.5);
+  }, 0.5);
+  await talk(g, [
+    [BRENDAN, 'Look at this. Floor to roof. There must be four hundred in here.', brendan],
+    [CHRIS, 'Shut the doors. We are standing in the road with a truck that is not ours.', p],
+  ]);
+  for (const m of load.splice(0)) g.untrack(m);
+  pal.stay = false;
   g.cam.fixed = null;
   p.locked = false;
   await wantCar(g, truck, 'Get in the <b>truck</b>.');
@@ -4226,26 +4613,39 @@ async function millersCar(g) {
   g.cam.fixed = null;
   pal.pos.copy(paulie.group.position); pal.stay = false;
   p.locked = false;
-  await reach(g, chop, 'Drive to the <b>north end of the beach</b>.', { how: 'car', r: 7 });
-
-  // Too late: the car is already in pieces.
-  p.locked = true;
+  // They are at it before anybody arrives: the teacher's car under the tarp with its wheels off, Eddie watching two of
+  // his boys take the rest of it apart, a torch going.
   const shell = new Car(g.scene, chop.x + 5, chop.z - 3, 0.6, 0xd9c7a0, 'sedan');
   g.track(shell.mesh);
   shell.hideWheels();
   shell.mesh.position.y -= 0.24;
+  eddie = actor(g, 'eddie', spot(chop, 2.6, -1.8), EAST);
+  const thug = (at, h, state) => { const a = makeHuman({ ...randomPedLook(), body: 'male' }); a.group.position.set(at.x, groundAt(at.x, at.z), at.z); a.group.rotation.y = h; a.set(state); g.track(a.group); return a; };
+  const thugs = [thug(spot(chop, 6.9, -1.4), WEST, 'kneel'), thug(spot(chop, 3.4, -4.6), SOUTH - 0.6, 'kneel')];
+  const torch = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 5), new THREE.MeshBasicMaterial({ color: 0xbfe8ff }));
+  torch.position.set(chop.x + 6.2, groundAt(chop.x + 6.2, chop.z - 1.6) + 0.55, chop.z - 1.6); g.track(torch);
+  let working = true;
+  g.updaters.push(() => { if (!working || !torch.parent) return false; torch.visible = Math.sin(g.time * 37) + Math.sin(g.time * 23) > 0.2; torch.scale.setScalar(0.7 + Math.random() * 0.9); return true; });
+  await reach(g, chop, 'Drive to the <b>north end of the beach</b>.', { how: 'car', r: 7 });
+
+  // Too late: the car is already in pieces.
+  p.locked = true;
   await cut(g, () => {
-    place(g, spot(chop, 1.5, 0.5), NORTH);
-    eddie = actor(g, 'eddie', spot(chop, 2.6, -1.8), SOUTH);
-    frame(g, p.pos, eddie.group.position, { dist: 4.6, side: -1 });
+    place(g, spot(chop, 1.5, 1.2), NORTH);
+    pal.stay = true; pal.car = null; paulie.group.visible = true;
+    const ps = spot(chop, 0, 1.9); paulie.group.position.set(ps.x, groundAt(ps.x, ps.z), ps.z); paulie.group.rotation.y = toward(ps, eddie.group.position); paulie.set('idle'); pal.pos.set(ps.x, 0, ps.z);
+    eddie.group.rotation.y = toward(eddie.group.position, p.pos);
+    p.heading = toward(p.pos, eddie.group.position);
+    shot(g, spot(chop, -3.6, 4.6), spot(chop, 3.6, -1.6), 1.8, 1.3);     // the two of them, Eddie, and the whole yard behind him
   });
-  const thug = (at, h) => { const a = makeHuman(randomPedLook()); a.group.position.set(at.x, groundAt(at.x, at.z), at.z); a.group.rotation.y = h; g.track(a.group); return a; };
-  const thugs = [thug(spot(chop, 6, 3), WEST), thug(spot(chop, -4, -5), SOUTH)];
   await talk(g, [
     ['Eddie', "The teacher's car? Aw, man. It's parts already. I didn't know he was a friend of yours.", eddie],
-    [PAULIE, 'So put it back together.'],
+    [PAULIE, 'So put it back together.', paulie],
     ['Eddie', "Hey, you don't come down here and talk to me like that. Boys!", eddie],
   ]);
+  working = false; g.untrack(torch);
+  for (const t of thugs) { t.after = null; t.set('idle'); }
+  pal.stay = false;
   const crew = thugs.map(t => g.makeEnemy(t, { health: 70, damage: 9, cash: 40 }));
   fistsOnly(g, true);
   g.cam.fixed = null;
@@ -4277,13 +4677,8 @@ async function millersCar(g) {
     g.enterCar(target);
   });
   await load.to(bodyshop.kerb, "Drive it to <b>Pussy's body shop</b>. Don't dent it.", target);
-  p.locked = true;
-  await fade(g, 1, 1);
-  target.repaint(0xcdb98a);
-  target.speed = 0;
-  await say(g, '', "Pussy's cousin sprayed it tan. Close to tan.");
-  await fade(g, 0, 1);
-  p.locked = false;
+  // Into the middle bay teal, and out of it tan.
+  await respray(g, target, { x: bodyshop.door.x, z: bodyshop.door.z + 3 }, SOUTH, 0xcdb98a, "Pussy's cousin sprayed it tan. Close to tan.");
   await load.to(school.gate, 'Deliver it to <b>Verbum Dei School</b>.', target);
   load.stop();
 
@@ -4340,30 +4735,72 @@ async function kitchenFire(g) {
   g.removeMarker(m);
   g.hud.objective();
 
+  // Inside. She is in her front room with a dish towel; the kitchen is behind her, and it is still going (unless the
+  // engines got there first, in which case a fireman is standing in it).
+  const HOME = g.places.rooms.LIVIA, UP = g.places.rooms.LIVIA_UP, door = g.places.doors.find(d => d.inside === HOME.inside);
+  ma = actor(g, 'livia', roomSpot(HOME, 0.6, 1.2), SOUTH, 'talk');
+  const blaze = [], pan = roomSpot(HOME, 6.1, 2.2);
+  for (let k = 0; k < 7; k++) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.3, 7, 5), new THREE.MeshBasicMaterial({ color: 0x3a3438, transparent: true, opacity: 0.5, depthWrite: false })); m.userData.k = k / 7; g.track(m); blaze.push(m); }
+  const flame = [0, 1, 2].map(k => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.16 - k * 0.03, 0.5 + k * 0.12, 6), new THREE.MeshBasicMaterial({ color: [0xff8a30, 0xffb040, 0xffe066][k], transparent: true, opacity: 0.9 })); m.position.set(pan.x + (k - 1) * 0.07, HOME.Y + 1.25, pan.z); g.track(m); return m; });
+  const skillet = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.15, 0.06, 12), new THREE.MeshLambertMaterial({ color: 0x1c1c22 })); skillet.position.set(pan.x, HOME.Y + 1, pan.z); g.track(skillet);
+  let burn = late ? 0 : 1;
+  g.updaters.push(() => {
+    if (!skillet.parent) return false;
+    for (const [k, m] of flame.entries()) { m.visible = burn > 0.05; m.scale.set(burn * (1 + Math.sin(g.time * 11 + k * 2) * 0.2), burn * (1 + Math.sin(g.time * 8 + k) * 0.35), burn); m.rotation.y = g.time * 2 + k; }
+    for (const m of blaze) { const k = (g.time * 0.3 + m.userData.k) % 1, thick = 0.25 + burn * 0.75; m.position.set(pan.x - k * 2.6 + Math.sin(m.userData.k * 30) * 0.5, HOME.Y + 1.2 + k * 1.9, pan.z + Math.cos(m.userData.k * 17) * 0.9 * k); m.scale.setScalar(0.6 + k * 2.2); m.material.opacity = 0.45 * thick * (1 - k); }
+    return true;
+  });
+  const fireman = late ? extraAt(g, roomSpot(HOME, 4.6, 2.4), WEST, 'idle', { jacket: 0x2a2a30, shirt: 0xf2c230, tee: true, pants: 0x2a2a30, hair: 0x2b1b12, hat: 'cap', hatColor: 0x2a2a30, bulk: 1.2 }) : null;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  fire.stop();
+  await reach(g, door.outside, late ? 'Go <b>in</b>.' : 'Go <b>in</b>! The kitchen is on the right.', { r: 1.8, how: 'foot' });
+  await enter(g, HOME);
+  if (!late) {
+    say(g, LIVIA, 'I was only making mushrooms! I turn my back one minute!', 3).catch(() => {});
+    await reach(g, roomSpot(HOME, 5, 2.2), 'Find the <b>stove</b>: the pan is alight.', { r: 1.2, how: 'foot' });
+    p.heading = EAST;
+    await shovel(g, 1, 1, 'Smother it with the lid', k => { burn = 1 - k; }, null, false);
+    burn = 0;
+    await say(g, TONY, 'It is out. It is out, Ma. Open a window.', 2.6);
+  } else {
+    p.locked = true;
+    await say(g, 'Fireman', 'Grease fire. We had it out in a minute. She told my lieutenant he was tracking mud. You the son?', 4);
+    p.locked = false;
+  }
+  // She sits. So does he, eventually.
+  ma.set('sit'); ma.group.position.set(HOME.sofa.x - 0.6, HOME.Y, HOME.sofa.z); ma.group.rotation.y = SOUTH;
+  if (fireman) g.untrack(fireman.group);
+  await reach(g, roomSpot(HOME, -2.2, -2.2), 'Find your <b>mother</b>. She has gone to sit down.', { r: 1.3, how: 'foot' });
   p.locked = true;
   await cut(g, () => {
-    fire.stop();
-    place(g, house.path, NORTH, house.kerb);
-    ma = actor(g, 'livia', house.porch, SOUTH);
-    help = actor(g, 'perrilyn', spot(house.path, 1.8, 0.6), NORTH);
-    frame(g, p.pos, house.porch, { dist: 5 });
-  });
+    p.pos.set(HOME.sofa.x + 0.7, 0, HOME.sofa.z); p.heading = SOUTH; p.pose = 'sit';
+    help = actor(g, 'perrilyn', roomSpot(HOME, 0.2, 3.4), NORTH);
+    g.cam.fixed = inRoom(HOME, [-0.4, 0.4], [-2.9, -3.3], 1.45, 1).cam;
+  }, 0.4);
   await talk(g, [
-    [LIVIA, late ? 'The firemen came before my own son did.' : 'I was only making mushrooms. I turn my back one minute.', ma],
-    [TONY, "Ma, this is Perrilyn. She's going to help around the house. Cook, clean, drive you.", p],
+    [LIVIA, late ? 'The firemen came before my own son did.' : 'That stove was your father\'s idea. I never wanted gas.', ma],
+    [TONY, "Ma. You can't be on your own here. I asked somebody to come. This is Perrilyn. She's going to help around the house. Cook, clean, drive you.", p],
+  ]);
+  { const pos = help.group.position, z0 = pos.z, t0 = g.time; help.set('walk', 0.9); g.updaters.push(() => { const k = Math.min(1, (g.time - t0) / 2.2); pos.z = z0 - k * 3.4; pos.x = HOME.X + 0.2 - k * 0.9; if (k >= 1) { help.set('idle'); help.group.rotation.y = toward(pos, ma.group.position); } return k < 1 && g.tracked.has(help.group); }); }
+  g.cam.fixed = inRoom(HOME, [1.6, 1.4], [-2.4, -3], 1.5, 1.05).cam;
+  await talk(g, [
     [LIVIA, "A stranger in my house. She'll steal. They all steal.", ma],
     ['Perrilyn', 'Mrs. Soprano, I have looked after families for twenty years.', help],
     [LIVIA, 'Then go and look after them.', ma],
   ]);
   await fade(g, 1, 0.8);
   dismiss(g, help);
+  for (const m of [...blaze, ...flame, skillet]) g.untrack(m);
+  p.pose = null;
   await say(g, '', 'Perrilyn lasted one afternoon.');
   await say(g, '', 'That Friday, Livia drove her friend Fanny home from the hairdresser.');
 
-  // The car lurches forward in the drive.
+  // The car lurches forward in the drive. (Seen from the street; Tony is not there.)
   const drive = spot(house.porch, 4.4, 0.6), car = g.spawnCar(drive.x, drive.z, SOUTH, 0xd9c7a0, 'sedan');
   ma.group.visible = false;
   p.hidden = true;
+  for (const h of door.hide || []) h.group.visible = true;
+  p.inside = null; p.pos.set(house.path.x, 0, house.path.z);
   fanny = actor(g, 'fanny', spot(drive, 0, 6.2), NORTH);
   shot(g, spot(drive, 6.5, 9.5), spot(drive, 0, 3.6), 1.9, 1);
   await fade(g, 0, 0.8);
@@ -4379,15 +4816,45 @@ async function kitchenFire(g) {
   await say(g, '', "Fanny's hip was broken in two places. Livia said the car did it by itself.");
   dismiss(g, fanny);
   g.removeCar(car);
+  // Back in her front room, and this time he does not sit.
   ma.group.visible = true;
   p.hidden = false;
-  g.cam.fixed = null;
+  for (const h of door.hide || []) h.group.visible = false;
+  p.inside = door;
+  p.pos.set(HOME.X - 1.4, 0, HOME.Z - 1.2); p.heading = toward(p.pos, ma.group.position);
+  g.cam.fixed = inRoom(HOME, [1.2, 0.8], [-2.6, -3], 1.55, 1.1).cam;
   await fade(g, 0, 0.8);
   await talk(g, [
     [TONY, "That's it. You can't cook, you can't drive. You're going to Green Grove. Today.", p],
     [LIVIA, 'Then kill me now. Go on. Take a knife and do it.', ma],
+    [TONY, 'I am going upstairs to get your case. You are going to be in the car when I come down.', p],
   ]);
+  g.cam.fixed = null;
   p.locked = false;
+  { // Up to her room for the suitcase, past a door he does not open, and down again.
+    const stair = (g.places.stairs || []).find(st => near(st.a, roomSpot(HOME, -5, 2.8), 1.5)), isUp = () => p.pos.z < HOME.Z - 12;
+    const climb = async (text, from, to, done) => {
+      g.hud.objective(text);
+      const m = g.addMarker(from.x, from.z, 1.3);
+      await g.until(() => near(p.pos, from, 1.4) || done());
+      g.removeMarker(m); g.hud.objective();
+      if (!done()) { p.locked = true; await fade(g, 1, 0.35); p.pos.set(to.x, 0, to.z); p.heading = g.cam.yaw = to.h; await fade(g, 0, 0.35); p.locked = false; }
+    };
+    await climb('Find the <b>stairs</b>, by the wall on the left, and go up.', stair.a, stair.b, isUp);
+    await reach(g, UP.suitcase, 'Find her <b>suitcase</b>: on top of the wardrobe in her room.', { r: 1.2, how: 'foot' });
+    p.heading = NORTH;
+    await shovel(g, 1, 1, 'Pack her things', null, null, false);
+    await say(g, '', 'Nightgowns, the pills, the photograph of his father. She had the case half packed already. She had had it half packed for a year.', 4.6);
+    await reach(g, UP.oldRoom, 'Find the room across the landing. <b>Look in</b>.', { r: 1.5, how: 'foot' });
+    p.locked = true; p.heading = NORTH;
+    g.cam.fixed = inRoom(UP, [1.2, 1.6], [4.4, -3.6], 1.6, 1.1).cam;
+    await say(g, '', 'The pennants, the aeroplanes, the glove. Nothing in it had been moved since he was sixteen. He could not have said whether that was love.', 5);
+    g.cam.fixed = null; p.locked = false;
+    await climb('Find the <b>stairs</b> again, and go down.', stair.b, stair.a, () => !isUp());
+  }
+  ma.set('idle'); ma.group.position.set(HOME.inside.x - 1.2, HOME.Y, HOME.inside.z + 0.4); ma.group.rotation.y = NORTH;
+  await walkOut(g, HOME, 'Go out to the <b>car</b>. She is waiting by the door.');
+  ma.group.position.set(p.pos.x + 1.2, groundAt(p.pos.x + 1.2, p.pos.z), p.pos.z + 0.6);
   const mother = follower(g, ma, { pace: 2.3, runs: false });
   g.hud.objective('Get in your <b>car</b>.');
   await g.until(() => p.car);
@@ -4488,9 +4955,15 @@ async function fortySixLong(g) {
   g.tonyCar.pos.set(house.kerb.x, 0, house.kerb.z); g.tonyCar.heading = house.kerb.h; g.tonyCar.speed = 0;
   await fade(g, 0, 1.2);
   p.locked = false;
-  await reach(g, house.porch, 'Go in and <b>pack her things</b>.', { r: 1.5, how: 'foot' });
+  // Inside, with the boxes: it is the cabinet of photographs that does it.
+  const HOME = g.places.rooms.LIVIA, hdoor = g.places.doors.find(d => d.inside === HOME.inside);
+  const boxes = [[-1.2, 2.2, 0.5], [-0.5, 2.5, 0.42], [3.6, -1.2, 0.5], [4.3, -0.9, 0.4], [-4.4, -0.4, 0.46]].map(([x, z, sz], k) => { const b = new THREE.Mesh(new THREE.BoxGeometry(sz + 0.12, sz, sz), new THREE.MeshLambertMaterial({ color: 0xc79a6a })); b.position.set(HOME.X + x, HOME.Y + sz / 2, HOME.Z + z); b.rotation.y = k * 0.5; g.track(b); return b; });
+  await reach(g, hdoor.outside, 'Go in and <b>pack her things</b>.', { r: 1.8, how: 'foot' });
+  await enter(g, HOME);
+  await reach(g, roomSpot(HOME, 4.9, -1.9), 'Find the cabinet of <b>photographs</b>, and start there.', { r: 1.3, how: 'foot' });
   p.locked = true;
-  p.heading = NORTH;
+  p.heading = EAST;
+  g.cam.fixed = inRoom(HOME, [2.2, 0.6], [5.6, -2.2], 1.6, 1.3).cam;
   await say(g, TONY, 'Forty years in this house. Look at this one. Me and my sisters on the stoop. Pop with the hat.');
   const calm = panic(g);
   await say(g, TONY, 'She kept every picture. ...I gotta sit down.', 3);
@@ -4499,6 +4972,10 @@ async function fortySixLong(g) {
   await fade(g, 1, 1.2);
   calm();
   p.down = 0;
+  for (const b of boxes) g.untrack(b);
+  for (const h of hdoor.hide || []) h.group.visible = true;
+  p.inside = null; p.pos.set(house.path.x, 0, house.path.z);   // the next thing he knows, it is Thursday and he is in a chair
+  g.cam.fixed = null;
 }
 
 // ---------- 7. Closing Time ----------

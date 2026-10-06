@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CITY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, mulberry32 } from './grid.js';
+import { CITY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, mulberry32, groundAt } from './grid.js';
 import { makeHuman } from './people.js';
 import { box, makeLook, makeTony, makeDuck, Car } from './entities.js';
 
@@ -830,6 +830,83 @@ export function buildWorld(scene) {
       put(M.plain, new THREE.BoxGeometry(0.6, 0.06, 0.6).rotateY(t).translate(c.x + lx, y + 0.42, c.z + lz), 0x49e0d0); put(M.plain, new THREE.BoxGeometry(0.6, 0.6, 0.06).translate(0, 0.3, -0.3).rotateY(t).translate(c.x + lx, y + 0.42, c.z + lz), 0x49e0d0);
       for (const [fx, fz] of [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]]) post(0xc9cbd2, 0.02, 0.42, c.x + lx + fx, y, c.z + lz + fz, 4);
     }
+    // ----- The grounds, as somebody who lives there keeps them (owner feedback: it is his home) -----
+    {
+      const GREEN = 0x2f4a3c, BRASS = 0xd9a520, STONE = 0xc9b79c, BLOOM = [0xd8342c, 0xff8ad8, 0xffe066, 0xf4f4f0, 0xc85cff];
+      const bush = (x, z, r = 0.55, n = 0) => { ball(0x2f7d46, r, x, y + r * 0.8, z); ball(0x3f9a5a, r * 0.7, x + r * 0.4, y + r * 1.25, z - r * 0.2); if (n) for (let k = 0; k < n; k++) ball(BLOOM[(k + Math.round(x)) % 5], 0.09, x + Math.sin(k * 2.4) * r * 0.8, y + r * (0.9 + (k % 3) * 0.3), z + Math.cos(k * 2.4) * r * 0.8); };
+      const lantern = (x, yy, z, glow = true) => { slab(0x1c1c22, 0.2, 0.36, 0.2, x, yy, z); slab(0xffe2a6, 0.14, 0.24, 0.22, x, yy + 0.05, z, M.glow); slab(0x1c1c22, 0.26, 0.05, 0.26, x, yy + 0.36, z); if (glow) halo(x, yy + 0.2, z, 0xffc070, 4); };
+      const cypress = (x, z, h = 5) => { put(M.plain, new THREE.ConeGeometry(0.75, h, 9).translate(x, y + h / 2 + 0.3, z), 0x1f5a3a); post(0x5a3320, 0.12, 0.4, x, y, z, 6); collide(x, z, 0.9, 0.9, h, true); };
+      // The front of the house: shutters, boxes of geraniums, lanterns, planting along the wall, the number by the door.
+      for (const [wx, wy, hh] of [[-10, 1.3, 2.2], [2, 1.3, 2.2], [-10, 5, 2], [2, 5, 2], [-4, 5, 2]]) {
+        const half = wx === -4 ? 1.3 : 1;
+        for (const s of [-1, 1]) { slab(GREEN, 0.42, hh, 0.07, c.x + wx + s * (half + 0.24), y + wy, front + 0.04); for (let k = 0; k < 6; k++) slab(0x24392e, 0.36, 0.03, 0.08, c.x + wx + s * (half + 0.24), y + wy + 0.2 + k * (hh - 0.4) / 5, front + 0.045); }
+        slab(0xffffff, half * 2 + 0.3, 0.12, 0.16, c.x + wx, y + wy - 0.12, front + 0.08);
+        if (wy < 2) { slab(0x8a5a44, half * 2, 0.24, 0.3, c.x + wx, y + wy - 0.36, front + 0.2, M.wood, 1); for (let k = 0; k < 7; k++) ball(BLOOM[k % 2 ? 0 : 1], 0.11, c.x + wx - half + 0.15 + k * (half * 2 - 0.3) / 6, y + wy - 0.06, front + 0.22); }
+      }
+      for (const s of [-1, 1]) lantern(c.x - 4 + s * 1.5, y + 2.3, front + 0.14);
+      sign('633', c.x - 2.3, y + 1.7, front + 0.08, 0, { w: 0.5, h: 0.24, color: '#1c1c22', bg: '#d9a520', size: 0.8, glow: false });
+      slab(0x8a2f3a, 1.4, 0.03, 0.8, c.x - 4, y + 0.16, front + 0.7); slab(BRASS, 0.5, 0.06, 0.03, c.x - 4, y + 1.2, front + 0.17);                         // the mat, the knocker
+      for (const s of [-1, 1]) { post(0xb5523b, 0.26, 0.5, c.x - 4 + s * 1.75, y + 0.16, front + 0.7, 10); ball(0x1f5a3a, 0.34, c.x - 4 + s * 1.75, y + 1, front + 0.7); ball(0x1f5a3a, 0.24, c.x - 4 + s * 1.75, y + 1.5, front + 0.7); post(0x5a3320, 0.03, 1.4, c.x - 4 + s * 1.75, y + 0.3, front + 0.7, 5); }
+      for (const [x0, x1] of [[-13.4, -7.6], [-0.4, 5.2]]) { flat(M.paint, 0x5a4636, x1 - x0, 1.5, c.x + (x0 + x1) / 2, y + 0.085, front + 0.95); for (let x = x0 + 0.5; x < x1; x += 1.15) bush(c.x + x, front + 0.95, 0.5, 4); collide(c.x + (x0 + x1) / 2, front + 0.9, x1 - x0, 1.3, 1.2); }
+      for (const dz of [-3.5, -8.5]) { slab(0xb9bcc4, 0.1, 5.6, 0.1, c.x + 17.9, y, c.z + dz - 14); } slab(0xb9bcc4, 0.1, 7.6, 0.1, c.x - 13.9, y, front + 0.06); slab(0xb9bcc4, 0.1, 7.6, 0.1, c.x + 5.9, y, front + 0.06);                // downpipes
+      slab(0x8d8a8e, 0.9, 0.8, 0.5, c.x + 5.6, y, c.z - 3.2); for (let k = 0; k < 5; k++) slab(0x6f6a66, 0.92, 0.03, 0.02, c.x + 5.6, y + 0.15 + k * 0.13, c.z - 2.94);                                                   // the air conditioning
+      put(M.plain, new THREE.TorusGeometry(0.28, 0.07, 6, 16).rotateY(Math.PI / 2).translate(c.x + 5.9, y + 0.9, c.z - 8.6), 0x2f7d46); slab(0x1c1c22, 0.12, 0.5, 0.12, c.x + 5.92, y + 0.3, c.z - 8.6);                   // the hose on its reel
+      // The garage: lanterns, the hoop AJ does not use, bins, a dish on the roof.
+      for (const lx of [-26.2, -20.5, -14.8]) lantern(c.x + lx, y + 3.2, c.z - 13.86);
+      post(0x3a3a44, 0.07, 3.4, c.x - 15.1, y, c.z - 9, 6); slab(0xf4f4f0, 0.08, 1.05, 1.5, c.x - 15.5, y + 3, c.z - 9); slab(0xd8342c, 0.09, 0.4, 0.55, c.x - 15.55, y + 3.15, c.z - 9); put(M.plain, new THREE.TorusGeometry(0.23, 0.02, 5, 16).rotateX(Math.PI / 2).translate(c.x - 15.82, y + 3.1, c.z - 9), 0xff8a30); slab(0x3a3a44, 0.5, 0.06, 0.06, c.x - 15.3, y + 3.3, c.z - 9);
+      ball(0xd9722a, 0.13, c.x - 16.6, y + 0.22, c.z - 10.4);                                                                                                                              // and the ball, where he dropped it
+      for (const [bz, hex] of [[-15, 0x2f5a3f], [-16, 0x2f5a3f], [-17, 0x3b6ea8]]) { post(hex, 0.3, 0.9, c.x - 14.4, y, c.z + bz, 10); post(0x23232b, 0.32, 0.06, c.x - 14.4, y + 0.9, c.z + bz, 10); } collide(c.x - 14.4, c.z - 16, 0.8, 2.9, 1);
+      post(0x8a8d96, 0.04, 0.8, c.x - 23, y + 6.6, c.z - 22, 5); put(M.plain, new THREE.SphereGeometry(0.5, 12, 6, 0, Math.PI * 2, 0, 1.1).rotateX(-1).translate(c.x - 23, y + 7.6, c.z - 22), 0xe9e2cf);
+      // The drive: a band of pale stone down each edge, the mailbox, this morning's paper where the boy threw it, lights.
+      for (const s of [-1, 1]) flat(M.paint, 0xd8d0c4, 0.5, 43, c.x - 20.5 + s * 4.5, y + 0.095, c.z + 7.5);
+      post(0x5a3320, 0.06, 1.1, c.x - 14.9, y, c.z + 29.2, 5); slab(0x1c1c22, 0.26, 0.24, 0.5, c.x - 14.9, y + 1.1, c.z + 29.2); slab(0xd8342c, 0.03, 0.2, 0.04, c.x - 14.75, y + 1.3, c.z + 29.1); collide(c.x - 14.9, c.z + 29.2, 0.4, 0.6, 1.4, true);
+      slab(0x3b6ea8, 0.42, 0.08, 0.14, c.x - 17.8, y + 0.1, c.z + 25.6); slab(0xf4f4f0, 0.3, 0.085, 0.1, c.x - 17.8, y + 0.1, c.z + 25.6);                                                    // the Star-Ledger of this place
+      for (let k = 0; k < 6; k++) for (const s of [-1, 1]) { const lx = c.x - 20.5 + s * 5.1, lz = c.z - 10 + k * 7.4; post(0x1c1c22, 0.03, 0.5, lx, y, lz, 5); ball(0xffe2a6, 0.08, lx, y + 0.55, lz, M.glow); if (k % 2 === 0) halo(lx, y + 0.55, lz, 0xffc070, 4); }
+      // Across the lawn: stepping stones from the drive to the patio, a fountain Carmela chose, cypresses, roses under the hedge.
+      for (let k = 0; k < 9; k++) put(M.plain, new THREE.CylinderGeometry(0.42, 0.42, 0.05, 9).translate(c.x - 15 + k * 0.95, y + 0.06, c.z + 9.6 - k * 0.5 + (k % 2) * 0.25), 0xd8d0c4);
+      { const fx = c.x - 11.5, fz = c.z + 18.5;
+        put(M.gravel, new THREE.CylinderGeometry(1.5, 1.6, 0.5, 20).translate(fx, y + 0.25, fz), STONE); put(M.plain, new THREE.CylinderGeometry(1.3, 1.3, 0.04, 20).translate(fx, y + 0.44, fz), 0x58c8e0);
+        post(STONE, 0.16, 1.3, fx, y + 0.4, fz, 10); put(M.gravel, new THREE.CylinderGeometry(0.7, 0.25, 0.22, 16).translate(fx, y + 1.5, fz), STONE); put(M.plain, new THREE.CylinderGeometry(0.62, 0.62, 0.03, 16).translate(fx, y + 1.6, fz), 0x8fe0f0); post(STONE, 0.07, 0.5, fx, y + 1.6, fz, 8); ball(STONE, 0.14, fx, y + 2.15, fz);
+        const jets = []; for (let n = 0; n < 6; n++) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 4), new THREE.MeshBasicMaterial({ color: 0xdff8ff, transparent: true, opacity: 0.8 })); scene.add(d); jets.push(d); }
+        updaters.push(t => jets.forEach((d, n) => { const k = (t * 0.9 + n / 6) % 1, a = n * 1.047; d.position.set(fx + Math.sin(a) * k * 0.62, y + 1.72 + Math.sin(k * Math.PI) * 0.34 - k * 0.2, fz + Math.cos(a) * k * 0.62); }));
+        collide(fx, fz, 3, 3, 1.2); places.fountain = { x: fx, z: fz };
+        for (let n = 0; n < 8; n++) { const a = n * Math.PI / 4; bush(fx + Math.sin(a) * 2.3, fz + Math.cos(a) * 2.3, 0.3, 3); } }
+      for (const cz of [4, 10, 16, 22]) cypress(c.x + 26, c.z + cz, 5.5); for (const cx of [-12, -6.5, -1]) cypress(c.x + cx, c.z + 26.2, 5);
+      for (const [x0, x1, z] of [[-14.5, -13, 26.4], [-10.6, -8, 26.4], [-5, -2.5, 26.4], [5, 20, 26.5]]) { flat(M.paint, 0x5a4636, x1 - x0, 1.1, c.x + (x0 + x1) / 2, y + 0.085, c.z + z); for (let x = x0 + 0.3; x < x1; x += 0.75) { ball(0x2f7d46, 0.26, c.x + x, y + 0.34, c.z + z); ball(BLOOM[Math.round(x * 3) % 5 < 2 ? 0 : 1], 0.1, c.x + x + 0.05, y + 0.6, c.z + z - 0.05); ball(BLOOM[0], 0.08, c.x + x - 0.12, y + 0.5, c.z + z + 0.1); } }
+      for (let k = 0; k < 6; k++) { const lx = c.x - 8 + k * 2.7, lz = c.z + 10.6; post(0x1c1c22, 0.025, 0.4, lx, y, lz, 5); ball(0xffe2a6, 0.07, lx, y + 0.44, lz, M.glow); }
+      // The patio: a pergola over the table, planters at the corners, the grill with its lid up and something on it, smoke.
+      for (const [px, pz] of [[0.1, -0.35], [5.1, -0.35], [0.1, 2.4], [5.1, 2.4]]) { post(0xf4f4f0, 0.09, 2.7, c.x + px, y, c.z + pz, 8); collide(c.x + px, c.z + pz, 0.3, 0.3, 2.7, true); }
+      for (const pz of [-0.35, 2.4]) slab(0xf4f4f0, 5.6, 0.16, 0.12, c.x + 2.6, y + 2.7, c.z + pz); for (let k = 0; k < 11; k++) slab(0xf4f4f0, 0.07, 0.1, 3.4, c.x + 0.1 + k * 0.5, y + 2.86, c.z + 1.02);
+      for (let k = 0; k < 6; k++) { ball(0x2f7d46, 0.2, c.x + 0.3 + k * 0.95, y + 2.8 + (k % 2) * 0.1, c.z - 0.35); ball(0xc85cff, 0.09, c.x + 0.5 + k * 0.95, y + 2.62, c.z - 0.3); }                                    // wisteria along the beam
+      for (const [px, pz] of [[-6.6, 0.5], [-6.6, 8.5], [4.6, 8.6]]) { slab(0xb5523b, 0.7, 0.5, 0.7, c.x + px, y, c.z + pz); bush(c.x + px, c.z + pz, 0.38, 5); collide(c.x + px, c.z + pz, 0.8, 0.8, 1, true); }
+      put(M.plain, new THREE.SphereGeometry(0.42, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-1.2).translate(gx, y + 1.05, gz - 0.38), 0x1c1c22);                                                                   // the lid, tipped back
+      for (let k = 0; k < 5; k++) put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.22, 6).rotateZ(Math.PI / 2).translate(gx - 0.1 + (k % 2) * 0.12, y + 1.01, gz - 0.16 + k * 0.08), 0x8a3a22);                      // sausage
+      for (let k = 0; k < 2; k++) put(M.plain, new THREE.CylinderGeometry(0.07, 0.07, 0.03, 10).translate(gx + 0.2, y + 1.01, gz - 0.1 + k * 0.2), 0x6a3a22);
+      put(M.plain, new THREE.CylinderGeometry(0.17, 0.15, 0.03, 12).translate(gx - 1.6, y + 0.9, gz - 0.1), 0xf4f4f0); for (let k = 0; k < 4; k++) put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.2, 6).rotateZ(Math.PI / 2).translate(gx - 1.6, y + 0.94, gz - 0.2 + k * 0.07), 0xc8705a); // the raw ones, waiting
+      slab(0x8a8d96, 0.03, 0.02, 0.4, gx - 1.25, y + 0.9, gz + 0.1); slab(0xd8342c, 0.08, 0.2, 0.08, gx - 2.05, y + 0.88, gz + 0.2); slab(0xffe066, 0.08, 0.2, 0.08, gx - 2.05, y + 0.88, gz); slab(0x5a4636, 0.4, 0.55, 0.26, gx + 0.9, y, gz - 0.2);   // tongs, ketchup, mustard, the charcoal
+      { const puffs = []; for (let n = 0; n < 5; n++) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.16, 7, 5), new THREE.MeshBasicMaterial({ color: 0xd8d2d8, transparent: true, opacity: 0.3, depthWrite: false })); scene.add(m); puffs.push(m); }
+        updaters.push(t => puffs.forEach((m, n) => { const k = (t * 0.28 + n / 5) % 1; m.position.set(gx + Math.sin(t * 0.7 + n * 2) * 0.18 * k + k * 0.5, y + 1.1 + k * 2.4, gz + Math.cos(t * 0.5 + n) * 0.14 * k); m.scale.setScalar(0.5 + k * 1.8); m.material.opacity = 0.34 * (1 - k); })); }
+      // The pool: a ladder, lights under the water, a ring nobody took out, towels, a table under an umbrella, the cabana.
+      for (const s of [-1, 1]) { put(M.plain, new THREE.TorusGeometry(0.42, 0.025, 5, 14, Math.PI).rotateY(Math.PI / 2).translate(pool.x - pool.w / 2 + 0.1, y + 0.2, pool.z - 7.2 + s * 0.3), 0xd8dce6); }
+      for (const lz of [-6, 0, 6]) for (const s of [-1, 1]) slab(0xdffcff, 0.03, 0.14, 0.4, pool.x + s * (pool.w / 2 - 0.03), y - 0.42, pool.z + lz, M.glow);
+      { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.14, 8, 18).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xff5fa8 })), bb = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 8), new THREE.MeshLambertMaterial({ color: 0xffe066 }));
+        scene.add(ring); scene.add(bb); updaters.push(t => { ring.position.set(pool.x + 3 + Math.sin(t * 0.11) * 1.4, WATER + 0.06 + Math.sin(t * 1.3) * 0.015, pool.z + 5 + Math.cos(t * 0.09) * 2); ring.rotation.y = t * 0.1; bb.position.set(pool.x - 2.6 + Math.cos(t * 0.07) * 1.2, WATER + 0.14 + Math.sin(t * 1.7) * 0.02, pool.z + 6.5 + Math.sin(t * 0.08) * 1.3); bb.rotation.x = t * 0.2; }); }
+      for (const lz of [-4, -1.2]) slab([0xff8a5c, 0xffe066][lz < -2 ? 0 : 1], 0.6, 0.03, 1.1, pool.x + pool.w / 2 + 1.6, y + 0.36, pool.z + lz + 0.3);
+      slab(0xf4f4f0, 0.5, 0.4, 0.5, pool.x + pool.w / 2 + 1.6, y, pool.z - 2.6); put(M.plain, new THREE.CylinderGeometry(0.04, 0.03, 0.14, 8).translate(pool.x + pool.w / 2 + 1.55, y + 0.47, pool.z - 2.6), 0xff8a5c); slab(0x3b6ea8, 0.2, 0.03, 0.14, pool.x + pool.w / 2 + 1.7, y + 0.4, pool.z - 2.5);
+      { const ux = pool.x + 4.2, uz = pool.z + pool.d / 2 + 1.5;
+        post(0xf4f4f0, 0.04, 2.5, ux, y, uz, 6); put(M.plain, new THREE.CylinderGeometry(0.55, 0.55, 0.04, 16).translate(ux, y + 0.74, uz), 0xf4f4f0); put(M.plain, new THREE.ConeGeometry(1.5, 0.55, 8).translate(ux, y + 2.6, uz), 0xd8342c); for (let n = 0; n < 4; n++) put(M.plain, new THREE.ConeGeometry(1.52, 0.56, 8, 1, true, n * Math.PI / 2, Math.PI / 4).translate(ux, y + 2.6, uz), 0xf4f4f0);
+        for (const s of [-1, 1]) { slab(0xf4f4f0, 0.45, 0.05, 0.45, ux + s * 0.95, y + 0.42, uz); slab(0xf4f4f0, 0.05, 0.5, 0.45, ux + s * 1.16, y + 0.45, uz); for (const [fx, fz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) post(0xc9cbd2, 0.015, 0.42, ux + s * 0.95 + fx, y, uz + fz, 4); }
+        put(M.plain, new THREE.CylinderGeometry(0.05, 0.04, 0.16, 8).translate(ux + 0.2, y + 0.84, uz), 0xcfe8ff); collide(ux, uz, 1.1, 1.1, 1, true); }
+      { const bx0 = c.x + 24.6, bz0 = c.z + 13.5;
+        for (const [px, pz] of [[-1.2, -1.9], [1.2, -1.9], [-1.2, 1.9], [1.2, 1.9]]) post(0x8a5a44, 0.09, 2.6, bx0 + px, y, bz0 + pz, 6);
+        put(M.plain, new THREE.ConeGeometry(2.9, 1.3, 4).rotateY(Math.PI / 4).scale(0.75, 1, 1.05).translate(bx0, y + 3.25, bz0), 0xd9b25a); for (let k = 0; k < 8; k++) slab(0xc79a4a, 0.04, 0.5, 3.9, bx0 - 1.3 + k * 0.37, y + 2.35, bz0);
+        slab(0x8a5a44, 0.6, 1.05, 3.4, bx0 - 0.9, y, bz0, M.wood, 2); slab(0x3a2418, 0.75, 0.05, 3.5, bx0 - 0.9, y + 1.05, bz0); for (let k = 0; k < 6; k++) put(M.plain, new THREE.CylinderGeometry(0.04, 0.05, 0.26, 8).translate(bx0 - 0.85, y + 1.23, bz0 - 1.3 + k * 0.5), [0xd9a520, 0x2f7d46, 0xc8312a, 0xe9e2cf, 0x8a5a2a, 0x49e0d0][k]);
+        slab(0x8a5a44, 0.5, 1.6, 3.4, bx0 + 1, y, bz0, M.wood, 2); for (let k = 0; k < 10; k++) put(M.plain, new THREE.CylinderGeometry(0.04, 0.05, 0.26, 8).translate(bx0 + 0.9, y + 1.73, bz0 - 1.4 + k * 0.31), [0xd9a520, 0x2f7d46, 0xc8312a, 0xe9e2cf][k % 4]);
+        for (const sz of [-1, 0, 1]) { post(0xc9cbd2, 0.03, 0.7, bx0 - 1.7, y, bz0 + sz, 5); post(0x49e0d0, 0.18, 0.06, bx0 - 1.7, y + 0.7, bz0 + sz, 10); }
+        for (let k = 0; k < 8; k++) ball([0xffe066, 0xff5fd2, 0x49e0d0, 0xff8a5c][k % 4], 0.07, bx0 - 1.25, y + 2.3, bz0 - 1.75 + k * 0.5, M.glow);
+        collide(bx0, bz0, 2.7, 4, 2.6); }
+      for (const [gx2, gz2] of [[-9.8, 3.2], [22.5, 24.4]]) { post(0xd8342c, 0.1, 0.16, c.x + gx2, y, c.z + gz2, 8); ball(0xf4d8c0, 0.07, c.x + gx2, y + 0.24, c.z + gz2); put(M.plain, new THREE.ConeGeometry(0.08, 0.2, 8).translate(c.x + gx2, y + 0.4, c.z + gz2), 0xd8342c); } // gnomes. Carmela denies them
+    }
     places.home = {
       grill: { x: gx, z: gz + 1.1 }, patio: { x: c.x - 2, z: c.z + 5 }, drive: { x: c.x - 20.5, z: c.z + 20 },
       road: { x: c.x - 20.5, z: c.z + 34 }, guest: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 },
@@ -942,6 +1019,13 @@ export function buildWorld(scene) {
     for (const s of [-1, 1]) halo(px, 9.4, pz + s, PINK, 10);
     for (const s of [-1, 1]) slab(PINK, 6.3, 0.1, 0.7, px, 7.86 + (s > 0 ? 3.1 : 0), pz, M.glow);
     for (const [lx, lz] of [[-20, 23], [-20, 9], [8, 23]]) palms.push({ x: c.x + lx, z: c.z + lz });
+    { // The door: a man who decides, a rope, a mat
+      const heavy = makeHuman({ jacket: 0x16161c, shirt: 0x16161c, tee: true, pants: 0x16161c, shoes: 0x16161c, hair: 0x111111, hairMesh: 'buzzed', glasses: 'shades', bulk: 1.4, height: 1.07 });
+      heavy.group.position.set(c.x + 1.7, CURB, c.z + 9.3); heavy.group.rotation.y = 0; scene.add(heavy.group);
+      for (const s of [-1, 1]) { post(0xd9a520, 0.05, 1, c.x + s * 1.2, CURB, c.z + 10.6, 8); ball(0xd9a520, 0.08, c.x + s * 1.2, CURB + 1.05, c.z + 10.6); collide(c.x + s * 1.2, c.z + 10.6, 0.3, 0.3, 1, true); }
+      slab(0x8a1228, 2.2, 0.02, 3, c.x, CURB + 0.005, c.z + 10.2);
+      places.bingDoorman = heavy;
+    }
     places.bing = { door: { x: c.x, z: c.z + 15 }, park: { x: c.x + 13, z: c.z + 17.5, h: Math.PI / 2 }, parking };
   }
 
@@ -1774,46 +1858,180 @@ export function buildWorld(scene) {
 
   // ----- Inside the Bada Bing: an interior set far below the city, like the therapy office -----
   function buildBingRoom() {
-    const X = 2680, Y = -0.1, Z = 0, WOOD = 0x3a2418, PINK = 0xff3fe0;
+    const X = 2680, Y = -0.1, Z = 0, WOOD = 0x3a2418, PINK = 0xff3fe0, CYAN = 0x49e0d0, RED = 0xff2a4a, AMBER = 0xffb060, VIOLET = 0x8a5cff, BLACK = 0x0e0a14, VINYL = 0x8a1228, CHROME = 0xd8dce6;
     const q = { minX: X - 9.7, maxX: X + 9.7, minZ: Z - 6.7, maxZ: Z + 6.7, lights: [] };
     interiors.push(q);
-    slab(0x3a2440, 20, 0.2, 14, X, Y - 0.2, Z, M.gravel, 4);                                    // carpet
-    slab(0x16101c, 20, 0.2, 14, X, Y + 4.2, Z);
-    for (const s of [-1, 1]) { slab(0x5a3450, 20, 4.4, 0.3, X, Y, Z + s * 7.15, M.wood, 3); slab(0x5a3450, 0.3, 4.4, 14, X + s * 10.15, Y, Z, M.wood, 3); }
-    // The bar along the back wall, with its shelves, stools and the house phone.
+    const rnd = mulberry32(77);                                                                 // its own dice: the city's are not touched
+    const tube = (hex, w, h, d, x, y, z) => slab(hex, w, h, d, x, y, z, M.glow);                  // a length of neon
+    // The shell: a black gloss floor that takes the lights, a black ceiling, walls the colour of a bruise.
+    slab(0x120c18, 20, 0.2, 14, X, Y - 0.2, Z);
+    const gloss = texture(256, 256, (c, w) => {
+      c.fillStyle = '#140d1c'; c.fillRect(0, 0, w, w);
+      c.strokeStyle = 'rgba(160,120,200,.22)'; c.lineWidth = 2; c.strokeRect(0, 0, w, w);
+      for (let n = 0; n < 60; n++) { c.fillStyle = `rgba(${200 + rnd() * 55 | 0},${140 + rnd() * 80 | 0},255,${0.15 + rnd() * 0.3})`; c.fillRect(rnd() * w, rnd() * w, 1.5, 1.5); }
+    });
+    gloss.repeat.set(14, 10);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(19.4, 13.4).rotateX(-Math.PI / 2), new THREE.MeshPhongMaterial({ map: gloss, shininess: 110, specular: 0x8a6ab0 }));
+    floor.position.set(X, Y + 0.005, Z); scene.add(floor);
+    slab(0x0c0812, 20, 0.2, 14, X, Y + 4.2, Z);
+    for (const s of [-1, 1]) { slab(0x2a1634, 20, 4.4, 0.3, X, Y, Z + s * 7.15); slab(0x2a1634, 0.3, 4.4, 14, X + s * 10.15, Y, Z); }
+    for (const s of [-1, 1]) { slab(VINYL, 19.4, 0.9, 0.06, X, Y, Z + s * 6.97); slab(VINYL, 0.06, 0.9, 13.4, X + s * 9.97, Y, Z); } // a padded dado all the way round
+    // Mirrors: what a mirror in a room like this shows is mostly the neon, so that is what is painted on them.
+    const mirror = texture(256, 256, (c, w) => {
+      const gr = c.createLinearGradient(0, 0, 0, w); gr.addColorStop(0, '#181230'); gr.addColorStop(0.55, '#3a3466'); gr.addColorStop(1, '#120e22');
+      c.fillStyle = gr; c.fillRect(0, 0, w, w);
+      for (let n = 0; n < 22; n++) {
+        const x = rnd() * w, y = rnd() * w, r = 10 + rnd() * 34, hue = ['255,63,224', '73,224,208', '255,176,96', '138,92,255', '255,42,74'][n % 5];
+        const g2 = c.createRadialGradient(x, y, 0, x, y, r); g2.addColorStop(0, `rgba(${hue},.75)`); g2.addColorStop(1, `rgba(${hue},0)`);
+        c.fillStyle = g2; c.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+      c.strokeStyle = 'rgba(230,236,255,.5)'; c.lineWidth = 2; for (let k = 0; k <= 4; k++) { c.beginPath(); c.moveTo(k * 64, 0); c.lineTo(k * 64, w); c.stroke(); }
+    });
+    const glass = (w, h, x, y, z, turn) => { const t = mirror.clone(); t.needsUpdate = true; t.repeat.set(w / 3.2, 1); const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t })); m.rotation.y = turn; m.position.set(x, y, z); scene.add(m); };
+    glass(8.6, 2.9, X - 5.5, Y + 2.5, Z - 6.98, 0);                                               // behind the stage
+    glass(8.8, 1.9, X - 9.98, Y + 2.3, Z + 2.4, Math.PI / 2);                                     // over the banquette on the west wall
+    glass(5.6, 1.9, X - 6.8, Y + 2.3, Z + 6.98, Math.PI);                                         // and the one on the south wall
+    for (const [x0, x1, z0, z1] of [[-9.8, -1.2, -6.96, -6.96], [-9.96, -9.96, -2, 6.8], [-9.6, -4, 6.96, 6.96]]) for (const y of [1.02, 3.98]) tube(y < 2 ? PINK : CYAN, Math.max(0.04, x1 - x0), 0.04, Math.max(0.04, z1 - z0), X + (x0 + x1) / 2, Y + y, Z + (z0 + z1) / 2);
+    // Neon round the top of the walls, and tubes on the ceiling running the length of the room.
+    for (const s of [-1, 1]) { tube(PINK, 19.4, 0.05, 0.05, X, Y + 4.1, Z + s * 6.9); tube(CYAN, 0.05, 0.05, 13.4, X + s * 9.9, Y + 4.1, Z); }
+    for (let k = 0; k < 5; k++) tube([VIOLET, PINK, RED, PINK, VIOLET][k], 0.04, 0.04, 5.2, X + 1 + k * 1.6, Y + 4.16, Z + 0.4);
+
+    // The bar along the back wall: lit from under the lip, shelves lit from behind, towers of beer, the bell.
     slab(WOOD, 9, 1.1, 0.9, X + 4, Y, Z - 5.2, M.wood, 2); slab(0x14080f, 9.3, 0.08, 1.1, X + 4, Y + 1.1, Z - 5.2);
-    slab(0x14080f, 9, 2.4, 0.3, X + 4, Y + 1.2, Z - 6.85); slab(0x8a5a9a, 8.6, 0.9, 0.05, X + 4, Y + 2.4, Z - 6.68, M.glow);
-    for (let n = 0; n < 16; n++) post([0xd9a520, 0x2f7d46, 0xc8312a, 0xe9e2cf, 0x8a5a2a][n % 5], 0.05, 0.32 + (n % 3) * 0.05, X + 0.3 + n * 0.5, Y + 1.55 + (n % 2) * 0.75, Z - 6.62, 6);
-    for (let n = 0; n < 5; n++) { post(0xc9cbd2, 0.04, 0.75, X + 0.8 + n * 1.6, Y, Z - 4.2); post(0x8a1c3a, 0.22, 0.08, X + 0.8 + n * 1.6, Y + 0.75, Z - 4.2, 10); }
-    slab(0x1c1c22, 0.26, 0.1, 0.2, X + 1.3, Y + 1.18, Z - 5.2); slab(0x1c1c22, 0.07, 0.07, 0.24, X + 1.3, Y + 1.3, Z - 5.2);
-    for (let n = 0; n < 5; n++) { put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.11, 8).translate(X + 0.55 + n * 1.6, Y + 1.24, Z - 4.9), 0xcfe8ff); if (n % 2 === 0) put(M.plain, new THREE.CylinderGeometry(0.07, 0.07, 0.025, 10).translate(X + 1.05 + n * 1.6, Y + 1.19, Z - 5), 0x8d8a8e); else slab(0x8a5a2a, 0.07, 0.24, 0.07, X + 1.1 + n * 1.6, Y + 1.18, Z - 5.05); } // glasses, ashtrays, a bottle here and there
-    sign('Bada Bing!', X + 4, Y + 3.55, Z - 6.66, 0, { w: 5, h: 1.25, color: '#ff5fd2', bg: '#14080f', font: '"Mr Dafoe", cursive', size: 0.78 });
-    // The stage, its pole, and a ring of neon.
-    put(M.plain, new THREE.CylinderGeometry(2.4, 2.4, 0.5, 24).translate(X - 6.4, Y + 0.25, Z - 3.6), 0x14080f);
-    put(M.glow, new THREE.TorusGeometry(2.4, 0.05, 6, 32).rotateX(Math.PI / 2).translate(X - 6.4, Y + 0.52, Z - 3.6), PINK);
-    post(0xc9cbd2, 0.05, 3.7, X - 6.4, Y + 0.5, Z - 3.6, 8);
+    tube(CYAN, 9, 0.04, 0.04, X + 4, Y + 1.02, Z - 4.72); tube(PINK, 9, 0.04, 0.04, X + 4, Y + 0.06, Z - 4.72);
+    for (let k = 0; k < 9; k++) slab(0x241018, 0.9, 0.86, 0.03, X + 0 + k * 1, Y + 0.12, Z - 4.74, M.wood, 1);                           // panels on the front of it
+    slab(0x14080f, 9, 2.6, 0.3, X + 4, Y + 1.1, Z - 6.85);
+    for (let r = 0; r < 3; r++) {
+      slab([0xff5fd2, 0x49e0d0, 0xffb060][r], 8.6, 0.62, 0.04, X + 4, Y + 1.32 + r * 0.72, Z - 6.68, M.glow);
+      slab(0x14080f, 8.8, 0.05, 0.3, X + 4, Y + 1.28 + r * 0.72, Z - 6.56);
+      for (let n = 0; n < 22; n++) post([0xd9a520, 0x2f7d46, 0xc8312a, 0xe9e2cf, 0x8a5a2a, 0x3b6ea8][(n + r * 2) % 6], 0.045, 0.3 + ((n + r) % 3) * 0.06, X - 0.1 + n * 0.39, Y + 1.33 + r * 0.72, Z - 6.5, 6);
+    }
+    for (let n = 0; n < 5; n++) { post(CHROME, 0.04, 0.75, X + 0.8 + n * 1.6, Y, Z - 4.2); post(VINYL, 0.22, 0.08, X + 0.8 + n * 1.6, Y + 0.75, Z - 4.2, 10); put(M.plain, new THREE.TorusGeometry(0.17, 0.015, 5, 14).rotateX(Math.PI / 2).translate(X + 0.8 + n * 1.6, Y + 0.3, Z - 4.2), CHROME); }
+    slab(0x1c1c22, 0.26, 0.1, 0.2, X + 1.3, Y + 1.18, Z - 5.2); slab(0x1c1c22, 0.07, 0.07, 0.24, X + 1.3, Y + 1.3, Z - 5.2);    // the house phone
+    for (let n = 0; n < 5; n++) { put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.11, 8).translate(X + 0.55 + n * 1.6, Y + 1.24, Z - 4.9), 0xcfe8ff); if (n % 2 === 0) put(M.plain, new THREE.CylinderGeometry(0.07, 0.07, 0.025, 10).translate(X + 1.05 + n * 1.6, Y + 1.19, Z - 5), 0x8d8a8e); else slab(0x8a5a2a, 0.07, 0.24, 0.07, X + 1.1 + n * 1.6, Y + 1.18, Z - 5.05); }
+    for (const bx of [2.6, 6.2]) { post(0x1c1c22, 0.11, 0.05, X + bx, Y + 1.18, Z - 5.35, 10); put(M.glow, new THREE.CylinderGeometry(0.07, 0.07, 0.7, 10).translate(X + bx, Y + 1.58, Z - 5.35), 0xe0a12c); post(CHROME, 0.08, 0.06, X + bx, Y + 1.93, Z - 5.35, 10); } // beer towers
+    for (let n = 0; n < 4; n++) { post(0x8a5a44, 0.045, 0.1, X + 0.2 + n * 2.4, Y + 1.18, Z - 4.86, 8); slab(0xf4f4f0, 0.04, 0.09, 0.005, X + 0.2 + n * 2.4, Y + 1.24, Z - 4.86); } // the cups the bills go in
+    slab(0x23232b, 0.42, 0.3, 0.36, X + 7.9, Y + 1.18, Z - 5.3); slab(0x7dffb0, 0.3, 0.12, 0.02, X + 7.9, Y + 1.36, Z - 5.11, M.glow);  // the till
+    post(0xc9cbd2, 0.16, 0.2, X + 5.2, Y + 1.18, Z - 5.45, 10); for (let n = 0; n < 4; n++) ball(0x8fd14f, 0.035, X + 4.5 + (n % 2) * 0.08, Y + 1.24, Z - 5.45 + (n >> 1) * 0.08); // ice, limes
+    slab(0x14080f, 8.6, 0.05, 0.5, X + 4, Y + 2.25, Z - 5.2); for (let n = 0; n < 26; n++) put(M.plain, new THREE.CylinderGeometry(0.035, 0.02, 0.13, 6).translate(X - 0.1 + n * 0.33, Y + 2.17, Z - 5.2 + (n % 2) * 0.16 - 0.08), 0xcfe8ff); // glasses hung over the bar
+    for (const hx of [-0.2, 8.2]) post(CHROME, 0.015, 1.9, X + hx, Y + 2.3, Z - 5.2, 4);
+    put(M.plain, new THREE.ConeGeometry(0.1, 0.16, 10, 1, true).translate(X - 0.2, Y + 1.9, Z - 4.9), 0xd9a520); post(0xd9a520, 0.008, 0.3, X - 0.2, Y + 1.95, Z - 4.9, 4); // the bell: ring it and the round is yours
+    sign('Bada Bing!', X + 4, Y + 3.82, Z - 6.66, 0, { w: 4.4, h: 0.7, color: '#ff5fd2', bg: '#14080f', font: '"Mr Dafoe", cursive', size: 0.8 });
+
+    // The stage: the round where it always was, and a runway out into the room, both lit from inside, five poles.
+    const sx = X - 6.4, sz = Z - 3.6, TOP = 0.55;
+    put(M.plain, new THREE.CylinderGeometry(2.4, 2.4, TOP, 28).translate(sx, Y + TOP / 2, sz), BLACK);
+    slab(BLACK, 1.9, TOP, 5, sx, Y, Z + 0.9); put(M.plain, new THREE.CylinderGeometry(1.35, 1.35, TOP, 22).translate(sx, Y + TOP / 2, Z + 3.4), BLACK);
+    put(M.glow, new THREE.TorusGeometry(2.4, 0.04, 6, 36).rotateX(Math.PI / 2).translate(sx, Y + TOP + 0.01, sz), PINK); put(M.glow, new THREE.TorusGeometry(2.42, 0.04, 6, 36).rotateX(Math.PI / 2).translate(sx, Y + 0.05, sz), CYAN);
+    put(M.glow, new THREE.TorusGeometry(1.35, 0.04, 6, 28).rotateX(Math.PI / 2).translate(sx, Y + TOP + 0.01, Z + 3.4), PINK); put(M.glow, new THREE.TorusGeometry(1.37, 0.04, 6, 28).rotateX(Math.PI / 2).translate(sx, Y + 0.05, Z + 3.4), CYAN);
+    for (const s of [-1, 1]) { tube(PINK, 0.05, 0.05, 3.6, sx + s * 0.95, Y + TOP - 0.02, Z + 0.4); tube(CYAN, 0.05, 0.05, 3.6, sx + s * 0.97, Y + 0.03, Z + 0.4); }
+    for (let n = 0; n < 14; n++) { const a = n / 14 * Math.PI * 2; ball(0xfff2c0, 0.035, sx + Math.sin(a) * 2.43, Y + 0.3, sz + Math.cos(a) * 2.43, M.glow); } // bulbs round the skirt
+    const poles = [[0, 0], [-1.35, -0.5], [1.35, -0.5], [0, 4.2], [0, 7]].map(([dx, dz]) => ({ x: sx + dx, z: sz + dz }));
+    for (const at of poles) { post(CHROME, 0.035, 4.2 - TOP, at.x, Y + TOP, at.z, 10); post(0xd9a520, 0.12, 0.03, at.x, Y + TOP, at.z, 12); post(0xd9a520, 0.1, 0.03, at.x, Y + 4.17, at.z, 12); }
+    // The floor of the stage is squares of light that chase one another.
+    const PAL = [PINK, CYAN, AMBER, VIOLET], LED = PAL.map(hex => new THREE.MeshBasicMaterial({ color: hex })), tileGeo = new THREE.PlaneGeometry(0.56, 0.56).rotateX(-Math.PI / 2);
+    const led = (x, z, k) => { const m = new THREE.Mesh(tileGeo, LED[k & 3]); m.position.set(x, Y + TOP + 0.006, z); scene.add(m); };
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 9; j++) led(sx + (i - 1) * 0.6, Z - 1.6 + j * 0.6, i + j);
+    for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) { const dx = (i - 3) * 0.6, dz = (j - 3) * 0.6; if (Math.hypot(dx, dz) < 2.05 && dz < 1.5) led(sx + dx, sz + dz, i + j * 2); }
+    const tmpC = new THREE.Color();
+    updaters.push(t => { const k = Math.floor(t * 2.4); LED.forEach((m, n) => m.color.copy(tmpC.setHex(PAL[(n + k) & 3])).multiplyScalar(0.34 + 0.2 * Math.sin(t * 5 + n * 1.7))); });
+    // Over it: a truss of cans, beams that sweep, and the mirror ball throwing its coins across the floor.
+    for (const tz of [-4.9, -2.3]) slab(0x23232b, 5.4, 0.08, 0.08, sx, Y + 3.9, Z + tz); slab(0x23232b, 0.08, 0.08, 6.6, sx, Y + 3.9, Z + 0.9);
+    const beams = [];
+    for (const [n, [bx, bz, hex]] of [[-2, -4.9, PINK], [2, -4.9, CYAN], [-2, -2.3, AMBER], [2, -2.3, VIOLET], [0, 0.4, PINK], [0, 3.2, CYAN]].entries()) {
+      put(M.plain, new THREE.CylinderGeometry(0.11, 0.15, 0.26, 10).translate(sx + bx, Y + 3.74, Z + bz), 0x16161c); put(M.glow, new THREE.CircleGeometry(0.13, 12).rotateX(Math.PI / 2).translate(sx + bx, Y + 3.6, Z + bz), hex);
+      const beam = new THREE.Mesh(new THREE.ConeGeometry(0.85, 3.1, 14, 1, true).translate(0, -1.55, 0), new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.11, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      beam.position.set(sx + bx, Y + 3.62, Z + bz); scene.add(beam); beams.push([beam, n]);
+    }
+    const mball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.32, 1), new THREE.MeshPhongMaterial({ color: 0xdfe6f2, specular: 0xffffff, shininess: 220, flatShading: true, emissive: 0x3a3a52 }));
+    mball.position.set(X - 2.6, Y + 3.55, Z - 0.4); scene.add(mball); post(0x23232b, 0.015, 0.35, X - 2.6, Y + 3.85, Z - 0.4, 4);
+    const coins = new THREE.Group(), coinMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false });
+    for (let n = 0; n < 34; n++) { const a = n * 2.4, r = 0.8 + ((n * 0.371) % 1) * 7.5, d = new THREE.Mesh(new THREE.CircleGeometry(0.07 + (n % 3) * 0.035, 8).rotateX(-Math.PI / 2), coinMat); d.position.set(Math.sin(a) * r, 0, Math.cos(a) * r); coins.add(d); }
+    coins.position.set(X - 2.6, Y + 0.02, Z - 0.4); scene.add(coins);
+    updaters.push(t => { mball.rotation.y = t * 0.7; coins.rotation.y = -t * 0.32; for (const [b, n] of beams) { b.rotation.z = Math.sin(t * 0.9 + n * 1.3) * 0.34; b.rotation.x = Math.cos(t * 0.7 + n * 2.1) * 0.3; } });
+
+    // Banquettes in red vinyl under the mirrors, low tables in front of them: a glass, a bottle, the cup with the bill in it.
+    slab(VINYL, 0.75, 0.45, 7.2, X - 9.5, Y, Z + 2.5); slab(0x6a0e20, 0.2, 0.75, 7.2, X - 9.8, Y + 0.45, Z + 2.5); slab(0x16101c, 0.8, 0.08, 7.3, X - 9.5, Y, Z + 2.5);
+    slab(VINYL, 5.6, 0.45, 0.75, X - 6.8, Y, Z + 6.45); slab(0x6a0e20, 5.6, 0.75, 0.2, X - 6.8, Y + 0.45, Z + 6.78);
+    for (let n = 0; n < 9; n++) ball(0x4a0a18, 0.03, X - 9.69, Y + 0.85, Z - 0.7 + n * 0.8); for (let n = 0; n < 7; n++) ball(0x4a0a18, 0.03, X - 9.2 + n * 0.8, Y + 0.85, Z + 6.67);
+    const lowTable = (x, z, k) => {
+      post(CHROME, 0.03, 0.55, x, Y, z, 6); post(CHROME, 0.2, 0.02, x, Y, z, 12); put(M.plain, new THREE.CylinderGeometry(0.32, 0.32, 0.03, 16).translate(x, Y + 0.56, z), 0x16101c);
+      put(M.glow, new THREE.TorusGeometry(0.32, 0.012, 4, 18).rotateX(Math.PI / 2).translate(x, Y + 0.585, z), k % 2 ? CYAN : PINK);
+      put(M.plain, new THREE.CylinderGeometry(0.03, 0.035, 0.2, 8).translate(x - 0.12, Y + 0.68, z + 0.05), [0x8a5a2a, 0x2f7d46][k % 2]); put(M.plain, new THREE.CylinderGeometry(0.035, 0.028, 0.11, 8).translate(x + 0.1, Y + 0.635, z - 0.1), 0xcfe8ff);
+      post(0x8a5a44, 0.04, 0.09, x + 0.08, Y + 0.58, z + 0.14, 8); slab(0xf4f4f0, 0.035, 0.08, 0.005, x + 0.08, Y + 0.63, z + 0.14);
+    };
+    [[-8.55, -0.2], [-8.55, 1.8], [-8.55, 3.8]].forEach(([x, z], k) => lowTable(X + x, Z + z, k)); [[-8.4, 5.5], [-6.6, 5.5], [-4.8, 5.5]].forEach(([x, z], k) => lowTable(X + x, Z + z, k + 1));
+
     // The crew's table, with the week's envelopes on it.
     const tx = X - 1.5, tz = Z + 2.6, seats = [];
     post(WOOD, 0.14, 0.72, tx, Y, tz, 8); put(M.plain, new THREE.CylinderGeometry(1.35, 1.35, 0.07, 24).translate(tx, Y + 0.75, tz), 0x1f5a3a);
+    put(M.glow, new THREE.TorusGeometry(1.35, 0.015, 4, 30).rotateX(Math.PI / 2).translate(tx, Y + 0.72, tz), AMBER);
     for (let n = 0; n < 7; n++) slab(n % 3 ? 0x86b87e : 0xe9e2cf, 0.3, 0.05 + (n % 3) * 0.04, 0.16, tx - 0.6 + (n % 4) * 0.36, Y + 0.79, tz - 0.3 + (n % 3) * 0.3);
+    put(M.plain, new THREE.CylinderGeometry(0.09, 0.09, 0.025, 10).translate(tx + 0.75, Y + 0.8, tz + 0.5), 0x8d8a8e); slab(0x8a5a2a, 0.07, 0.26, 0.07, tx - 0.85, Y + 0.79, tz + 0.55); // an ashtray, a bottle
     for (let n = 0; n < 6; n++) {
-      const a = n * Math.PI / 3 + 0.5, sx = tx + Math.sin(a) * 2.05, sz = tz + Math.cos(a) * 2.05;
-      post(0x8a1c3a, 0.26, 0.08, sx, Y + 0.44, sz, 10); post(0x1c1c22, 0.04, 0.44, sx, Y, sz);
-      put(M.plain, new THREE.BoxGeometry(0.5, 0.6, 0.07).translate(0, 0.8, -0.28).rotateY(a).translate(sx, Y, sz), 0x8a1c3a);
-      seats.push({ x: sx, y: Y, z: sz, h: a + Math.PI });
+      const a = n * Math.PI / 3 + 0.5, cx = tx + Math.sin(a) * 2.05, cz = tz + Math.cos(a) * 2.05;
+      post(VINYL, 0.26, 0.08, cx, Y + 0.44, cz, 10); post(0x1c1c22, 0.04, 0.44, cx, Y, cz);
+      put(M.plain, new THREE.BoxGeometry(0.5, 0.6, 0.07).translate(0, 0.8, -0.28).rotateY(a).translate(cx, Y, cz), VINYL);
+      seats.push({ x: cx, y: Y, z: cz, h: a + Math.PI });
     }
-    // Pool table, and a television on the wall.
+    // The pool table under its lamp, the cues on the wall, a television nobody watches.
     slab(WOOD, 2.6, 0.8, 1.4, X + 6.4, Y, Z + 3.4, M.wood, 2); slab(0x1f6b4a, 2.4, 0.04, 1.2, X + 6.4, Y + 0.8, Z + 3.4);
-    slab(0x1c1c22, 0.12, 1, 1.5, X - 9.9, Y + 2.2, Z + 2.6); slab(0x9fd0f5, 0.04, 0.8, 1.3, X - 9.8, Y + 2.3, Z + 2.6, M.glow);
-    roomLamp(q, tx, Y + 3.1, tz, 0xffd9a8, 70, 16); roomLamp(q, X - 5.5, Y + 3.4, Z - 2.6, 0xff5fd2, 60, 20); roomLamp(q, X + 4, Y + 2.9, Z - 3.6, 0xffb060, 34, 12);
-    // The way in, on the east wall; what you bump into; and who is always here.
+    for (const s of [-1, 1]) { slab(WOOD, 2.6, 0.06, 0.1, X + 6.4, Y + 0.82, Z + 3.4 + s * 0.65, M.wood, 1); slab(WOOD, 0.1, 0.06, 1.4, X + 6.4 + s * 1.25, Y + 0.82, Z + 3.4, M.wood, 1); }
+    for (let n = 0; n < 9; n++) ball([0xf2c230, 0x2f56c8, 0xd8342c, 0x8a5cff, 0xff8a5c, 0x2f7d46, 0x8a1c1c, 0x16161c, 0xf4f4f0][n], 0.035, X + 5.7 + (n % 5) * 0.32 + (n > 4 ? 0.1 : 0), Y + 0.875, Z + 3.2 + (n % 3) * 0.2);
+    put(M.plain, new THREE.CylinderGeometry(0.012, 0.008, 1.4, 5).rotateZ(Math.PI / 2).rotateY(0.5).translate(X + 6.7, Y + 0.87, Z + 3.7), 0xd9b48a);
+    slab(0x1f6b4a, 1.6, 0.16, 0.6, X + 6.4, Y + 2.1, Z + 3.4); slab(0xfff2c0, 1.4, 0.02, 0.45, X + 6.4, Y + 2.09, Z + 3.4, M.glow); for (const s of [-1, 1]) post(0x23232b, 0.01, 1.9, X + 6.4 + s * 0.6, Y + 2.26, Z + 3.4, 4);
+    slab(WOOD, 1.2, 0.1, 0.06, X + 6.4, Y + 1.9, Z + 6.94, M.wood, 1); for (let n = 0; n < 4; n++) post(0xd9b48a, 0.012, 1.35, X + 6 + n * 0.27, Y + 0.6, Z + 6.9, 5);
+    slab(0x1c1c22, 0.12, 1, 1.5, X - 9.9, Y + 3.1, Z - 1.2); slab(0x9fd0f5, 0.04, 0.8, 1.3, X - 9.8, Y + 3.2, Z - 1.2, M.glow);
+    // The booth, between the stage and the bar: two decks, a mixer, stacks either side.
+    slab(0x16101c, 2.4, 1.05, 0.7, X - 2.2, Y, Z - 5.7); tube(VIOLET, 2.4, 0.04, 0.04, X - 2.2, Y + 0.98, Z - 5.33); tube(PINK, 2.2, 0.5, 0.03, X - 2.2, Y + 0.3, Z - 5.33);
+    for (const s of [-1, 1]) { put(M.plain, new THREE.CylinderGeometry(0.22, 0.22, 0.03, 18).translate(X - 2.2 + s * 0.7, Y + 1.07, Z - 5.7), 0x16161c); put(M.plain, new THREE.CylinderGeometry(0.07, 0.07, 0.035, 10).translate(X - 2.2 + s * 0.7, Y + 1.07, Z - 5.7), [RED, CYAN][(s + 1) / 2]); }
+    slab(0x23232b, 0.5, 0.06, 0.4, X - 2.2, Y + 1.05, Z - 5.7); for (let n = 0; n < 8; n++) slab([0x7dffb0, 0xffe066, 0xff2a4a][n % 3], 0.03, 0.02, 0.03, X - 2.38 + (n % 4) * 0.12, Y + 1.11, Z - 5.8 + (n >> 2) * 0.16, M.glow);
+    for (const s of [-1, 1]) for (let k = 0; k < 2; k++) { slab(0x16161c, 0.7, 0.9, 0.6, X - 2.2 + s * 1.7, Y + k * 0.92, Z - 6.5); put(M.plain, new THREE.CylinderGeometry(0.24, 0.24, 0.03, 16).rotateX(Math.PI / 2).translate(X - 2.2 + s * 1.7, Y + 0.45 + k * 0.92, Z - 6.19), 0x3a3a44); put(M.plain, new THREE.CylinderGeometry(0.09, 0.09, 0.04, 10).rotateX(Math.PI / 2).translate(X - 2.2 + s * 1.7, Y + 0.45 + k * 0.92, Z - 6.18), 0x8d8a8e); }
+    for (const [cx, cz] of [[-9.6, -6.6], [9.6, 6.6], [9.6, -6.6]]) { slab(0x16161c, 0.5, 0.7, 0.5, X + cx, Y + 3.3, Z + cz); } // more of them up in the corners
+    // What is written on the walls.
+    sign('A GO-GO', X + 4.6, Y + 2.9, Z + 6.96, Math.PI, { w: 3.6, h: 1, color: '#ff3fe0', bg: '#1a0c20', font: '"Mr Dafoe", cursive', size: 0.8 });
+    sign('HAPPY HOUR  6 - 9', X + 0.6, Y + 3.1, Z + 6.96, Math.PI, { w: 3, h: 0.6, color: '#ffe066', bg: '#1a0c20', size: 0.66 });
+    sign('COLD BEER', X + 9.96, Y + 3.2, Z - 2, -Math.PI / 2, { w: 3, h: 0.7, color: '#49e0d0', bg: '#1a0c20', size: 0.7 });
+    sign('NO PHOTOS', X + 9.96, Y + 2.3, Z - 2, -Math.PI / 2, { w: 1.8, h: 0.4, color: '#ff2a4a', bg: '#1a0c20', size: 0.62 });
+    sign('LADIES NIGHT  EVERY NIGHT', X - 9.96, Y + 3.62, Z + 2.4, Math.PI / 2, { w: 5.4, h: 0.5, color: '#ff8ad8', bg: '#1a0c20', size: 0.62 });
+    sign('PRIVATE', X + 2.4, Y + 2.5, Z + 6.96, Math.PI, { w: 1.3, h: 0.34, color: '#e9e2cf', bg: '#14080f', size: 0.6, glow: false });
+    slab(0x241018, 1.1, 2.3, 0.08, X + 2.4, Y, Z + 6.95, M.wood, 1); slab(0xd9a520, 0.06, 0.06, 0.06, X + 2.85, Y + 1.1, Z + 6.88);   // the office: his door
+    // The way in, on the east wall: velvet either side, a desk where the cover is paid, and what you bump into.
     slab(0x2a1218, 0.1, 3, 1.6, X + 10.02, Y, Z + 4);
-    for (const [x, z, w, d] of [[4, -5.2, 9, 1], [tx - X, tz - Z, 2.8, 2.8], [-6.4, -3.6, 5, 5], [6.4, 3.4, 2.8, 1.6]]) collide(X + x, Z + z, w, d, 1.5);
-    const georgie = makeLook('georgie'), dancer = makeHuman({ body: 'female', shirt: 0xff5fd2, tee: true, pants: 0xffffff, shoes: 0xf2efe8, hair: 0xd9b25a, hairMesh: 'long' });
+    for (const s of [-1, 1]) for (let n = 0; n < 5; n++) post(n % 2 ? 0x8a1228 : 0x6a0e20, 0.09, 3.1, X + 9.86, Y, Z + 4 + s * (0.95 + n * 0.15), 6);
+    slab(0xd9a520, 0.05, 0.05, 3.2, X + 9.86, Y + 3.1, Z + 4);
+    // The way out has to be findable in the dark: a lit door, green round the frame, EXIT over it, arrows on the floor.
+    slab(0x7a5a3a, 0.06, 2.6, 1.3, X + 9.95, Y, Z + 4, M.wood, 1); slab(0xfff2c0, 0.04, 0.5, 0.5, X + 9.93, Y + 1.6, Z + 4, M.glow); slab(0xd9a520, 0.08, 0.06, 0.3, X + 9.9, Y + 1.05, Z + 4.4);
+    for (const s of [-1, 1]) tube(0x3dff7a, 0.05, 2.7, 0.05, X + 9.9, Y, Z + 4 + s * 0.72); tube(0x3dff7a, 0.05, 0.05, 1.5, X + 9.9, Y + 2.7, Z + 4);
+    sign('EXIT', X + 9.9, Y + 3.25, Z + 4, -Math.PI / 2, { w: 1.5, h: 0.55, color: '#3dff7a', bg: '#0c1a10', size: 0.8 });
+    sign('EXIT  >', X - 0.9, Y + 3.45, Z + 6.96, Math.PI, { w: 1.6, h: 0.4, color: '#3dff7a', bg: '#0c1a10', size: 0.74 });
+    for (let n = 0; n < 5; n++) put(M.glow, new THREE.ConeGeometry(0.16, 0.34, 3).rotateX(Math.PI / 2).rotateY(Math.PI / 2).scale(1, 0.05, 1).translate(X + 3.4 + n * 1.25, Y + 0.012, Z + 5.2 - Math.max(0, n - 2) * 0.55), 0x3dff7a);
+    slab(0x241018, 1.1, 1.05, 0.6, X + 8.9, Y, Z + 6.3, M.wood, 1); slab(0x14080f, 1.2, 0.05, 0.7, X + 8.9, Y + 1.05, Z + 6.3); tube(PINK, 1.1, 0.04, 0.04, X + 8.9, Y + 0.98, Z + 5.98);
+    slab(0x23232b, 0.3, 0.2, 0.26, X + 9.1, Y + 1.1, Z + 6.3);
+    for (const [x, z, w, d, h] of [[4, -5.2, 9, 1, 1.5], [tx - X, tz - Z, 2.8, 2.8, 1.5], [-6.4, -3.6, 5, 5, 1.5], [-6.4, 1.6, 2.1, 6.2, 1.5], [6.4, 3.4, 2.8, 1.6, 1.5], [-9.35, 2.5, 1.2, 7.3, 1.2], [-6.8, 6.3, 5.8, 1.1, 1.2], [-2.2, -6, 4.4, 1.6, 1.8], [8.9, 6.3, 1.3, 0.8, 1.2]]) collide(X + x, Z + z, w, d, h);
+    // Who is always here: Georgie behind the bar, five on the stage, the man in the booth, the girl at the door, and the trade.
+    const georgie = makeLook('georgie');
     georgie.group.position.set(X + 1.9, Y, Z - 6.1); georgie.group.rotation.y = 0; scene.add(georgie.group);
-    dancer.group.position.set(X - 6.4, Y + 0.5, Z - 3.6); dancer.group.rotation.y = Math.PI / 2; dancer.set('dance'); scene.add(dancer.group);
+    const crowd = [], stand = (who, x, y, z, turn, state, skip = 0) => { who.group.position.set(x, y, z); who.group.rotation.y = turn; who.set(state); if (skip) who.mixer?.update(skip); scene.add(who.group); crowd.push(who); return who; };
+    const GIRLS = [ // five on the stage, no two alike: the colour of the two-piece, the hair and how it is worn
+      { bikini: 0xff3fe0, hair: 0xe0c070, hairMesh: 'long' }, { bikini: 0x49e0d0, hair: 0x111111, hairMesh: 'long', hairScale: [1.06, 1.12, 1.08], dark: true },
+      { bikini: 0xff2a4a, hair: 0xb5392a, hairMesh: 'parted', hairScale: [1.08, 1.05, 1.1] }, { bikini: 0xf4f4f0, hair: 0x2a1a14, hairMesh: 'long', hairScale: [1, 0.9, 1] },
+      { bikini: 0xffe066, hair: 0xff8ad8, hairMesh: 'parted', hairScale: [1.1, 1.12, 1.12], dark: true },
+    ];
+    poles.forEach((at, n) => stand(makeHuman({ body: 'female', shoes: [0xf4f4f0, 0x16161c, 0xff2a4a, 0xd9a520, 0x16161c][n], height: 0.94 + (n % 3) * 0.02, ...GIRLS[n] }), at.x + (n % 2 ? 0.42 : -0.42), Y + TOP, at.z + 0.25, [0.6, -0.4, 0.9, 1.6, 0.2][n], 'dance', n * 0.83));
+    stand(makeHuman({ shirt: 0x16161c, tee: true, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', dark: true, glasses: 'shades' }), X - 2.2, Y, Z - 6.4, 0, 'idle');
+    stand(makeHuman({ body: 'female', shirt: 0x16161c, sleeves: 'long', pants: 0x16161c, hair: 0x111111, hairMesh: 'long' }), X + 8.9, Y, Z + 6.72, Math.PI, 'idle');
+    const HEAVY = { jacket: 0x16161c, shirt: 0x16161c, tee: true, pants: 0x16161c, shoes: 0x16161c, hair: 0x111111, hairMesh: 'buzzed', glasses: 'shades', bulk: 1.38, height: 1.06 };
+    stand(makeHuman({ ...HEAVY }), X + 9.2, Y, Z + 2.5, -Math.PI / 2, 'idle');                    // the door, inside: arms folded, sees everything
+    stand(makeHuman({ ...HEAVY, dark: true, hairMesh: undefined, goatee: 0x111111 }), X - 3.2, Y, Z - 1.6, Math.PI / 2 + 2.2, 'idle'); // the stage: nobody touches
+    const TRADE = [{ shirt: 0xf4f4f0, pants: 0x3b4a66, hair: 0x8d8a8e, bulk: 1.15 }, { shirt: 0x2f7d46, tee: true, pants: 0xd9c7a0, hair: 0x2b1b12 }, { shirt: 0x9fd0f5, pants: 0x23232b, hair: 0xc9a14a, bulk: 1.08 }, { shirt: 0xd8342c, tee: true, pants: 0x3b6ea8, hair: 0x111111, dark: true }, { shirt: 0xffe066, pants: 0x23232b, hair: 0x3a2a1c, bulk: 1.2 }, { shirt: 0x16161c, tee: true, pants: 0x3b4a66, hair: 0x2b1b12, bulk: 0.95 }];
+    [[-9.42, -0.9, Math.PI / 2], [-9.42, 1.1, Math.PI / 2], [-9.42, 3.0, Math.PI / 2], [-7.6, 6.42, Math.PI], [-5.6, 6.42, Math.PI]].forEach(([x, z, turn], n) => stand(makeHuman(TRADE[n]), X + x, Y, Z + z, turn, 'sit'));
+    stand(makeHuman({ body: 'female', shirt: 0xff8ad8, tee: true, pants: 0x16161c, hair: 0x111111, hairMesh: 'long', height: 0.95 }), X - 9.42, Y, Z + 4.6, Math.PI / 2, 'sit');
+    q.lights.length = 0;
+    roomLamp(q, tx, Y + 3.1, tz, 0xffd9a8, 62, 15); roomLamp(q, sx, Y + 3.5, sz + 0.8, 0xff5fd2, 85, 20); roomLamp(q, X + 4, Y + 2.9, Z - 3.6, 0xffb060, 38, 12);
+    roomLamp(q, sx, Y + 3.3, Z + 3, 0x6a8cff, 60, 15); roomLamp(q, X + 7, Y + 3.2, Z + 4.4, 0xff4a6a, 30, 12); roomLamp(q, X - 8.2, Y + 2.6, Z + 5, 0xc85cff, 36, 11);
     places.bingRoom = {
-      ambient: [georgie, dancer], inside: { x: X + 7, z: Z + 4, h: -Math.PI / 2 },
+      ambient: [georgie], crowd, inside: { x: X + 7, z: Z + 4, h: -Math.PI / 2 },
       y: Y, seats, table: { x: tx, y: Y, z: tz },
       bar: { x: X + 1.3, y: Y, z: Z - 4.0 }, tender: { x: X + 1.9, y: Y, z: Z - 6.1 }, stool: { x: X + 3.4, y: Y, z: Z - 3.6 },
       stools: [2, 1, 3, 0, 4].map(n => ({ x: X + 0.8 + n * 1.6, y: Y + 0.27, z: Z - 4.2 })), // the middle ones first
@@ -1860,7 +2078,7 @@ export function buildWorld(scene) {
     interiors.push(q);
     slab(0xd9b48a, 16, 0.2, 12, X, Y - 0.2, Z, M.wood, 2);
     slab(0xf6f1e6, 16, 0.2, 12, X, Y + 3.4, Z);
-    for (const s of [-1, 1]) { slab(CREAM, 16, 3.6, 0.3, X, Y, Z + s * 6.15, M.gravel, 3); slab(CREAM, 0.3, 3.6, 12, X + s * 8.15, Y, Z, M.gravel, 3); }
+    for (const s of [-1, 1]) { slab(0xf6ead2, 16, 3.6, 0.3, X, Y, Z + s * 6.15); slab(0xf6ead2, 0.3, 3.6, 12, X + s * 8.15, Y, Z); }
     // Kitchen along the west wall: counters, the island, the fridge and stove.
     slab(WOOD, 1, 0.9, 9, X - 7.4, Y, Z - 1, M.wood, 1); slab(0x2a2a30, 1.1, 0.05, 9.1, X - 7.4, Y + 0.9, Z - 1); collide(X - 7.4, Z - 1, 1, 9, 1);
     slab(WOOD, 7, 0.9, 1, X - 3.5, Y, Z - 5.4, M.wood, 1); slab(0x2a2a30, 7.1, 0.05, 1.1, X - 3.5, Y + 0.9, Z - 5.4); collide(X - 3.5, Z - 5.4, 7, 1, 1);
@@ -1883,7 +2101,73 @@ export function buildWorld(scene) {
     for (let n = 0; n < 7; n++) slab(0xd9b48a, 1.2, 0.2, 0.32, X + 7.3, Y + n * 0.3, Z + 1.6 + n * 0.32, M.wood, 1); collide(X + 7.3, Z + 2.6, 1.2, 2.4, 2);
     slab(0xe9e2cf, 1.6, 1.2, 0.05, X + 4, Y + 1.5, Z - 6, M.glow);                                 // a window on the garden
     slab(0x3a2418, 1.4, 2.8, 0.1, X + 2, Y, Z + 6.02);                                           // the front door
-    roomLamp(q, X - 3, Y + 3.1, Z - 2, 0xfff0d0, 45, 14); roomLamp(q, X + 4.5, Y + 3, Z - 2, 0xffd9a8, 30, 12);
+    // ----- The house, lived in (owner feedback: this is his home, it should look like one) -----
+    {
+      const IVORY = 0xefe4cf, BRASS = 0xd9a520, STEELC = 0xc9cbd2, lay = (tex, w, d, x, z, y, shiny = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), shiny ? new THREE.MeshPhongMaterial({ map: tex, shininess: shiny, specular: 0x555555 }) : new THREE.MeshLambertMaterial({ map: tex })); m.position.set(x, y, z); scene.add(m); };
+      // Floors: terracotta tile in the kitchen, a rug under the table.
+      const terra = texture(128, 128, (c, w) => { c.fillStyle = '#c9895e'; c.fillRect(0, 0, w, w); c.fillStyle = '#d39a70'; c.fillRect(4, 4, 56, 56); c.fillRect(68, 68, 56, 56); c.fillStyle = '#bf7d52'; c.fillRect(68, 4, 56, 56); c.fillRect(4, 68, 56, 56); c.strokeStyle = '#e9dcc8'; c.lineWidth = 4; for (const k of [0, 64, 128]) { c.beginPath(); c.moveTo(k, 0); c.lineTo(k, w); c.moveTo(0, k); c.lineTo(w, k); c.stroke(); } });
+      terra.repeat.set(6, 6); lay(terra, 6.4, 6.4, X - 4.7, Z - 2.7, Y + 0.004, 40);
+      const rugT = texture(128, 96, (c, w, h) => { c.fillStyle = '#2c3a5a'; c.fillRect(0, 0, w, h); c.fillStyle = '#e9dcc0'; c.fillRect(6, 6, w - 12, h - 12); c.fillStyle = '#7a2f3a'; c.fillRect(10, 10, w - 20, h - 20); c.strokeStyle = '#e9dcc0'; c.lineWidth = 2; c.strokeRect(18, 18, w - 36, h - 36); c.fillStyle = '#d9b25a'; c.beginPath(); c.ellipse(w / 2, h / 2, 26, 16, 0, 0, 7); c.fill(); c.fillStyle = '#2c3a5a'; c.beginPath(); c.ellipse(w / 2, h / 2, 14, 8, 0, 0, 7); c.fill(); });
+      rugT.wrapS = rugT.wrapT = THREE.ClampToEdgeWrapping; lay(rugT, 4.6, 3.2, X + 0.5, Z + 1.5, Y + 0.006);
+      // Skirting and a cornice all the way round; a chair rail where the table is.
+      for (const s of [-1, 1]) { slab(0xffffff, 15.7, 0.12, 0.04, X, Y, Z + s * 5.98); slab(0xffffff, 0.04, 0.12, 11.7, X + s * 7.98, Y, Z); slab(0xffffff, 15.7, 0.12, 0.1, X, Y + 3.28, Z + s * 5.95); slab(0xffffff, 0.1, 0.12, 11.7, X + s * 7.95, Y + 3.28, Z); }
+      // The kitchen: cupboards over the counters, tile behind them, the sink under its window, the hood, and everything a counter collects.
+      slab(IVORY, 0.42, 0.85, 8.6, X - 7.78, Y + 1.6, Z - 1.1); for (let n = 0; n < 9; n++) { slab(0xd8c8a8, 0.02, 0.75, 0.02, X - 7.56, Y + 1.65, Z - 5.3 + n * 0.95); slab(BRASS, 0.03, 0.1, 0.03, X - 7.55, Y + 1.72, Z - 5.2 + n * 0.95); }
+      slab(0xf1ece0, 0.03, 0.6, 9, X - 7.97, Y + 0.96, Z - 1); slab(0xf1ece0, 7, 0.6, 0.03, X - 3.5, Y + 0.96, Z - 5.97);
+      for (let n = 0; n < 15; n++) slab(0xd8d0c0, 0.035, 0.6, 0.012, X - 7.96, Y + 0.96, Z - 5.3 + n * 0.6); for (let n = 0; n < 12; n++) slab(0xd8d0c0, 0.012, 0.6, 0.035, X - 6.8 + n * 0.6, Y + 0.96, Z - 5.96);
+      for (const [x0, w] of [[-6.3, 1.6], [-2.6, 1.2]]) { slab(IVORY, w, 0.85, 0.42, X + x0, Y + 1.6, Z - 5.78); slab(BRASS, 0.03, 0.1, 0.03, X + x0, Y + 1.72, Z - 5.55); slab(0xd8c8a8, 0.02, 0.75, 0.02, X + x0, Y + 1.65, Z - 5.56); }
+      slab(0xcfe8ff, 1.8, 1, 0.04, X - 4.5, Y + 1.5, Z - 5.98, M.glow); slab(0xffffff, 1.9, 0.06, 0.08, X - 4.5, Y + 1.45, Z - 5.95); slab(0xffffff, 0.05, 1, 0.06, X - 4.5, Y + 1.5, Z - 5.96); slab(0xd8342c, 1.9, 0.22, 0.05, X - 4.5, Y + 2.35, Z - 5.93); for (let n = 0; n < 7; n++) slab(0xf4f4f0, 0.1, 0.22, 0.055, X - 5.3 + n * 0.27, Y + 2.35, Z - 5.93); // gingham
+      slab(STEELC, 0.9, 0.02, 0.55, X - 4.5, Y + 0.955, Z - 5.4); slab(0x8a8d96, 0.8, 0.02, 0.45, X - 4.5, Y + 0.95, Z - 5.4); post(STEELC, 0.02, 0.3, X - 4.5, Y + 0.96, Z - 5.72, 6); slab(STEELC, 0.03, 0.03, 0.22, X - 4.5, Y + 1.24, Z - 5.62);
+      put(M.plain, new THREE.CylinderGeometry(0.06, 0.06, 0.26, 10).translate(X - 3.85, Y + 1.09, Z - 5.6), 0xf4f4f0); slab(0x49e0d0, 0.1, 0.16, 0.05, X - 5.1, Y + 0.96, Z - 5.65);                    // paper towel, the soap
+      slab(STEELC, 1, 0.5, 0.6, X - 1.2, Y + 1.75, Z - 5.68); slab(STEELC, 0.4, 1, 0.4, X - 1.2, Y + 2.25, Z - 5.78); slab(0xfff2c0, 0.8, 0.02, 0.4, X - 1.2, Y + 1.74, Z - 5.65, M.glow);          // the hood
+      slab(0x1c1c22, 0.9, 0.5, 0.05, X - 1.2, Y + 0.3, Z - 4.88); slab(STEELC, 0.7, 0.03, 0.05, X - 1.2, Y + 0.72, Z - 4.86); put(M.plain, new THREE.CylinderGeometry(0.17, 0.15, 0.2, 12).translate(X - 1.45, Y + 1.02, Z - 5.6), 0xb5651d); post(0x1c1c22, 0.012, 0.3, X - 1.2, Y + 1.0, Z - 5.52, 4); // the oven door, a pot of gravy
+      slab(0x23232b, 0.55, 0.34, 0.4, X - 2.6, Y + 0.95, Z - 5.5); slab(0x7dffb0, 0.1, 0.05, 0.01, X - 2.42, Y + 1.2, Z - 5.29, M.glow); slab(0x3a3a44, 0.32, 0.2, 0.01, X - 2.68, Y + 1.02, Z - 5.29);  // the microwave
+      slab(0x1c1c22, 0.24, 0.34, 0.26, X - 7.4, Y + 0.95, Z - 4.4); put(M.plain, new THREE.CylinderGeometry(0.07, 0.08, 0.14, 8).translate(X - 7.35, Y + 1.02, Z - 4.2), 0x5a3320);                 // the coffee machine and its pot
+      slab(STEELC, 0.2, 0.18, 0.3, X - 7.4, Y + 0.95, Z - 3.4); slab(0x5a3320, 0.14, 0.24, 0.2, X - 7.5, Y + 0.95, Z - 2.6); for (let n = 0; n < 4; n++) post(0x1c1c22, 0.012, 0.1, X - 7.52 + (n % 2) * 0.05, Y + 1.19, Z - 2.66 + (n >> 1) * 0.08, 4); // toaster, the knives
+      for (let n = 0; n < 3; n++) put(M.plain, new THREE.CylinderGeometry(0.08 - n * 0.008, 0.08 - n * 0.008, 0.24 - n * 0.04, 10).translate(X - 7.45, Y + 1.07 - n * 0.02, Z - 1.6 + n * 0.24), 0xe9e2cf); // flour, sugar, coffee
+      slab(0xc79a6a, 0.3, 0.2, 0.42, X - 7.42, Y + 0.95, Z + 0.4, M.wood, 1); slab(0x8a1c1c, 0.03, 0.3, 0.22, X - 7.5, Y + 0.95, Z + 1.3); slab(0xf1ece0, 0.02, 0.26, 0.2, X - 7.47, Y + 0.97, Z + 1.3);  // bread box, a cookbook open on its stand
+      put(M.plain, new THREE.CylinderGeometry(0.2, 0.13, 0.09, 14).translate(X - 4, Y + 0.99, Z - 1.5), 0x3b6ea8); ball(0xf2c230, 0.07, X - 4.05, Y + 1.08, Z - 1.45); ball(0xd8342c, 0.07, X - 3.92, Y + 1.08, Z - 1.56); ball(0xff8a5c, 0.07, X - 4.08, Y + 1.08, Z - 1.6); // the bowl
+      slab(0xe9e2cf, 0.34, 0.012, 0.26, X - 3.2, Y + 0.96, Z - 1.3); slab(0x8a8d96, 0.14, 0.02, 0.2, X - 4.9, Y + 0.96, Z - 1.2);                                                          // the mail; his newspaper
+      for (const sx of [-5, -4, -3]) { post(STEELC, 0.025, 0.62, X + sx, Y, Z - 0.42, 5); post(0x8a2f3a, 0.19, 0.06, X + sx, Y + 0.62, Z - 0.42, 12); put(M.plain, new THREE.TorusGeometry(0.15, 0.012, 4, 14).rotateX(Math.PI / 2).translate(X + sx, Y + 0.25, Z - 0.42), STEELC); } // stools at the island
+      for (const sx of [-5, -4, -3]) { post(0x1c1c22, 0.008, 0.9, X + sx, Y + 2.5, Z - 1.5, 4); put(M.glow, new THREE.ConeGeometry(0.17, 0.22, 10, 1, true).translate(X + sx, Y + 2.4, Z - 1.5), 0xffe2a6); }
+      for (const [dx, dz] of [[-6, -4], [-3, -4], [-6, 0.5], [-3, 3.5], [-6, 3.5]]) put(M.glow, new THREE.CylinderGeometry(0.1, 0.1, 0.02, 10).translate(X + dx, Y + 3.39, Z + dz), 0xfff2c0);
+      // The fridge: a handle on each door, a year of magnets, the school photographs.
+      slab(0x8a8d96, 0.02, 0.01, 1, X - 6.8, Y + 1.3, Z + 4.5); slab(STEELC, 0.04, 0.5, 0.04, X - 6.78, Y + 1.45, Z + 4.1); for (let n = 0; n < 7; n++) slab([0xd8342c, 0xf2c230, 0x49e0d0, 0xf4f4f0, 0xff8ad8, 0xe9e2cf, 0x2f7d46][n], 0.012, 0.09 + (n % 2) * 0.05, 0.08 + (n % 3) * 0.03, X - 6.79, Y + 1.4 + (n % 3) * 0.16, Z + 4.3 + (n % 4) * 0.14);
+      slab(IVORY, 0.09, 0.26, 0.12, X - 7.94, Y + 1.35, Z + 3.6); slab(IVORY, 0.07, 0.2, 0.05, X - 7.88, Y + 1.38, Z + 3.6); for (let n = 0; n < 6; n++) ball(IVORY, 0.018, X - 7.9, Y + 1.28 - n * 0.06, Z + 3.6 + Math.sin(n) * 0.02);  // the telephone on the wall, and its cord
+      slab(0xf4f4f0, 0.02, 0.5, 0.4, X - 7.97, Y + 1.7, Z + 2.6); for (let n = 0; n < 12; n++) slab(0xd8342c, 0.022, 0.02, 0.03, X - 7.96, Y + 1.78 + (n % 4) * 0.09, Z + 2.48 + (n >> 2) * 0.1);                       // the calendar
+      // The table: laid for Sunday, the light over it, six chairs now.
+      slab(0xf4f0e6, 2.2, 0.012, 0.5, X + 0.5, Y + 0.8, Z + 1.5); put(M.plain, new THREE.CylinderGeometry(0.16, 0.1, 0.14, 12).translate(X + 0.5, Y + 0.88, Z + 1.5), 0xcfe8ff); for (const [dx, dz, hex] of [[-0.05, 0, 0xd8342c], [0.06, 0.04, 0xffe066], [0, -0.06, 0xff8ad8], [0.02, 0.07, 0xf4f4f0]]) ball(hex, 0.06, X + 0.5 + dx, Y + 1.04, Z + 1.5 + dz);
+      for (const [cx, cz] of [[-0.7, 0.42], [0.7, 0.42], [-0.7, -0.42], [0.7, -0.42]]) { put(M.plain, new THREE.CylinderGeometry(0.15, 0.15, 0.012, 14).translate(X + 0.5 + cx, Y + 0.81, Z + 1.5 + cz), 0xf4f4f0); put(M.plain, new THREE.CylinderGeometry(0.03, 0.025, 0.1, 8).translate(X + 0.5 + cx + 0.22, Y + 0.86, Z + 1.5 + cz), 0xcfe8ff); }
+      for (const s of [-1, 1]) { slab(0x5a3320, 0.46, 0.06, 0.46, X + 0.5 + s * 1.75, Y + 0.46, Z + 1.5); put(M.plain, new THREE.BoxGeometry(0.46, 0.5, 0.06).translate(0, 0.75, -0.23).rotateY(s * Math.PI / 2 + Math.PI).translate(X + 0.5 + s * 1.75, Y, Z + 1.5), 0x5a3320); for (const [fx, fz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) post(0x3a2418, 0.02, 0.46, X + 0.5 + s * 1.75 + fx, Y, Z + 1.5 + fz, 4); }
+      for (const [cx, cz] of [[-0.7, 1.4], [0.7, 1.4], [-0.7, -1.4], [0.7, -1.4]]) for (const [fx, fz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) post(0x3a2418, 0.02, 0.46, X + 0.5 + cx + fx, Y, Z + 1.5 + cz + fz, 4);
+      put(M.plain, new THREE.TorusGeometry(0.5, 0.02, 5, 24).rotateX(Math.PI / 2).translate(X + 0.5, Y + 2.5, Z + 1.5), BRASS); post(BRASS, 0.012, 0.9, X + 0.5, Y + 2.5, Z + 1.5, 4); for (let n = 0; n < 8; n++) { const a = n * Math.PI / 4; ball(0xfff2c0, 0.05, X + 0.5 + Math.sin(a) * 0.5, Y + 2.58, Z + 1.5 + Math.cos(a) * 0.5, M.glow); }
+      // The den: a hearth with the family over it, shelves, curtains at the garden window, the big chair's blanket, the fan turning.
+      slab(0xb5523b, 2, 1.3, 0.5, X + 1.7, Y, Z - 5.74, M.brick, 2); slab(0x16161c, 1.1, 0.75, 0.3, X + 1.7, Y + 0.1, Z - 5.62); slab(0xff8a30, 0.8, 0.3, 0.05, X + 1.7, Y + 0.14, Z - 5.52, M.glow); slab(0xffe066, 0.4, 0.2, 0.06, X + 1.7, Y + 0.14, Z - 5.5, M.glow);
+      slab(0xf1ece0, 2.3, 0.1, 0.6, X + 1.7, Y + 1.3, Z - 5.7); slab(0xb5523b, 1.3, 2, 0.3, X + 1.7, Y + 1.4, Z - 5.84, M.brick, 2); collide(X + 1.7, Z - 5.74, 2.1, 0.55, 2);
+      for (let n = 0; n < 4; n++) { slab(BRASS, 0.26, 0.32, 0.03, X + 0.95 + n * 0.5, Y + 1.4, Z - 5.55); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac, 0xe9e2cf][n], 0.2, 0.26, 0.035, X + 0.95 + n * 0.5, Y + 1.43, Z - 5.55); }                                     // communions, graduations
+      slab(BRASS, 1.1, 0.8, 0.04, X + 1.7, Y + 2.2, Z - 5.68); slab(0x4a6a52, 1, 0.7, 0.045, X + 1.7, Y + 2.25, Z - 5.68); slab(0xc9d8dc, 1, 0.3, 0.05, X + 1.7, Y + 2.65, Z - 5.68);                                                         // a landscape somebody's aunt painted
+      for (const s of [-1, 1]) slab(0x7a2f3a, 0.3, 1.8, 0.1, X + 4 + s * 1.05, Y + 0.9, Z - 5.9); slab(0x7a2f3a, 2.5, 0.25, 0.14, X + 4, Y + 2.65, Z - 5.9);
+      slab(0x5a3320, 0.45, 2.3, 2.4, X + 7.72, Y, Z - 2.6, M.wood, 2); for (let r = 0; r < 4; r++) { slab(0x3a2418, 0.46, 0.04, 2.4, X + 7.71, Y + 0.5 + r * 0.5, Z - 2.6); for (let n = 0; n < 9; n++) if ((n + r) % 4) slab([0x8a1c1c, 0x1f3a2c, 0x2c3a5a, 0xd9c7a0, 0x16161c][(n + r) % 5], 0.3, 0.3 + (n % 3) * 0.04, 0.12, X + 7.64, Y + 0.54 + r * 0.5, Z - 3.6 + n * 0.24); }
+      post(BRASS, 0.05, 0.22, X + 7.62, Y + 2.3, Z - 2.1, 8); ball(BRASS, 0.08, X + 7.62, Y + 2.6, Z - 2.1); collide(X + 7.72, Z - 2.6, 0.6, 2.5, 2.3);                                                                              // a bowling trophy, of all things
+      slab(0xd9c7a0, 1.5, 0.03, 0.9, X + 4.4, Y + 0.56, Z - 4.4); for (const [dx, hex] of [[-0.9, 0xd9a520], [0.6, 0x7a2f3a]]) slab(hex, 0.42, 0.34, 0.14, X + 5.2 + dx, Y + 0.62, Z - 4.62);                                           // a throw, cushions
+      slab(0xe9e2cf, 0.3, 0.02, 0.22, X + 5.0, Y + 0.41, Z - 2.6); slab(0x1c1c22, 0.16, 0.03, 0.05, X + 5.5, Y + 0.41, Z - 2.5); put(M.plain, new THREE.CylinderGeometry(0.12, 0.08, 0.06, 12).translate(X + 4.7, Y + 0.44, Z - 2.75), 0xcfe8ff); // the guide, the remote, a dish of something
+      slab(0x23232b, 0.5, 0.1, 0.34, X + 5.2, Y + 0.12, Z - 0.3); for (const s of [-1, 1]) slab(0x1c1c22, 0.28, 0.7, 0.3, X + 5.2 + s * 0.95, Y, Z - 0.3);                                                                              // the tape machine; speakers
+      post(0xb5523b, 0.24, 0.45, X + 7.4, Y, Z + 0.85, 10); ball(0x2f7d46, 0.45, X + 7.4, Y + 0.95, Z + 0.85); ball(0x3f9a5a, 0.3, X + 7.3, Y + 1.4, Z + 0.8); collide(X + 7.4, Z + 0.85, 0.6, 0.6, 1.4);
+      const fan = new THREE.Group(); for (let n = 0; n < 4; n++) { const b = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.02, 0.2).translate(0.65, 0, 0), new THREE.MeshLambertMaterial({ color: 0x5a3320 })); b.rotation.y = n * Math.PI / 2; fan.add(b); }
+      fan.position.set(X + 5.2, Y + 3.05, Z - 2.6); scene.add(fan); post(BRASS, 0.05, 0.3, X + 5.2, Y + 3.08, Z - 2.6, 8); ball(0xfff2c0, 0.11, X + 5.2, Y + 2.98, Z - 2.6, M.glow); updaters.push(t => { fan.rotation.y = t * 2.6; });
+      // By the door: the hall table with the keys and the flowers, a mirror, coats, the clock; the banister.
+      slab(0x5a3320, 2.2, 0.8, 0.45, X - 1.6, Y, Z + 5.74, M.wood, 1); slab(0x3a2418, 2.3, 0.04, 0.5, X - 1.6, Y + 0.8, Z + 5.74); collide(X - 1.6, Z + 5.74, 2.3, 0.5, 1);
+      put(M.plain, new THREE.CylinderGeometry(0.1, 0.07, 0.3, 10).translate(X - 1.6, Y + 0.99, Z + 5.74), 0x3b6ea8); for (const [dx, hex] of [[-0.08, 0xf4f4f0], [0.08, 0xff8ad8], [0, 0xd8342c], [0.03, 0xffe066]]) ball(hex, 0.07, X - 1.6 + dx, Y + 1.3 + Math.abs(dx), Z + 5.74);
+      for (let n = 0; n < 3; n++) { slab(BRASS, 0.2, 0.26, 0.03, X - 2.4 + n * 0.22 + (n > 1 ? 1.4 : 0), Y + 0.84, Z + 5.8); } put(M.plain, new THREE.CylinderGeometry(0.1, 0.1, 0.03, 10).translate(X - 0.9, Y + 0.85, Z + 5.6), BRASS); slab(STEELC, 0.08, 0.01, 0.04, X - 0.9, Y + 0.87, Z + 5.6);
+      slab(BRASS, 1.3, 0.9, 0.04, X - 1.6, Y + 1.5, Z + 5.96); slab(0xb9c8d8, 1.16, 0.76, 0.045, X - 1.6, Y + 1.57, Z + 5.96);
+      post(0x3a2418, 0.03, 1.8, X + 3.5, Y, Z + 5.6, 6); for (let n = 0; n < 4; n++) slab(0x3a2418, 0.2, 0.03, 0.03, X + 3.5 + Math.cos(n * 1.57) * 0.1, Y + 1.7, Z + 5.6 + Math.sin(n * 1.57) * 0.1); slab(0x6f5a44, 0.3, 0.9, 0.16, X + 3.62, Y + 0.8, Z + 5.6); slab(0x23232b, 0.26, 0.7, 0.14, X + 3.4, Y + 0.95, Z + 5.68);
+      slab(0x3a2418, 0.5, 2.1, 0.34, X + 5, Y, Z + 5.8, M.wood, 1); put(M.plain, new THREE.CylinderGeometry(0.17, 0.17, 0.03, 16).rotateX(Math.PI / 2).translate(X + 5, Y + 1.75, Z + 5.62), 0xf1ece0); slab(BRASS, 0.03, 0.5, 0.02, X + 5, Y + 0.8, Z + 5.62); ball(BRASS, 0.06, X + 5, Y + 0.78, Z + 5.62); collide(X + 5, Z + 5.8, 0.6, 0.4, 2.1);
+      slab(0x8a2f3a, 0.9, 0.012, 0.6, X + 2, Y + 0.005, Z + 5.4);                                                                                                                              // the mat
+      for (let n = 0; n < 7; n++) post(0xffffff, 0.02, 0.9, X + 6.68, Y + n * 0.3 + 0.2, Z + 1.6 + n * 0.32, 4); put(M.plain, new THREE.BoxGeometry(0.06, 0.06, 2.9).rotateX(-Math.atan2(2.1, 2.24)).translate(X + 6.68, Y + 2.1, Z + 2.6), 0x5a3320); post(0x5a3320, 0.05, 1.15, X + 6.68, Y, Z + 1.4, 6); ball(0x5a3320, 0.07, X + 6.68, Y + 1.2, Z + 1.4);
+      for (let n = 0; n < 5; n++) { slab(0x3a2418, 0.03, 0.4, 0.32, X + 7.97, Y + 1.5 + n * 0.3, Z + 1.7 + n * 0.34); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac][n % 3], 0.035, 0.32, 0.24, X + 7.96, Y + 1.54 + n * 0.3, Z + 1.7 + n * 0.34); }   // the children, year by year, up the stairs
+      slab(BRASS, 0.04, 0.5, 0.4, X + 7.96, Y + 1.7, Z - 0.6); slab(0x8a1c1c, 0.045, 0.42, 0.32, X + 7.95, Y + 1.74, Z - 0.6);
+    }
+    roomLamp(q, X - 3.6, Y + 3.1, Z - 2, 0xfff0d0, 46, 14); roomLamp(q, X + 4.8, Y + 2.8, Z - 2.4, 0xffd9a8, 34, 12); roomLamp(q, X + 0.5, Y + 2.4, Z + 1.6, 0xffe8c0, 26, 9); roomLamp(q, X + 1.7, Y + 0.6, Z - 4.9, 0xff8a30, 12, 5);
     const carmela = makeLook('carmela');
     carmela.group.position.set(X - 4, Y, Z - 3.6); carmela.group.rotation.y = Math.PI; scene.add(carmela.group);
     places.houseRoom = { ambient: [carmela], inside: { x: X + 2, z: Z + 3.2, h: Math.PI } };
@@ -2080,6 +2364,81 @@ export function buildWorld(scene) {
     post(0x1c1c22, 0.03, 1.5, q.X - 6.2, q.Y, q.Z - 4.8, 6); put(M.glow, new THREE.ConeGeometry(0.32, 0.4, 12, 1, true).translate(q.X - 6.2, q.Y + 1.7, q.Z - 4.8), 0xffe2a6);
     q.window(-2, -5.72, 2.4, 1.4, 1.8, 0, 0xffd9a8); q.window(3.5, 5.72, 2.4, 1.4, 1.8, Math.PI);
     q.light(-2, 3, -2, 0xffe8c8, 34, 14); q.light(4, 3, 1, 0xffd9a8, 20, 12);
+    { // ----- Her house, as she keeps it (owner feedback: it is his mother's house; build it, both floors) -----
+      const BRASS = 0xd9a520, DARK = 0x3a2418, lay = (tex, w, d, x, z, yy, shiny = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), shiny ? new THREE.MeshPhongMaterial({ map: tex, shininess: shiny, specular: 0x444444 }) : new THREE.MeshLambertMaterial({ map: tex })); m.position.set(x, yy, z); scene.add(m); };
+      const paper = texture(128, 128, (c, w) => { c.fillStyle = '#e9dcc6'; c.fillRect(0, 0, w, w); c.fillStyle = '#dccdb2'; for (let k = 0; k < 4; k++) c.fillRect(k * 32 + 12, 0, 8, w); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const x = i * 32 + 16 + (j % 2) * 16, y = j * 32 + 16; c.fillStyle = '#b5686a'; c.beginPath(); c.arc(x % w, y, 3.2, 0, 7); c.fill(); c.fillStyle = '#6a8a5a'; c.fillRect((x % w) - 5, y + 3, 4, 2); c.fillRect((x % w) + 2, y + 3, 4, 2); } });
+      const hang = (qq, w, h, x, z, turn, rep) => { const t = paper.clone(); t.needsUpdate = true; t.repeat.set(rep, h / 1.1); const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: t })); m.rotation.y = turn; m.position.set(qq.X + x, qq.Y + 1 + h / 2, qq.Z + z); scene.add(m); };
+      const dress = (qq, w, d) => { // wallpaper over a dark dado, on all four walls of a room
+        hang(qq, w - 0.6, 2.3, 0, -d / 2 + 0.31, 0, w / 1.1); hang(qq, w - 0.6, 2.3, 0, d / 2 - 0.31, Math.PI, w / 1.1); hang(qq, d - 0.6, 2.3, -w / 2 + 0.31, 0, Math.PI / 2, d / 1.1); hang(qq, d - 0.6, 2.3, w / 2 - 0.31, 0, -Math.PI / 2, d / 1.1);
+        for (const s of [-1, 1]) { slab(DARK, w - 0.6, 1, 0.04, qq.X, qq.Y, qq.Z + s * (d / 2 - 0.32), M.wood, 2); slab(DARK, 0.04, 1, d - 0.6, qq.X + s * (w / 2 - 0.32), qq.Y, qq.Z, M.wood, 2); }
+      };
+      dress(q, 14, 12);
+      const shag = texture(64, 64, (c, w) => { c.fillStyle = '#7a7a4a'; c.fillRect(0, 0, w, w); for (let n = 0; n < 500; n++) { c.fillStyle = n % 2 ? '#6a6a3e' : '#8a8a58'; c.fillRect((n * 37) % w, (n * 91) % w, 2, 3); } });
+      shag.repeat.set(7, 5); lay(shag, 7.4, 6, q.X - 3, q.Z - 2.4, q.Y + 0.004);
+      const lino = texture(64, 64, (c, w) => { c.fillStyle = '#e9e2cf'; c.fillRect(0, 0, w, w); c.fillStyle = '#7a9a7a'; c.fillRect(0, 0, 32, 32); c.fillRect(32, 32, 32, 32); });
+      lino.repeat.set(7, 7.5); lay(lino, 5.6, 6, q.X + 3.9, q.Z + 2.7, q.Y + 0.004, 50);
+      // The kitchen, in the corner by the street window: the stove where it happens, the sink, the icebox, a table with an oilcloth.
+      q.block(0xe9e2cf, 0.9, 0.92, 4.6, 6.2, 3.3); slab(0x8a9a8a, 1, 0.04, 4.7, q.X + 6.2, q.Y + 0.92, q.Z + 3.3);
+      q.block(0xe9e2cf, 2.6, 0.92, 0.9, 4.5, 5.2); slab(0x8a9a8a, 2.7, 0.04, 1, q.X + 4.5, q.Y + 0.92, q.Z + 5.2);
+      slab(0xf4f4f0, 0.86, 0.94, 0.8, q.X + 6.2, q.Y, q.Z + 2.2); for (let n = 0; n < 4; n++) put(M.plain, new THREE.TorusGeometry(0.12, 0.02, 4, 12).rotateX(Math.PI / 2).translate(q.X + 6.05 + (n % 2) * 0.34, q.Y + 0.97, q.Z + 2.02 + (n >> 1) * 0.36), 0x1c1c22); slab(0x1c1c22, 0.03, 0.4, 0.6, q.X + 5.76, q.Y + 0.3, q.Z + 2.2); slab(0xf4f4f0, 0.1, 0.3, 0.8, q.X + 6.6, q.Y + 0.95, q.Z + 2.2); // the stove
+      slab(0xc9cbd2, 0.9, 0.02, 0.5, q.X + 3.6, q.Y + 0.965, q.Z + 5.2); post(0xc9cbd2, 0.02, 0.26, q.X + 3.6, q.Y + 0.96, q.Z + 5.5, 6); slab(0xf4f4f0, 2.4, 0.3, 0.05, q.X + 3.5, q.Y + 2.45, q.Z + 5.64); for (let n = 0; n < 8; n++) slab(0xd8342c, 0.12, 0.3, 0.055, q.X + 2.5 + n * 0.3, q.Y + 2.45, q.Z + 5.64); // the sink under the window; a valance
+      slab(0xe9e2cf, 0.8, 1.75, 0.8, q.X + 6.2, q.Y, q.Z + 0.35); slab(0xc9cbd2, 0.03, 0.4, 0.04, q.X + 5.78, q.Y + 1.1, q.Z + 0.05); slab(0xb9b3ac, 0.02, 0.01, 0.8, q.X + 5.79, q.Y + 1.3, q.Z + 0.35); collide(q.X + 6.2, q.Z + 0.35, 0.9, 0.9, 1.8);
+      slab(0xe9e2cf, 0.4, 0.75, 3.2, q.X + 6.45, q.Y + 1.6, q.Z + 3.9); for (let n = 0; n < 4; n++) slab(BRASS, 0.03, 0.08, 0.03, q.X + 6.23, q.Y + 1.7, q.Z + 2.7 + n * 0.8);
+      for (let n = 0; n < 4; n++) put(M.plain, new THREE.CylinderGeometry(0.07, 0.07, 0.2 - n * 0.02, 8).translate(q.X + 6.3, q.Y + 1.06, q.Z + 3.4 + n * 0.22), [0xd8342c, 0xf4f4f0, 0xd8342c, 0xf4f4f0][n]); slab(0x8a5a44, 0.3, 0.2, 0.34, q.X + 6.3, q.Y + 0.96, q.Z + 4.7, M.wood, 1); put(M.plain, new THREE.CylinderGeometry(0.11, 0.09, 0.2, 10).translate(q.X + 5.2, q.Y + 1.06, q.Z + 5.3), 0x9fd0f5); // tins, the bread, a kettle
+      slab(0xf4f4f0, 0.02, 0.4, 0.3, q.X + 6.67, q.Y + 1.6, q.Z + 1.3); for (let n = 0; n < 9; n++) slab(0x1c1c22, 0.022, 0.03, 0.03, q.X + 6.66, q.Y + 1.66 + (n % 3) * 0.1, q.Z + 1.2 + Math.floor(n / 3) * 0.1);                                    // the calendar from the funeral home
+      q.block(0xf4f4f0, 1.1, 0.74, 0.8, 3.4, 2.6); slab(0xd8342c, 1.2, 0.012, 0.9, q.X + 3.4, q.Y + 0.745, q.Z + 2.6); for (let n = 0; n < 12; n++) slab(0xf4f4f0, 0.1, 0.014, 0.1, q.X + 2.95 + (n % 4) * 0.3, q.Y + 0.746, q.Z + 2.3 + Math.floor(n / 4) * 0.3);          // gingham
+      put(M.plain, new THREE.CylinderGeometry(0.07, 0.06, 0.07, 8).translate(q.X + 3.2, q.Y + 0.8, q.Z + 2.5), 0xf4f4f0); put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.1, 6).translate(q.X + 3.6, q.Y + 0.81, q.Z + 2.7), 0xf4f4f0); put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.1, 6).translate(q.X + 3.7, q.Y + 0.81, q.Z + 2.7), 0x23232b);
+      for (const [cx, cz, h] of [[3.4, 3.4, Math.PI], [3.4, 1.8, 0]]) chairAt({ x: q.X + cx, z: q.Z + cz, h }, q.Y, 0x8a9a8a);
+      collide(q.X + 6.2, q.Z + 3.3, 1, 4.7, 1); collide(q.X + 4.5, q.Z + 5.2, 2.7, 1, 1);
+      // The living room: antimacassars, the Infant of Prague, a rocker, the radiator, drapes, the telephone she uses like a rifle.
+      for (const sx of [-4, -3, -2]) slab(0xf4f4f0, 0.4, 0.3, 0.02, q.X + sx, q.Y + 0.8, q.Z - 3.74); slab(0xf4f4f0, 0.3, 0.3, 0.02, q.X - 5.6, q.Y + 0.56, q.Z - 0.5);
+      slab(0xf4f4f0, 0.5, 0.012, 0.5, q.X - 3, q.Y + 1.0, q.Z + 0.9); post(0xd9c7a0, 0.08, 0.05, q.X - 3, q.Y + 1.01, q.Z + 0.9, 8); put(M.plain, new THREE.ConeGeometry(0.1, 0.3, 8).translate(q.X - 3, q.Y + 1.21, q.Z + 0.9), 0xd8342c); ball(0xf4d8c0, 0.05, q.X - 3, q.Y + 1.4, q.Z + 0.9); put(M.plain, new THREE.ConeGeometry(0.05, 0.07, 6).translate(q.X - 3, q.Y + 1.47, q.Z + 0.9), BRASS); // on the television
+      slab(0x5a3320, 0.6, 0.08, 0.6, q.X - 5.4, q.Y + 0.42, q.Z + 1.6, M.wood, 1); slab(0x5a3320, 0.6, 0.7, 0.07, q.X - 5.68, q.Y + 0.42, q.Z + 1.6, M.wood, 1); for (const s of [-1, 1]) put(M.plain, new THREE.TorusGeometry(0.5, 0.025, 4, 12, 1.2).rotateY(Math.PI / 2).rotateX(-0.6).translate(q.X - 5.4, q.Y + 0.5, q.Z + 1.6 + s * 0.28), 0x5a3320); slab(0xc85cff, 0.5, 0.05, 0.5, q.X - 5.4, q.Y + 0.5, q.Z + 1.6); collide(q.X - 5.4, q.Z + 1.6, 0.8, 0.8, 1, true);
+      for (let n = 0; n < 9; n++) slab(0xd8d2c8, 0.1, 0.7, 0.16, q.X - 3.4 + n * 0.12, q.Y + 0.08, q.Z - 5.58); slab(0xd8d2c8, 1.2, 0.04, 0.2, q.X - 2.9, q.Y + 0.78, q.Z - 5.58);                                                                          // the radiator under the window
+      for (const s of [-1, 1]) slab(0x6a2f3a, 0.4, 2, 0.1, q.X - 2 + s * 1.4, q.Y + 0.8, q.Z - 5.62); slab(0x6a2f3a, 3.2, 0.3, 0.14, q.X - 2, q.Y + 2.75, q.Z - 5.6); slab(0xf4f4f0, 2.3, 1.4, 0.02, q.X - 2, q.Y + 1.1, q.Z - 5.66);                             // drapes and the nets behind them
+      q.block(DARK, 0.5, 0.72, 0.5, -1.5, 5.3, M.wood, 1); slab(0xf4f4f0, 0.4, 0.012, 0.4, q.X - 1.5, q.Y + 0.72, q.Z + 5.3); slab(0x1c1c22, 0.24, 0.1, 0.2, q.X - 1.5, q.Y + 0.73, q.Z + 5.3); slab(0x1c1c22, 0.07, 0.05, 0.26, q.X - 1.5, q.Y + 0.83, q.Z + 5.3); slab(0xe9e2cf, 0.16, 0.012, 0.22, q.X - 1.5, q.Y + 0.735, q.Z + 5.05); // the telephone, and the numbers
+      slab(BRASS, 0.06, 0.4, 0.03, q.X + 1.6, q.Y + 2.2, q.Z - 5.66); slab(BRASS, 0.24, 0.06, 0.03, q.X + 1.6, q.Y + 2.42, q.Z - 5.66);                                                                                                               // the crucifix over the table
+      slab(BRASS, 0.7, 0.9, 0.03, q.X - 5.6, q.Y + 1.6, q.Z - 5.66); slab(0x8a8d96, 0.6, 0.8, 0.035, q.X - 5.6, q.Y + 1.65, q.Z - 5.66); slab(0x1c1c22, 0.3, 0.3, 0.04, q.X - 5.6, q.Y + 2.05, q.Z - 5.65);                                              // her husband, in a good frame
+      put(M.plain, new THREE.CylinderGeometry(0.2, 0.2, 0.04, 16).rotateX(Math.PI / 2).translate(q.X + 0.3, q.Y + 2.5, q.Z - 5.66), 0xf1ece0); put(M.plain, new THREE.TorusGeometry(0.2, 0.02, 4, 18).translate(q.X + 0.3, q.Y + 2.5, q.Z - 5.64), DARK);
+      put(M.plain, new THREE.CylinderGeometry(0.45, 0.3, 0.26, 12, 1, true).translate(q.X - 3, q.Y + 3.05, q.Z - 2.4), 0xe9d9a8); ball(0xfff2c0, 0.1, q.X - 3, q.Y + 3, q.Z - 2.4, M.glow); for (let n = 0; n < 12; n++) post(0xd9a520, 0.006, 0.1, q.X - 3 + Math.sin(n * 0.52) * 0.44, q.Y + 2.84, q.Z - 2.4 + Math.cos(n * 0.52) * 0.44, 3); // the fringed shade
+      slab(0xd9c7a0, 1, 0.012, 0.6, q.X, q.Y + 0.005, q.Z + 5.2); for (let n = 0; n < 2; n++) slab(0xf4f4f0, 1.7, 0.012, 0.5, q.X - 0.4, q.Y + 0.006, q.Z + 3.6 - n * 1.8);                                                                           // plastic runners, so nobody walks on the carpet
+      // The stairs, against the west wall.
+      for (let n = 0; n < 7; n++) slab(0x5a3320, 1.1, 0.2, 0.32, q.X - 6.1, q.Y + n * 0.3, q.Z + 3 + n * 0.32, M.wood, 1); collide(q.X - 6.1, q.Z + 4.1, 1.1, 2.4, 2);
+      for (let n = 0; n < 7; n++) post(0xf4f4f0, 0.02, 0.9, q.X - 5.52, q.Y + n * 0.3 + 0.2, q.Z + 3 + n * 0.32, 4); put(M.plain, new THREE.BoxGeometry(0.06, 0.06, 2.9).rotateX(-Math.atan2(2.1, 2.24)).translate(q.X - 5.52, q.Y + 2.1, q.Z + 4), DARK);
+      slab(0x7a2f3a, 0.6, 0.012, 2.3, q.X - 6.1, q.Y + 0.21, q.Z + 3.1);
+      q.lights.length = 0; q.light(-2.6, 3, -2.2, 0xffe2b8, 36, 13); q.light(4, 3, 2.8, 0xf4f6e8, 30, 11); q.light(2.5, 2.8, -3.4, 0xffd9a8, 18, 8);
+      q.sofa = { x: q.X - 3, y: q.Y, z: q.Z - 3.3, h: 0 }; q.armchair = { x: q.X - 5.6, y: q.Y, z: q.Z - 0.9, h: Math.PI / 2 }; q.stove = { x: q.X + 6.2, z: q.Z + 2.2 }; q.phone = { x: q.X - 1.5, z: q.Z + 4.6 };
+
+      // ----- Upstairs: her bedroom, the landing, and the room of a boy who is forty now -----
+      const u = rooms.LIVIA_UP = room(13, 9, 3, { floor: M.wood, floorTint: 0x8a6a4a, floorScale: 1.5, wall: M.plain, wallTint: 0xe9dcc6, door: 0xe9dcc6, at: [q.X, q.Z - 24] });
+      dress(u, 13, 9);
+      u.block(0xe9dcc6, 0.2, 3, 5.6, 0.6, -1.4);                                                                                                                 // the wall between the two rooms; both open onto the landing
+      // Her room: the iron bed, chenille, the dressing table, the wardrobe, a rosary on the post, him on the night table with a candle.
+      u.block(0xf4f4f0, 1.6, 0.5, 2.1, -3.6, -2.9); slab(0xf7c8d4, 1.64, 0.1, 1.5, u.X - 3.6, u.Y + 0.5, u.Z - 2.6); slab(0xffffff, 1.2, 0.14, 0.4, u.X - 3.6, u.Y + 0.5, u.Z - 3.7);
+      for (const s of [-1, 1]) { post(0x1c1c22, 0.03, 1.3, u.X - 3.6 + s * 0.8, u.Y, u.Z - 3.98, 6); ball(BRASS, 0.05, u.X - 3.6 + s * 0.8, u.Y + 1.33, u.Z - 3.98); post(0x1c1c22, 0.03, 0.8, u.X - 3.6 + s * 0.8, u.Y, u.Z - 1.84, 6); } for (let n = 0; n < 5; n++) post(0x1c1c22, 0.015, 0.7, u.X - 4.2 + n * 0.3, u.Y + 0.5, u.Z - 3.98, 4); slab(0x1c1c22, 1.6, 0.03, 0.03, u.X - 3.6, u.Y + 1.2, u.Z - 3.98);
+      for (let n = 0; n < 9; n++) ball(0x3a2418, 0.02, u.X - 2.8 + Math.sin(n * 0.7) * 0.06, u.Y + 1.2 - n * 0.05, u.Z - 3.96); slab(BRASS, 0.03, 0.08, 0.01, u.X - 2.8, u.Y + 0.72, u.Z - 3.96);
+      u.block(DARK, 0.5, 0.6, 0.45, -2.3, -3.8, M.wood, 1); slab(0xf4f4f0, 0.42, 0.01, 0.38, u.X - 2.3, u.Y + 0.6, u.Z - 3.8); slab(BRASS, 0.16, 0.22, 0.03, u.X - 2.4, u.Y + 0.61, u.Z - 3.9); post(0xd8342c, 0.035, 0.12, u.X - 2.15, u.Y + 0.61, u.Z - 3.75, 8); ball(0xffd060, 0.02, u.X - 2.15, u.Y + 0.76, u.Z - 3.75, M.glow);
+      for (let n = 0; n < 3; n++) put(M.plain, new THREE.CylinderGeometry(0.025, 0.025, 0.07, 8).translate(u.X - 2.45 + n * 0.07, u.Y + 0.64, u.Z - 3.65), 0xff8a30); slab(0x1c1c22, 0.14, 0.1, 0.08, u.X - 2.2, u.Y + 0.61, u.Z - 3.95);                                  // her pills, the clock
+      u.block(DARK, 1.2, 0.74, 0.45, -5.6, -0.6, M.wood, 1); put(M.plain, new THREE.CylinderGeometry(0.36, 0.36, 0.03, 18).rotateZ(Math.PI / 2).scale(1, 1.3, 1).translate(u.X - 6.16, u.Y + 1.4, u.Z - 0.6), 0xb9c8d8); for (let n = 0; n < 4; n++) put(M.plain, new THREE.CylinderGeometry(0.025, 0.03, 0.09, 6).translate(u.X - 5.9 + n * 0.14, u.Y + 0.79, u.Z - 0.55), [0xf7c8d4, 0xcfe8ff, 0xd9a520, 0xf4f4f0][n]); slab(0xf7c8d4, 0.3, 0.02, 0.2, u.X - 5.3, u.Y + 0.75, u.Z - 0.6);
+      u.block(DARK, 1.8, 2.2, 0.6, -1, -3.9, M.wood, 2); slab(0x2a1810, 0.02, 2, 0.02, u.X - 1, u.Y + 0.1, u.Z - 3.59); for (const s of [-1, 1]) slab(BRASS, 0.03, 0.12, 0.03, u.X - 1 + s * 0.1, u.Y + 1.1, u.Z - 3.58);
+      slab(0x8a5a44, 0.8, 0.26, 0.5, u.X - 1, u.Y + 2.2, u.Z - 3.9, M.wood, 1); slab(BRASS, 0.1, 0.04, 0.02, u.X - 1, u.Y + 2.3, u.Z - 3.64);                                                                                                                  // the suitcase, on top of it
+      u.window(-6.22, -2.6, 1.6, 1.3, 1.9, Math.PI / 2, 0xffe8c8); for (const s of [-1, 1]) slab(0xf4f4f0, 0.05, 1.5, 0.5, u.X - 6.16, u.Y + 1.2, u.Z - 2.6 + s * 0.7);
+      slab(0xb5686a, 2.2, 0.012, 1.3, u.X - 3.6, u.Y + 0.005, u.Z - 1.1); slab(BRASS, 0.5, 0.64, 0.03, u.X - 4.8, u.Y + 1.7, u.Z - 4.16); slab(0x9fb8d8, 0.42, 0.56, 0.035, u.X - 4.8, u.Y + 1.74, u.Z - 4.16);                                              // a rug; Our Lady
+      // His room: the narrow bed, pennants, a shelf of models, the glove, a desk with a lamp, a box that says DO NOT THROW OUT.
+      u.block(0x2c3a5a, 1, 0.42, 2, 5.6, -3); slab(0xf4f4f0, 0.8, 0.12, 0.4, u.X + 5.6, u.Y + 0.42, u.Z - 3.75); slab(0x8a1c1c, 1.02, 0.06, 1.3, u.X + 5.6, u.Y + 0.42, u.Z - 2.6);
+      for (const [k, hex] of [0xd8342c, 0x2f56c8, 0xf2c230].entries()) put(M.plain, new THREE.ConeGeometry(0.16, 0.7, 3).rotateZ(Math.PI / 2).scale(1, 1, 0.05).translate(u.X + 3.4 + k * 1, u.Y + 2 + (k % 2) * 0.3, u.Z - 4.16), hex);
+      slab(DARK, 1.6, 0.04, 0.26, u.X + 2.2, u.Y + 1.6, u.Z - 4.05, M.wood, 1); for (let n = 0; n < 3; n++) { slab([0x8a8d96, 0x2f5a3f, 0xd9c7a0][n], 0.34, 0.07, 0.07, u.X + 1.7 + n * 0.5, u.Y + 1.68, u.Z - 4.05); slab([0x8a8d96, 0x2f5a3f, 0xd9c7a0][n], 0.07, 0.02, 0.36, u.X + 1.7 + n * 0.5, u.Y + 1.7, u.Z - 4.05); } // aeroplanes he glued himself
+      u.block(DARK, 1.3, 0.72, 0.6, 2.2, -3.9, M.wood, 1); post(0x1c1c22, 0.015, 0.36, u.X + 2.6, u.Y + 0.72, u.Z - 3.95, 5); put(M.glow, new THREE.ConeGeometry(0.12, 0.14, 8, 1, true).translate(u.X + 2.6, u.Y + 1.12, u.Z - 3.95), 0xffe2a6); slab(0x8a5a2a, 0.26, 0.1, 0.24, u.X + 1.9, u.Y + 0.72, u.Z - 3.9); ball(0xf4f4f0, 0.045, u.X + 1.9, u.Y + 0.84, u.Z - 3.9); // the glove, the ball
+      slab(0xc79a6a, 0.6, 0.4, 0.5, u.X + 1.4, u.Y, u.Z - 1.2); slab(0xf4f4f0, 0.4, 0.14, 0.01, u.X + 1.4, u.Y + 0.14, u.Z - 0.94); put(M.plain, new THREE.CylinderGeometry(0.02, 0.03, 0.85, 6).rotateZ(0.2).translate(u.X + 1.1, u.Y + 0.43, u.Z - 1.9), 0xd9b48a);                            // the box; a bat in the corner
+      u.window(6.22, -2.6, 1.4, 1.2, 1.9, -Math.PI / 2, 0xffe8c8); slab(0x2c3a5a, 1.8, 0.012, 1.2, u.X + 4, u.Y + 0.005, u.Z - 1.4);
+      // The landing: a runner, the bathroom door, the stairhead, the telephone extension, more of the dead.
+      slab(0x7a2f3a, 11, 0.012, 1.1, u.X, u.Y + 0.006, u.Z + 2.6); slab(0xf4f4f0, 0.9, 2.1, 0.05, u.X + 3.2, u.Y, u.Z + 4.16); slab(BRASS, 0.05, 0.05, 0.05, u.X + 2.9, u.Y + 1.05, u.Z + 4.12);
+      for (let n = 0; n < 5; n++) { slab(DARK, 0.4, 0.5, 0.03, u.X - 4 + n * 1.2, u.Y + 1.7, u.Z + 4.16); slab(0xb9b3ac, 0.32, 0.42, 0.035, u.X - 4 + n * 1.2, u.Y + 1.74, u.Z + 4.16); }
+      for (const lx of [-3.6, 4]) { put(M.plain, new THREE.CylinderGeometry(0.3, 0.2, 0.2, 10, 1, true).translate(u.X + lx, u.Y + 2.8, u.Z - 1.6), 0xe9d9a8); ball(0xfff2c0, 0.08, u.X + lx, u.Y + 2.76, u.Z - 1.6, M.glow); }
+      u.light(-3.6, 2.6, -2, 0xffe2c8, 30, 10); u.light(4, 2.6, -2, 0xfff0d0, 26, 10); u.light(0, 2.6, 2.6, 0xffe8c8, 20, 11);
+      u.suitcase = { x: u.X - 1, z: u.Z - 2.9 }; u.bed = { x: u.X - 3.6, y: u.Y + 0.55, z: u.Z - 2.9 }; u.oldRoom = { x: u.X + 3.6, z: u.Z - 1.4 };
+      (places.stairs ??= []).push({ a: { x: q.X - 5, z: q.Z + 2.8, h: Math.PI / 2 }, b: { x: u.X - 5.4, z: u.Z + 2.6, h: Math.PI / 2 }, up: 'Go upstairs', down: 'Go downstairs' });
+    }
   }
   { // a warehouse: racks of boxes to the roof, a forklift, a foreman's cage
     const q = rooms.WAREHOUSE = room(24, 16, 6, { floor: M.asphalt, floorTint: 0x8a8890, floorScale: 5, wall: M.siding, wallTint: 0x9fb0c4, wallScale: 1.6, ceil: 0x55525a, doorX: -8 });
@@ -2259,17 +2618,154 @@ export function buildWorld(scene) {
     clerk(q, 0, -3.9, 0, { body: 'female', hair: 0x2b1b12, hairMesh: 'long', shirt: 0x1f6b4a, tee: true });
     q.person(pick(PED_ROOM_LOOKS), -3.2, 1.5, 0, 'sit');
   }
-  { // F-Note Records: a lobby of gold records, a receptionist, a mixing desk through the glass
-    const q = rooms.FNOTE = room(14, 10, 3.6, { floor: M.gravel, floorTint: 0x5a4a66, wallTint: 0xf5f5f0, ceil: 0x16161c });
-    counter(q, 0, -2.6, 5, 0x16161c, 0); slab(0x49e0d0, 5.2, 0.06, 0.1, q.X, q.Y + 1.0, q.Z - 2.15, M.glow);
-    for (let n = 0; n < 8; n++) { slab(0x16161c, 0.8, 0.8, 0.05, q.X - 5.6 + n * 1.6, q.Y + 2, q.Z - 4.84, M.plain); put(M.plain, new THREE.CylinderGeometry(0.3, 0.3, 0.02, 20).rotateX(Math.PI / 2).translate(q.X - 5.6 + n * 1.6, q.Y + 2.4, q.Z - 4.8), n % 3 ? 0xd9a520 : 0xc9cbd2); }
-    q.block(0x16161c, 5, 2.6, 0.3, 4, -4.7); q.glowPanel(0x9fd0f5, 4.4, 1.4, 4, -4.52, 2); slab(0x3a3a44, 4, 0.4, 1, q.X + 4, q.Y + 0.8, q.Z - 4.2); for (let n = 0; n < 16; n++) slab([0xd8342c, 0x49e0d0, 0xffe066][n % 3], 0.1, 0.05, 0.1, q.X + 2.2 + n * 0.24, q.Y + 1.2, q.Z - 4.2, M.glow); // the studio, through glass
-    for (const s of [-1, 1]) { q.block(0x2f4a44, 2.2, 0.5, 0.9, s * 4.5, 2.5); q.block(0x2f4a44, 2.2, 0.5, 0.3, s * 4.5, 2.1, M.plain, 0, 0.5); }
-    q.block(0x16161c, 1, 0.4, 1, 0, 2.8, M.plain, 0); for (let n = 0; n < 3; n++) slab(0xe9e2cf, 0.3, 0.02, 0.4, q.X - 0.3 + n * 0.3, q.Y + 0.41, q.Z + 2.8);
-    sign('F-Note Records', q.X - 2, q.Y + 3, q.Z - 4.84, 0, { w: 5, h: 1.1, color: '#49e0d0', bg: '#16161c', font: '"Mr Dafoe", cursive', size: 0.8 });
-    q.window(-3, 4.72, 3, 1.6, 1.8, Math.PI);
-    q.light(0, 3.2, -1, 0xcfe8ff, 40, 14); q.light(0, 3.2, 2.5, 0xffd9a8, 24, 12);
+  { // F-Note Records: reception under the gold records, a vocal booth behind glass with the board in front of it, and the door through to Hesh
+    const q = rooms.FNOTE = room(14, 10, 3.6, { floor: M.gravel, floorTint: 0x4a3a5a, wall: M.plain, wallTint: 0x3a2e4a, ceil: 0x16161c });
+    const WALNUT = 0x4a2c1c, GOLD = 0xd9a520, TEAL = 0x49e0d0, INK = 0x16161c, OX = 0x5a1a1a;
+    const lay = (tex, w, d, x, z, y = 0.004, shiny = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), shiny ? new THREE.MeshPhongMaterial({ map: tex, shininess: shiny, specular: 0x444444 }) : new THREE.MeshLambertMaterial({ map: tex })); m.position.set(x, y, z); scene.add(m); return m; };
+    const pane = (w, h, x, y, z, turn) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshPhongMaterial({ color: 0x9fd0f5, transparent: true, opacity: 0.2, shininess: 160, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false })); m.rotation.y = turn; m.position.set(x, y, z); scene.add(m); };
+    // A gold (or platinum) record in a frame, with its plaque and a light over it. `turn` is the way it faces.
+    const award = (x, y, z, turn, hex = GOLD) => {
+      const g0 = new THREE.BoxGeometry(0.7, 0.9, 0.04), g1 = new THREE.BoxGeometry(0.58, 0.78, 0.045), d0 = new THREE.CylinderGeometry(0.23, 0.23, 0.05, 22).rotateX(Math.PI / 2).translate(0, 0.1, 0), d1 = new THREE.CylinderGeometry(0.07, 0.07, 0.055, 12).rotateX(Math.PI / 2).translate(0, 0.1, 0), pl = new THREE.BoxGeometry(0.3, 0.1, 0.05).translate(0, -0.26, 0), lt = new THREE.BoxGeometry(0.4, 0.03, 0.1).translate(0, 0.52, 0.07);
+      for (const [geo, c, m] of [[g0, INK], [g1, 0xf1ece0], [d0, hex], [d1, TEAL], [pl, GOLD], [lt, 0xfff2c0, M.glow]]) put(m || M.plain, geo.rotateY(turn).translate(x, y, z), c);
+    };
+    const carpet = texture(128, 128, (c, w) => { c.fillStyle = '#3f2e55'; c.fillRect(0, 0, w, w); c.strokeStyle = 'rgba(217,165,32,.28)'; c.lineWidth = 1.5; for (let k = -1; k < 3; k++) { c.beginPath(); c.moveTo(k * 64, 0); c.lineTo(k * 64 + 64, 64); c.lineTo(k * 64, 128); c.moveTo(k * 64 + 64, 0); c.lineTo(k * 64, 64); c.lineTo(k * 64 + 64, 128); c.stroke(); } c.fillStyle = 'rgba(73,224,208,.35)'; for (const [x, y] of [[0, 0], [64, 64], [0, 128], [128, 0], [128, 128]]) c.fillRect(x - 2, y - 2, 4, 4); });
+    carpet.repeat.set(9, 6.4); lay(carpet, 13.4, 9.4, q.X, q.Z, q.Y + 0.004);
+    for (const s of [-1, 1]) { slab(WALNUT, 13.4, 1, 0.05, q.X, q.Y, q.Z + s * 4.68, M.wood, 2); slab(WALNUT, 0.05, 1, 9.4, q.X + s * 6.68, q.Y, q.Z, M.wood, 2); slab(GOLD, 13.4, 0.03, 0.06, q.X, q.Y + 1, q.Z + s * 4.68); slab(GOLD, 0.06, 0.03, 9.4, q.X + s * 6.68, q.Y + 1, q.Z); } // a walnut dado and a line of brass
+    // Reception: the walnut wall with the name on it, the desk, and what is on the desk.
+    slab(WALNUT, 6.6, 3.5, 0.06, q.X + 0.1, q.Y, q.Z - 4.83, M.wood, 2); for (let k = 0; k < 6; k++) slab(GOLD, 0.02, 3.5, 0.07, q.X - 3.2 + k * 1.32, q.Y, q.Z - 4.83);
+    sign('F-Note Records', q.X + 0.1, q.Y + 2.75, q.Z - 4.78, 0, { w: 4.6, h: 1, color: '#49e0d0', bg: '#2a1810', font: '"Mr Dafoe", cursive', size: 0.8 });
+    counter(q, 0, -2.6, 5, INK, 0); slab(TEAL, 5.2, 0.06, 0.1, q.X, q.Y + 1.0, q.Z - 2.15, M.glow); slab(GOLD, 5, 0.03, 0.03, q.X, q.Y + 0.2, q.Z - 2.19);
+    slab(0x23232b, 0.5, 0.36, 0.05, q.X - 1.2, q.Y + 1.2, q.Z - 2.8); slab(0x9fd0f5, 0.44, 0.3, 0.02, q.X - 1.2, q.Y + 1.23, q.Z - 2.83, M.glow); slab(0x23232b, 0.2, 0.08, 0.14, q.X - 1.2, q.Y + 1.13, q.Z - 2.8);
+    slab(0x8a1c1c, 0.24, 0.08, 0.18, q.X + 0.5, q.Y + 1.13, q.Z - 2.7); slab(0x8a1c1c, 0.06, 0.05, 0.22, q.X + 0.5, q.Y + 1.21, q.Z - 2.7);                    // the telephone
+    post(0xf4f4f0, 0.06, 0.2, q.X + 1.9, q.Y + 1.13, q.Z - 2.7, 8); for (const [dx, hex] of [[-0.05, 0xd8342c], [0.04, 0xffe066], [0, 0xff8ad8]]) ball(hex, 0.05, q.X + 1.9 + dx, q.Y + 1.42 + Math.abs(dx), q.Z - 2.7); // flowers
+    for (let n = 0; n < 6; n++) slab([0xd8342c, 0xffe066, TEAL, 0xf4f4f0, 0x8a5cff, 0xff8a5c][n], 0.11, 0.02, 0.07, q.X - 0.3, q.Y + 1.13 + n * 0.021, q.Z - 2.9);            // demo tapes, unplayed
+    slab(GOLD, 0.5, 0.09, 0.02, q.X, q.Y + 1.13, q.Z - 2.3);                                                                                       // RECEPTION, in brass
+    for (const px of [-1.6, 0, 1.6]) { post(INK, 0.008, 1, q.X + px, q.Y + 2.5, q.Z - 2.6, 4); put(M.glow, new THREE.ConeGeometry(0.16, 0.2, 10, 1, true).translate(q.X + px, q.Y + 2.4, q.Z - 2.6), 0xffe2a6); }
+    // The door through to the office, on the north wall, and the name on it.
+    slab(0x2a1810, 1.3, 2.6, 0.06, q.X - 5.4, q.Y, q.Z - 4.84); slab(WALNUT, 1.1, 2.4, 0.08, q.X - 5.4, q.Y, q.Z - 4.83, M.wood, 1); slab(GOLD, 0.06, 0.06, 0.08, q.X - 4.98, q.Y + 1.1, q.Z - 4.8);
+    sign(['H. RABKIN', 'PRIVATE'], q.X - 5.4, q.Y + 1.75, q.Z - 4.77, 0, { w: 0.7, h: 0.3, color: '#2a1810', bg: '#d9a520', size: 0.7, glow: false });
+    // The booth: glass on two sides, foam on the walls, a microphone, somebody singing; RECORDING over the glass.
+    for (const [w, h, d, x, z] of [[3.6, 0.12, 0.12, 4.95, -2.7], [0.12, 0.12, 2.1, 3.2, -3.7]]) { slab(INK, w, h, d, q.X + x, q.Y + 2.5, q.Z + z); slab(INK, w, 0.5, d, q.X + x, q.Y, q.Z + z); }
+    for (const [x, z] of [[3.2, -2.7], [6.65, -2.7], [3.2, -4.65]]) post(INK, 0.06, 2.6, q.X + x, q.Y, q.Z + z, 4);
+    pane(3.4, 2, q.X + 4.95, q.Y + 1.5, q.Z - 2.7, 0); pane(2, 2, q.X + 3.2, q.Y + 1.5, q.Z - 3.7, Math.PI / 2);
+    slab(INK, 3.6, 1, 0.12, q.X + 4.95, q.Y + 2.6, q.Z - 2.7); slab(INK, 0.12, 1, 2.1, q.X + 3.2, q.Y + 2.6, q.Z - 3.7);
+    slab(0x23232b, 3.4, 3.4, 0.05, q.X + 4.95, q.Y, q.Z - 4.8); for (let i = 0; i < 7; i++) for (let j = 0; j < 5; j++) put(M.plain, new THREE.ConeGeometry(0.2, 0.1, 4).rotateX(Math.PI / 2).rotateZ(Math.PI / 4).translate(q.X + 3.5 + i * 0.48, q.Y + 0.7 + j * 0.5, q.Z - 4.72), (i + j) % 2 ? 0x2e2e38 : 0x3a3a46); // foam
+    post(0x8a8d96, 0.015, 1.45, q.X + 4.9, q.Y, q.Z - 3.5, 5); post(0x8a8d96, 0.14, 0.02, q.X + 4.9, q.Y, q.Z - 3.5, 10); put(M.plain, new THREE.CylinderGeometry(0.035, 0.035, 0.16, 8).rotateX(Math.PI / 2).translate(q.X + 4.9, q.Y + 1.5, q.Z - 3.55), 0xc9cbd2); put(M.plain, new THREE.CylinderGeometry(0.09, 0.09, 0.01, 14).rotateX(Math.PI / 2).translate(q.X + 4.9, q.Y + 1.5, q.Z - 3.72), 0x23232b);
+    post(INK, 0.012, 1.1, q.X + 5.6, q.Y, q.Z - 3.6, 4); put(M.plain, new THREE.BoxGeometry(0.4, 0.3, 0.02).rotateX(-0.3).translate(q.X + 5.6, q.Y + 1.2, q.Z - 3.6), 0xf4f4f0);
+    sign('RECORDING', q.X + 4.95, q.Y + 2.85, q.Z - 2.63, 0, { w: 1.5, h: 0.32, color: '#ff2a4a', bg: '#16161c', size: 0.7 });
+    q.person({ body: 'female', dark: true, hair: 0x111111, hairMesh: 'long', shirt: 0xffe066, tee: true, pants: 0x23232b }, 4.9, -4.1, 0, 'talk');
+    collide(q.X + 4.95, q.Z - 3.7, 3.7, 2.2, 3);
+    // The board, facing the glass: faders, meters, two monitors, the tape machine turning beside it, the man who has heard it all.
+    slab(0x23232b, 3, 0.74, 0.9, q.X + 4.7, q.Y, q.Z - 1.5); put(M.plain, new THREE.BoxGeometry(3, 0.07, 0.8).rotateX(0.22).translate(q.X + 4.7, q.Y + 0.84, q.Z - 1.5), 0x3a3a44);
+    for (let n = 0; n < 20; n++) { slab(0xe9e2cf, 0.035, 0.03, 0.07, q.X + 3.4 + n * 0.135, q.Y + 0.86 + ((n * 7) % 5) * 0.012, q.Z - 1.38 + ((n * 7) % 5) * 0.05); slab([0x7dffb0, 0xffe066, 0xff2a4a][n % 3], 0.03, 0.02, 0.03, q.X + 3.4 + n * 0.135, q.Y + 0.93, q.Z - 1.8, M.glow); }
+    slab(INK, 1, 0.3, 0.06, q.X + 4.7, q.Y + 0.98, q.Z - 1.92); slab(0x7dffb0, 0.9, 0.2, 0.02, q.X + 4.7, q.Y + 1.03, q.Z - 1.88, M.glow);
+    for (const s of [-1, 1]) { slab(INK, 0.36, 0.5, 0.3, q.X + 4.7 + s * 1.25, q.Y + 0.9, q.Z - 1.85); put(M.plain, new THREE.CylinderGeometry(0.12, 0.12, 0.02, 14).rotateX(Math.PI / 2).translate(q.X + 4.7 + s * 1.25, q.Y + 1.1, q.Z - 1.69), 0x8d8a8e); }
+    slab(0x8d8a8e, 0.7, 1, 0.6, q.X + 2.7, q.Y, q.Z - 1.5); const reels = [-0.17, 0.17].map(dx => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.03, 6), new THREE.MeshLambertMaterial({ color: 0xc9cbd2 })); r.position.set(q.X + 2.7 + dx, q.Y + 1.02, q.Z - 1.5); scene.add(r); return r; });
+    updaters.push(t => { reels[0].rotation.y = t * 2.2; reels[1].rotation.y = t * 2.2; });
+    slab(0x23232b, 0.5, 0.08, 0.5, q.X + 4.7, q.Y + 0.42, q.Z - 0.55); post(0x8a8d96, 0.03, 0.42, q.X + 4.7, q.Y, q.Z - 0.55, 5); slab(0x23232b, 0.5, 0.5, 0.06, q.X + 4.7, q.Y + 0.5, q.Z - 0.3);
+    q.person({ shirt: 0x3b4a66, sleeves: 'long', pants: 0x23232b, hair: 0x8d8a8e, hairStyle: 'balding', bulk: 1.1, age: 0.6, glasses: 'clear' }, 4.7, -0.6, Math.PI, 'sit');
+    collide(q.X + 4.4, q.Z - 1.5, 4.2, 1.1, 1.2);
+    // Records on the walls; the trophies in their case; the jukebox; the water; something green.
+    for (let n = 0; n < 5; n++) award(q.X - 6.66, q.Y + 1.95, q.Z - 3 + n * 1.5, Math.PI / 2, n % 3 === 1 ? 0xc9cbd2 : GOLD);
+    for (let n = 0; n < 3; n++) award(q.X + 6.66, q.Y + 1.95, q.Z + 1.4 + n * 1.3, -Math.PI / 2, n === 1 ? 0xc9cbd2 : GOLD);
+    slab(WALNUT, 0.5, 0.9, 1.3, q.X - 6.4, q.Y, q.Z + 4, M.wood, 1); for (const [w, d, x, z] of [[0.5, 0.02, -6.4, 3.36], [0.5, 0.02, -6.4, 4.64], [0.02, 1.3, -6.16, 4]]) slab(0xcfe8ff, w, 0.9, d, q.X + x, q.Y + 0.9, q.Z + z); slab(WALNUT, 0.52, 0.05, 1.32, q.X - 6.4, q.Y + 1.8, q.Z + 4);
+    for (let n = 0; n < 4; n++) { const z = q.Z + 3.55 + n * 0.3; post(GOLD, 0.05, 0.04, q.X - 6.4, q.Y + 0.9, z, 8); post(GOLD, 0.012, 0.14, q.X - 6.4, q.Y + 0.94, z, 5); put(M.plain, new THREE.CylinderGeometry(0.07, 0.03, 0.14 + (n % 2) * 0.06, 10).translate(q.X - 6.4, q.Y + 1.15 + (n % 2) * 0.03, z), n === 2 ? 0xc9cbd2 : GOLD); }
+    collide(q.X - 6.4, q.Z + 4, 0.6, 1.4, 1.9);
+    slab(0x3a1c10, 0.6, 1.25, 0.9, q.X + 6.3, q.Y, q.Z + 0.35, M.wood, 1); put(M.wood, new THREE.CylinderGeometry(0.45, 0.45, 0.6, 14, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateX(Math.PI / 2).translate(q.X + 6.3, q.Y + 1.25, q.Z + 0.35), 0x3a1c10);
+    slab(0xffb060, 0.03, 0.5, 0.7, q.X + 5.99, q.Y + 0.95, q.Z + 0.35, M.glow); slab(0xff5fd2, 0.03, 0.12, 0.74, q.X + 5.98, q.Y + 0.78, q.Z + 0.35, M.glow); slab(TEAL, 0.03, 0.5, 0.06, q.X + 5.98, q.Y + 0.2, q.Z + 0.05, M.glow); slab(TEAL, 0.03, 0.5, 0.06, q.X + 5.98, q.Y + 0.2, q.Z + 0.65, M.glow);
+    collide(q.X + 6.3, q.Z + 0.35, 0.7, 1, 1.8);
+    slab(0xf4f4f0, 0.36, 1, 0.36, q.X - 6.4, q.Y, q.Z + 0.9); put(M.plain, new THREE.CylinderGeometry(0.15, 0.15, 0.42, 12).translate(q.X - 6.4, q.Y + 1.22, q.Z + 0.9), 0x8fd0e8); collide(q.X - 6.4, q.Z + 0.9, 0.5, 0.5, 1.4);
+    for (const [px, pz] of [[6.2, 4.2], [-1.7, 4.3], [3, 4.3]]) { post(0xb5523b, 0.2, 0.4, q.X + px, q.Y, q.Z + pz, 10); ball(0x2f7d46, 0.38, q.X + px, q.Y + 0.85, q.Z + pz); ball(0x3f9a5a, 0.26, q.X + px + 0.12, q.Y + 1.2, q.Z + pz - 0.05); }
+    // Where people wait: two sofas, the low table, this month's trade papers; and who is coming to town, on the wall.
+    for (const s of [-1, 1]) { q.block(OX, 2.2, 0.5, 0.9, s * 4.5, 2.5); q.block(OX, 2.2, 0.5, 0.3, s * 4.5, 2.1, M.plain, 0, 0.5); for (const t of [-1, 1]) slab(0x4a1414, 0.2, 0.25, 0.9, q.X + s * 4.5 + t * 1.1, q.Y + 0.5, q.Z + 2.5); }
+    q.block(INK, 1, 0.4, 1, 0, 2.8, M.plain, 0); slab(GOLD, 1.04, 0.02, 1.04, q.X, q.Y + 0.4, q.Z + 2.8); for (let n = 0; n < 3; n++) slab(0xe9e2cf, 0.3, 0.02, 0.4, q.X - 0.3 + n * 0.3, q.Y + 0.42, q.Z + 2.8); slab(0x8a1c1c, 0.31, 0.012, 0.31, q.X + 0.2, q.Y + 0.44, q.Z + 3.05);
+    sign(['THE VELVETONES', 'ONE NIGHT ONLY'], q.X + 2.3, q.Y + 2, q.Z + 4.68, Math.PI, { w: 1.3, h: 0.9, color: '#ffe066', bg: '#8a1c1c', size: 0.6, glow: false });
+    sign(['MISS RUBY DELL', 'SINGS'], q.X + 3.9, q.Y + 2, q.Z + 4.68, Math.PI, { w: 1.3, h: 0.9, color: '#16161c', bg: '#49e0d0', size: 0.6, glow: false });
+    sign(['LITTLE EARL', '& THE CHIMES'], q.X + 5.5, q.Y + 2, q.Z + 4.68, Math.PI, { w: 1.3, h: 0.9, color: '#f4f4f0', bg: '#3b2a6a', size: 0.6, glow: false });
+    q.window(-3.6, 4.72, 3, 1.6, 1.8, Math.PI); for (let n = 0; n < 9; n++) slab(0xe9e2cf, 3, 0.02, 0.05, q.X - 3.6, q.Y + 1.1 + n * 0.18, q.Z + 4.66);
+    for (const tz of [-1, 2.4]) { slab(INK, 9, 0.04, 0.06, q.X, q.Y + 3.5, q.Z + tz); for (let n = 0; n < 6; n++) put(M.glow, new THREE.CylinderGeometry(0.06, 0.08, 0.1, 8).translate(q.X - 3.75 + n * 1.5, q.Y + 3.42, q.Z + tz), 0xfff2c0); }
+    q.light(0, 3.2, -1, 0xcfe8ff, 40, 14); q.light(0, 3.2, 2.5, 0xffd9a8, 26, 12); q.light(4.9, 2.6, -3.7, 0xff8a70, 16, 6); q.light(-5, 3, 1, 0xffd9a8, 18, 9);
     clerk(q, 0, -3.6, 0, { body: 'female', dark: true, hair: 0x111111, hairMesh: 'long', shirt: 0x49e0d0, sleeves: 'long' });
+
+    // ----- Hesh's office, through the door: a desk a man could be buried in, forty years of records, horses on the wall -----
+    const o = rooms.HESH = room(12, 9, 3.4, { floor: M.wood, floorTint: 0x7a4a30, floorScale: 1.5, wall: M.plain, wallTint: 0x2f4a3c, ceil: 0xe9e2cf, door: WALNUT, doorX: -4, at: [q.X - 1.4, q.Z - 11] });
+    const ox = x => o.X + x, oz = z => o.Z + z, Y = o.Y;
+    for (const s of [-1, 1]) { slab(WALNUT, 11.4, 1.1, 0.05, o.X, Y, oz(s * 4.18), M.wood, 2); slab(WALNUT, 0.05, 1.1, 8.4, ox(s * 5.68), Y, o.Z, M.wood, 2); slab(GOLD, 11.4, 0.03, 0.06, o.X, Y + 1.1, oz(s * 4.18)); slab(GOLD, 0.06, 0.03, 8.4, ox(s * 5.68), Y + 1.1, o.Z); slab(0xe9e2cf, 11.4, 0.14, 0.08, o.X, Y + 3.26, oz(s * 4.16)); slab(0xe9e2cf, 0.08, 0.14, 8.4, ox(s * 5.66), Y + 3.26, o.Z); }
+    for (const bz of [-2.4, 0, 2.4]) slab(WALNUT, 11.4, 0.16, 0.22, o.X, Y + 3.24, oz(bz), M.wood, 2);                                             // beams
+    const persian = texture(256, 176, (c, w, h) => {
+      c.fillStyle = '#1c2a4a'; c.fillRect(0, 0, w, h); c.fillStyle = '#d9b25a'; c.fillRect(8, 8, w - 16, h - 16); c.fillStyle = '#7a1626'; c.fillRect(14, 14, w - 28, h - 28);
+      c.strokeStyle = '#d9b25a'; c.lineWidth = 2; c.strokeRect(26, 26, w - 52, h - 52);
+      c.fillStyle = '#1c2a4a'; c.beginPath(); c.moveTo(w / 2, 34); c.lineTo(w - 60, h / 2); c.lineTo(w / 2, h - 34); c.lineTo(60, h / 2); c.fill();
+      c.fillStyle = '#d9b25a'; c.beginPath(); c.moveTo(w / 2, 58); c.lineTo(w - 96, h / 2); c.lineTo(w / 2, h - 58); c.lineTo(96, h / 2); c.fill();
+      c.fillStyle = '#7a1626'; c.beginPath(); c.arc(w / 2, h / 2, 14, 0, 7); c.fill();
+      c.fillStyle = '#e9d9a8'; for (let k = 0; k < 22; k++) { c.fillRect(20 + k * 10, 18, 4, 4); c.fillRect(20 + k * 10, h - 22, 4, 4); } for (let k = 0; k < 13; k++) { c.fillRect(18, 24 + k * 10, 4, 4); c.fillRect(w - 22, 24 + k * 10, 4, 4); }
+      for (const [x, y] of [[44, 44], [w - 44, 44], [44, h - 44], [w - 44, h - 44]]) { c.fillStyle = '#1c2a4a'; c.beginPath(); c.arc(x, y, 9, 0, 7); c.fill(); c.fillStyle = '#d9b25a'; c.beginPath(); c.arc(x, y, 4, 0, 7); c.fill(); }
+    });
+    persian.wrapS = persian.wrapT = THREE.ClampToEdgeWrapping; lay(persian, 6.6, 4.5, ox(0.6), oz(-0.2), Y + 0.006);
+    // The desk, his chair behind it, two for whoever has come to ask.
+    slab(0x3a1c10, 2.7, 0.08, 1.25, ox(0.5), Y + 0.74, oz(-2.2), M.wood, 1); for (const s of [-1, 1]) slab(0x3a1c10, 0.75, 0.74, 1.1, ox(0.5 + s * 0.92), Y, oz(-2.2), M.wood, 1); slab(0x2a1408, 1.1, 0.5, 0.05, ox(0.5), Y + 0.24, oz(-1.68));
+    slab(0x1f5a3a, 1.5, 0.012, 0.8, ox(0.5), Y + 0.82, oz(-2.2)); for (const s of [-1, 1]) for (let k = 0; k < 3; k++) slab(GOLD, 0.12, 0.02, 0.02, ox(0.5 + s * 0.92), Y + 0.2 + k * 0.2, oz(-1.63));
+    post(GOLD, 0.02, 0.3, ox(1.45), Y + 0.82, oz(-2.45), 6); post(GOLD, 0.09, 0.02, ox(1.45), Y + 0.82, oz(-2.45), 10); put(M.glow, new THREE.CylinderGeometry(0.09, 0.09, 0.34, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).translate(ox(1.45), Y + 1.13, oz(-2.45)), 0x4fd08a); // the banker's lamp
+    slab(INK, 0.26, 0.09, 0.2, ox(-0.45), Y + 0.82, oz(-2.5)); slab(INK, 0.07, 0.05, 0.26, ox(-0.45), Y + 0.91, oz(-2.5)); put(M.plain, new THREE.CylinderGeometry(0.05, 0.05, 0.01, 10).translate(ox(-0.45), Y + 0.915, oz(-2.42)), 0xe9e2cf);
+    slab(0x5a3320, 0.34, 0.12, 0.24, ox(-0.5), Y + 0.82, oz(-1.9), M.wood, 1); slab(0x2f4a3c, 0.42, 0.05, 0.3, ox(0.45), Y + 0.83, oz(-2.2)); slab(0xf1ece0, 0.4, 0.012, 0.28, ox(0.45), Y + 0.88, oz(-2.2)); slab(GOLD, 0.2, 0.02, 0.03, ox(0.9), Y + 0.83, oz(-2.05));
+    put(M.plain, new THREE.CylinderGeometry(0.04, 0.035, 0.09, 8).translate(ox(1.1), Y + 0.87, oz(-1.85)), 0xd9a14a); put(M.plain, new THREE.CylinderGeometry(0.07, 0.07, 0.025, 10).translate(ox(0.05), Y + 0.83, oz(-1.82)), 0x8d8a8e); put(M.plain, new THREE.CylinderGeometry(0.012, 0.012, 0.12, 5).rotateZ(1.4).translate(ox(0.05), Y + 0.86, oz(-1.82)), 0x5a3320);
+    slab(INK, 0.03, 0.22, 0.18, ox(1.55), Y + 0.82, oz(-1.9)); slab(0xe9e2cf, 0.01, 0.16, 0.12, ox(1.53), Y + 0.85, oz(-1.9));                              // somebody's photograph, turned his way
+    collide(ox(0.5), oz(-2.2), 2.8, 1.35, 1);
+    slab(OX, 0.7, 0.14, 0.66, ox(0.5), Y + 0.34, oz(-3.3)); slab(OX, 0.7, 1, 0.14, ox(0.5), Y + 0.48, oz(-3.62)); for (const s of [-1, 1]) slab(0x4a1414, 0.1, 0.3, 0.6, ox(0.5 + s * 0.38), Y + 0.48, oz(-3.3)); post(0x23232b, 0.05, 0.34, ox(0.5), Y, oz(-3.3), 6); post(0x23232b, 0.3, 0.03, ox(0.5), Y, oz(-3.3), 5);
+    const guests = [-0.45, 1.45].map(dx => { slab(OX, 0.68, 0.3, 0.64, ox(dx), Y + 0.14, oz(-0.85)); slab(OX, 0.68, 0.5, 0.14, ox(dx), Y + 0.44, oz(-0.55)); for (const s of [-1, 1]) slab(0x4a1414, 0.12, 0.24, 0.64, ox(dx + s * 0.36), Y + 0.44, oz(-0.85)); for (const [fx, fz] of [[-0.28, -0.26], [0.28, -0.26], [-0.28, 0.26], [0.28, 0.26]]) post(0x2a1408, 0.03, 0.14, ox(dx + fx), Y, oz(-0.85 + fz), 4); return { x: ox(dx), y: Y, z: oz(-0.9), h: Math.PI }; });
+    // Behind him: the credenza and its cups, the horse he paid too much for, two more records for the wall.
+    slab(WALNUT, 3.8, 0.82, 0.5, ox(0.5), Y, oz(-3.93), M.wood, 1); slab(0x2a1408, 3.9, 0.04, 0.56, ox(0.5), Y + 0.82, oz(-3.93)); for (let k = 0; k < 4; k++) slab(GOLD, 0.04, 0.04, 0.02, ox(-0.9 + k * 0.94), Y + 0.45, oz(-3.67));
+    for (const [dx, hgt] of [[-1.1, 0.3], [-0.7, 0.2], [2.1, 0.34]]) { post(0x2a1408, 0.07, 0.05, ox(dx), Y + 0.86, oz(-3.93), 8); post(GOLD, 0.014, 0.1, ox(dx), Y + 0.91, oz(-3.93), 5); put(M.plain, new THREE.CylinderGeometry(0.08, 0.03, hgt, 10).translate(ox(dx), Y + 1.01 + hgt / 2, oz(-3.93)), GOLD); }
+    put(M.plain, new THREE.CylinderGeometry(0.07, 0.09, 0.2, 8).translate(ox(1.5), Y + 0.96, oz(-3.93)), 0xb5651d); post(0xb5651d, 0.025, 0.08, ox(1.5), Y + 1.06, oz(-3.93), 6); for (const dx of [1.72, 1.86]) put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.08, 8).translate(ox(dx), Y + 0.9, oz(-3.9)), 0xcfe8ff);
+    const horse = texture(256, 160, (c, w, h) => {
+      const sky = c.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#b9d4e6'); sky.addColorStop(0.6, '#e9e2c8'); c.fillStyle = sky; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#6a8a4a'; c.fillRect(0, h * 0.68, w, h); c.fillStyle = '#56763c'; c.fillRect(0, h * 0.8, w, h); c.fillStyle = '#f4f4f0'; c.fillRect(0, h * 0.66, w, 3);
+      c.fillStyle = '#5a321c'; c.beginPath(); c.ellipse(128, 86, 52, 22, 0, 0, 7); c.fill();                                                    // the barrel
+      c.beginPath(); c.moveTo(166, 78); c.lineTo(200, 40); c.lineTo(214, 48); c.lineTo(182, 96); c.fill();                                    // the neck
+      c.beginPath(); c.ellipse(212, 44, 17, 8, 0.5, 0, 7); c.fill(); c.beginPath(); c.moveTo(200, 34); c.lineTo(204, 24); c.lineTo(208, 34); c.fill();
+      c.strokeStyle = '#4a2814'; c.lineWidth = 6; c.lineCap = 'round'; for (const [x0, x1] of [[92, 84], [108, 112], [154, 150], [168, 176]]) { c.beginPath(); c.moveTo(x0, 98); c.lineTo(x1, 138); c.stroke(); }
+      c.strokeStyle = '#1c1410'; c.lineWidth = 5; c.beginPath(); c.moveTo(78, 80); c.quadraticCurveTo(58, 92, 62, 118); c.stroke(); c.lineWidth = 4; c.beginPath(); c.moveTo(176, 66); c.lineTo(196, 42); c.stroke();
+      c.fillStyle = '#8a1c2a'; c.fillRect(112, 62, 30, 10);
+    });
+    horse.wrapS = horse.wrapT = THREE.ClampToEdgeWrapping;
+    { const m = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 1.3), new THREE.MeshLambertMaterial({ map: horse })); m.position.set(ox(0.5), Y + 2.2, oz(-4.14)); scene.add(m); }
+    slab(GOLD, 2.3, 1.5, 0.05, ox(0.5), Y + 1.45, oz(-4.19)); slab(0xfff2c0, 1.2, 0.03, 0.1, ox(0.5), Y + 3, oz(-4.1), M.glow);
+    award(ox(-1.5), Y + 2.15, oz(-4.16), 0); award(ox(2.5), Y + 2.15, oz(-4.16), 0, 0xc9cbd2); award(ox(3.5), Y + 2.15, oz(-4.16), 0);
+    collide(ox(0.5), oz(-3.95), 3.9, 0.6, 1.4);
+    slab(0x3a3a44, 0.7, 0.8, 0.7, ox(5.2), Y, oz(-3.7)); put(M.plain, new THREE.CylinderGeometry(0.1, 0.1, 0.03, 14).rotateZ(Math.PI / 2).translate(ox(4.84), Y + 0.5, oz(-3.7)), 0xc9cbd2); slab(0xc9cbd2, 0.03, 0.2, 0.04, ox(4.84), Y + 0.3, oz(-3.5)); collide(ox(5.2), oz(-3.7), 0.8, 0.8, 1); // the safe
+    // The west wall: every record he ever put out, and the machine he plays them on.
+    slab(WALNUT, 0.42, 2.7, 4.6, ox(-5.46), Y, oz(-1.7), M.wood, 2);
+    const SLEEVES = [0x8a1c1c, 0x1f3a2c, 0x2c3a5a, 0xd9c7a0, 0x5a3320, 0x16161c, 0xb5523b, 0xd9a520, 0x49e0d0, 0xf4f4f0, 0x8a5cff, 0xff8a5c];
+    for (let r = 0; r < 5; r++) { slab(0x2a1408, 0.44, 0.04, 4.6, ox(-5.44), Y + 0.08 + r * 0.52, oz(-1.7)); for (let n = 0; n < 42; n++) if ((n * 7 + r * 3) % 11) slab(SLEEVES[(n * 5 + r * 7) % 12], 0.32, 0.4 + ((n + r) % 3) * 0.02, 0.05 + (n % 2) * 0.03, ox(-5.36), Y + 0.12 + r * 0.52, oz(-3.9 + n * 0.105)); }
+    collide(ox(-5.46), oz(-1.7), 0.6, 4.7, 2.7);
+    slab(WALNUT, 0.55, 0.72, 1.5, ox(-5.4), Y, oz(2), M.wood, 1); slab(0x23232b, 0.42, 0.07, 0.46, ox(-5.4), Y + 0.72, oz(1.65));
+    const platter = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.02, 20), new THREE.MeshLambertMaterial({ color: 0x16161c })); platter.position.set(ox(-5.4), Y + 0.8, oz(1.65)); scene.add(platter);
+    const label = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.022, 0.05), new THREE.MeshLambertMaterial({ color: 0xd8342c })); label.position.y = 0.002; platter.add(label);
+    updaters.push(t => { platter.rotation.y = t * 3.4; });
+    slab(0x8d8a8e, 0.4, 0.14, 0.5, ox(-5.4), Y + 0.72, oz(2.4)); for (let n = 0; n < 4; n++) put(M.glow, new THREE.CylinderGeometry(0.028, 0.028, 0.12, 8).translate(ox(-5.4), Y + 0.92, oz(2.22 + n * 0.12)), 0xffb060);
+    for (const sz of [0.75, 3.25]) { slab(0x2a1408, 0.42, 1.15, 0.42, ox(-5.44), Y, oz(sz), M.wood, 1); put(M.plain, new THREE.CylinderGeometry(0.15, 0.15, 0.02, 14).rotateZ(Math.PI / 2).translate(ox(-5.22), Y + 0.5, oz(sz)), 0x3a3a44); put(M.plain, new THREE.CylinderGeometry(0.06, 0.06, 0.02, 10).rotateZ(Math.PI / 2).translate(ox(-5.22), Y + 0.92, oz(sz)), 0x3a3a44); }
+    collide(ox(-5.42), oz(2), 0.6, 3, 1.2);
+    // The east wall: the couch under the blinds, a lamp, the low table; the cart with the good bottles.
+    slab(OX, 0.9, 0.42, 2.7, ox(5.15), Y, oz(0.7)); slab(OX, 0.24, 0.5, 2.7, ox(5.5), Y + 0.42, oz(0.7)); for (const s of [-1, 1]) slab(0x4a1414, 0.9, 0.3, 0.22, ox(5.15), Y + 0.42, oz(0.7 + s * 1.3)); for (let n = 0; n < 5; n++) ball(0x3a0e0e, 0.025, ox(5.37), Y + 0.7, oz(-0.3 + n * 0.5));
+    collide(ox(5.2), oz(0.7), 1, 2.8, 1);
+    const couch = [0.1, 1.3].map(dz => ({ x: ox(5.05), y: Y, z: oz(dz), h: -Math.PI / 2 }));
+    slab(0x3a1c10, 0.6, 0.38, 1.1, ox(3.9), Y, oz(0.7), M.wood, 1); slab(0xe9e2cf, 0.3, 0.015, 0.4, ox(3.9), Y + 0.38, oz(0.5)); put(M.plain, new THREE.CylinderGeometry(0.08, 0.08, 0.025, 10).translate(ox(3.9), Y + 0.39, oz(1)), 0x8d8a8e); collide(ox(3.9), oz(0.7), 0.6, 1.1, 0.5);
+    o.window(5.72, 0.7, 2.4, 1.3, 2.1, -Math.PI / 2, 0xffe2b0); for (let n = 0; n < 9; n++) slab(0x8a7a5a, 0.04, 0.025, 2.4, ox(5.68), Y + 1.5 + n * 0.15, oz(0.7)); for (const s of [-1, 1]) slab(0x1f3a2c, 0.08, 1.9, 0.4, ox(5.66), Y + 1.25, oz(0.7 + s * 1.45));
+    slab(0x3a1c10, 0.45, 0.55, 0.45, ox(5.3), Y, oz(-1.1), M.wood, 1); post(GOLD, 0.015, 0.4, ox(5.3), Y + 0.55, oz(-1.1), 5); put(M.glow, new THREE.ConeGeometry(0.2, 0.26, 10, 1, true).translate(ox(5.3), Y + 1.05, oz(-1.1)), 0xffe2a6);
+    for (const s of [-1, 1]) for (const t of [-1, 1]) post(GOLD, 0.012, 0.85, ox(4.9 + s * 0.3), Y, oz(3.5 + t * 0.2), 4); for (const y of [0.3, 0.8]) slab(0xcfe8ff, 0.66, 0.02, 0.46, ox(4.9), Y + y, oz(3.5));
+    for (let n = 0; n < 5; n++) put(M.plain, new THREE.CylinderGeometry(0.04, 0.05, 0.24 + (n % 2) * 0.06, 8).translate(ox(4.68 + n * 0.11), Y + 0.94 + (n % 2) * 0.03, oz(3.5)), [0xb5651d, 0xe9e2cf, 0x8a5a2a, 0x2f5a3f, 0xd9a14a][n]); for (let n = 0; n < 4; n++) put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.08, 8).translate(ox(4.72 + n * 0.12), Y + 0.36, oz(3.5)), 0xcfe8ff);
+    post(0x3a1c10, 0.02, 0.9, ox(3.4), Y, oz(3.7), 5); ball(0x3b6ea8, 0.24, ox(3.4), Y + 1.1, oz(3.7)); put(M.plain, new THREE.TorusGeometry(0.27, 0.012, 4, 20).rotateX(0.4).translate(ox(3.4), Y + 1.1, oz(3.7)), GOLD); // the globe
+    // The south wall: the upright he still plays, faces he made famous, the clock.
+    slab(0x1c1410, 1.5, 1.2, 0.55, ox(0.6), Y, oz(3.85)); slab(0x1c1410, 1.5, 0.06, 0.32, ox(0.6), Y + 0.7, oz(3.45)); slab(0xf4f4f0, 1.3, 0.02, 0.14, ox(0.6), Y + 0.76, oz(3.4)); for (let n = 0; n < 18; n++) if (n % 7 !== 2 && n % 7 !== 6) slab(0x16161c, 0.03, 0.025, 0.08, ox(0 + n * 0.07), Y + 0.77, oz(3.43));
+    put(M.plain, new THREE.BoxGeometry(0.4, 0.28, 0.01).rotateX(0.2).translate(ox(0.6), Y + 1, oz(3.56)), 0xf1ece0); slab(0x2a1408, 0.8, 0.08, 0.34, ox(0.6), Y + 0.46, oz(2.9), M.wood, 1); for (const s of [-1, 1]) slab(0x2a1408, 0.05, 0.46, 0.3, ox(0.6 + s * 0.35), Y, oz(2.9));
+    collide(ox(0.6), oz(3.85), 1.6, 0.7, 1.3); collide(ox(0.6), oz(2.9), 0.8, 0.36, 0.5);
+    for (let n = 0; n < 10; n++) { const x = ox(-2.2 + (n % 5) * 0.62 + (n > 4 ? 3.6 : 0) - (n > 4 ? 0 : 0)), y = Y + 1.6 + (n % 2) * 0.62 + ((n * 3) % 4) * 0.04; if (n < 5 || n > 4) { slab(INK, 0.46, 0.56, 0.03, x - (n > 4 ? 1.3 : 0), y, oz(4.15)); slab([0xd8d2c8, 0xb9b3ac, 0xe9e2cf][n % 3], 0.38, 0.48, 0.035, x - (n > 4 ? 1.3 : 0), y + 0.04, oz(4.15)); } }
+    put(M.plain, new THREE.CylinderGeometry(0.22, 0.22, 0.04, 20).rotateX(Math.PI / 2).translate(ox(3.3), Y + 2.5, oz(4.15)), 0xf1ece0); put(M.plain, new THREE.TorusGeometry(0.22, 0.02, 5, 22).translate(ox(3.3), Y + 2.5, oz(4.13)), GOLD); slab(INK, 0.015, 0.14, 0.01, ox(3.3), Y + 2.5, oz(4.12)); slab(INK, 0.1, 0.015, 0.01, ox(3.35), Y + 2.5, oz(4.12));
+    post(0xb5523b, 0.22, 0.42, ox(-2.4), Y, oz(3.7), 10); ball(0x2f7d46, 0.42, ox(-2.4), Y + 0.9, oz(3.7)); ball(0x3f9a5a, 0.3, ox(-2.3), Y + 1.3, oz(3.65));
+    put(M.plain, new THREE.TorusGeometry(0.42, 0.02, 5, 22).rotateX(Math.PI / 2).translate(ox(0.6), Y + 2.7, oz(-0.4)), GOLD); post(GOLD, 0.012, 0.6, ox(0.6), Y + 2.7, oz(-0.4), 4); for (let n = 0; n < 6; n++) ball(0xfff2c0, 0.05, ox(0.6 + Math.sin(n * 1.047) * 0.42), Y + 2.76, oz(-0.4 + Math.cos(n * 1.047) * 0.42), M.glow);
+    o.light(0.6, 2.7, -0.6, 0xffd9a8, 52, 13); o.light(4.2, 2.4, 1, 0xffe2b0, 24, 9); o.light(-4.2, 2.6, -0.6, 0xfff0d0, 24, 9); o.light(1.3, 1.4, -2.2, 0x9fe8b0, 9, 3.5);
+    Object.assign(o, { chair: { x: ox(0.5), y: Y, z: oz(-3.28), h: 0 }, guests, couch, desk: { x: ox(0.5), z: oz(-2.2) } });
+    (places.stairs ??= []).push({ a: { x: q.X - 5.4, z: q.Z - 3.9, h: 0 }, b: { x: o.inside.x, z: o.inside.z + 1.2, h: Math.PI }, up: "Go through to Hesh's office", down: 'Back to reception' });
   }
   { // Bonpensiero Bros.: a car up on the lift, tool chests, tyres, a girlie calendar
     const q = rooms.BODYSHOP = room(18, 14, 5, { floor: M.asphalt, floorTint: 0x6a6870, floorScale: 5, wall: M.brick, wallTint: 0x9a8a84, wallScale: 2, ceil: 0x3a3a44, doorX: 6 });
@@ -2399,14 +2895,43 @@ export function buildWorld(scene) {
   }
 
   if (!LA) { // Upstairs at the Sopranos': the master bedroom, AJ's room and Meadow's, off a landing. Reached by the stairs in the den.
-    const q = rooms.UPSTAIRS = room(18, 11, 3.1, { floor: M.gravel, floorTint: 0xb9a58a, wallTint: 0xf3e9d8, door: 0xf3e9d8, at: [2840, -24] });
-    for (const x of [-1.5, 3.8]) { q.block(0xf3e9d8, 0.2, 3.1, 7, x, -1.8, M.gravel, 3); } // the walls between the rooms; each is open to the landing
+    const q = rooms.UPSTAIRS = room(18, 11, 3.1, { floor: M.gravel, floorTint: 0xb9a58a, wall: M.plain, wallTint: 0xf3e6cf, door: 0xf3e9d8, at: [2840, -24] });
+    for (const x of [-1.5, 3.8]) { q.block(0xf3e6cf, 0.2, 3.1, 7, x, -1.8); }
+    for (const s of [-1, 1]) { slab(0xffffff, 17.4, 0.12, 0.04, q.X, q.Y, q.Z + s * 5.18); slab(0xffffff, 0.04, 0.12, 10.4, q.X + s * 8.68, q.Y, q.Z); } // the walls between the rooms; each is open to the landing
     // The master bedroom: the big bed, two night tables, a dresser with a television on it.
     q.block(0x8a5a44, 2.4, 0.45, 2.6, -5.8, -3.4, M.wood, 1); slab(0xf1ede4, 2.3, 0.2, 2.5, q.X - 5.8, q.Y + 0.45, q.Z - 3.4); slab(0x7a1626, 2.3, 0.06, 1.5, q.X - 5.8, q.Y + 0.65, q.Z - 2.9);
     slab(0x8a5a44, 2.5, 1.1, 0.14, q.X - 5.8, q.Y, q.Z - 4.78); for (const sx of [-0.55, 0.55]) slab(0xffffff, 0.8, 0.16, 0.5, q.X - 5.8 + sx, q.Y + 0.65, q.Z - 4.3);
     for (const sx of [-1.7, 1.7]) { q.block(0x5a3320, 0.6, 0.55, 0.5, -5.8 + sx, -4.5, M.wood, 1); put(M.glow, new THREE.ConeGeometry(0.2, 0.3, 10, 1, true).translate(q.X - 5.8 + sx, q.Y + 0.95, q.Z - 4.5), 0xffe2a6); }
     q.block(0x5a3320, 2.2, 0.9, 0.6, -5.8, 1.4, M.wood, 1); slab(0x1c1c22, 1, 0.7, 0.4, q.X - 5.8, q.Y + 0.9, q.Z + 1.4); q.glowPanel(0x9fd0f5, 0.8, 0.5, -5.8, 1.19, 1.25, Math.PI);
     q.window(-8.72, -2, 2.4, 1.4, 1.7, Math.PI / 2, 0xffd9a8);
+    { // The master bedroom, furnished: the wardrobe with the long mirror, her dressing table, his chair, what is on the night tables
+      const IVORY = 0xefe4cf, BRASS = 0xd9a520, B = (x, z) => [q.X + x, q.Z + z];
+      slab(0xd9c7a0, 4.2, 0.015, 2.6, q.X - 5.8, q.Y + 0.005, q.Z - 1.3); slab(0xc9b48a, 3.8, 0.017, 2.2, q.X - 5.8, q.Y + 0.006, q.Z - 1.3);
+      q.block(IVORY, 0.6, 2.4, 3.3, -1.95, -2.9); for (let n = 0; n < 4; n++) { slab(0xd8c8a8, 0.02, 2.2, 0.02, q.X - 2.26, q.Y + 0.1, q.Z - 4.5 + n * 0.82 + 0.4); slab(BRASS, 0.03, 0.14, 0.03, q.X - 2.27, q.Y + 1.1, q.Z - 4.5 + n * 0.82 + 0.3); } slab(0xb9c8d8, 0.02, 1.8, 0.66, q.X - 2.27, q.Y + 0.3, q.Z - 1.7);
+      slab(0x8a2f3a, 2.3, 0.1, 0.5, q.X - 5.8, q.Y + 0.66, q.Z - 2.35); for (const sx of [-0.5, 0.5]) slab(0xd9a520, 0.5, 0.3, 0.14, q.X - 5.8 + sx, q.Y + 0.8, q.Z - 4.05);                                           // the folded quilt, the good cushions
+      for (let n = 0; n < 5; n++) ball(0x6a4634, 0.03, q.X - 6.8 + n * 0.5, q.Y + 0.85, q.Z - 4.7); slab(BRASS, 0.06, 0.42, 0.03, q.X - 5.8, q.Y + 1.9, q.Z - 5.32); slab(BRASS, 0.26, 0.06, 0.03, q.X - 5.8, q.Y + 2.14, q.Z - 5.32);     // the cross over the bed
+      for (const sx of [-1.5, 1.5]) { slab(BRASS, 0.5, 0.64, 0.03, q.X - 5.8 + sx, q.Y + 1.6, q.Z - 5.32); slab(0xe9e2cf, 0.42, 0.56, 0.035, q.X - 5.8 + sx, q.Y + 1.64, q.Z - 5.32); }
+      slab(0x1c1c22, 0.18, 0.08, 0.1, q.X - 4.1, q.Y + 0.55, q.Z - 4.35); slab(0xff2a4a, 0.12, 0.04, 0.01, q.X - 4.1, q.Y + 0.57, q.Z - 4.29, M.glow);                                                               // 4:07, most nights
+      put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.09, 8).translate(q.X - 3.95, q.Y + 0.6, q.Z - 4.6), 0xff8a30); put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.1, 8).translate(q.X - 4.25, q.Y + 0.6, q.Z - 4.6), 0xcfe8ff); // the pills, the water
+      slab(0x3b6ea8, 0.2, 0.04, 0.28, q.X - 7.5, q.Y + 0.55, q.Z - 4.4); slab(IVORY, 0.22, 0.08, 0.16, q.X - 7.6, q.Y + 0.55, q.Z - 4.65);                                                                           // her book, the telephone
+      for (const s of [-1, 1]) slab(0x5a3320, 0.12, 0.05, 0.26, q.X - 4.35 + s * 0.09, q.Y, q.Z - 2.3);                                                                                                            // slippers
+      q.block(IVORY, 0.5, 0.74, 1.3, -8.4, 0.3); put(M.plain, new THREE.CylinderGeometry(0.42, 0.42, 0.03, 20).rotateZ(Math.PI / 2).scale(1, 1.25, 1).translate(q.X - 8.66, q.Y + 1.5, q.Z + 0.3), 0xb9c8d8); put(M.plain, new THREE.TorusGeometry(0.44, 0.03, 5, 22).rotateY(Math.PI / 2).scale(1, 1.25, 1).translate(q.X - 8.65, q.Y + 1.5, q.Z + 0.3), BRASS);
+      for (let n = 0; n < 5; n++) put(M.plain, new THREE.CylinderGeometry(0.025, 0.03, 0.08 + (n % 3) * 0.03, 8).translate(q.X - 8.45, q.Y + 0.8, q.Z - 0.1 + n * 0.16), [0xff8ad8, 0xd9a520, 0xcfe8ff, 0x8a5cff, 0xf4f4f0][n]); slab(0x8a1c2a, 0.2, 0.1, 0.14, q.X - 8.35, q.Y + 0.74, q.Z + 0.78);
+      post(BRASS, 0.02, 0.4, q.X - 7.7, q.Y, q.Z + 0.3, 5); post(0xff8ad8, 0.2, 0.08, q.X - 7.7, q.Y + 0.4, q.Z + 0.3, 12);
+      slab(0x2f4a44, 0.7, 0.4, 0.7, q.X - 2.6, q.Y, q.Z + 0.9); slab(0x2f4a44, 0.16, 0.5, 0.7, q.X - 2.28, q.Y + 0.4, q.Z + 0.9); slab(0xf4f4f0, 0.5, 0.5, 0.08, q.X - 2.5, q.Y + 0.45, q.Z + 0.58); collide(q.X - 2.6, q.Z + 0.9, 0.8, 0.8, 0.9); // his chair, and the white robe
+      for (const s of [-1, 1]) slab(0x7a2f3a, 0.1, 1.9, 0.34, q.X - 8.66, q.Y + 0.8, q.Z - 2 + s * 1.36); slab(0x7a2f3a, 0.14, 0.24, 3, q.X - 8.64, q.Y + 2.62, q.Z - 2);
+      slab(IVORY, 0.9, 2.1, 0.06, q.X - 2.9, q.Y, q.Z - 5.32); slab(BRASS, 0.05, 0.05, 0.06, q.X - 3.2, q.Y + 1.05, q.Z - 5.28); slab(0xfff2c0, 0.86, 0.02, 0.02, q.X - 2.9, q.Y + 0.01, q.Z - 5.28, M.glow);                // the bathroom, a light left on
+      put(M.glow, new THREE.SphereGeometry(0.22, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).translate(q.X - 5.2, q.Y + 3.1, q.Z - 1.6), 0xfff2c0);
+      for (let n = 0; n < 4; n++) put(M.plain, new THREE.CylinderGeometry(0.03, 0.035, 0.1 + (n % 2) * 0.05, 8).translate(q.X - 6.6 + n * 0.14, q.Y + 0.96, q.Z + 1.5), [0xd9a520, 0xcfe8ff, 0x8a1c2a, 0xf4f4f0][n]); for (let n = 0; n < 2; n++) slab(BRASS, 0.18, 0.24, 0.03, q.X - 5.0 + n * 0.26, q.Y + 0.9, q.Z + 1.55);
+      void B;
+      // The landing: a table with flowers under the photographs, a window at the end, lights; a few things on the children's floors.
+      q.block(0x5a3320, 1.3, 0.78, 0.36, -3, 5.0, M.wood, 1); put(M.plain, new THREE.CylinderGeometry(0.09, 0.06, 0.26, 10).translate(q.X - 3, q.Y + 0.91, q.Z + 5), 0xf4f4f0); for (const [dx, hex] of [[-0.07, 0xff8ad8], [0.07, 0xffe066], [0, 0xd8342c]]) ball(hex, 0.07, q.X - 3 + dx, q.Y + 1.2 + Math.abs(dx), q.Z + 5);
+      q.window(-8.72, 3.9, 1.4, 1.5, 1.7, Math.PI / 2, 0xffd9a8); for (const s of [-1, 1]) slab(0xd9c7a0, 0.08, 1.9, 0.3, q.X - 8.66, q.Y + 0.8, q.Z + 3.9 + s * 0.85);
+      for (const lx of [-5, 0, 5]) put(M.glow, new THREE.CylinderGeometry(0.12, 0.12, 0.03, 10).translate(q.X + lx, q.Y + 3.08, q.Z + 3.8), 0xfff2c0);
+      slab(0x8a5a2a, 0.75, 0.04, 0.2, q.X + 1.2, q.Y + 0.05, q.Z - 1.4); for (const s of [-1, 1]) post(0x1c1c22, 0.03, 0.05, q.X + 1.2 + s * 0.25, q.Y, q.Z - 1.4, 6);                                                  // the skateboard
+      for (const [dx, dz, hex] of [[0.9, -2.2, 0x2f56c8], [1.6, -2.6, 0xd8342c], [-0.5, -1.8, 0xe9e2cf]]) put(M.plain, new THREE.BoxGeometry(0.5, 0.05, 0.4).rotateY(dx).translate(q.X + dx, q.Y + 0.03, q.Z + dz), hex);   // clothes where they fell
+      slab(0xf7a8c4, 2.4, 0.015, 1.6, q.X + 6, q.Y + 0.005, q.Z - 1.8); for (const [dx, hex] of [[4.9, 0xd9b25a], [5.2, 0xf4f4f0], [5.5, 0x8a5a44]]) { ball(hex, 0.13, q.X + dx, q.Y + 0.7, q.Z - 4.3); ball(hex, 0.08, q.X + dx, q.Y + 0.88, q.Z - 4.3); } // bears she has not thrown out
+    }
     // AJ's room: an unmade bed, a television with a console, a drum kit he never practises on.
     q.block(0x3b6ea8, 1.1, 0.4, 2.1, 0.2, -3.7); slab(0xf1ede4, 1, 0.14, 0.5, q.X + 0.2, q.Y + 0.4, q.Z - 4.5); slab(0x2f56c8, 1.05, 0.07, 1.3, q.X + 0.2, q.Y + 0.4, q.Z - 3.2);
     q.block(0x1c1c22, 0.9, 0.5, 0.5, 2.9, -4.5); slab(0x1c1c22, 0.8, 0.6, 0.4, q.X + 2.9, q.Y + 0.5, q.Z - 4.5); q.glowPanel(0x7dffb0, 0.65, 0.45, 2.9, -4.28, 0.8); slab(0x8d8a8e, 0.3, 0.06, 0.2, q.X + 2.9, q.Y + 0.02, q.Z - 3.7);
@@ -2699,6 +3224,7 @@ export function buildWorld(scene) {
   // Where the world makes a noise of its own: { kind, x, z, r (how far it carries) }.
   places.sounds = [];
   const sound = (kind, at, r, vol = 1) => { if (at) places.sounds.push({ kind, x: at.x, z: at.z, r, vol }); };
+  sound('water', places.fountain, 22, 0.5);
   if (!LA) {
     sound('club', { x: places.bing.door.x, z: places.bing.door.z - 9 }, 62);
     sound('water', places.grove.fountain, 28); sound('water', { x: places.home.pool.x + 7.6, z: places.home.pool.z }, 22, 0.6); sound('water', places.park?.pond, 26, 0.7);
@@ -2709,6 +3235,33 @@ export function buildWorld(scene) {
   for (const d of shopDoors) { if (d.shop === 'CHURCH') sound('bell', d.outside, 340); else if (d.shop === 'BAR') sound('club', d.outside, 20, 0.6); }
 
   places.chop = { x: SHORE + 18, z: bounds.minZ + 16 }; // the north end of the beach, where stolen cars get stripped
+  if (!LA) { // ...and it looks like it: a tarp on poles, a container, what has come off other people's cars, lamps for working at night
+    const cx = places.chop.x, cz = places.chop.z, y = groundAt(cx, cz), RUST = 0x8a4a2a, TARP = 0x2f56c8;
+    const on = (x, z) => groundAt(cx + x, cz + z);
+    for (const [px, pz] of [[1.6, -6.4], [8.8, -6.4], [1.6, 0.6], [8.8, 0.6]]) { post(0x8a8d96, 0.06, 3.1, cx + px, on(px, pz), cz + pz, 6); collide(cx + px, cz + pz, 0.3, 0.3, 3, true); }
+    put(M.plain, new THREE.BoxGeometry(7.8, 0.05, 7.6).rotateZ(0.06).translate(cx + 5.2, y + 3.15, cz - 2.9), TARP); for (let k = 0; k < 4; k++) slab(0x24449a, 7.8, 0.02, 0.06, cx + 5.2, y + 3.2, cz - 6 + k * 2);
+    slab(RUST, 6.4, 2.6, 2.5, cx + 4.6, y, cz - 10.6, M.siding, 1.2); slab(0x5a2a16, 0.08, 2.4, 1.2, cx + 1.5, y + 0.1, cz - 9.3); slab(0x16161c, 0.05, 2.3, 2.3, cx + 1.42, y + 0.1, cz - 10.6); collide(cx + 4.6, cz - 10.6, 6.5, 2.6, 2.6);
+    for (let k = 0; k < 12; k++) slab([0xf4f4f0, 0xffe066, 0x49e0d0, 0xf4f4f0, 0xd8342c, 0x2f56c8][k % 6], 0.5, 0.24, 0.02, cx + 2.6 + (k % 6) * 0.62, y + 1.5 + Math.floor(k / 6) * 0.34, cz - 9.33);                 // plates off every one of them
+    const tyres = (x, z, n) => { for (let k = 0; k < n; k++) put(M.plain, new THREE.TorusGeometry(0.3, 0.13, 6, 14).rotateX(Math.PI / 2).translate(cx + x, on(x, z) + 0.13 + k * 0.26, cz + z), 0x16161c); collide(cx + x, cz + z, 0.8, 0.8, 1, true); };
+    tyres(-2.2, -6.2, 4); tyres(-1.3, -6.9, 3); tyres(10.2, -4.6, 5); tyres(10.9, -3.8, 2);
+    for (const [k, hex] of [0xd9c7a0, 0x29c7c0, 0xd8342c, 0x23232b].entries()) put(M.plain, new THREE.BoxGeometry(1.05, 0.95, 0.06).rotateX(-0.22).translate(cx + 10.6, on(10.6, 0.6) + 0.5, cz + 0.6 + k * 0.22), hex);                              // doors, leaning
+    put(M.plain, new THREE.BoxGeometry(1.5, 0.06, 1.2).rotateZ(0.3).translate(cx + 0.2, on(0.2, -8.2) + 0.3, cz - 8.2), 0xd8342c); put(M.plain, new THREE.BoxGeometry(1.5, 0.06, 1.2).rotateZ(-0.15).translate(cx - 0.6, on(-0.6, -8.6) + 0.12, cz - 8.6), 0x2f56c8); // hoods
+    slab(0xc9cbd2, 1.7, 0.16, 0.14, cx + 7.2, on(7.2, 5.4), cz + 5.4); slab(0x23232b, 1.7, 0.16, 0.14, cx + 7.6, on(7.6, 5.9), cz + 5.9);                                                                // bumpers
+    for (const [sx, sz, t] of [[8.6, 3.9, 0.5], [9.6, 4.6, 0.9]]) { put(M.plain, new THREE.BoxGeometry(0.55, 0.16, 0.55).rotateY(t).translate(cx + sx, on(sx, sz) + 0.2, cz + sz), 0x6a4a34); put(M.plain, new THREE.BoxGeometry(0.55, 0.7, 0.14).translate(0, 0.55, -0.24).rotateY(t).translate(cx + sx, on(sx, sz), cz + sz), 0x6a4a34); } // seats, in the open air
+    // The hoist with an engine on it, the bench, the red chest, the gas, the lamps, the fire in the drum.
+    for (const a of [0, 2.09, 4.19]) put(M.plain, new THREE.CylinderGeometry(0.035, 0.035, 3.2, 5).rotateZ(0.32).rotateY(a).translate(cx - 0.4 + Math.cos(a) * 0.5, on(-0.4, -3.8) + 1.5, cz - 3.8 - Math.sin(a) * 0.5), 0x8a8d96);
+    post(0x8a8d96, 0.008, 1.5, cx - 0.4, on(-0.4, -3.8) + 1.3, cz - 3.8, 4); slab(0x3a3a44, 0.6, 0.55, 0.8, cx - 0.4, on(-0.4, -3.8) + 0.75, cz - 3.8); slab(0x8d8a8e, 0.5, 0.16, 0.5, cx - 0.4, on(-0.4, -3.8) + 1.3, cz - 3.8); collide(cx - 0.4, cz - 3.8, 1.2, 1.2, 2, true);
+    slab(0x8a6a44, 2.6, 0.08, 0.8, cx + 5.2, on(5.2, -8.2) + 0.85, cz - 8.2, M.wood, 1); for (const s of [-1, 1]) slab(0x5a3320, 0.08, 0.85, 0.7, cx + 5.2 + s * 1.2, on(5.2, -8.2), cz - 8.2); collide(cx + 5.2, cz - 8.2, 2.7, 0.9, 1, true);
+    slab(0x23232b, 0.4, 0.22, 0.2, cx + 4.4, on(5.2, -8.2) + 0.93, cz - 8.3); slab(0x7dffb0, 0.1, 0.05, 0.01, cx + 4.3, on(5.2, -8.2) + 1.05, cz - 8.19, M.glow); for (let k = 0; k < 5; k++) put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.2, 6).translate(cx + 5 + k * 0.2, on(5.2, -8.2) + 1.03, cz - 8.2), [0x8a5a2a, 0x2f7d46][k % 2]);
+    slab(0xd8342c, 0.9, 1.1, 0.5, cx + 9.9, on(9.9, -1.6), cz - 1.6); for (let k = 0; k < 4; k++) slab(0xc9cbd2, 0.7, 0.03, 0.02, cx + 9.9, on(9.9, -1.6) + 0.2 + k * 0.24, cz - 1.34); collide(cx + 9.9, cz - 1.6, 1, 0.6, 1.1, true);
+    for (const [gx, hex] of [[11, 0x2f7d46], [11.4, 0xd8342c]]) { post(hex, 0.13, 1.2, cx + gx, on(gx, -2.6), cz - 2.6, 8); post(0xc9cbd2, 0.04, 0.12, cx + gx, on(gx, -2.6) + 1.2, cz - 2.6, 6); }
+    for (const [lx, lz, tx, tz] of [[-1.4, -7.6, 1, 1], [11.2, -7.4, -1, 1]]) { for (const a of [0, 2.09, 4.19]) put(M.plain, new THREE.CylinderGeometry(0.025, 0.025, 2.4, 4).rotateZ(0.2).rotateY(a).translate(cx + lx + Math.cos(a) * 0.24, on(lx, lz) + 1.15, cz + lz - Math.sin(a) * 0.24), 0x23232b); slab(0x23232b, 0.5, 0.36, 0.2, cx + lx, on(lx, lz) + 2.3, cz + lz); slab(0xfff6d8, 0.42, 0.28, 0.22, cx + lx + tx * 0.02, on(lx, lz) + 2.34, cz + lz + tz * 0.02, M.glow); halo(cx + lx, on(lx, lz) + 2.5, cz + lz, 0xffe2a6, 10); }
+    post(RUST, 0.3, 0.9, cx - 3, on(-3, 2.6), cz + 2.6, 10); collide(cx - 3, cz + 2.6, 0.7, 0.7, 0.9, true); halo(cx - 3, on(-3, 2.6) + 1.2, cz + 2.6, 0xff8a30, 4);
+    const flames = [0, 1, 2].map(k => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.16 - k * 0.03, 0.5 + k * 0.1, 6), new THREE.MeshBasicMaterial({ color: [0xff8a30, 0xffb040, 0xffe066][k], transparent: true, opacity: 0.85 })); m.position.set(cx - 3 + (k - 1) * 0.08, on(-3, 2.6) + 1.1, cz + 2.6); scene.add(m); return m; });
+    updaters.push(t => flames.forEach((m, k) => { m.scale.set(1 + Math.sin(t * 11 + k * 2) * 0.2, 1 + Math.sin(t * 8 + k) * 0.35, 1 + Math.cos(t * 9 + k) * 0.2); m.rotation.y = t * 2 + k; }));
+    put(M.plain, new THREE.CylinderGeometry(0.6, 0.6, 0.1, 14).translate(cx - 5.2, on(-5.2, -1) + 0.7, cz - 1), 0x8a6a44); post(0x8a6a44, 0.2, 0.7, cx - 5.2, on(-5.2, -1), cz - 1, 8); for (let k = 0; k < 4; k++) put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.2, 6).translate(cx - 5.4 + (k % 2) * 0.3, on(-5.2, -1) + 0.85, cz - 1.15 + (k >> 1) * 0.3), 0x8a5a2a); // a cable drum for a table
+    for (let k = 0; k < 5; k++) { post(0x8a8d96, 0.04, 2.2, cx - 6 + k * 3.4, on(-6 + k * 3.4, -13), cz - 13, 5); if (k < 4) { slab(0x9aa0a8, 3.4, 0.04, 0.04, cx - 4.3 + k * 3.4, on(-4.3 + k * 3.4, -13) + 2.15, cz - 13); slab(0x9aa0a8, 3.4, 0.04, 0.04, cx - 4.3 + k * 3.4, on(-4.3 + k * 3.4, -13) + 1.1, cz - 13); } } // what is left of a fence
+  }
 
   // ----- Beach: boardwalk, palms along Ocean Drive, umbrellas and lifeguard huts on the sand -----
   const beachLen = bounds.maxZ - bounds.minZ;
@@ -2750,6 +3303,40 @@ export function buildWorld(scene) {
     for (let x = deck + 8; x < end; x += 16) { post(STEEL, 0.07, 3.6, x, dy, pierZ - 2.4); ball(0xffe2a6, 0.2, x, dy + 3.7, pierZ - 2.4, M.glow); halo(x, dy + 3.7, pierZ - 2.4, 0xffb860, 4); }
     slab(0xffffff, 0.07, 1, 5, end, dy, pierZ); bench(end - 1.2, pierZ, -Math.PI / 2);
     places.pier = { start: { x: ramp - 3, z: pierZ }, end: { x: end - 5, z: pierZ } };
+    { // The pier, used: benches, more lamps, tackle left along the rail, a ring to throw, crates at the head, a shack for bait,
+      // a boat on a mooring, a buoy with a light on it, gulls going round.
+      const RAIL = pierZ - 2.42, FAR = pierZ + 2.42;
+      for (let x = deck + 16; x < end - 8; x += 16) { post(STEEL, 0.07, 3.6, x, dy, FAR); ball(0xffe2a6, 0.2, x, dy + 3.7, FAR, M.glow); halo(x, dy + 3.7, FAR, 0xffb860, 4); }
+      for (let x = deck + 12; x < end - 10; x += 16) { // a bench against the south rail, facing the water to the north
+        slab(0x8a5a44, 1.7, 0.06, 0.42, x, dy + 0.42, FAR - 0.3, M.wood, 1); slab(0x8a5a44, 1.7, 0.4, 0.05, x, dy + 0.5, FAR - 0.08, M.wood, 1); for (const s of [-1, 1]) slab(0x3a3a44, 0.06, 0.42, 0.4, x + s * 0.75, dy, FAR - 0.3);
+      }
+      for (const [n, x] of [deck + 22, deck + 38, end - 20, end - 9].entries()) { // a rod propped on the rail, its bucket, a box of hooks
+        put(M.plain, new THREE.CylinderGeometry(0.008, 0.014, 2.6, 4).rotateX(-0.75).translate(x, dy + 1.5, RAIL - 0.75), 0x3a2a1c); post([0xf4f4f0, 0x2f56c8, 0xd8342c, 0xf4f4f0][n], 0.14, 0.26, x + 0.5, dy, RAIL + 0.3, 10); slab(0x2f5a3f, 0.34, 0.18, 0.2, x - 0.5, dy, RAIL + 0.28);
+      }
+      for (const x of [deck + 30, end - 14]) { slab(0xf4f4f0, 0.5, 0.6, 0.06, x, dy + 0.55, FAR + 0.02); put(M.plain, new THREE.TorusGeometry(0.2, 0.06, 6, 16).translate(x, dy + 0.86, FAR - 0.06), 0xff5a30); }                 // a life ring on its board
+      for (const [cx, cz, n] of [[end - 1.4, pierZ - 1.6, 3], [end - 1.2, pierZ + 1.7, 2], [end - 2.3, pierZ + 1.9, 1]]) for (let k = 0; k < n; k++) slab(0x8a6a44, 0.7, 0.5, 0.7, cx, dy + k * 0.5, cz, M.wood, 1);            // crates, lobster pots
+      put(M.plain, new THREE.TorusGeometry(0.3, 0.07, 5, 14).rotateX(Math.PI / 2).translate(end - 2.6, dy + 0.07, pierZ - 1.9), 0xc9b79c); put(M.plain, new THREE.TorusGeometry(0.22, 0.07, 5, 14).rotateX(Math.PI / 2).translate(end - 2.6, dy + 0.18, pierZ - 1.9), 0xc9b79c); // rope
+      post(0x3a3a44, 0.05, 1.1, end - 0.5, dy, pierZ, 6); put(M.plain, new THREE.CylinderGeometry(0.09, 0.07, 0.42, 10).rotateZ(Math.PI / 2 - 0.2).translate(end - 0.45, dy + 1.25, pierZ), 0x8a8d96);                           // a telescope: a quarter a look
+      // The bait shack on the sand by the ramp.
+      const sx = ramp - 7, sz = pierZ + 6.5;
+      slab(0x8fd0c8, 3.6, 2.6, 2.8, sx, 0, sz, M.siding, 1.5); hip(0xd8342c, 4.2, 3.4, 0.9, sx, 2.6, sz, 0.3); slab(0x16161c, 2, 1, 0.08, sx, 1.1, sz - 1.42); slab(0xfff2c0, 1.8, 0.8, 0.04, sx, 1.2, sz - 1.44, M.glow); slab(0x8a5a44, 2.4, 0.08, 0.5, sx, 1.02, sz - 1.6, M.wood, 1);
+      sign(['BAIT · ICE · BEER'], sx, 2.25, sz - 1.44, Math.PI, { w: 3.2, h: 0.55, color: '#f4f4f0', bg: '#1f5a8a', size: 0.7, glow: false });
+      slab(0xf4f4f0, 0.8, 0.9, 0.6, sx + 2.4, 0, sz - 0.9); slab(0x2f56c8, 0.82, 0.3, 0.02, sx + 2.4, 0.5, sz - 1.21); collide(sx, sz, 3.8, 3, 3); collide(sx + 2.4, sz - 0.9, 0.9, 0.7, 1);
+      // What moves: a boat on its mooring, a buoy, three gulls.
+      const boat = new THREE.Group(), hullM = new THREE.MeshLambertMaterial({ color: 0xf4f4f0 }), trimM = new THREE.MeshLambertMaterial({ color: 0x1f5a8a });
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.9, 1.9), hullM), bow = new THREE.Mesh(new THREE.ConeGeometry(0.95, 1.6, 4).rotateZ(-Math.PI / 2).rotateX(Math.PI / 4).scale(1, 0.48, 1), hullM), stripe = new THREE.Mesh(new THREE.BoxGeometry(5.24, 0.14, 1.94), trimM), cabin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1, 1.5), hullM), glass = new THREE.Mesh(new THREE.BoxGeometry(1.74, 0.4, 1.3), new THREE.MeshLambertMaterial({ color: 0x24324c })), mast = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 5), trimM);
+      hull.position.y = 0.2; bow.position.set(3.4, 0.2, 0); stripe.position.y = 0.52; cabin.position.set(-0.6, 1.1, 0); glass.position.set(-0.6, 1.2, 0); mast.position.set(-0.6, 2.6, 0); boat.add(hull, bow, stripe, cabin, glass, mast);
+      scene.add(boat);
+      const buoy = new THREE.Group(), lampM = new THREE.MeshBasicMaterial({ color: 0xff2a3c });
+      buoy.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.5, 10), new THREE.MeshLambertMaterial({ color: 0xd8342c })), new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.3, 6).translate(0, 0.9, 0), new THREE.MeshLambertMaterial({ color: 0xd8342c })));
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 5), lampM); lamp.position.y = 1.65; buoy.add(lamp); scene.add(buoy);
+      const birds = [0, 1, 2].map(k => { const grp = new THREE.Group(), wm = new THREE.MeshBasicMaterial({ color: 0xf4f4f0, side: THREE.DoubleSide }); const wings = [-1, 1].map(sd => { const w = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.16).translate(sd * 0.27, 0, 0).rotateX(-Math.PI / 2), wm); grp.add(w); return w; }); grp.add(new THREE.Mesh(new THREE.SphereGeometry(0.07, 5, 4).scale(1, 1, 2), wm)); scene.add(grp); return { grp, wings, k }; });
+      updaters.push(t => {
+        boat.position.set(end - 16 + Math.sin(t * 0.21) * 0.5, -0.5 + Math.sin(t * 1.1) * 0.07, pierZ - 9 + Math.cos(t * 0.17) * 0.4); boat.rotation.set(Math.sin(t * 0.9) * 0.035, 0.25 + Math.sin(t * 0.13) * 0.08, Math.sin(t * 1.1 + 1) * 0.03);
+        buoy.position.set(end + 22, -0.55 + Math.sin(t * 1.4) * 0.1, pierZ + 14); buoy.rotation.z = Math.sin(t * 1.2) * 0.12; lampM.color.setHex(Math.floor(t * 0.8) % 2 ? 0xff2a3c : 0x3a0a10);
+        for (const { grp, wings, k } of birds) { const a = t * (0.32 + k * 0.05) + k * 2.1, r = 9 + k * 4; grp.position.set(end - 4 + Math.sin(a) * r, 7 + k * 1.6 + Math.sin(t * 0.6 + k) * 0.8, pierZ + Math.cos(a) * r); grp.rotation.y = a + Math.PI / 2; const f = Math.sin(t * (5 + k) + k) * 0.5; wings[0].rotation.z = -f; wings[1].rotation.z = f; }
+      });
+    }
   }
 
   // ----- Rideland: a wheel, a carousel and a row of stalls on the sand south of the pier. It was there in 1967 and it is there now -----
@@ -2906,7 +3493,7 @@ export function buildWorld(scene) {
     ...shopList,
   ];
   // The lights inside rooms are a handful of shared lights that follow the camera from room to room.
-  const rig = Array.from({ length: 4 }, () => { const l = new THREE.PointLight(0xffffff, 0, 1); scene.add(l); return l; });
+  const rig = Array.from({ length: 6 }, () => { const l = new THREE.PointLight(0xffffff, 0, 1); scene.add(l); return l; });
   let litRoom = null;
   places.lightRoom = q => {
     if (q === litRoom) return;
