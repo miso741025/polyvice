@@ -2574,7 +2574,7 @@ export function buildWorld(scene) {
   const beachLen = bounds.maxZ - bounds.minZ;
   slab(0xd9b48a, 4.6, 0.12, beachLen - 16, SHORE + 2.3, -0.08, (bounds.minZ + bounds.maxZ) / 2, M.wood, 2.5);
   for (let z = bounds.minZ + 14; z < bounds.maxZ - 10; z += 13) palms.push({ x: SHORE + 5.6 + rand() * 1.5, z: z + rand() * 4 });
-  const pierZ = blockCenter(NX - 1, 2).z, offPier = z => Math.abs(z - pierZ) > 7;
+  const pierZ = blockCenter(NX - 1, 2).z, offPier = z => Math.abs(z - pierZ) > 7 && !(z > pierZ + 8 && z < pierZ + 48); // nothing grows through the pier, or through Rideland beside it
   for (let k = 0; k < 14; k++) { const z = bounds.minZ + 12 + rand() * (beachLen - 24); if (offPier(z)) palms.push({ x: SHORE + 14 + rand() * 30, z }); }
   for (let k = 0; k < 24; k++) {
     const x = SHORE + 12 + rand() * 36, z = bounds.minZ + 14 + rand() * (beachLen - 28);
@@ -2610,6 +2610,55 @@ export function buildWorld(scene) {
     for (let x = deck + 8; x < end; x += 16) { post(STEEL, 0.07, 3.6, x, dy, pierZ - 2.4); ball(0xffe2a6, 0.2, x, dy + 3.7, pierZ - 2.4, M.glow); halo(x, dy + 3.7, pierZ - 2.4, 0xffb860, 4); }
     slab(0xffffff, 0.07, 1, 5, end, dy, pierZ); bench(end - 1.2, pierZ, -Math.PI / 2);
     places.pier = { start: { x: ramp - 3, z: pierZ }, end: { x: end - 5, z: pierZ } };
+  }
+
+  // ----- Rideland: a wheel, a carousel and a row of stalls on the sand south of the pier. It was there in 1967 and it is there now -----
+  if (!LA) {
+    const x = SHORE + 22, z = pierZ + 27, y = -0.1, RED = 0xd8342c, CREAM = 0xf6eedc;
+    // The arch on the promenade side.
+    for (const s of [-1, 1]) { post(CREAM, 0.22, 4.6, x - 13, y, z + s * 3, 10); collide(x - 13, z + s * 3, 0.6, 0.6, 4.6, true); }
+    slab(RED, 0.4, 1.5, 7, x - 13, y + 4.2, z); sign('Rideland', x - 13.22, y + 4.95, z, -Math.PI / 2, { w: 6.4, h: 1.3, color: '#ffe066', bg: '#8a1c1c', font: '"Mr Dafoe", cursive', size: 0.86, also: [[x - 12.78, y + 4.95, z, Math.PI / 2]] });
+    for (let n = 0; n < 9; n++) ball([0xffe066, 0xff5fd2, 0x49e0d0][n % 3], 0.1, x - 13, y + 4.05, z - 3.2 + n * 0.8, M.glow);
+    halo(x - 13, y + 4.6, z, 0xffe066, 10);
+    // The wheel, edge-on to the sea.
+    const wx = x + 8, wz = z + 9, R = 8.5, hub = 10.6;
+    put(M.plain, new THREE.TorusGeometry(R, 0.13, 6, 40).rotateY(Math.PI / 2).translate(wx, y + hub, wz), RED);
+    put(M.plain, new THREE.TorusGeometry(R * 0.5, 0.09, 6, 28).rotateY(Math.PI / 2).translate(wx, y + hub, wz), CREAM);
+    for (let k = 0; k < 12; k++) {
+      const a = k * Math.PI / 6, gy = y + hub + Math.cos(a) * R, gz = wz + Math.sin(a) * R;
+      put(M.plain, new THREE.BoxGeometry(0.08, R, 0.08).translate(0, R / 2, 0).rotateX(a).translate(wx, y + hub, wz), CREAM);
+      slab([RED, 0x49e0d0, 0xffe066, 0xf7a8c4][k % 4], 1.1, 0.8, 1.1, wx, gy - 1.3, gz); slab(CREAM, 1.2, 0.08, 1.2, wx, gy - 0.3, gz); post(STEEL, 0.02, 0.5, wx, gy - 0.5, gz, 4);
+      ball(0xffe2a6, 0.1, wx - 0.2, y + hub + Math.cos(a + 0.26) * R, wz + Math.sin(a + 0.26) * R, M.glow);
+    }
+    for (const s of [-1, 1]) { put(M.plain, new THREE.BoxGeometry(0.3, hub + 0.6, 0.3).translate(0, (hub + 0.6) / 2, 0).rotateX(s * 0.3).translate(wx, y, wz - s * 3.2), CREAM); put(M.plain, new THREE.BoxGeometry(0.3, hub + 0.6, 0.3).translate(0, (hub + 0.6) / 2, 0).rotateX(s * 0.3).translate(wx + 0.9, y, wz - s * 3.2), CREAM); }
+    put(M.plain, new THREE.CylinderGeometry(0.5, 0.5, 1.4, 10).rotateZ(Math.PI / 2).translate(wx + 0.4, y + hub, wz), RED); halo(wx, y + hub, wz, 0xffe2a6, 10);
+    slab(0x8d8a8e, 3, 0.3, 9, wx, y, wz); collide(wx, wz, 3, 9, 2);
+    // The carousel.
+    const cx = x - 3, cz = z - 3;
+    put(M.plain, new THREE.CylinderGeometry(4.2, 4.4, 0.28, 24).translate(cx, y + 0.14, cz), 0xc79a6a);
+    put(M.plain, new THREE.CylinderGeometry(0.5, 0.5, 3.4, 12).translate(cx, y + 1.9, cz), CREAM); collide(cx, cz, 1.1, 1.1, 3.4);
+    for (let k = 0; k < 12; k++) put(M.plain, new THREE.ConeGeometry(4.8, 1.9, 3, 1, false, k * Math.PI / 6, Math.PI / 6).translate(cx, y + 4.5, cz), k % 2 ? RED : CREAM);
+    put(M.plain, new THREE.CylinderGeometry(4.8, 4.8, 0.3, 24).translate(cx, y + 3.5, cz), RED); ball(0xffe066, 0.25, cx, y + 5.6, cz, M.glow);
+    const horses = [];
+    for (let k = 0; k < 8; k++) {
+      const a = k * Math.PI / 4, hx = cx + Math.sin(a) * 3.1, hz = cz + Math.cos(a) * 3.1, up = (k % 2) * 0.3, hue = [0xf4f4f0, 0xd9a520, 0x49a0d0, 0xf7a8c4][k % 4];
+      post(0xd9a520, 0.03, 3.3, hx, y + 0.28, hz, 5);
+      put(M.plain, new THREE.BoxGeometry(0.3, 0.42, 1).rotateY(a + Math.PI / 2).translate(hx, y + 1.1 + up, hz), hue);
+      put(M.plain, new THREE.BoxGeometry(0.2, 0.5, 0.26).translate(0, 0.36, 0.5).rotateY(a + Math.PI / 2).translate(hx, y + 1.1 + up, hz), hue);
+      for (const f of [-0.35, 0.35]) put(M.plain, new THREE.BoxGeometry(0.1, 0.5, 0.1).translate(0, -0.42, f).rotateY(a + Math.PI / 2).translate(hx, y + 1.1 + up, hz), hue);
+      ball(0xffe2a6, 0.08, cx + Math.sin(a) * 4.7, y + 3.3, cz + Math.cos(a) * 4.7, M.glow);
+      horses.push({ x: hx, y: y + 0.95 + up, z: hz, h: a + Math.PI / 2 });
+    }
+    // The ticket booth and three stalls with striped awnings.
+    slab(RED, 2, 2.6, 2, x - 9, y, z + 6, M.siding, 0.8); collide(x - 9, z + 6, 2, 2, 2.8); hip(CREAM, 2.6, 2.6, 0.8, x - 9, y + 2.6, z + 6, 0.1, M.plain);
+    sign('TICKETS 25¢', x - 10.02, y + 2.1, z + 6, -Math.PI / 2, { w: 1.8, h: 0.5, color: '#8a1c1c', bg: '#f6eedc', size: 0.8, glow: false }); slab(0x24324c, 0.05, 0.8, 1.2, x - 10.01, y + 1.1, z + 6);
+    for (let n = 0; n < 3; n++) { const sz = z - 11 + n * 0.01, sx = x - 8 + n * 5.2, hue = [0x49e0d0, 0xffe066, 0xf7a8c4][n];
+      slab(CREAM, 4, 2.3, 2.2, sx, y, sz - 1, M.siding, 0.8); collide(sx, sz - 1, 4, 2.2, 2.5); slab(0x24324c, 3.4, 1.1, 0.06, sx, y + 0.9, sz + 0.12); slab(0xc79a6a, 3.8, 0.1, 0.5, sx, y + 0.85, sz + 0.3);
+      for (let k = 0; k < 8; k++) put(M.plain, new THREE.BoxGeometry(0.5, 0.06, 1.3).rotateX(0.5).translate(sx - 1.75 + k * 0.5, y + 2.45, sz + 0.6), k % 2 ? hue : CREAM);
+      for (let k = 0; k < 5; k++) ball([RED, 0xffe066, 0x49a0d0, 0xf4f4f0, 0x2f7d46][(k + n) % 5], 0.16, sx - 1.2 + k * 0.6, y + 1.7, sz - 0.2); }
+    for (let n = 0; n < 14; n++) { ball([0xffe066, 0xff5fd2, 0x49e0d0, 0xff8a5c][n % 4], 0.09, x - 12 + n * 1.6, y + 3.6 - Math.sin(n / 13 * Math.PI) * 0.5, z + 3, M.glow); if (n % 4 === 0) halo(x - 12 + n * 1.6, y + 3.4, z + 3, 0xffd9a8, 4); }
+    for (const s of [0, 1]) post(CREAM, 0.06, 3.7, x - 12 + s * 20.8, y, z + 3, 6);
+    places.rideland = { gate: { x: x - 13, z }, carousel: { x: cx, z: cz }, horses, wheel: { x: wx, z: wz }, booth: { x: x - 9, z: z + 6 }, hide: { x: x - 7.4, z: z + 7.6 }, stop: { x: SHORE - 5, z }, kerb: { x: nodeX(NX) + 3.6, z, h: 0 } };
   }
 
   // ----- The marsh on the west shore: reeds and dark water -----

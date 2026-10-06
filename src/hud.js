@@ -104,7 +104,13 @@ export class Hud {
   // 0..1: the blurred, tunnel-vision look of a panic attack.
   panic(k) {
     $('fx').style.opacity = k;
-    $('game').style.filter = k > 0.01 ? `blur(${(k * 5).toFixed(1)}px) saturate(${(1 - k * 0.6).toFixed(2)})` : '';
+    this.blur = k > 0.01 ? `blur(${(k * 5).toFixed(1)}px) saturate(${(1 - k * 0.6).toFixed(2)})` : '';
+    $('game').style.filter = [this.blur, this.old].filter(Boolean).join(' ');
+  }
+  // Another year: the picture goes the colour of an old photograph.
+  era(on) {
+    this.old = on ? 'sepia(0.72) contrast(1.08) brightness(1.03)' : '';
+    $('game').style.filter = [this.blur, this.old].filter(Boolean).join(' ');
   }
 
   // North-up radar centred on the player.

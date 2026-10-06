@@ -200,7 +200,7 @@ async function boot() {
       if (p.inside) { for (const h of p.inside.hide || []) h.group.visible = true; p.inside = null; }
       Object.assign(p, { car: null, hidden: false, locked: false, down: 0, pose: null, dying: false });
       g.cam.fixed = null; g.cam.sway = 0; g.cam.yaw = p.heading = 0;
-      hud.panic(0); hud.objective(); hud.subtitle(); hud.prompt(''); hud.card(); hud.passed();
+      hud.panic(0); hud.era(false); hud.objective(); hud.subtitle(); hud.prompt(''); hud.card(); hud.passed();
       g.setNight(0);
       combat.reset();
       g.addMoney(-Math.min(g.cash, 500));

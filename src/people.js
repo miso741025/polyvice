@@ -1088,6 +1088,17 @@ export const LOOKS = {
 };
 // Episode five.
 Object.assign(LOOKS, {
+  // Episode seven: 1967, and the school.
+  tonyboy: { pattern: 'stripes', shirt: 0xece6dc, tee: true, pants: 0x3b4a66, hair: 0x2b1b12, hairMesh: 'parted', height: 0.8, head: 1.2, bulk: 1.22 },
+  janice: { body: 'female', shirt: 0xf2a3b4, tee: true, pants: 0xf5f0e6, hair: 0x2b1b12, hairMesh: 'long', height: 0.84, head: 1.14 },
+  johnnyboy: { jacket: 0x2a2a34, shirt: 0xf4f4f4, tie: 0x16161c, tucked: true, pants: 0x2a2a34, hair: 0x16110e, hairMesh: 'parted', hat: 'fedora', hatColor: 0x2a2a34, bulk: 1.2, face: { jaw: 0.15, brow: 0.3 } },
+  junior67: { jacket: 0x6f5a44, shirt: 0xf4f4f4, tie: 0x6a1c2c, tucked: true, pants: 0x4a4652, hair: 0x2b1b12, hairStyle: 'receding', glasses: 'clear', glassesScale: 1.3, bulk: 0.96, height: 0.97, age: 0.3, face: { nose: 0.95, cheeks: -0.4, jaw: 0.04 } },
+  livia67: { body: 'female', shirt: 0x9a7fb0, sleeves: 'long', pants: 0x4a4652, hair: 0x16110e, hairMesh: 'parted', hairScale: [1.06, 1.04, 1.08], bulk: 1.05, height: 0.94, age: 0.3, face: { jaw: 0.1, cheeks: -0.3, chin: 0.4 }, frown: true },
+  rocco: { pattern: 'plaid', shirt: 0xb5523b, pants: 0x4a3324, hair: 0x4a3324, hairMesh: 'parted', bulk: 1.1, stubble: 0.3 },
+  kida: { shirt: 0xd8342c, tee: true, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', dark: true, hat: 'cap', height: 0.84, head: 1.18, bulk: 0.95 },
+  kidb: { pattern: 'stripes', shirt: 0x9fd0f5, tee: true, pants: 0x3b6ea8, hair: 0xd9b25a, hairMesh: 'parted', height: 0.8, head: 1.2, bulk: 1.05 },
+  psychologist: { body: 'female', jacket: 0x6f8a6a, shirt: 0xf5f0e6, pants: 0x3d4658, tucked: true, hair: 0x7a3b1a, hairMesh: 'long', glasses: 'clear', age: 0.4 },
+  coach: { shirt: 0xd8342c, tee: true, pants: 0x23232b, shoes: 0xf2efe8, hair: 0x4a3324, hairMesh: 'buzzed', hat: 'cap', hatColor: 0xd8342c, bulk: 1.28, stubble: 0.3 },
   // Episode six: the captains, a card player, a dealer, a man from New York, a waiter.
   jimmy: { jacket: 0x6f5a44, shirt: 0xf4f4f4, pants: 0x4a3324, hair: 0x2b1b12, hairStyle: 'receding', mustache: 0x2b1b12, bulk: 1.25, age: 0.6, face: { jaw: 0.15, cheeks: 0.5 } },
   larry: { jacket: 0x3d4658, shirt: 0xcfe8ff, tucked: true, pants: 0x3d4658, hair: 0x9a9690, hairMesh: 'parted', glasses: 'clear', bulk: 1.32, age: 0.8, face: { jowls: 0.6, cheeks: 0.6 } },
