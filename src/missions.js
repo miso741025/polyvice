@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CITY, near, clamp, bounds, SHORE, groundAt, pushOut, colliders } from './grid.js';
+import { CITY, near, clamp, bounds, SHORE, groundAt, pushOut, colliders, nodeX, nodeZ, NX, NZ } from './grid.js';
 import { HEAT } from './heat.js';
 import { makeLook, makeHuman, randomPedLook, Car, roam, nearestNode } from './entities.js';
 
@@ -1849,6 +1849,93 @@ const EPISODES = [
     titles: ['Sacramental Wine', "The Principal's Office", '1967', 'Rideland', 'Loose Lips', 'Sundaes'] },
 ];
 
+// ---------- Things to do ----------
+// The pieces missions are built from, beside driving somewhere and talking: a round of calls, a car to run down,
+// a tail to shake, the police to lose, a conversation that happens while he drives.
+
+// Several places to call at, in any order: a marker at each and a count in the objective. `each(k)` runs at stop k.
+export async function rounds(g, stops, text, each) {
+  const p = g.player, left = stops.map((s, k) => ({ x: s.x, z: s.z, k, m: g.addMarker(s.x, s.z, 5) }));
+  while (left.length) {
+    g.hud.objective(`${text} &nbsp; <b>${stops.length - left.length} of ${stops.length}</b>`);
+    await g.until(() => left.some(s => near(p.pos, s, 5.8) && (!p.car || Math.abs(p.car.speed) < 6)));
+    const s = left.find(st => near(p.pos, st, 5.8));
+    g.removeMarker(s.m); left.splice(left.indexOf(s), 1);
+    g.hud.objective();
+    g.setCheckpoint?.();
+    await each?.(s.k, s);
+  }
+}
+// A car that runs. Ram it, or shoot it, until it has had enough and stops. It is red on the radar.
+export async function runDown(g, car, text, { speed = 16 } = {}) {
+  const p = g.player, corners = [[1, 1], [NX - 1, 1], [NX - 1, NZ - 1], [1, NZ - 1]].map(([i, j]) => ({ x: nodeX(i), z: nodeZ(j) }));
+  const far = () => corners.slice().sort((a, b) => Math.hypot(b.x - car.pos.x, b.z - car.pos.z) - Math.hypot(a.x - car.pos.x, a.z - car.pos.z))[Math.floor(Math.random() * 2)];
+  car.hp = 100; car.mission = false; car.driverless = true; // it can be hurt all the way
+  let goal = far();
+  dispatch(g, car, car.pos, goal, speed);
+  const blip = { x: car.pos.x, z: car.pos.z, color: '#ff3b4a' };
+  g.blips.push(blip);
+  g.setCheckpoint?.();
+  await g.until(() => {
+    blip.x = car.pos.x; blip.z = car.pos.z;
+    if (car.nav) car.nav.cruise = speed * (car.hp < 60 ? 0.8 : 1);
+    if (!car.nav || near(car.pos, goal, 30)) { goal = far(); dispatch(g, car, car.pos, goal, speed); }
+    const hp = Math.max(0, car.hp - 35), pips = Math.ceil(hp / 13);
+    g.hud.objective(`${text} &nbsp; <b>${'▮'.repeat(pips)}${'▯'.repeat(5 - pips)}</b>`);
+    return car.hp <= 35 || car.wreck;
+  });
+  g.blips.splice(g.blips.indexOf(blip), 1);
+  g.hud.objective();
+  car.nav = null; car.speed = 0; car.mission = true; car.hp = Math.max(car.hp, 20); car.wreck = false; car.dieAt = 0;
+}
+// Somebody is following. He is red on the radar; get well clear of him for a few seconds and he is gone.
+export async function shake(g, text, { color = 0x23232b, kind = 'sedan' } = {}) {
+  const p = g.player;
+  if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+  const mine = p.car, unit = propCar(g, { x: mine.pos.x - Math.sin(mine.heading) * 34, z: mine.pos.z - Math.cos(mine.heading) * 34 }, mine.heading, color, kind);
+  dispatch(g, unit, unit.pos, p.pos, 15); unit.nav.goal = p.pos;
+  const blip = { x: unit.pos.x, z: unit.pos.z, color: '#ff3b4a' };
+  g.blips.push(blip);
+  let clear = 0, last = g.time;
+  await g.until(() => {
+    blip.x = unit.pos.x; blip.z = unit.pos.z;
+    if (!unit.nav) { dispatch(g, unit, unit.pos, p.pos, 15); unit.nav.goal = p.pos; }
+    const d = Math.hypot(unit.pos.x - p.pos.x, unit.pos.z - p.pos.z), dt = g.time - last;
+    last = g.time;
+    clear = d > 150 ? clear + dt : 0;
+    const k = clamp(d / 150, 0, 1), at = Math.round(k * 8);
+    g.hud.objective(`${text} &nbsp; <span style="color:${k < 0.4 ? '#ff3b4a' : k < 1 ? '#ffd23f' : '#3fd16b'}">${k < 0.4 ? 'ON YOU' : k < 1 ? 'DROPPING BACK' : 'CLEAR'}</span> <span style="letter-spacing:2px">${Array.from({ length: 9 }, (_, i) => (i === at ? '◆' : '·')).join('')}</span>`);
+    return clear > 2.5;
+  });
+  g.blips.splice(g.blips.indexOf(blip), 1);
+  g.removeCar(unit);
+  g.hud.objective();
+}
+// The police want him: nothing else happens until he has lost them.
+export async function loseHeat(g, stars, text) {
+  g.noHeat = false;
+  g.heat(stars);
+  g.hud.objective(text);
+  await g.until(() => g.wanted < 1);
+  g.hud.objective();
+}
+// Talk in the car: lines that come up one after another while he drives, without stopping him. Call what it returns to end it.
+export function banter(g, lines) {
+  let on = true;
+  (async () => {
+    await g.wait(2.5);
+    for (const [who, text] of lines) {
+      if (!on || !g.player.car) break;
+      introduce(g, who);
+      g.hud.subtitle(who, text);
+      await g.wait(Math.max(2.8, text.length * 0.07));
+      if (on) g.hud.subtitle();
+      await g.wait(1.4);
+    }
+  })().catch(() => {});
+  return () => { if (on) { on = false; g.hud.subtitle(); } };
+}
+
 // ---------- Between missions ----------
 // The story waits for the player. When one mission is done the next is a yellow marker somewhere that makes sense
 // for it (home, the Bing, the doctor's, the precinct), and it starts when he walks or drives into it.
@@ -2778,7 +2865,48 @@ async function backRoom(g) {
   g.hud.card('The Back Room', 'The Bada Bing');
   await phone(g, PAULIE, "T. We're counting at the Bing. Sil's doing his voices again. Come save us.");
   g.hud.card();
-  await reach(g, bing.door, 'Go to the <b>Bada Bing</b>.', { r: 4 });
+  // On the way in: three envelopes that are late.
+  await phone(g, SILVIO, 'Before you come in. Three envelopes did not turn up this week: the cafe, the auto body, the motor lodge. You are passing all three.');
+  const { cafe, bodyshop, motel } = g.places;
+  let runner = null;
+  await rounds(g, [cafe.kerb, bodyshop.kerb, motel.kerb], '<b>Drive</b> round and collect the three envelopes.', async k => {
+    const at = [cafe.kerb, bodyshop.kerb, motel.kerb][k];
+    if (k === 0) {
+      await say(g, 'Owner', 'It is all there, Mr. Soprano. I had it ready Tuesday. Nobody came for it.', 3.2);
+      g.sfx?.cash();
+    } else if (k === 1) {
+      if (p.car) { p.car.speed = 0; g.leaveCar(); }
+      const man = extraAt(g, spot(p.pos, 2.2, 0.6), toward(spot(p.pos, 2.2, 0.6), p.pos), 'idle', { shirt: 0x2f56c8, sleeves: 'long', tucked: true, pants: 0x2f56c8, hair: 0x4a3324, hairMesh: 'buzzed', bulk: 1.25, stubble: 0.5 });
+      await talk(g, [
+        ['Mechanic', 'I pay your uncle now. A man came round. He said the arrangement had changed.', man],
+        [TONY, 'Did he. Then let us change it back.', p],
+      ]);
+      const foe = g.makeEnemy(man, { health: 90, damage: 7, cash: 0 });
+      foe.die = () => { foe.health = 1; foe.dead = true; foe.ai = null; man.after = null; man.set('down'); };
+      fistsOnly(g, true);
+      g.hud.objective('<b>Rough him up</b> until he remembers who he pays.');
+      await g.until(() => foe.dead);
+      g.hud.objective();
+      fistsOnly(g, false);
+      g.removeNpc(man);
+      await say(g, 'Mechanic', 'Okay! Okay. It is in the tin under the bench. All of it.', 3);
+      g.sfx?.cash();
+      g.pardon();
+      g.wait(6).then(() => g.untrack(man.group)).catch(() => {});
+    } else {
+      await say(g, '', 'The night man at the motor lodge pointed at the road. Somebody had been in ten minutes before, said he was collecting for the family, and was just now pulling out.');
+      runner = propCar(g, spot(at, 26, 0), at.h ?? EAST, 0x2f56c8, 'coupe');
+      if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+      await runDown(g, runner, '<b>Stop the</b> blue coupe. Ram it until it gives up.');
+      p.locked = true;
+      await say(g, 'Driver', 'It is on the seat! Take it! I was told nobody was working this side any more!', 3.4);
+      await say(g, TONY, 'Told by who? ...Never mind. I know by who.', 2.8);
+      g.sfx?.cash();
+      p.locked = false;
+    }
+  });
+  await reach(g, bing.door, 'Three envelopes. Take them to the <b>Bada Bing</b>.', { r: 4 });
+  if (runner && g.cars.includes(runner)) g.removeCar(runner);
 
   await bingRoom(g, 'tableCam', room => {
     const sit = (look, n) => actor(g, look, room.seats[n], room.seats[n].h, 'sit');
@@ -2960,6 +3088,22 @@ async function sitDown(g) {
     [TONY, "And my end comes off the top of those DVD players. That's the tax for making me sit through that.", p],
   ]);
   await cut(g, () => { dismiss(g, chris, brendan); g.cam.fixed = null; });
+  p.locked = false;
+  // The ruling was restitution. Tony sees to it himself.
+  const { comley } = g.places, lot = spot(satriale.kerb, 14, 0);
+  const truck = propCar(g, lot, satriale.kerb.h, 0xd8342c, 'truck');
+  await say(g, TONY, 'The truck goes back tonight, with everything still in it. I will drive it myself, so I know it got there.', 3.6);
+  await wantCar(g, truck, 'Get in the <b>truck</b>.');
+  truck.driverless = false;
+  const load = careful(g, 'The load', 'At the second bump a carton of DVD players went out through the back doors. He stacked it again and started over.', () => { if (p.car) g.leaveCar(); truck.pos.set(lot.x, 0, lot.z); truck.heading = satriale.kerb.h; truck.speed = 0; g.enterCar(truck); });
+  await load.to(comley.gate, '<b>Drive</b> the truck back to Comley Trucking. Gently.', truck);
+  load.stop();
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'He left it at the dock with the keys on the seat, and walked to the corner for a cab.');
+  g.removeCar(truck);
+  homeAsTony(g, p.human);
+  await fade(g, 0, 1.2);
   p.locked = false;
   await passed(g, '$4,000', 4000);
 }
@@ -3342,7 +3486,19 @@ async function closingTime(g) {
   });
   g.setNight(0);
   place(g, bing.door, SOUTH, bing.park);
+  const cad = propCar(g, spot(bing.park, 9, 6), EAST, 0xf4f4f0, 'coupe');
   await fade(g, 0, 1.2);
+  p.locked = false;
+  // And on his way out, a man who has decided tonight is a good night not to pay.
+  await say(g, GEORGIE, 'Tone! The guy in the white coupe! Four hundred on the tab and he walked!', 3.2);
+  if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+  await runDown(g, cad, '<b>Stop the</b> white coupe. Ram it off the road.');
+  p.locked = true;
+  await say(g, 'Customer', 'Okay! Okay! I thought my friend had paid! Here, here is five!', 3.2);
+  await say(g, TONY, 'Four for the bar. One for the bodywork. And you drink somewhere else.', 3.2);
+  g.sfx?.cash();
+  g.removeCar(cad);
+  g.pardon();
   p.locked = false;
   await passed(g, 'Episode two complete', 3000);
 }
@@ -3520,6 +3676,8 @@ async function patience(g) {
   g.hud.card('Patience', 'The park');
   await phone(g, JUNIOR, 'The park. Now. Bring nobody.');
   g.hud.card();
+  await say(g, TONY, 'Bring nobody, he says. And who is that two cars back?', 3);
+  await shake(g, '<b>Drive.</b> Lose the grey car before you go near the park.', { color: 0x8d8a8e });
   await reach(g, park.kerb, 'Meet Uncle Junior in the <b>park</b>.');
 
   p.locked = true;
@@ -3709,6 +3867,8 @@ async function denial(g) {
   fistsOnly(g, false);
   g.pardon();
   await say(g, TONY, "...Sorry. Sorry about that. Here, that's for the dry cleaning.");
+  await say(g, '', 'Somebody at the front desk had already picked up a telephone.', 2.8);
+  await loseHeat(g, 2, 'A man beaten in a hospital car park. <b>Lose the police.</b>');
   await passed(g, 'Respect +');
 }
 
@@ -3807,6 +3967,24 @@ async function acceptance(g) {
   const chris = makeLook('christopher');
   g.setPlayer(chris);
   place(g, bing.door, SOUTH);
+  { // First he goes looking.
+    g.cam.fixed = null;
+    const ride = propCar(g, bing.park, bing.park.h, 0x8a1c2a, 'coupe'), { cafe, motel, flat, diner } = g.places;
+    g.hud.fade(0, 1.2);
+    await playing(g, 'Christopher Moltisanti', "Tony's nephew. You play him in this one");
+    p.locked = false;
+    await wantCar(g, ride, 'Get in the <b>red coupe</b>, and go and look for Brendan.');
+    ride.driverless = false;
+    const notes = ["Brendan's car was not outside the cafe. Nobody inside had seen him since Tuesday.", 'At the motor lodge the night man looked at the floor, and said room nine was paid up and empty.',
+      "The curtains at Brendan's place were shut. They had been shut that morning too, which he had not thought about until now."];
+    await rounds(g, [cafe.kerb, motel.kerb, (flat || diner).kerb], '<b>Drive</b> round the places Brendan would be.', async k => { await say(g, '', notes[k]); });
+    await reach(g, bing.door, '<b>Drive</b> back to the Bing. Maybe he has turned up.', { r: 5 });
+    p.locked = true;
+    await fade(g, 1, 0.8);
+    if (p.car) g.leaveCar();
+    g.removeCar(ride);
+    place(g, bing.door, SOUTH);
+  }
   mikey = actor(g, 'mikey', spot(bing.door, -1.2, 3.4), NORTH);
   goon = actor(g, 'trucker', spot(bing.door, 1.6, 3.6), NORTH);
   frame(g, p.pos, spot(bing.door, 0, 3.5), { dist: 4.6 });
@@ -4500,6 +4678,8 @@ async function meadowlands(g) {
   g.hud.card('Meadowlands', 'The churchyard');
   await phone(g, CARMELA, "The funeral is at eleven. Wear the grey. And Tony: your mother is coming, and so is your uncle. Be nice.");
   g.hud.card();
+  await say(g, TONY, 'A van with dark glass, parked across from my house on the day of a funeral. Subtle.', 3.4);
+  await shake(g, '<b>Drive.</b> Lose the van before the church. They can take their pictures there.', { kind: 'van', color: 0x23232b });
   await reach(g, church.kerb, 'Drive to the <b>church</b>.');
 
   p.locked = true;

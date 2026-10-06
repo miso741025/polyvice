@@ -429,7 +429,7 @@ async function boot() {
           o.pos.x -= dx * push * 0.4; o.pos.z -= dz * push * 0.4;
           hit = true;
         }
-        if (hit) { if (Math.abs(car.speed) > 6 && g.time - (car.bumpAt || -9) > 0.6) { car.bumpAt = g.time; sfx.crash(Math.abs(car.speed) / 25); g.hurtCar(car, Math.abs(car.speed) * 0.45); g.hurtCar(o, Math.abs(car.speed) * 0.6); } car.speed *= 0.93; if (!o.nav) o.collide(); }
+        if (hit) { if (Math.abs(car.speed) > 6 && g.time - (car.bumpAt || -9) > 0.6) { car.bumpAt = g.time; sfx.crash(Math.abs(car.speed) / 25); g.hurtCar(car, Math.abs(car.speed) * 0.18); g.hurtCar(o, Math.abs(car.speed) * 0.6); /* the one doing the ramming comes off better */ } car.speed *= 0.93; if (!o.nav) o.collide(); }
       }
       p.pos.copy(car.pos);
       // The body shop puts it right.
@@ -791,7 +791,7 @@ async function boot() {
     hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips, ...(g.hostiles || [])], landmarks);
     hud.map(g.mapOpen, { focus: p.pos, heading: p.car ? p.car.heading : p.heading, blips: [...g.markers, ...g.blips], landmarks });
     { // How far to where he is going, and which way, beside the objective. And the state of the car he is in.
-      const m = g.markers[0];
+      const m = g.markers.slice().sort((a, b) => Math.hypot(a.x - p.pos.x, a.z - p.pos.z) - Math.hypot(b.x - p.pos.x, b.z - p.pos.z))[0]; // the nearest, when there are several calls to make
       if (m && !p.hidden && !g.cam.fixed) {
         const dx = m.x - p.pos.x, dz = m.z - p.pos.z, d = Math.hypot(dx, dz), turn = wrapAngle(Math.atan2(dx, dz) - g.cam.yaw);
         hud.distance(d < m.r + 1 ? '' : `${'↑↖←↙↓↘→↗'[(Math.round(turn / (Math.PI / 4)) + 8) % 8]} ${d < 1000 ? Math.round(d / 5) * 5 + ' m' : (d / 1000).toFixed(1) + ' km'}`);

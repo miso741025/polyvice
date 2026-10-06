@@ -246,7 +246,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   };
   const muzzleOf = (human, out) => { human.pistol.getWorldPosition(out); return out; };
   // A shot from `from` along `heading`; hits the first target within the cylinder of fire. Returns it.
-  const fire = (from, heading, by, range = 70) => {
+  const fire = (from, heading, by, range = 70, dmg = 0) => {
     const fx = Math.sin(heading), fz = Math.cos(heading), room = roomAt(from.x, from.z, 0);
     let hit = null, best = wallAt(from.x, from.z, fx, fz, range);
     for (const t of targets()) {
@@ -254,6 +254,14 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
       const dx = t.pos.x - from.x, dz = t.pos.z - from.z, ahead = dx * fx + dz * fz;
       if (ahead < 0.5 || ahead > best || Math.abs(dx * fz - dz * fx) > 0.75) continue;
       best = ahead; hit = t;
+    }
+    // A car in the way takes the round instead (not the one the shooter is sitting in).
+    for (const c of cars) {
+      if (c === p.car || c.wreck) continue;
+      const dx = c.pos.x - from.x, dz = c.pos.z - from.z, ahead = dx * fx + dz * fz;
+      if (ahead < 1.2 || ahead > best || Math.abs(dx * fz - dz * fx) > 1.25) continue;
+      best = ahead; hit = null;
+      if (dmg) g.hurtCar?.(c, dmg * 0.45);
     }
     tmp.set(from.x + fx * best, from.y, from.z + fz * best);
     tracer(from, tmp);
@@ -273,7 +281,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     const heading = lock ? Math.atan2(lock.pos.x - p.pos.x, lock.pos.z - p.pos.z) : (p.car ? g.cam.yaw : p.heading);
     for (let n = 0; n < (w.pellets || 1); n++) {
       const aim = heading + (Math.random() - 0.5) * 2 * w.spread * (lock ? 0.5 : 1);
-      const hit = lock && n === 0 && Math.random() > w.spread * 3 && sees(p.car ? p.car.pos : p.pos, lock.pos) ? (tracer(from, tmp.set(lock.pos.x, from.y, lock.pos.z)), lock) : fire(from, aim, p.human, w.range);
+      const hit = lock && n === 0 && Math.random() > w.spread * 3 && sees(p.car ? p.car.pos : p.pos, lock.pos) ? (tracer(from, tmp.set(lock.pos.x, from.y, lock.pos.z)), lock) : fire(from, aim, p.human, w.range, w.dmg);
       if (hit) { hit.hurt(w.dmg, p.pos); if (innocent(hit)) g.heat(hit.dead ? 2 : 1); } else if (n === 0) g.heat(0.4);
     }
     for (const ped of peds) if (!ped.dead && Math.hypot(ped.pos.x - p.pos.x, ped.pos.z - p.pos.z) < 26) ped.flee(p.pos, 7);
