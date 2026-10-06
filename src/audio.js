@@ -254,6 +254,12 @@ every(0.3, (t, n) => {
 });
 
 let unlocked = false;
+// Browsers keep a page silent until it is clicked or a key is pressed, and a game that starts itself (a mission picked
+// from the menu reloads straight into play) has had neither. So every click and every key tries again, for as long as
+// it takes; and nothing is scheduled while the clock is stopped, or it would all sound at once when it starts.
+const wake = () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); };
+for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchstart']) addEventListener(ev, wake, true);
+const live = () => unlocked && ctx.state === 'running';
 // What the world is doing, as of the last frame.
 const st = { room: null, last: 0, stride: 0, bird: 0, gull: 0, event: 0, clink: 0, clank: 0, range: 0, tick: 0, beep: 0, hour: -1, harbour: 0, ship: 0 };
 // One footfall, by what is underfoot.
@@ -289,8 +295,9 @@ const strike = (to, t) => { for (const [m, v, d] of [[1, 0.22, 2.8], [2.76, 0.09
 
 export const sfx = {
   // Browsers keep audio silent until the page is clicked; call this from the Start button.
-  unlock() { if (!unlocked) { ctx.resume(); unlocked = true; } },
-  get ready() { return unlocked && ctx.state === 'running'; },
+  unlock() { unlocked = true; wake(); },
+  get ready() { return live(); },
+  get state() { return ctx.state; }, // 'running', or 'suspended' while the browser is still holding it back
   setVolume(v) { master.gain.value = v; },
   setAmbience(v) { ambient.gain.value = v; },
   // Tell the audio where the world's own noises are: [{ kind, x, z, r }].
@@ -308,7 +315,7 @@ export const sfx = {
   // towers, `exposed` 0..1 for open decks, `night` 0..1, `hour` of the clock, `cars` [{ dx, dz, speed, heavy }] nearby.
   ambience({ speed = 0, throttle = 0, inCar = false, shore = 0, police = 0, sliding = 0, night = 0, ear = { x: 0, z: 0 }, right = { x: 1, z: 0 }, room = null,
     surface = 'pave', foot = 0, seaward = { x: 1, z: 0 }, green = 0.2, dense = 0.5, exposed = 0, hour = -1, cars = [], la = false }) {
-    if (!unlocked) return;
+    if (!live()) return;
     const now = ctx.currentTime, dt = Math.min(0.1, Math.max(0, now - st.last)), inside = !!room, out = inside ? 0 : 1, day = 1 - night;
     st.last = now;
     const side = (dx, dz) => { const d = Math.hypot(dx, dz) || 1; return Math.max(-1, Math.min(1, (dx * right.x + dz * right.z) / d)); };
@@ -404,82 +411,82 @@ export const sfx = {
   },
 
   shot() {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     burst(1800, 0.6, t, 0.9, 0.003, 0.09, 'highpass');
     burst(300, 1.2, t, 0.8, 0.004, 0.18, 'lowpass');
     tone('sine', 110, t, 0.5, 0.004, 0.12, { slide: 40 });
   },
   punch(hit = true) {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     burst(hit ? 240 : 900, 1.5, t, hit ? 0.7 : 0.25, 0.004, hit ? 0.12 : 0.06, 'lowpass');
     if (hit) tone('sine', 90, t, 0.4, 0.004, 0.1, { slide: 45 });
   },
   hurt() { // the player takes a blow
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     burst(180, 1.2, t, 0.6, 0.004, 0.14, 'lowpass'); tone('triangle', 160, t, 0.2, 0.01, 0.2, { slide: 70 });
   },
   cash() {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     tone('square', 1320, t, 0.12, 0.004, 0.07); tone('square', 1760, t + 0.07, 0.12, 0.004, 0.14);
   },
   door() {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     burst(700, 2, t, 0.3, 0.003, 0.05); burst(180, 1, t + 0.06, 0.4, 0.004, 0.12, 'lowpass');
   },
   carDoor() {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     burst(260, 1.4, t, 0.5, 0.003, 0.08, 'lowpass'); burst(1400, 1, t + 0.01, 0.15, 0.002, 0.04);
   },
   horn(pitch = 1, loud = 0.1) {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     for (const f of [370, 466]) tone('sawtooth', f * pitch, t, loud, 0.02, 0.35, { to: filter('lowpass', 1400, 1) });
   },
   crash(strength = 1) { // a car hitting something
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime, s = Math.min(1, strength);
     burst(160, 0.8, t, 0.7 * s, 0.003, 0.25 + 0.2 * s, 'lowpass'); burst(2600, 1.4, t, 0.3 * s, 0.002, 0.08);
   },
   explosion() {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     burst(80, 0.7, t, 1.2, 0.01, 1.6, 'lowpass'); burst(900, 0.6, t, 0.6, 0.005, 0.5); tone('sine', 60, t, 0.9, 0.01, 1.2, { slide: 25 });
   },
   passed() { // the mission sting: a rising major arpeggio with a shimmer on top
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     [261.6, 329.6, 392, 523.3].forEach((f, n) => { tone('triangle', f, t + n * 0.12, 0.18, 0.01, 0.9, { detune: 4 }); tone('sine', f * 2, t + n * 0.12, 0.06, 0.01, 0.6); });
     tone('sine', 1046.5, t + 0.5, 0.08, 0.02, 1.4);
   },
   failed() {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     [196, 185, 174.6].forEach((f, n) => tone('sawtooth', f, t + n * 0.35, 0.12, 0.02, 0.6, { to: filter('lowpass', 900, 1) }));
   },
   wasted() {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     tone('sawtooth', 110, t, 0.2, 0.05, 2.2, { slide: 55, to: filter('lowpass', 600, 1) });
     burst(120, 1, t, 0.5, 0.01, 0.6, 'lowpass');
   },
   phone() { // a ring, twice
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime;
     for (const r of [0, 0.6]) for (let k = 0; k < 8; k++) tone('square', k % 2 ? 1180 : 1040, t + r + k * 0.05, 0.05, 0.005, 0.04);
   },
   click() {
-    if (!unlocked) return;
+    if (!live()) return;
     burst(2400, 3, ctx.currentTime, 0.12, 0.002, 0.03);
   },
   // The crowd: a scream when someone is shot at, a shout when someone is hit.
   scream() {
-    if (!unlocked) return;
+    if (!live()) return;
     const t = ctx.currentTime + Math.random() * 0.1, f = 700 + Math.random() * 400;
     tone('sawtooth', f, t, 0.07, 0.03, 0.4, { slide: f * 0.7, to: filter('bandpass', f, 2) });
   },

@@ -544,6 +544,7 @@ async function boot() {
       { key: 'Digit6', label: 'Crowd', hint: ['light', 'normal', 'heavy'][settings.crowd] },
       { key: 'Digit7', label: 'Shadows', hint: settings.shadows ? 'on' : 'off' },
       { key: 'Digit9', label: 'Ambient sound', hint: ['off', 'quiet', 'normal', 'loud'][settings.ambience] },
+      { key: 'KeyT', label: 'Test the sound', hint: settings.volume === 0 ? 'the volume is at 0%' : sfx.state === 'running' ? 'plays a chime: if you hear nothing, it is the browser or the computer' : 'the browser is holding the sound back: click the page once' },
       { key: 'Digit8', label: 'Missions', hint: 'play any mission again, or skip ahead' },
       { key: 'Escape', label: 'Resume' },
       { key: 'Digit0', label: 'Quit to the title screen', hint: 'progress is saved after each mission' },
@@ -556,6 +557,7 @@ async function boot() {
       else if (code === 'Digit6') { settings.crowd = (settings.crowd + 1) % 3; crowdLimit(); }
       else if (code === 'Digit7') settings.shadows = !settings.shadows;
       else if (code === 'Digit9') settings.ambience = (settings.ambience + 1) % 4;
+      else if (code === 'KeyT') { sfx.unlock(); sfx.passed(); }
       else if (code === 'Digit8') { applySettings(); missionMenu(pr && !pr.done ? pr.n - 1 : 0); return; }
       else if (code === 'Digit0') { applySettings(); location.reload(); return; }
       else if (code === 'Escape' || code === 'Enter') { applySettings(); hud.menu(); g.paused = false; for (const k in keys) keys[k] = false; return; }
@@ -581,6 +583,7 @@ async function boot() {
     return roomKinds.get(q);
   };
   sfx.place(places.sounds || []);
+  const muteEl = document.getElementById('mute');
 
   function step(dt) {
     if (g.paused) { if (!g.skipRender) renderer.render(scene, camera); pressed.clear(); return; }
@@ -677,6 +680,7 @@ async function boot() {
         hour: Math.floor(((18 * 60 + 30 + g.time + (g.clockOffset || 0)) % 1440) / 60), cars: near4,
       });
     }
+    muteEl.classList.toggle('on', g.started && sfx.state !== 'running'); // say so, rather than leave him wondering
     hud.clock(g.time + (g.clockOffset || 0));
     hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips], landmarks);
     hud.map(g.mapOpen, { focus: p.pos, heading: p.car ? p.car.heading : p.heading, blips: [...g.markers, ...g.blips], landmarks });

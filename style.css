@@ -130,3 +130,8 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
 #other:hover { background: #49e0d0; color: #0b0b18; }
 body.la .logo .sop { letter-spacing: 12px; }
 body.la .logo .vc { color: #6fb0ff; text-shadow: 3px 3px 0 #10204a; }
+
+/* Shown while the browser is still holding the sound back. */
+#mute { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 30; display: none; padding: 8px 16px; background: rgba(20, 8, 15, .85); border: 2px solid #ff5fd2;
+  font-family: 'Rubik', sans-serif; font-weight: 700; font-size: 15px; color: #ffe066; pointer-events: none; }
+#mute.on { display: block; }
