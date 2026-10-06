@@ -762,11 +762,11 @@ async function preciousMetals(g) {
   await say(g, NEIL, '...', 1.6);
   g.cam.fixed = null;
   p.locked = false;
+  let c2, m2;
+  c2 = actor(g, 'shiherlis', spot(depository.door, -1.2, 0.6), SOUTH); m2 = actor(g, 'cheritto', spot(depository.door, 1.3, 0.4), SOUTH); // there before he arrives
   await reach(g, spot(depository.door, 0, 2.4), 'Go back. <b>Call it off.</b>', { r: 1.8, how: 'foot' });
   p.locked = true;
-  let c2, m2;
   await cut(g, () => {
-    c2 = actor(g, 'shiherlis', spot(depository.door, -1.2, 0.6), SOUTH); m2 = actor(g, 'cheritto', spot(depository.door, 1.3, 0.4), SOUTH);
     place(g, spot(depository.door, 0, 2.6), NORTH);
     frame(g, p.pos, c2.group.position, { dist: 4.4 });
   }, 0.4);
@@ -1166,14 +1166,14 @@ async function kelso(g) {
   place(g, his.door, his.door.h ?? SOUTH);
   await fade(g, 0, 1);
   p.locked = false;
+  let chris, cheritto, trejo;
+  chris = actor(g, 'shiherlis', spot(yard.shed, 0.2, 1.4), WEST); // there before he arrives
+  cheritto = actor(g, 'cheritto', spot(yard.shed, -1, 4.6), NORTH);
+  trejo = actor(g, 'trejo', spot(yard.shed, -3.4, 5.2), NORTH);
   await reach(g, yard.gate, 'Drive to the <b>yard</b>. The crew is waiting.');
   p.locked = true;
-  let chris, cheritto, trejo;
   await cut(g, () => {
     place(g, spot(yard.shed, -3, 2.4), EAST, { x: yard.shed.x - 9, z: yard.shed.z + 7, h: EAST });
-    chris = actor(g, 'shiherlis', spot(yard.shed, 0.2, 1.4), WEST);
-    cheritto = actor(g, 'cheritto', spot(yard.shed, -1, 4.6), NORTH);
-    trejo = actor(g, 'trejo', spot(yard.shed, -3.4, 5.2), NORTH);
     frame(g, p.pos, chris.group.position, { dist: 5.2 });
   });
   await talk(g, [
@@ -1331,12 +1331,12 @@ async function hardware(g) {
   g.noHeat = false;
   g.hud.objective('Get in the <b>pickup</b> again.');
   await g.until(() => p.car);
+  let cheritto;
+  cheritto = actor(g, 'cheritto', spot(yard.shed, -0.4, 2.2), WEST); // there before he arrives
   await reach(g, yard.gate, '<b>Drive</b> the case to the yard.', { how: 'car', r: 8 });
   p.locked = true;
-  let cheritto;
   await cut(g, () => {
     place(g, spot(yard.shed, -3, 2.4), EAST, { x: yard.shed.x - 9, z: yard.shed.z + 7, h: EAST });
-    cheritto = actor(g, 'cheritto', spot(yard.shed, -0.4, 2.2), WEST);
     frame(g, p.pos, cheritto.group.position, { dist: 4.4 });
   });
   await talk(g, [

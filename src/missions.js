@@ -2293,13 +2293,13 @@ async function greenGrove(g) {
   g.hud.card('Green Grove', 'A retirement community');
   await say(g, TONY, "She had a fire on the stove last week. She can't be alone in that house.");
   g.hud.card();
+  let ma;
+  ma = actor(g, 'livia', house.porch, SOUTH); // there before he arrives
   await reach(g, house.kerb, 'Visit your mother at <b>her house</b>.');
 
   p.locked = true;
-  let ma;
   await cut(g, () => {
     place(g, house.path, NORTH, house.kerb);
-    ma = actor(g, 'livia', house.porch, SOUTH);
     frame(g, p.pos, house.porch, { dist: 4.6 });
   });
   await talk(g, [
@@ -2405,12 +2405,12 @@ async function garbage(g) {
   await titleCard(g, 'Garbage', "Satriale's Pork Store, after hours");
   await say(g, CHRIS, 'Emil Kolar wants to talk about the contract. Fine. We talk in the back.');
   p.locked = false;
+  emil = actor(g, 'kolar', spot(satriale.back, -3, 0.2), EAST); // there before he arrives
   await reach(g, satriale.back, "Go around to the <b>back door</b> of Satriale's.", { r: 1.8, how: 'foot' });
 
   p.locked = true;
   await cut(g, () => {
     p.pos.set(satriale.back.x, 0, satriale.back.z);
-    emil = actor(g, 'kolar', spot(satriale.back, -3, 0.2), EAST);
     p.heading = toward(p.pos, emil.group.position);
     shot(g, spot(satriale.back, 3.4, -1.3), spot(satriale.back, -1.6, 0.2));
   }, 0.5);
@@ -2530,12 +2530,12 @@ async function insurance(g) {
   await phone(g, SILVIO, "Your uncle won't move it. Thursday, at Artie's, like he said.");
   await say(g, TONY, "Then Artie's closed Thursday. I got an idea.");
   g.hud.card();
+  artie = actor(g, 'artie', spot(v.door, 0, -1.6), SOUTH); // there before he arrives
   await reach(g, v.kerb, 'Bring Artie the cruise tickets at <b>Vesuvio</b>.');
 
   p.locked = true;
   await cut(g, () => {
     place(g, spot(v.door, -1.6, 0.6), NORTH, v.kerb);
-    artie = actor(g, 'artie', spot(v.door, 0, -1.6), SOUTH);
     frame(g, p.pos, artie.group.position, { dist: 5.2 });
   });
   await talk(g, [
@@ -2657,13 +2657,13 @@ async function secondOpinion(g) {
   g.hud.card('Second Opinion', 'F-Note Records');
   await phone(g, HESH, 'Anthony. Come by the label. I had a thought about your friend the gambler.');
   g.hud.card();
+  hesh = actor(g, 'hesh', spot(label.door, -1, 1.4), NORTH); // there before he arrives
+  pussy = actor(g, 'pussy', spot(label.door, 1.5, 1.2), NORTH);
   await reach(g, label.kerb, "Drive to <b>F-Note Records</b>, Hesh's label.");
 
   p.locked = true;
   await cut(g, () => {
     place(g, spot(label.door, 0, -1.6), SOUTH, label.kerb);
-    hesh = actor(g, 'hesh', spot(label.door, -1, 1.4), NORTH);
-    pussy = actor(g, 'pussy', spot(label.door, 1.5, 1.2), NORTH);
     frame(g, p.pos, spot(label.door, 0, 1.3), { dist: 5.4 });
   });
   await talk(g, [
@@ -3048,14 +3048,14 @@ async function sitDown(g) {
   g.hud.card('The Sit-Down', "Satriale's Pork Store");
   await phone(g, JUNIOR, "Your nephew robbed a truck that pays me. You, me and Jackie. Satriale's. Now.");
   g.hud.card();
+  junior = actor(g, 'junior', spot(t, -0.95, 0), EAST, 'sit'); // there before he arrives
+  jackie = actor(g, 'jackie', spot(t, 0.95, 0), WEST, 'sit');
   await reach(g, satriale.kerb, "Drive to <b>Satriale's</b>.");
 
   p.locked = true;
   await cut(g, () => {
     place(g, spot(t, -1.5, 2.1), NORTH, satriale.kerb);
     p.heading = toward(p.pos, t);
-    junior = actor(g, 'junior', spot(t, -0.95, 0), EAST, 'sit');
-    jackie = actor(g, 'jackie', spot(t, 0.95, 0), WEST, 'sit');
     shot(g, spot(t, 2.8, 4.6), spot(t, -0.3, 0.5), 1.6, 1.1);
   });
   await talk(g, [
@@ -3639,14 +3639,14 @@ async function studyAid(g) {
   await g.wait(1);
   g.pardon();
   p.locked = false;
+  let m2, h2;
+  m2 = actor(g, 'meadow', spot(school.lot, -4.6, 1.6), EAST); h2 = actor(g, 'hunter', spot(school.lot, -5, 3.2), EAST); // there before he arrives
   await reach(g, school.gate, 'Bring it to <b>Verbum Dei</b>. Meadow is waiting in the lot.', { r: 6 });
 
   p.locked = true;
-  let m2, h2;
   await cut(g, () => {
     dismiss(g, rico, ...muscle);
     place(g, spot(school.lot, -2, 2), WEST, school.gate);
-    m2 = actor(g, 'meadow', spot(school.lot, -4.6, 1.6), EAST); h2 = actor(g, 'hunter', spot(school.lot, -5, 3.2), EAST);
     frame(g, p.pos, m2.group.position, { dist: 4.4 });
   });
   await talk(g, [
@@ -3678,13 +3678,13 @@ async function patience(g) {
   g.hud.card();
   await say(g, TONY, 'Bring nobody, he says. And who is that two cars back?', 3);
   await shake(g, '<b>Drive.</b> Lose the grey car before you go near the park.', { color: 0x8d8a8e });
+  junior = actor(g, 'junior', spot(park.bench, 0, 0.2), SOUTH, 'sit'); // there before he arrives
+  mikey = actor(g, 'mikey', spot(park.bench, -2.4, 1.2), EAST);
   await reach(g, park.kerb, 'Meet Uncle Junior in the <b>park</b>.');
 
   p.locked = true;
   await cut(g, () => {
     place(g, spot(park.bench, 2.2, 1.4), WEST, park.kerb);
-    junior = actor(g, 'junior', spot(park.bench, 0, 0.2), SOUTH, 'sit');
-    mikey = actor(g, 'mikey', spot(park.bench, -2.4, 1.2), EAST);
     shot(g, spot(park.bench, 0.6, 5.2), spot(park.bench, 0, 0.6), 1.6, 1.1);
   });
   await talk(g, [
@@ -3733,13 +3733,13 @@ async function theMotel(g) {
   g.hud.card('The Motel', "Satriale's");
   await phone(g, SILVIO, "There's a man here with a hat and a problem. Says Hesh sent him. Says he pays.");
   g.hud.card();
+  shlomo = actor(g, 'shlomo', spot(t, 0.95, 0), WEST, 'sit'); // there before he arrives
   await reach(g, satriale.kerb, "Meet the man at <b>Satriale's</b>.");
 
   p.locked = true;
   await cut(g, () => {
     place(g, spot(t, -1.5, 2.1), NORTH, satriale.kerb);
     p.heading = toward(p.pos, t);
-    shlomo = actor(g, 'shlomo', spot(t, 0.95, 0), WEST, 'sit');
     shot(g, spot(t, 2.8, 4.6), spot(t, -0.3, 0.5), 1.6, 1.1);
   });
   await talk(g, [
@@ -4553,13 +4553,13 @@ async function theBoss(g) {
   g.hud.card('The Boss', 'The park');
   await phone(g, JUNIOR, 'You said nice. Come say it. The park.');
   g.hud.card();
+  junior = actor(g, 'junior', spot(park.bench, 0, 0.2), SOUTH, 'sit'); // there before he arrives
+  mikey = actor(g, 'mikey', spot(park.bench, -2.4, 1.2), EAST);
   await reach(g, park.kerb, 'Meet Uncle Junior in the <b>park</b>.');
 
   p.locked = true;
   await cut(g, () => {
     place(g, spot(park.bench, 2.2, 1.4), WEST, park.kerb);
-    junior = actor(g, 'junior', spot(park.bench, 0, 0.2), SOUTH, 'sit');
-    mikey = actor(g, 'mikey', spot(park.bench, -2.4, 1.2), EAST);
     shot(g, spot(park.bench, 0.6, 5.2), spot(park.bench, 0, 0.6), 1.6, 1.1);
   });
   await talk(g, [
@@ -4612,13 +4612,13 @@ async function theBoss(g) {
     p.inside = null; place(g, bar.door, bar.door.h);
   });
   p.locked = false;
+  junior = actor(g, 'junior', spot(park.bench, 0, 0.2), SOUTH, 'sit'); // there before he arrives
+  mikey = actor(g, 'mikey', spot(park.bench, -2.4, 1.2), EAST);
   await reach(g, park.kerb, 'Bring it to <b>Junior</b>.');
 
   p.locked = true;
   await cut(g, () => {
     place(g, spot(park.bench, 2.2, 1.4), WEST, park.kerb);
-    junior = actor(g, 'junior', spot(park.bench, 0, 0.2), SOUTH, 'sit');
-    mikey = actor(g, 'mikey', spot(park.bench, -2.4, 1.2), EAST);
     shot(g, spot(park.bench, 0.6, 5.2), spot(park.bench, 0, 0.6), 1.6, 1.1);
   });
   p.human.play('interact', 'idle');
@@ -4769,12 +4769,12 @@ async function collegeTrip(g) {
   g.hud.card('College', 'The Soprano house');
   await phone(g, CARMELA, "I have a fever of a hundred and two, so you are taking her. Three colleges, up the coast. Do not embarrass her in front of the admissions people.");
   g.hud.card();
+  let meadow;
+  meadow = actor(g, 'meadow', spot(home.drive, 2.2, 0.4), WEST); // there before he arrives
   await reach(g, home.road, 'Drive <b>home</b> and collect Meadow.');
   p.locked = true;
-  let meadow;
   await cut(g, () => {
     place(g, home.drive, EAST, home.car);
-    meadow = actor(g, 'meadow', spot(home.drive, 2.2, 0.4), WEST);
     frame(g, p.pos, meadow.group.position, { dist: 4.2 });
   });
   await talk(g, [
