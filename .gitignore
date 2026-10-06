@@ -1,2 +1,7 @@
 assets/downloads/
 .DS_Store
+# Songs and recordings are the player's own: they stay on his computer.
+music/*
+!music/README.md
+sounds/*
+!sounds/README.md

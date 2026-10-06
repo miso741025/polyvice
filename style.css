@@ -135,3 +135,8 @@ body.la .logo .vc { color: #6fb0ff; text-shadow: 3px 3px 0 #10204a; }
 #mute { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 30; display: none; padding: 8px 16px; background: rgba(20, 8, 15, .85); border: 2px solid #ff5fd2;
   font-family: 'Rubik', sans-serif; font-weight: 700; font-size: 15px; color: #ffe066; pointer-events: none; }
 #mute.on { display: block; }
+
+/* The radio's display: top left, while a song is new. */
+#radio { position: absolute; left: 32px; top: 26px; max-width: 46vw; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 26px; letter-spacing: 2px; color: #ffe066;
+  text-shadow: 3px 3px 0 #000, -1px -1px 0 #000; opacity: 0; transform: translateX(-12px); transition: opacity .4s, transform .4s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#radio.on { opacity: 1; transform: none; }

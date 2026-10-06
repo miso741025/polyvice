@@ -107,6 +107,15 @@ export class Hud {
     this.blur = k > 0.01 ? `blur(${(k * 5).toFixed(1)}px) saturate(${(1 - k * 0.6).toFixed(2)})` : '';
     $('game').style.filter = [this.blur, this.old].filter(Boolean).join(' ');
   }
+  // What the radio is playing, for a few seconds.
+  radio(title) {
+    const el = $('radio');
+    if (!el || !title) return;
+    el.textContent = '♪  ' + title;
+    el.classList.add('on');
+    clearTimeout(this.radioTimer);
+    this.radioTimer = setTimeout(() => el.classList.remove('on'), 5000);
+  }
   // Another year: the picture goes the colour of an old photograph.
   era(on) {
     this.old = on ? 'sepia(0.72) contrast(1.08) brightness(1.03)' : '';

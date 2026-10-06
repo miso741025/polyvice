@@ -76,16 +76,26 @@ const spotAt = (level, pan = 0, to = world) => { const p = panTo(to), g = ctx.cr
 
 // ----- The player's car -----
 
-// The engine: a low saw and a square an octave up, through a low-pass that opens with the throttle.
+// The engine. Two saws and a square an octave down make the firing; a soft clipper gives it grit; and two
+// resonances, like an exhaust and an intake, put most of it between 300 and 1500 Hz, where a laptop's speakers can
+// actually reproduce it. (The first version lived below 200 Hz and could not be heard on anything small.)
 const engine = (() => {
-  const out = gainAt(0, master), lp = filter('lowpass', 400, 2, out);
-  const a = ctx.createOscillator(), b = ctx.createOscillator(), rumble = noise();
-  a.type = 'sawtooth'; b.type = 'square';
-  const bg = gainAt(0.25, lp), rg = gainAt(0.08, lp), rl = filter('lowpass', 120, 1, rg);
-  a.connect(lp); b.connect(bg); rumble.connect(rl);
-  a.start(); b.start(); rumble.start();
-  return { out, lp, a, b };
+  const out = gainAt(0, master), body = filter('lowpass', 3200, 0.5, out);
+  const f1 = filter('bandpass', 380, 1.2, gainAt(1.1, body)), f2 = filter('bandpass', 950, 1.6, gainAt(0.7, body)), low = filter('lowpass', 240, 0.7, gainAt(0.8, body));
+  const shape = ctx.createWaveShaper(), curve = new Float32Array(1024);
+  for (let k = 0; k < 1024; k++) curve[k] = Math.tanh((k / 512 - 1) * 3.2);
+  shape.curve = curve; shape.connect(f1); shape.connect(f2); shape.connect(low);
+  const pre = ctx.createGain(); pre.gain.value = 0.7; pre.connect(shape);
+  const a = ctx.createOscillator(), b = ctx.createOscillator(), c = ctx.createOscillator();
+  a.type = 'sawtooth'; b.type = 'sawtooth'; c.type = 'square';
+  a.connect(gainAt(0.6, pre)); b.connect(gainAt(0.3, pre)); c.connect(gainAt(0.45, pre));
+  const rasp = gainAt(0, body), rb = filter('bandpass', 1500, 0.8, rasp), rn = noise(); rn.connect(rb);
+  a.start(); b.start(); c.start(); rn.start();
+  return { out, a, b, c, f1, f2, rasp };
 })();
+// A box of five gears: where in which gear a speed (m/s) falls, 0..1. The note climbs through each and drops at the change.
+const GEARS = [0, 8, 16, 25, 35, 60];
+const revs = v => { const k = Math.max(0, GEARS.findIndex(g => v < g) - 1), lo = GEARS[k], hi = GEARS[k + 1] ?? 80; return { gear: k, frac: Math.min(1, (v - lo) / (hi - lo)) }; };
 // The road under the tyres, and the air over the roof: both grow with speed.
 const road = (() => { const out = gainAt(0, master), bp = filter('bandpass', 700, 0.6, out), s = noise(); s.connect(bp); s.start(); return { out, bp }; })();
 const rush = (() => { const out = gainAt(0, master), hp = filter('highpass', 2200, 0.5, out), s = noise(); s.connect(hp); s.start(); return { out }; })();
@@ -253,6 +263,70 @@ every(0.3, (t, n) => {
   }
 });
 
+// ----- Recordings -----
+// Files in the sounds/ folder, by name (see sounds/README.md). Where one exists it is used in place of the synthesised
+// layer it stands for; where none does, the synthesiser carries on.
+const beds = {};
+async function loadBeds() {
+  let names = [];
+  try { names = await (await fetch('sounds/list.json')).json(); } catch { return []; }
+  await Promise.all(names.map(async name => {
+    try { beds[name.replace(/\.[^.]+$/, '').toLowerCase()] = { buffer: await ctx.decodeAudioData(await (await fetch('sounds/' + encodeURIComponent(name))).arrayBuffer()) }; } catch { /* not a file the browser can read: the synthesiser covers for it */ }
+  }));
+  return Object.keys(beds);
+}
+// Set a recording's level (starting it, somewhere in its middle, the first time it is wanted). False if there is no such file.
+function bed(key, to, level, k = 0.5, rate) {
+  const b = beds[key];
+  if (!b) return false;
+  if (!b.src) {
+    if (level < 0.002) return true;
+    b.src = ctx.createBufferSource(); b.src.buffer = b.buffer; b.src.loop = true;
+    b.gain = gainAt(0, to); b.src.connect(b.gain); b.src.start(0, Math.random() * b.buffer.duration);
+  }
+  smooth(b.gain.gain, level, k);
+  if (rate) smooth(b.src.playbackRate, rate, 0.12);
+  return true;
+}
+
+// ----- The radio -----
+// The player's own songs, from the music/ folder: in the car, and in the bars. One song after another; it stops when
+// he gets out and carries on from the same bar of the same song when he gets back in.
+const radio = (() => {
+  const el = new Audio(), out = gainAt(0, master), tone0 = filter('lowpass', 18000, 0.5, out);
+  el.preload = 'auto';
+  const r = { tracks: [], i: 0, on: true, vol: 0.7, title: '', playing: false, wired: false, idle: 0, onChange: null };
+  const pretty = name => name.replace(/\.[^.]+$/, '').replace(/_/g, ' ').replace(/^\s*\d+\s*[-._)]*\s*/, '').trim();
+  r.cue = (d = 0) => {
+    if (!r.tracks.length) return;
+    r.i = (r.i + d + r.tracks.length) % r.tracks.length;
+    el.src = 'music/' + encodeURIComponent(r.tracks[r.i]);
+    r.title = pretty(r.tracks[r.i]);
+    if (r.playing) { el.play().catch(() => {}); r.onChange?.(r.title); }
+  };
+  el.addEventListener('ended', () => r.cue(1));
+  el.addEventListener('error', () => { if (r.tracks.length > 1 && r.playing) r.cue(1); }); // a file the browser cannot play: the next one
+  r.load = async () => {
+    try { r.tracks = await (await fetch('music/list.json')).json(); } catch { r.tracks = []; }
+    if (r.tracks.length) { r.i = Math.floor(Math.random() * r.tracks.length); r.cue(0); }
+    return r.tracks.length;
+  };
+  // Called each frame: should it be heard, and how (through a bar's speakers it has less top).
+  r.heard = (want, room) => {
+    const listen = want && r.on && r.tracks.length > 0 && r.vol > 0;
+    if (listen && !r.playing) {
+      if (!r.wired) { ctx.createMediaElementSource(el).connect(tone0); r.wired = true; }
+      r.playing = true; el.play().catch(() => { r.playing = false; });
+      r.onChange?.(r.title);
+    }
+    if (!listen && r.playing) { r.playing = false; r.idle = ctx.currentTime + 0.7; }
+    if (!r.playing && r.idle && ctx.currentTime > r.idle) { el.pause(); r.idle = 0; }
+    smooth(out.gain, listen ? r.vol * (room ? 0.55 : 0.9) : 0, 0.18);
+    smooth(tone0.frequency, room ? 5200 : 18000, 0.2);
+  };
+  return r;
+})();
+
 let unlocked = false;
 // Browsers keep a page silent until it is clicked or a key is pressed, and a game that starts itself (a mission picked
 // from the menu reloads straight into play) has had neither. So every click and every key tries again, for as long as
@@ -300,13 +374,28 @@ export const sfx = {
   get state() { return ctx.state; }, // 'running', or 'suspended' while the browser is still holding it back
   setVolume(v) { master.gain.value = v; },
   setAmbience(v) { ambient.gain.value = v; },
+  // The radio: `radio.load()` reads the music folder; next(±1), toggle(), volume(v); `onChange` is told each new title.
+  radio: {
+    load: () => radio.load(), next: d => { if (radio.tracks.length) { radio.cue(d); if (!radio.playing) radio.onChange?.(radio.title); } }, toggle: () => { radio.on = !radio.on; return radio.on; },
+    volume: v => { radio.vol = v; }, set onChange(fn) { radio.onChange = fn; }, get count() { return radio.tracks.length; }, get title() { return radio.title; }, get on() { return radio.on; }, get playing() { return radio.playing; },
+  },
+  // Recordings of real places, from the sounds/ folder. Resolves to the names found.
+  loadRecordings: () => loadBeds(),
+  get recordings() { return Object.keys(beds); },
   // Tell the audio where the world's own noises are: [{ kind, x, z, r }].
   place(list) { for (const e of emitters) e.out.disconnect(); emitters = list.map(emitter); },
+  // How much of the mix lies in a band of frequencies (Hz), 0..1 of full scale: to check that something can be heard on small speakers.
+  band(lo, hi) {
+    const d = new Uint8Array(probe.frequencyBinCount); probe.getByteFrequencyData(d);
+    const hz = ctx.sampleRate / probe.fftSize; let sum = 0, n = 0;
+    for (let k = Math.floor(lo / hz); k <= Math.min(d.length - 1, Math.ceil(hi / hz)); k++) { sum += d[k]; n++; }
+    return +(sum / n / 255).toFixed(3);
+  },
   // How loud the mix is right now, after the limiter: for whoever is checking it.
   meter() {
     const d = new Float32Array(probe.fftSize); probe.getFloatTimeDomainData(d);
     let peak = 0, sum = 0; for (const v of d) { peak = Math.max(peak, Math.abs(v)); sum += v * v; }
-    return { peak: +peak.toFixed(3), rms: +Math.sqrt(sum / d.length).toFixed(4), state: ctx.state, room: st.room, steps: st.steps || 0, under: st.under, world: +world.gain.value.toFixed(2), sea: +sea.out.gain.value.toFixed(3), city: +city.out.gain.value.toFixed(3), wind: +wind.out.gain.value.toFixed(3), crickets: +crickets.out.gain.value.toFixed(3), emitters: emitters.filter(e => e.level > 0.005).map(e => e.kind + ':' + e.level.toFixed(2)), passers: passers.map(v => +v.out.gain.value.toFixed(3)) };
+    return { peak: +peak.toFixed(3), rms: +Math.sqrt(sum / d.length).toFixed(4), state: ctx.state, room: st.room, steps: st.steps || 0, under: st.under, world: +world.gain.value.toFixed(2), sea: +sea.out.gain.value.toFixed(3), city: +city.out.gain.value.toFixed(3), wind: +wind.out.gain.value.toFixed(3), crickets: +crickets.out.gain.value.toFixed(3), engine: +engine.out.gain.value.toFixed(3), radio: radio.playing ? radio.title : '', emitters: emitters.filter(e => e.level > 0.005).map(e => e.kind + ':' + e.level.toFixed(2)), passers: passers.map(v => +v.out.gain.value.toFixed(3)) };
   },
 
   // Per-frame levels. The car: speed in m/s, throttle 0..1, sliding 0..1. The listener: `ear` {x, z}, `right` the unit
@@ -321,10 +410,12 @@ export const sfx = {
     const side = (dx, dz) => { const d = Math.hypot(dx, dz) || 1; return Math.max(-1, Math.min(1, (dx * right.x + dz * right.z) / d)); };
 
     // The car he is driving.
-    const v = Math.abs(speed), rpm = inCar ? 60 + v * 7 + throttle * 25 : 0;
-    smooth(engine.a.frequency, Math.max(40, rpm), 0.06); smooth(engine.b.frequency, Math.max(80, rpm * 2), 0.06);
-    smooth(engine.lp.frequency, 300 + throttle * 900 + v * 20);
-    smooth(engine.out.gain, inCar ? 0.16 + throttle * 0.1 : 0);
+    const v = Math.abs(speed), { gear, frac } = revs(v), fire = v < 0.6 ? 27 + throttle * 26 : 34 + gear * 3 + frac * 72 + throttle * 7;
+    const quiet = radio.playing ? 0.6 : 1, car = bed('car', master, inCar ? (0.3 + throttle * 0.14) * quiet : 0, 0.15, 0.6 + (v < 0.6 ? throttle * 0.35 : 0.12 + frac * 0.85));
+    smooth(engine.a.frequency, fire, 0.07); smooth(engine.b.frequency, fire * 2.01, 0.07); smooth(engine.c.frequency, fire / 2, 0.07);
+    smooth(engine.f1.frequency, 300 + fire * 2.2, 0.1); smooth(engine.f2.frequency, 720 + fire * 5, 0.1);
+    smooth(engine.rasp.gain, inCar ? throttle * 0.05 + frac * 0.02 : 0, 0.1);
+    smooth(engine.out.gain, inCar && !car ? (0.11 + throttle * 0.09 + frac * 0.04) * quiet : 0, 0.08);
     smooth(road.out.gain, inCar ? Math.min(0.07, v / 40 * 0.07) * (surface === 'sand' || surface === 'grass' ? 1.8 : 1) : 0, 0.15);
     smooth(road.bp.frequency, surface === 'wood' ? 300 : 500 + v * 14, 0.2);
     smooth(rush.out.gain, inCar ? Math.min(0.05, (v / 38) ** 2 * 0.05) : 0, 0.2);
@@ -335,11 +426,20 @@ export const sfx = {
     smooth(rooms.gain, inside ? 1 : 0, 0.15);
 
     // The outdoors.
-    smooth(sea.out.gain, 0.02 + shore * 0.27 + exposed * 0.1, 0.4);
+    // Recordings first: a real street for the hour and the district, a real beach. What they cover, the synthesiser leaves alone.
+    const town = la ? 'la' : 'vice', leafy = green > 0.6, dayKey = leafy && beds['suburb-day'] ? 'suburb-day' : town + '-day', nightKey = leafy && beds['suburb-night'] ? 'suburb-night' : town + '-night';
+    let covered = 0;
+    for (const key of [town + '-day', town + '-night', 'suburb-day', 'suburb-night']) {
+      const level = key === dayKey ? day : key === nightKey ? night : 0;
+      if (bed(key, world, level * 0.55 * (1 - shore * 0.45), 0.9)) covered += level;
+    }
+    covered = Math.min(1, covered);
+    const surf = bed('beach', world, shore * 0.6 + exposed * 0.2, 0.6) ? 0 : 1, synth = 1 - covered;
+    smooth(sea.out.gain, (0.02 + shore * 0.27 + exposed * 0.1) * surf, 0.4);
     if (sea.pan.pan) smooth(sea.pan.pan, exposed > 0.5 ? 0 : side(seaward.x, seaward.z) * (0.25 + shore * 0.6), 0.3);
-    smooth(city.out.gain, (0.04 + dense * 0.09) * (1 - night * 0.45) * (1 - exposed * 0.6), 0.5);
+    smooth(city.out.gain, (0.04 + dense * 0.09) * (1 - night * 0.45) * (1 - exposed * 0.6) * synth, 0.5);
     smooth(wind.out.gain, 0.012 + shore * 0.02 + exposed * 0.06 + (1 - dense) * 0.01, 0.5);
-    smooth(crickets.out.gain, night * green * 0.05 * (1 - shore * 0.5), 0.8);
+    smooth(crickets.out.gain, night * green * 0.05 * (1 - shore * 0.5) * synth, 0.8);
     smooth(siren.out.gain, police * 0.12, 0.2);
     for (const [k, voice] of passers.entries()) {
       const c = cars[k];
@@ -358,9 +458,14 @@ export const sfx = {
     }
 
     // The room, if he is in one.
-    const R = ROOMS[room] || (inside ? ROOMS.plain : {});
+    let R = ROOMS[room] || (inside ? ROOMS.plain : {});
+    const roomKey = room ? 'room-' + (room === 'office' ? 'house' : room) : null;
+    for (const key in beds) if (key.startsWith('room-')) bed(key, rooms, key === roomKey ? 0.6 : 0, 0.3);
+    if (roomKey && beds[roomKey]) R = { verb: R.verb, music: R.music, chime: R.chime }; // the recording is the room; only its music and its echo are ours
+    radio.heard(inCar || room === 'bar', room === 'bar');
+    const ownMusic = radio.playing ? 0 : R.music || 0;
     smooth(walla.out.gain, R.walla || 0, 0.3); smooth(hum.out.gain, R.hum || 0, 0.3); smooth(drone.out.gain, R.drone || 0, 0.6);
-    smooth(sizzle.out.gain, R.sizzle || 0, 0.3); smooth(music.out.gain, R.music || 0, 0.25);
+    smooth(sizzle.out.gain, R.sizzle || 0, 0.3); smooth(music.out.gain, ownMusic, 0.25);
     smooth(wet.gain, inside ? R.verb ?? 0.1 : 0.035, 0.2);
     if (room !== st.room) {
       if (R.chime) { tone('sine', 1318, now + 0.25, 0.09, 0.005, 0.5); tone('sine', 1046, now + 0.6, 0.09, 0.005, 0.8); } // the bell over a shop door
@@ -381,9 +486,9 @@ export const sfx = {
 
     // Life: birds by day where there are trees, gulls by the water, and now and then something a long way off.
     if (out) {
-      if (now > st.bird) { st.bird = now + rnd(1.2, 5) / (0.25 + green); if (day > 0.5 && Math.random() < 0.35 + green * 0.6) bird(rnd(-1, 1)); }
-      if (now > st.gull) { st.gull = now + rnd(3, 9); if (day > 0.4 && shore > 0.35) gull(side(seaward.x, seaward.z) * rnd(0.2, 1)); }
-      if (now > st.event) {
+      if (now > st.bird) { st.bird = now + rnd(1.2, 5) / (0.25 + green); if (day > 0.5 && synth > 0.5 && Math.random() < 0.35 + green * 0.6) bird(rnd(-1, 1)); }
+      if (now > st.gull) { st.gull = now + rnd(3, 9); if (day > 0.4 && shore > 0.35 && surf) gull(side(seaward.x, seaward.z) * rnd(0.2, 1)); }
+      if (now > st.event && synth > 0.5) {
         st.event = now + rnd(9, 22);
         const r = Math.random(), pan = rnd(-0.9, 0.9);
         if (la && r < 0.22) faraway('plane', pan);
@@ -402,7 +507,7 @@ export const sfx = {
 
     // The sequencers: whoever can hear the beat or the waltz gets its notes.
     clubTargets = emitters.filter(e => e.kind === 'club' && e.level > 0.004).map(e => e.in);
-    if (R.music) clubTargets.push(music.in);
+    if (ownMusic) clubTargets.push(music.in);
     waltzTargets = emitters.filter(e => e.kind === 'carousel' && e.level > 0.004).map(e => e.out);
     for (const q of seqs) {
       if (q.next < now - 0.5) { q.next = now + 0.05; } // the page was asleep: start again from here

@@ -49,10 +49,10 @@ async function boot() {
   const hud = new Hud();
   // Settings, kept in the browser: volume, mouse, the crowd, shadows.
   const SETTINGS = 'sopranos-vice.settings';
-  const settings = { volume: 0.7, ambience: 2, sens: 1, invert: false, crowd: 1, shadows: true };
+  const settings = { volume: 0.7, ambience: 2, radio: 2, sens: 1, invert: false, crowd: 1, shadows: true };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS)) || {}); } catch { /* defaults */ }
   const applySettings = () => {
-    sfx.setVolume(settings.volume); sfx.setAmbience([0, 0.5, 1, 1.6][settings.ambience] ?? 1);
+    sfx.setVolume(settings.volume); sfx.setAmbience([0, 0.5, 1, 1.6][settings.ambience] ?? 1); sfx.radio.volume([0, 0.4, 0.7, 1][settings.radio] ?? 0.7);
     renderer.shadowMap.enabled = settings.shadows; sun.castShadow = settings.shadows;
     scene.traverse(o => { if (o.material) { for (const m of [].concat(o.material)) m.needsUpdate = true; } });
     try { localStorage.setItem(SETTINGS, JSON.stringify(settings)); } catch { /* play on */ }
@@ -544,6 +544,7 @@ async function boot() {
       { key: 'Digit6', label: 'Crowd', hint: ['light', 'normal', 'heavy'][settings.crowd] },
       { key: 'Digit7', label: 'Shadows', hint: settings.shadows ? 'on' : 'off' },
       { key: 'Digit9', label: 'Ambient sound', hint: ['off', 'quiet', 'normal', 'loud'][settings.ambience] },
+      { key: 'KeyR', label: 'Radio', hint: sfx.radio.count ? `${sfx.radio.count} songs  ·  ${['off', 'quiet', 'normal', 'loud'][settings.radio]}  ·  in the car: N next, B back, V off` : 'no songs yet: put audio files in the music folder' },
       { key: 'KeyT', label: 'Test the sound', hint: settings.volume === 0 ? 'the volume is at 0%' : sfx.state === 'running' ? 'plays a chime: if you hear nothing, it is the browser or the computer' : 'the browser is holding the sound back: click the page once' },
       { key: 'Digit8', label: 'Missions', hint: 'play any mission again, or skip ahead' },
       { key: 'Escape', label: 'Resume' },
@@ -558,6 +559,7 @@ async function boot() {
       else if (code === 'Digit7') settings.shadows = !settings.shadows;
       else if (code === 'Digit9') settings.ambience = (settings.ambience + 1) % 4;
       else if (code === 'KeyT') { sfx.unlock(); sfx.passed(); }
+      else if (code === 'KeyR') settings.radio = (settings.radio + 1) % 4;
       else if (code === 'Digit8') { applySettings(); missionMenu(pr && !pr.done ? pr.n - 1 : 0); return; }
       else if (code === 'Digit0') { applySettings(); location.reload(); return; }
       else if (code === 'Escape' || code === 'Enter') { applySettings(); hud.menu(); g.paused = false; for (const k in keys) keys[k] = false; return; }
@@ -583,12 +585,20 @@ async function boot() {
     return roomKinds.get(q);
   };
   sfx.place(places.sounds || []);
+  // The player's own songs and recordings, if he has put any in the folders beside the game.
+  sfx.radio.onChange = title => hud.radio(title);
+  sfx.radio.load(); sfx.loadRecordings();
   const muteEl = document.getElementById('mute');
 
   function step(dt) {
     if (g.paused) { if (!g.skipRender) renderer.render(scene, camera); pressed.clear(); return; }
     if (g.started && g.consume('Escape')) { openSettings(); pressed.clear(); return; }
     if (g.started && g.consume('KeyM')) g.mapOpen = !g.mapOpen;
+    if (g.started && p.car) { // the radio's buttons
+      if (g.consume('KeyN')) sfx.radio.next(1);
+      if (g.consume('KeyB')) sfx.radio.next(-1);
+      if (g.consume('KeyV')) hud.radio(sfx.radio.toggle() ? sfx.radio.title || 'Radio on' : 'Radio off');
+    }
     if (g.started && !p.locked && !p.inside && (p.pos.x - places.bridge.far.x) * places.bridge.dir > 0 && Math.abs(p.pos.z - places.bridge.far.z) < 12) crossBridge();
     g.time += dt;
 
