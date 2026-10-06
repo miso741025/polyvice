@@ -1939,6 +1939,12 @@ export function buildWorld(scene) {
     if (cloth) ball(0xd8342c, 0.08, q.X + x, q.Y + 0.84, q.Z + z);
     collide(q.X + x, q.Z + z, 1.2, 1.2, 1);
   };
+  // A dining chair at a seat { x, z, h }: a thin seat on four legs and a back, facing h.
+  const chairAt = (st, y, hex) => {
+    slab(hex, 0.46, 0.07, 0.46, st.x, y + 0.4, st.z);
+    for (const [fx, fz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) post(0x3a2418, 0.025, 0.4, st.x + fx, y, st.z + fz, 4);
+    put(M.plain, new THREE.BoxGeometry(0.46, 0.5, 0.05).translate(0, 0.74, -0.22).rotateY(st.h).translate(st.x, y, st.z), hex);
+  };
   const racks = (q, x, z, w, rows, items, turn = 0) => { // a wall of shelving with coloured goods on it
     const dx = Math.cos(turn), dz = -Math.sin(turn), along = v => [Math.abs(dx) * v, Math.abs(dz) * v];
     const [uw, ud] = along(w), [bw, bd] = along(0.5);
@@ -2135,7 +2141,48 @@ export function buildWorld(scene) {
   }
   { // Vesuvio: the dining room, white cloths, a bar, murals of the bay, the kitchen door
     const q = rooms.VESUVIO = room(18, 14, 3.8, { floor: M.paver, floorTint: 0xb9a58a, wall: M.gravel, wallTint: 0xf6e6c6, ceil: 0xf6f1e6, doorX: 4 });
-    for (const [x, z] of [[-5, -2], [-1, -2], [-5, 2], [-1, 2], [3, 1], [-5, 5], [-1, 5]]) table(q, x, z, 0xffffff, true);
+    // The floor: cream and green-black marble laid on the diagonal, polished, inside a border of dark wood and a line of brass.
+    const marble = texture(256, 256, (c, w) => {
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+        const dark = (i + j) % 2;
+        c.fillStyle = dark ? '#1f2a26' : '#efe6d2'; c.fillRect(i * w / 2, j * w / 2, w / 2, w / 2);
+        c.strokeStyle = dark ? 'rgba(170,200,180,.28)' : 'rgba(120,96,70,.3)'; c.lineWidth = 1.2;
+        for (let k = 0; k < 7; k++) { c.beginPath(); let x = i * w / 2 + rand() * w / 2, y = j * w / 2; c.moveTo(x, y); for (let t = 0; t < 5; t++) { x += (rand() - 0.5) * 34; y += w / 10; c.lineTo(Math.max(i * w / 2, Math.min((i + 1) * w / 2, x)), y); } c.stroke(); }
+      }
+      c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 1.5; c.strokeRect(0, 0, w / 2, w / 2); c.strokeRect(w / 2, w / 2, w / 2, w / 2);
+    });
+    marble.repeat.set(10, 7.6); marble.rotation = Math.PI / 4; marble.center.set(0.5, 0.5);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(16.6, 12.6).rotateX(-Math.PI / 2), new THREE.MeshPhongMaterial({ map: marble, shininess: 90, specular: 0x6a6a6a }));
+    floor.position.set(q.X, q.Y + 0.006, q.Z); scene.add(floor);
+    for (const sgn of [-1, 1]) { slab(0x2b1a12, 17.4, 0.012, 0.42, q.X, q.Y, q.Z + sgn * 6.5, M.wood, 2); slab(0x2b1a12, 0.42, 0.012, 13.4, q.X + sgn * 8.5, q.Y, q.Z, M.wood, 2); slab(0xd9a520, 16.6, 0.016, 0.05, q.X, q.Y, q.Z + sgn * 6.28); slab(0xd9a520, 0.05, 0.016, 12.6, q.X + sgn * 8.28, q.Y, q.Z); }
+    // A table laid for dinner: linen to the floor, a second cloth across it, four places, two glasses each, a candle, a flower; four upholstered chairs.
+    const fineTable = (x, z) => {
+      const tx = q.X + x, tz = q.Z + z, top = q.Y + 0.76;
+      put(M.plain, new THREE.CylinderGeometry(0.62, 0.7, 0.76, 20).translate(tx, q.Y + 0.38, tz), 0xf6f1e6);
+      put(M.plain, new THREE.BoxGeometry(0.9, 0.012, 0.9).rotateY(Math.PI / 4).translate(tx, top + 0.006, tz), 0x7a1c2a);
+      for (let k = 0; k < 4; k++) {
+        const a = k * Math.PI / 2, sx = Math.sin(a), sz = Math.cos(a), px = tx + sx * 0.4, pz = tz + sz * 0.4;
+        put(M.plain, new THREE.CylinderGeometry(0.13, 0.11, 0.012, 16).translate(px, top + 0.02, pz), 0xffffff); put(M.plain, new THREE.CylinderGeometry(0.09, 0.09, 0.006, 14).translate(px, top + 0.03, pz), 0xd9a520);
+        put(M.plain, new THREE.CylinderGeometry(0.035, 0.012, 0.13, 8).translate(px + sz * 0.17, top + 0.08, pz - sx * 0.17), 0xe9f4fa); put(M.plain, new THREE.CylinderGeometry(0.028, 0.012, 0.1, 8).translate(px + sz * 0.24, top + 0.065, pz - sx * 0.24), 0xe9f4fa);
+        put(M.plain, new THREE.BoxGeometry(0.014, 0.004, 0.16).rotateY(a).translate(px - sz * 0.17, top + 0.016, pz + sx * 0.17), 0xc9cbd2);
+        put(M.plain, new THREE.BoxGeometry(0.11, 0.05, 0.11).translate(px - sz * 0.02, top + 0.06, pz + sx * 0.02), 0xf6f1e6);                                  // a folded napkin on the plate
+        chairAt({ x: tx + sx * 0.98, z: tz + sz * 0.98, h: a + Math.PI }, q.Y, 0x6a1c2a);
+      }
+      post(0xd9a520, 0.012, 0.14, tx - 0.07, top + 0.012, tz, 6); put(M.glow, new THREE.ConeGeometry(0.018, 0.05, 6).translate(tx - 0.07, top + 0.18, tz), 0xffd27a);    // the candle
+      post(0xe9f4fa, 0.025, 0.1, tx + 0.08, top + 0.012, tz + 0.04, 8); ball(0xc8312a, 0.045, tx + 0.08, top + 0.15, tz + 0.04);                                     // one rose
+      collide(tx, tz, 1.3, 1.3, 1);
+    };
+    for (const [x, z] of [[-5, -2], [-1, -2], [-5, 2], [-1, 2], [3, 1], [-5, 5], [-1, 5]]) fineTable(x, z);
+    // Curtains at the windows, a mirror and glass shelves behind the bar, a chandelier, a trolley of desserts, an espresso machine.
+    for (const x of [-5, 0]) for (const sgn of [-1, 1]) slab(0x6a1c2a, 0.5, 2.9, 0.12, q.X + x + sgn * 2.2, q.Y + 0.5, q.Z + 6.6); for (const x of [-5, 0]) slab(0xd9a520, 5, 0.1, 0.14, q.X + x, q.Y + 3.4, q.Z + 6.6);
+    q.glowPanel(0xcfe0e8, 6.4, 1.3, 4.5, -6.42, 2.3); for (const y of [1.75, 2.35]) slab(0xe9f4fa, 6.4, 0.02, 0.22, q.X + 4.5, q.Y + y + 0.25, q.Z - 6.32);
+    put(M.plain, new THREE.TorusGeometry(0.9, 0.03, 6, 24).rotateX(Math.PI / 2).translate(q.X - 3, q.Y + 3.0, q.Z + 1.5), 0xd9a520); post(0xd9a520, 0.015, 0.7, q.X - 3, q.Y + 3.05, q.Z + 1.5, 4);
+    for (let k = 0; k < 8; k++) ball(0xfff0c8, 0.07, q.X - 3 + Math.sin(k * Math.PI / 4) * 0.9, q.Y + 3.08, q.Z + 1.5 + Math.cos(k * Math.PI / 4) * 0.9, M.glow);
+    q.block(0x3a2418, 0.9, 0.8, 0.5, 7.4, 1.2, M.wood, 1); slab(0xd9a520, 0.95, 0.03, 0.55, q.X + 7.4, q.Y + 0.8, q.Z + 1.2); for (let k = 0; k < 4; k++) { put(M.plain, new THREE.CylinderGeometry(0.12, 0.12, 0.07, 12).translate(q.X + 7.1 + (k % 2) * 0.5, q.Y + 0.87, q.Z + 1.05 + Math.floor(k / 2) * 0.28), [0xf6e7b4, 0x6a3a22, 0xf7a8c4, 0xfff6e0][k]); }
+    q.block(0xc9cbd2, 0.7, 0.5, 0.45, 1.8, -5.2, M.plain, 0, 1.05); for (const dx of [-0.15, 0.15]) post(0x16161c, 0.03, 0.12, q.X + 1.8 + dx, q.Y + 1.2, q.Z - 4.95, 6);
+    // The kitchen is through a swing door at the end of the bar.
+    slab(0xc9cbd2, 0.95, 2.3, 0.08, q.X + 0.45, q.Y, q.Z - 6.8); put(M.plain, new THREE.CylinderGeometry(0.16, 0.16, 0.02, 14).rotateX(Math.PI / 2).translate(q.X + 0.45, q.Y + 1.6, q.Z - 6.75), 0x9fd0f5);
+    sign('KITCHEN', q.X + 0.45, q.Y + 2.6, q.Z - 6.84, 0, { w: 1.1, h: 0.28, color: '#f6e7b4', bg: '#3a1414', size: 0.8, glow: false });
     counter(q, 4.5, -5.2, 7, 0x3a2418, 0); q.block(0x3a2418, 7, 2, 0.3, 4.5, -6.6, M.wood, 2, 1); for (let n = 0; n < 12; n++) post(BOTTLES[n % 6], 0.05, 0.35, q.X + 1.4 + n * 0.55, q.Y + 1.5 + (n % 2) * 0.7, q.Z - 6.4, 6);
     for (const x of [-6, -1.5]) q.glowPanel(0x9fd0f5, 3.6, 1.6, x, -6.84, 2.2); // murals of the bay, lit
     for (const x of [-6, -1.5]) slab(0x8a5a44, 3.8, 1.8, 0.06, q.X + x, q.Y + 1.3, q.Z - 6.86);
@@ -2162,6 +2209,42 @@ export function buildWorld(scene) {
     for (const [k, hex] of [0x2f7d46, 0xf4f4f0, 0xc8312a].entries()) slab(hex, 0.5, 0.9, 0.04, q.X - 8 + k * 0.5, q.Y + 2.3, q.Z + 6.62);
     q.person(pick(PED_ROOM_LOOKS), -5.9, -2, Math.PI / 2, 'sit');
     q.person(pick(PED_ROOM_LOOKS), -0.1, 2, -Math.PI / 2, 'sit');
+  }
+  { // Vesuvio's kitchen, behind the dining room: a range under a hood, a brick oven, a steel table in the middle, the pass, the dish pit, a walk-in
+    const d0 = rooms.VESUVIO, q = rooms.VKITCHEN = room(13, 8, 3.4, { floor: M.paver, floorTint: 0xe9e4dc, floorScale: 1, wallTint: 0xf4f4f0, ceil: 0xf6f6f2, door: 0xc9cbd2, doorX: -4, at: [d0.X + 4, d0.Z - 12.5] });
+    for (let k = 0; k < 13; k++) for (let j = 0; j < 8; j++) if ((k + j) % 2) slab(0x23232b, 1, 0.012, 1, q.X - 6 + k, q.Y, q.Z - 3.5 + j);                       // a chequered floor
+    { // White tile to head height on all four walls, a steel rail along the top of it
+      const tile = texture(64, 64, (c, w) => { c.fillStyle = '#f4f5f2'; c.fillRect(0, 0, w, w); c.strokeStyle = '#b9bdbd'; c.lineWidth = 2; c.strokeRect(0, 0, w, w); c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(5, 5, w - 26, 5); });
+      const face = (w, x, z, turn) => { const t = tile.clone(); t.needsUpdate = true; t.repeat.set(w / 0.3, 7); const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 2.1), new THREE.MeshPhongMaterial({ map: t, shininess: 60, specular: 0x555555 })); m.rotation.y = turn; m.position.set(q.X + x, q.Y + 1.05, q.Z + z); scene.add(m); };
+      face(12.4, 0, -3.69, 0); face(12.4, 0, 3.69, Math.PI); face(7.4, -6.19, 0, Math.PI / 2); face(7.4, 6.19, 0, -Math.PI / 2);
+      for (const sgn of [-1, 1]) { slab(0xc9cbd2, 12.4, 0.06, 0.04, q.X, q.Y + 2.1, q.Z + sgn * 3.68); slab(0xc9cbd2, 0.04, 0.06, 7.4, q.X + sgn * 6.18, q.Y + 2.1, q.Z); }
+    }
+    // The range: six burners, pots on three of them, a hood with a light in it.
+    q.block(0xb9bcc4, 6, 0.9, 0.85, 1.5, -3.3, M.plain, 0); slab(0x16161c, 5.8, 0.03, 0.7, q.X + 1.5, q.Y + 0.9, q.Z - 3.3);
+    for (let k = 0; k < 6; k++) { put(M.plain, new THREE.TorusGeometry(0.16, 0.02, 5, 14).rotateX(Math.PI / 2).translate(q.X - 1 + k, q.Y + 0.95, q.Z - 3.3), 0x3a3a44); if (k % 2 === 0) put(M.glow, new THREE.CylinderGeometry(0.13, 0.13, 0.02, 10).translate(q.X - 1 + k, q.Y + 0.94, q.Z - 3.3), 0x4f8cff); }
+    for (const [k, r, h, hex] of [[0, 0.26, 0.34, 0xc9cbd2], [2, 0.2, 0.2, 0x8a5a44], [4, 0.3, 0.42, 0xc9cbd2]]) { put(M.plain, new THREE.CylinderGeometry(r, r, h, 14).translate(q.X - 1 + k, q.Y + 0.96 + h / 2, q.Z - 3.3), hex); put(M.plain, new THREE.CylinderGeometry(r - 0.02, r - 0.02, 0.02, 14).translate(q.X - 1 + k, q.Y + 0.96 + h, q.Z - 3.3), k === 2 ? 0x8a1c1c : 0xe0a12c); }
+    put(M.plain, new THREE.BoxGeometry(6.2, 0.7, 1.1).translate(q.X + 1.5, q.Y + 2.5, q.Z - 3.2), 0xb9bcc4); slab(0xffe8c0, 5.6, 0.04, 0.3, q.X + 1.5, q.Y + 2.13, q.Z - 3.2, M.glow);
+    for (let k = 0; k < 7; k++) { post(0x8a8d96, 0.012, 0.3, q.X - 1.2 + k * 0.85, q.Y + 1.75, q.Z - 2.75, 4); put(M.plain, new THREE.CylinderGeometry(0.13 + (k % 3) * 0.03, 0.11, 0.07, 10).translate(q.X - 1.2 + k * 0.85, q.Y + 1.7, q.Z - 2.75), k % 2 ? 0x3a3a44 : 0xb5651d); } // pans on a rail
+    // The oven: brick, an arch, a fire at the back of it, a peel leaning beside.
+    q.block(0xb5523b, 2.4, 2.3, 1.5, -4.9, -3, M.brick, 1.2); put(M.glow, new THREE.CircleGeometry(0.55, 14, 0, Math.PI).translate(q.X - 4.9, q.Y + 1.1, q.Z - 2.24), 0xff8a30); slab(0x2b1a12, 1.2, 0.08, 0.2, q.X - 4.9, q.Y + 1.05, q.Z - 2.2);
+    put(M.plain, new THREE.BoxGeometry(0.04, 1.9, 0.04).rotateZ(0.12).translate(q.X - 3.4, q.Y + 0.95, q.Z - 2.9), 0xc79a6a); slab(0xc79a6a, 0.4, 0.03, 0.5, q.X - 3.52, q.Y + 1.86, q.Z - 2.9);
+    // The steel table: boards, a knife block, tomatoes, basil, a ball of dough under a cloth, a stack of plates.
+    q.block(0xb9bcc4, 4.4, 0.9, 1.1, 0.4, 0.2, M.plain, 0); slab(0xc79a6a, 0.9, 0.04, 0.6, q.X - 0.9, q.Y + 0.9, q.Z + 0.2); slab(0xc79a6a, 0.7, 0.04, 0.5, q.X + 1.2, q.Y + 0.9, q.Z + 0.1);
+    for (let k = 0; k < 5; k++) ball(0xc8312a, 0.07, q.X - 1.15 + k * 0.13, q.Y + 1.01, q.Z + 0.12 + (k % 2) * 0.1); for (let k = 0; k < 3; k++) ball(0x2f7d46, 0.06, q.X + 1.05 + k * 0.12, q.Y + 0.99, q.Z + 0.02);
+    put(M.plain, new THREE.SphereGeometry(0.2, 10, 6).scale(1, 0.6, 1).translate(q.X + 0.1, q.Y + 1.0, q.Z + 0.3), 0xf6e7b4); q.block(0x3a2418, 0.2, 0.26, 0.14, 2.2, 0.5, M.wood, 1, 0.9);
+    for (let k = 0; k < 8; k++) put(M.plain, new THREE.CylinderGeometry(0.14, 0.12, 0.018, 14).translate(q.X + 2.2, q.Y + 0.91 + k * 0.02, q.Z - 0.1), 0xffffff);
+    // The pass, on the dining-room side: plates waiting under two heat lamps. The dish pit. The walk-in.
+    q.block(0xb9bcc4, 3.4, 1.05, 0.6, 3.2, 3.3, M.plain, 0); for (let k = 0; k < 3; k++) { put(M.plain, new THREE.CylinderGeometry(0.15, 0.13, 0.02, 14).translate(q.X + 2.2 + k, q.Y + 1.07, q.Z + 3.3), 0xffffff); ball([0xc8312a, 0xe0a12c, 0x2f7d46][k], 0.07, q.X + 2.2 + k, q.Y + 1.13, q.Z + 3.3); }
+    for (const dx of [2.6, 3.8]) { post(0x3a3a44, 0.015, 0.8, q.X + dx, q.Y + 2.5, q.Z + 3.3, 4); put(M.glow, new THREE.ConeGeometry(0.16, 0.2, 10, 1, true).translate(q.X + dx, q.Y + 2.4, q.Z + 3.3), 0xff9a50); }
+    q.block(0xb9bcc4, 2.2, 0.9, 0.8, -2, 3.2, M.plain, 0); slab(0x4f8cb8, 0.9, 0.02, 0.5, q.X - 2.4, q.Y + 0.88, q.Z + 3.2, M.glow); post(0xc9cbd2, 0.02, 0.4, q.X - 2.4, q.Y + 0.9, q.Z + 3.5, 5);
+    for (let k = 0; k < 5; k++) put(M.plain, new THREE.CylinderGeometry(0.14, 0.14, 0.02, 12).rotateZ(0.9).translate(q.X - 1.5 + k * 0.1, q.Y + 1.05, q.Z + 3.2), 0xffffff);
+    slab(0xb9bcc4, 0.08, 2.3, 1.3, q.X + 6.3, q.Y, q.Z - 1); slab(0x8a8d96, 0.06, 0.4, 0.06, q.X + 6.24, q.Y + 1.1, q.Z - 0.55); sign('WALK-IN', q.X + 6.3, q.Y + 2.6, q.Z - 1, -Math.PI / 2, { w: 1.1, h: 0.26, color: '#1c2740', bg: '#c9cbd2', size: 0.8, glow: false });
+    for (let k = 0; k < 4; k++) { slab(0xd9c7a0, 0.5, 0.36, 0.4, q.X + 5.6, q.Y + (k % 2) * 0.37, q.Z + 1.2 + Math.floor(k / 2) * 0.5); } post(0x2f5a3f, 0.05, 0.3, q.X + 5.6, q.Y + 0.74, q.Z + 1.3, 6);
+    q.light(1.5, 3, -1.5, 0xf4f8ff, 120, 20); q.light(-4.6, 1.6, -1.6, 0xff8a30, 26, 8);
+    q.person({ shirt: 0xf4f4f4, sleeves: 'long', tucked: true, pants: 0x55525a, hair: 0x2b1b12, hairMesh: 'buzzed', hat: 'cap', hatColor: 0xf4f4f4, bulk: 1.1 }, 0.4, -2.3, Math.PI);
+    q.person({ shirt: 0xf4f4f4, tee: true, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', dark: true, bulk: 0.95 }, -1.6, 2.4, 0);
+    // Through the swing door, either way.
+    (places.stairs ??= []).push({ a: { x: d0.X + 0.45, z: d0.Z - 5.9, h: 0 }, b: { x: q.X - 4, z: q.Z + 2.6, h: Math.PI }, up: 'Go through to the kitchen', down: 'Back to the dining room' });
   }
   { // Bean Scene: an espresso bar with chalkboards, mismatched sofas and a magazine rack
     const q = rooms.BEAN = room(12, 10, 3.4, { floor: M.wood, floorTint: 0xb98a5e, wall: M.brick, wallTint: 0xd8c8b4, wallScale: 2, ceil: 0x3a3a44 });
@@ -2246,12 +2329,6 @@ export function buildWorld(scene) {
     q.light(-2, 2.6, -2, 0xffd9a8, 36, 12); q.light(0, 2.6, 3, 0xffe8c8, 30, 12);
     q.gap = q.at(2.3, 2.4); q.inroom = q.at(2.3, -0.4); q.bed = q.at(-2.6, -2); q.window0 = q.at(-1, -3);
   }
-  // A dining chair at a seat { x, z, h }: a thin seat on four legs and a back, facing h.
-  const chairAt = (st, y, hex) => {
-    slab(hex, 0.46, 0.07, 0.46, st.x, y + 0.4, st.z);
-    for (const [fx, fz] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) post(0x3a2418, 0.025, 0.4, st.x + fx, y, st.z + fz, 4);
-    put(M.plain, new THREE.BoxGeometry(0.46, 0.5, 0.05).translate(0, 0.74, -0.22).rotateY(st.h).translate(st.x, y, st.z), hex);
-  };
   if (!LA) { // Room six at the motor lodge: the beds stood against the wall, a felt table under one hanging lamp, a cooler, the curtains shut
     const q = rooms.CARDROOM = room(9, 8, 3, { floor: M.gravel, floorTint: 0x7a5a4a, wallTint: 0xffd3a1, ceil: 0xe9e2cf });
     const cx = -0.6, cz = -0.9;
@@ -2346,7 +2423,7 @@ export function buildWorld(scene) {
     q.person('aj', 2.4, -3.2, 0).set('idle');
     q.person('meadow', 6.7, -1.5, Math.PI / 2, 'sit');
     const H = places.houseRoom.inside; // (X + 2, Z + 3.2) of the downstairs room
-    places.stairs = [{ a: { x: H.x + 4.1, z: H.z - 0.7, h: -Math.PI / 2 }, b: { x: q.X + 7.6, z: q.Z + 3.8, h: -Math.PI / 2 }, up: 'Go upstairs', down: 'Go downstairs' }];
+    places.stairs = [...(places.stairs || []), { a: { x: H.x + 4.1, z: H.z - 0.7, h: -Math.PI / 2 }, b: { x: q.X + 7.6, z: q.Z + 3.8, h: -Math.PI / 2 }, up: 'Go upstairs', down: 'Go downstairs' }];
     places.beds = [{ x: q.X - 4.2, z: q.Z - 3.2, name: 'Sleep' }];
   }
 

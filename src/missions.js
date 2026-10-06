@@ -2015,10 +2015,13 @@ async function badDreams(g) {
   await say(g, '', 'Christopher had not slept through a night in a week.');
   if (p.car) g.leaveCar();
   g.setNight(1);
-  asOther(g, 'christopher', spot(satriale.back, 0, 2), NORTH);
-  const emil = actor(g, 'kolar', spot(satriale.back, -0.6, -1.6), SOUTH);
+  // The dream is in the store, where it happened.
+  const store = g.places.shopRoom, dx = store.inside.x, dz = store.inside.z - 3.2;
+  asOther(g, 'christopher', { x: dx + 0.2, z: dz - 0.2 }, NORTH);
+  for (const a of store.ambient) a.group.visible = false;
+  const emil = actor(g, 'kolar', { x: dx - 1.3, y: -0.1, z: dz - 2 }, SOUTH);
   g.hud.panic(0.35); g.cam.sway = 0.5;
-  shot(g, spot(satriale.back, 3, 4), spot(satriale.back, -0.4, -0.6), 1.6, 1.3);
+  g.cam.fixed = { pos: new THREE.Vector3(dx + 3.4, 1.5, dz + 2), look: new THREE.Vector3(dx - 0.6, 1.1, dz - 1.4) };
   await fade(g, 0, 1.2);
   await talk(g, [
     ['Emil Kolar', 'You left one in the table, Christopher. A bullet. They will dig it out of the wood, and it will have your name on it.', emil],
@@ -2028,6 +2031,8 @@ async function badDreams(g) {
   await fade(g, 1, 0.8);
   g.hud.panic(0); g.cam.sway = 0;
   dismiss(g, emil);
+  for (const a of store.ambient) a.group.visible = true;
+  g.cam.fixed = null;
   // Awake, at the Bing, at two in the morning.
   place(g, spot(bing.door, 0, 1.6), SOUTH);
   const car = propCar(g, bing.park, bing.park.h, 0x8a1c2a, 'coupe'), georgie = actor(g, 'georgie', spot(bing.door, 1.6, 2.4), WEST);
@@ -2838,6 +2843,96 @@ export function banter(g, lines) {
   return () => { if (on) { on = false; g.hud.subtitle(); } };
 }
 
+// A man in a tarpaulin: something long, tied in two places, that takes two to carry. Nothing of him shows.
+export function bundle(g, at) {
+  const grp = new THREE.Group(), tarp = new THREE.MeshLambertMaterial({ color: 0x3f4a44 }), rope = new THREE.MeshLambertMaterial({ color: 0xc9b79c });
+  const roll = new THREE.Mesh(new THREE.CapsuleGeometry(0.26, 1.25, 5, 10), tarp);
+  roll.rotation.z = Math.PI / 2;
+  grp.add(roll);
+  for (const x of [-0.42, 0.38]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.265, 0.018, 5, 14), rope); r.rotation.y = Math.PI / 2; r.position.x = x; grp.add(r); }
+  grp.position.set(at.x, groundAt(at.x, at.z) + 0.27, at.z);
+  g.track(grp);
+  return grp;
+}
+// Two people carry it: it hangs between the player and whoever has the other end, until what this returns is called.
+export function carry(g, load, other) {
+  let on = true;
+  g.updaters.push(() => {
+    if (!on) return false;
+    const a = g.player.pos, b = other.group.position;
+    load.visible = !g.player.car;
+    load.position.set((a.x + b.x) / 2, groundAt((a.x + b.x) / 2, (a.z + b.z) / 2) + 0.85 + Math.sin(g.time * 9) * 0.015, (a.z + b.z) / 2);
+    load.rotation.y = Math.atan2(b.x - a.x, b.z - a.z) + Math.PI / 2;
+    return true;
+  });
+  return () => { on = false; };
+}
+// A hole in the ground and the earth that came out of it. dig(k) deepens it (k from 0 to 1); fill(k) puts the earth back.
+export function pit(g, at) {
+  const y = groundAt(at.x, at.z);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(1, 18).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x0c0a0a }));
+  const heap = new THREE.Mesh(new THREE.SphereGeometry(0.8, 10, 6), new THREE.MeshLambertMaterial({ color: 0x4a3a2a }));
+  hole.position.set(at.x, y + 0.03, at.z); hole.scale.set(0.01, 1, 0.01); hole.scale.x = hole.scale.z = 0.01;
+  heap.position.set(at.x + 1.5, y, at.z + 0.2); heap.scale.set(0.01, 0.01, 0.01);
+  g.track(hole); g.track(heap);
+  { // the shovel, standing in the mud beside it when it is not in his hands
+    const spade = new THREE.Group(), wood = new THREE.MeshLambertMaterial({ color: 0x8a6a44 }), steel = new THREE.MeshLambertMaterial({ color: 0x8a8d96 });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 6), wood), blade = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.28, 0.02), steel), grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.03), wood);
+    shaft.position.y = 0.7; blade.position.y = 0.1; grip.position.y = 1.26;
+    spade.add(shaft, blade, grip); spade.position.set(at.x - 1.3, y, at.z + 0.5); spade.rotation.z = 0.12;
+    g.track(spade);
+  }
+  const set = (h, m) => { hole.scale.set(Math.max(0.01, h * 1.05), 1, Math.max(0.01, h * 0.62)); heap.scale.set(Math.max(0.01, m), Math.max(0.01, m * 0.55), Math.max(0.01, m * 0.8)); };
+  return { at, hole, heap, dig: k => set(k, k), fill: k => { set(1 - k, 1 - k); if (k >= 1) { heap.scale.set(1.3, 0.12, 0.8); heap.position.set(at.x, y, at.z); } } };
+}
+// A spell with the shovel, done by hand: each press of F is one stroke. He bends to it, earth flies, `each` is told how far along it is.
+export async function shovel(g, n, of, word = 'Dig', each, heap) {
+  const p = g.player, strokes = 4;
+  p.locked = true;                                   // he stands at the hole; F is the shovel and nothing else
+  for (let k = 0; k < strokes; k++) {
+    g.hud.objective(`${word}: press <b>F</b>. &nbsp; <b>${n} of ${of}</b> &nbsp; ${'●'.repeat(k)}${'○'.repeat(strokes - k)}`);
+    g.consume('KeyF');
+    await g.until(() => g.consume('KeyF'));
+    p.human.play('kneel', 'idle');
+    await g.wait(0.3); g.sfx?.punch?.(false);
+    if (heap) clod(g, p.pos, heap);
+    each?.((k + 1) / strokes);
+    await g.wait(0.28);
+  }
+  p.locked = false;
+  g.hud.objective();
+}
+// A shovelful of earth thrown from one place to another.
+function clod(g, from, to) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 4), new THREE.MeshLambertMaterial({ color: 0x4a3a2a }));
+  const y0 = groundAt(from.x, from.z) + 0.5, t0 = g.time;
+  g.track(m);
+  g.updaters.push(() => { const k = Math.min(1, (g.time - t0) / 0.45); m.position.set(from.x + (to.x - from.x) * k, y0 + Math.sin(k * Math.PI) * 1.1 - k * 0.4, from.z + (to.z - from.z) * k); if (k >= 1) g.untrack(m); return k < 1; });
+}
+// Headlamps go by on a road. He has to be still until they have gone; if he moves, `caught` plays and it comes round again.
+export async function headlamps(g, from, to, text, caught) {
+  const p = g.player, car = g.spawnCar(from.x, from.z, toward(from, to), 0xf4f4f0, 'police');
+  car.driverless = true; car.mission = true;
+  const len = Math.hypot(to.x - from.x, to.z - from.z), ux = (to.x - from.x) / len, uz = (to.z - from.z) / len;
+  for (;;) {
+    car.pos.set(from.x, 0, from.z); car.speed = 0;
+    let moved = false, gone = false, s = 0;
+    g.hud.objective(text);
+    g.updaters.push(dt => { if (gone) return false; s += 13 * dt; car.pos.set(from.x + ux * s, 0, from.z + uz * s); car.sync?.(); if (s > len) gone = true; return true; });
+    await g.wait(1.2);
+    await g.until(() => { if (p.motion !== 'idle' || p.car) moved = true; return gone || moved; });
+    g.hud.objective();
+    if (!moved) break;
+    gone = true;
+    p.locked = true;
+    await fade(g, 1, 0.8);
+    await say(g, '', caught);
+    await fade(g, 0, 0.8);
+    p.locked = false;
+  }
+  g.removeCar(car);
+}
+
 // ---------- Between missions ----------
 // The story waits for the player. When one mission is done the next is a yellow marker somewhere that makes sense
 // for it (home, the Bing, the doctor's, the precinct), and it starts when he walks or drives into it.
@@ -3305,24 +3400,28 @@ async function garbage(g) {
   g.cam.fixed = null;
   g.hud.fade(0, 1.2);
   await titleCard(g, 'Garbage', "Satriale's Pork Store, after hours");
-  await say(g, CHRIS, 'Emil Kolar wants to talk about the contract. Fine. We talk in the back.');
+  await say(g, CHRIS, 'Emil Kolar wants to talk about the contract. Fine. We talk in the store, with the blinds down.');
   p.locked = false;
-  emil = actor(g, 'kolar', spot(satriale.back, -3, 0.2), EAST); // there before he arrives
-  await reach(g, satriale.back, "Go around to the <b>back door</b> of Satriale's.", { r: 1.8, how: 'foot' });
+  // The store after hours: the lights low, the butcher gone home, one man waiting by the cold case.
+  const shop = g.places.shopRoom, sx = shop.inside.x, sz = shop.inside.z - 3.2, floorY = -0.1;
+  const street = g.places.doors.find(d => d.inside === shop.inside).outside;
+  for (const a of shop.ambient) a.group.visible = false;
+  emil = actor(g, 'kolar', { x: sx - 1.3, y: floorY, z: sz - 2 }, NORTH); // there before he arrives
+  await reach(g, street, "Go <b>in</b> to Satriale's.", { r: 1.8, how: 'foot' });
+  await enter(g, shop);
+  await reach(g, { x: sx + 0.2, z: sz - 0.9 }, 'Emil is at the <b>counter</b>.', { r: 1.5, how: 'foot' });
 
   p.locked = true;
-  await cut(g, () => {
-    p.pos.set(satriale.back.x, 0, satriale.back.z);
-    p.heading = toward(p.pos, emil.group.position);
-    shot(g, spot(satriale.back, 3.4, -1.3), spot(satriale.back, -1.6, 0.2));
-  }, 0.5);
+  p.pos.set(sx + 0.2, 0, sz - 0.9); p.heading = toward(p.pos, emil.group.position);
+  emil.group.rotation.y = toward(emil.group.position, p.pos);
+  g.cam.fixed = { pos: new THREE.Vector3(sx + 3.6, floorY + 1.6, sz + 1.6), look: new THREE.Vector3(sx - 0.6, floorY + 1.2, sz - 1.6) };
   await talk(g, [
-    [KOLAR, 'Christopher? Emil Kolar. My brothers send their respect. It smells like meat back here.', emil],
-    [CHRIS, "It's a pork store. Come inside, I got something to show you about that bid of yours.", p],
+    [KOLAR, 'Christopher? Emil Kolar. My brothers send their respect. It smells like meat in here.', emil],
+    [CHRIS, "It's a pork store. Come and look in the case, I got something to show you about that bid of yours.", p],
     [KOLAR, 'In the old country, this is how business is done. At night, between men.', emil],
     [CHRIS, 'Yeah? Here too.', p],
   ]);
-  // Emil turns to look at the door. Christopher has the gun.
+  // Emil bends to look into the cold case. Christopher has the gun.
   emil.group.rotation.y = NORTH;
   const mark = g.addNpc(emil, { health: 60, cash: 0, stays: true });
   g.cam.fixed = null;
@@ -3343,17 +3442,40 @@ async function garbage(g) {
   await say(g, '', 'Emil Kolar would not be bidding on any more contracts.');
   g.setWeapon('fist');
 
+  let body;
   await cut(g, () => {
-    pussy = actor(g, 'pussy', spot(satriale.back, 2.6, 0.3), WEST);
-    p.heading = toward(p.pos, pussy.group.position);
-    shot(g, spot(satriale.back, -3.6, -1.3), spot(satriale.back, 1.4, 0.2));
+    pussy = actor(g, 'pussy', { x: sx + 0.9, y: floorY, z: sz + 2.2 }, NORTH);
+    p.pos.set(sx + 0.2, 0, sz - 0.6); p.heading = toward(p.pos, pussy.group.position);
+    body = bundle(g, { x: sx - 1.3, z: sz - 1.9 }); body.position.y = floorY + 0.27; body.visible = false;
+    g.cam.fixed = { pos: new THREE.Vector3(sx - 4.2, floorY + 1.6, sz + 0.2), look: new THREE.Vector3(sx + 0.5, floorY + 1.1, sz + 0.6) };
   }, 0.5);
   await talk(g, [
     [PUSSY, "Madonn'. You did this in the store? Where they cut the meat?", pussy],
     [CHRIS, "The Kolars pull their bid now. Tony's gonna see what I can do.", p],
     [PUSSY, "First we clean up. Then we worry what Tony sees. He goes in your trunk, and we go.", pussy],
   ]);
-  const big = follower(g, pussy);
+  // Out of the shop, between them, in the plastic the hams come in.
+  g.cam.fixed = null;
+  p.locked = false;
+  await reach(g, { x: sx - 0.6, z: sz - 1.5 }, '<b>Wrap him</b> in the plastic sheeting from behind the counter.', { r: 1.4, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, { x: sx - 1.3, z: sz - 1.9 });
+  p.human.play('kneel', 'idle');
+  await g.wait(2.2);
+  body.visible = true;
+  await say(g, PUSSY, 'Feet first. Not through the front like a delivery. ...Fine, through the front. Quick.', 3.6);
+  p.locked = false;
+  const big = follower(g, pussy, { gap: 1.9, runs: false, pace: 3.2 });
+  big.pos.copy(pussy.group.position);
+  let carrying = carry(g, body, pussy);
+  await walkOut(g, shop, 'Carry him out to the <b>street</b>. Pussy has the other end.');
+  for (const a of shop.ambient) a.group.visible = true;
+  const boot = { x: ride.pos.x - Math.sin(ride.heading) * 3, z: ride.pos.z - Math.cos(ride.heading) * 3 };
+  await reach(g, boot, 'Put him in the <b>trunk</b> of the black coupe.', { r: 1.5, how: 'foot' });
+  carrying();
+  body.visible = false;
+  g.sfx?.carDoor();
+  await say(g, '', 'The lid came down on the second try.', 2.4);
 
   // The drive: every hard crash loosens the trunk.
   let hits = 0, last = 0, watching = true;
@@ -3402,9 +3524,49 @@ async function garbage(g) {
   await drive(marsh, 'Drive to the <b>marsh</b> on the west shore.');
   watching = false;
 
+  // The marsh. This part is done by hand.
   p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  await say(g, PUSSY, 'Kill the lamps. Nobody comes out here but the gulls, and I would like to keep it that way.', 3.6);
+  p.locked = false;
+  const back = { x: ride.pos.x - Math.sin(ride.heading) * 3, z: ride.pos.z - Math.cos(ride.heading) * 3 }, grave = spot(marsh, -4.5, 7), hole = pit(g, grave);
+  await reach(g, back, 'Open the <b>trunk</b>.', { r: 1.5, how: 'foot' });
+  g.sfx?.carDoor();
+  body.position.set(back.x, groundAt(back.x, back.z) + 0.27, back.z); body.visible = true;
+  carrying = carry(g, body, pussy);
+  await reach(g, spot(grave, 0.2, 1.5), 'Carry him out into the <b>reeds</b>, away from the road.', { r: 1.1, how: 'foot' });
+  carrying();
+  body.position.set(grave.x - 0.2, groundAt(grave.x, grave.z) + 0.27, grave.z - 1.7); body.rotation.set(0, 0.2, 0);   // laid down on the far side of where the hole will be
+  big.stay = true;
+  const digging = ['', 'Deeper. The tide comes up here, and what the tide finds it gives back.', 'A little more. I want him under the roots.'];
+  for (let n = 1; n <= 3; n++) {
+    p.heading = g.cam.yaw = toward(p.pos, grave);
+    if (digging[n - 1]) await say(g, PUSSY, digging[n - 1], 3);
+    await shovel(g, n, 3, 'Dig', k => hole.dig((n - 1 + k) / 3), hole.heap.position);
+    if (n === 2) await headlamps(g, { x: nodeX(0) + 3.6, z: marsh.z - 130 }, { x: nodeX(0) + 3.6, z: marsh.z + 130 }, 'Headlamps on the west road. <b>Keep still</b> until they have gone by.', 'The patrol car stopped. A torch went over the reeds, and over a shovel standing up in the mud. That is not how it went. Again.');
+  }
+  await reach(g, spot(grave, -0.2, -2.6), 'Go round behind him and <b>roll him in</b>.', { r: 0.9, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, grave);
+  p.human.play('kneel', 'idle');
+  { const t0 = g.time, from = body.position.clone(), y0 = groundAt(grave.x, grave.z);
+    g.updaters.push(() => { const k = Math.min(1, (g.time - t0) / 1.4); body.position.set(from.x + (grave.x - from.x) * k, y0 + 0.27 - k * k * 0.55, from.z + (grave.z - from.z) * k); body.rotation.x = k * 3; return k < 1; }); }
+  await g.wait(1.7);
+  body.visible = false;
+  p.locked = false;
+  p.heading = g.cam.yaw = toward(p.pos, grave);
+  for (let n = 1; n <= 2; n++) await shovel(g, n, 2, 'Fill it in', k => hole.fill((n - 1 + k) / 2), grave);
+  p.locked = true;
+  frame(g, p.pos, pussy.group.position, { dist: 4.6 });
+  await talk(g, [
+    [PUSSY, 'Tread it flat. In a week the reeds will be over it.', pussy],
+    [CHRIS, 'That is one Kolar the less.', p],
+    [PUSSY, 'Do not count them. Go home, and burn the shoes.', pussy],
+  ]);
   await fade(g, 1, 1.2);
-  await say(g, '', 'They dug until the sky turned pink.');
+  await say(g, '', 'It was getting light when they found the road again.');
+  g.cam.fixed = null;
+  g.untrack(hole.hole); g.untrack(hole.heap); g.untrack(body);
   big.on = false;
   dismiss(g, pussy);
   g.removeCar(ride);
