@@ -39,7 +39,7 @@ const BIOS = {
   'Rosalie': "Jackie's wife", 'Hunter': "Meadow's friend", 'Mikey Palmice': "Junior's driver, and his right hand", 'Father Phil': 'Parish priest. Likes a baked ziti',
   'Febby': 'Once a made man. Now a travel agent with another name', 'Vin Makazian': 'Detective. Owes Tony money', 'Mrs. Gaetano': 'Principal of Verbum Dei', 'Adriana': "Christopher's girlfriend",
   'Jimmy Altieri': 'Captain. His card game is at the motor lodge', 'Larry Boy': 'Captain', 'Raymond Curto': 'Captain. The quiet one', 'Sammy Grigio': "Deals Jimmy's card game", 'Rusty Irish': 'Sells by the pond in the park',
-  'Johnny Sack': 'Underboss, across the river', 'Agent Harris': 'F.B.I. Polite about it', 'Johnny Boy': "Tony's father, in 1967", 'Anthony': 'Tony, at eleven',
+  'Johnny Sack': 'Underboss, across the river', 'Agent Harris': 'F.B.I. Polite about it', 'Coach Hauser': 'Coaches the girls at Verbum Dei. A university wants him', 'Johnny Boy': "Tony's father, in 1967", 'Anthony': 'Tony, at eleven',
   'Neil': 'Takes scores. Owns nothing he would turn around for', 'Chris': 'Boxman. Married to Charlene, more or less', 'Cheritto': 'Ten years in the crew. Eats like it is a sport', 'Trejo': 'The driver',
   'Waingro': 'New. Recommended by a man somebody trusts', 'Nate': 'Sells what Neil takes, and finds the next one', 'Hanna': 'Lieutenant, Major Crimes. On his third marriage', 'Eady': 'Works in a bookstore. Draws letters',
   'Van Zant': 'Whose bonds they were', 'Drucker': 'Sergeant, Major Crimes', 'Casals': 'Detective, Major Crimes', 'Justine': "Hanna's wife", 'Lauren': "Justine's daughter", 'Charlene': "Chris's wife",
@@ -2322,6 +2322,412 @@ async function inThePaper(g) {
   await passed(g, 'Episode eight complete', 5000);
 }
 
+// ========== Episode Nine: Boca ==========
+// A soccer coach who is leaving, fathers who would rather he stayed, and then something that changes what they
+// want. And a walk in the park with Uncle Junior. Follows the plot of the ninth episode; every line is written for the game.
+
+const HAUSER = 'Coach Hauser';
+
+// ---------- 1. The Coach ----------
+// The semi-final, and an announcement on the touchline.
+
+async function theCoach(g) {
+  const { home, school } = g.places, p = g.player, lot = school.lot, line = spot(lot, -9, 5);
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('The Coach', 'Saturday morning');
+  const meadow = actor(g, 'meadow', spot(home.drive, 2, 0.5), WEST), ride = follower(g, meadow, { pace: 3.2 });
+  await say(g, MEADOW, 'Dad! Kick-off is at ten. If I am late Coach benches me, and it is the semi-final.', 3.6);
+  g.hud.card();
+  // The field is there before they are: the coach, the girls, two fathers on the line.
+  const coach = actor(g, 'hauser', spot(lot, 1, -7), SOUTH), artie = actor(g, 'artie', spot(line, 1.6, -0.4), NORTH), sil = actor(g, 'silvio', spot(line, 3.2, 0), NORTH);
+  const girl = k => ({ body: 'female', shirt: 0x2f56c8, tee: true, pants: 0xf4f4f0, shoes: 0xf2efe8, hair: [0x2a1a14, 0xd9b25a, 0x7a3b1a, 0x111111][k % 4], hairMesh: 'long', height: 0.88, head: 1.1 });
+  const team = [[-5, -3], [3, -2], [7, 1], [-2, 2], [5, 5]].map(([x, z], k) => extraAt(g, spot(lot, x, z), k % 2 ? EAST : WEST, k % 2 ? 'run' : 'idle', girl(k)));
+  for (;;) {
+    g.hud.objective('Get in the <b>car</b> with Meadow.');
+    await g.until(() => p.car);
+    const hush = banter(g, [[MEADOW, 'Coach Hauser says I read the game better than anybody he has had.'], [TONY, 'You get that from me.'], [MEADOW, 'He says a scout from a university is coming in the spring.'], [TONY, 'For you?'], [MEADOW, 'For him.']]);
+    const ok = await against(g, school.gate, '<b>Drive</b> Meadow to the match.', 100, { r: 7 });
+    hush();
+    if (ok) break;
+    p.locked = true;
+    await fade(g, 1, 0.8);
+    await say(g, '', 'They came through the gate at ten past. She did not speak to him again until Tuesday. He drove it again.');
+    const c = p.car || g.tonyCar; g.enterCar(c); c.pos.set(home.road.x, 0, home.road.z); c.speed = 0;
+    await fade(g, 0, 0.8);
+    p.locked = false;
+  }
+  await reach(g, line, 'Stand on the <b>touchline</b> with the other fathers.', { r: 2, how: 'foot' });
+  p.locked = true;
+  ride.on = false;
+  meadow.group.position.set(lot.x + 0.5, groundAt(lot.x, lot.z), lot.z + 0.5); meadow.group.visible = true; meadow.set('run');
+  p.pos.set(line.x, 0, line.z); p.heading = NORTH;
+  shot(g, spot(line, -3.4, 2.6), spot(line, 2.4, -1), 1.6, 1.3);
+  await talk(g, [
+    [ARTIE, 'Your girl is the best one out there, Tony. Mine runs like she is late for a bus.', artie],
+    [SILVIO, 'It is the coach. Three years ago this school could not beat a convent.', sil],
+  ]);
+  await say(g, '', 'Verbum Dei won four to one. Meadow made two of them and scored the last.');
+  for (const t of team) t.set('idle');
+  meadow.set('idle');
+  coach.group.position.set(line.x + 1.2, groundAt(line.x, line.z), line.z - 2.6); coach.group.rotation.y = SOUTH;
+  await talk(g, [
+    [HAUSER, 'Gentlemen. I wanted the fathers to hear it from me, and not in a letter. I have taken a job at a university, upstate. This is my last season.', coach],
+    [TONY, 'In the middle of a winning streak.', p],
+    [HAUSER, 'It is a very good job, Mr. Soprano.', coach],
+  ]);
+  coach.group.visible = false;
+  await talk(g, [
+    [ARTIE, 'So that is that.', artie],
+    [TONY, 'Nothing is ever that. A man can be shown he is appreciated.', p],
+    [SILVIO, 'A television. Everybody likes a television.', sil],
+    [TONY, 'A big one.', p],
+  ]);
+  await cut(g, () => { dismiss(g, coach, artie, sil, meadow, ...team); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 2. A Gift ----------
+// Played as Paulie. Fifty inches, a pickup, and a man who will not take it.
+
+async function aGift(g) {
+  const { bing, pawn, school } = g.places, p = g.player, tony = p.human, his = aHouse(g, school.gate, 300), dh = his.door.h ?? SOUTH, step = spot(his.door, 0, Math.cos(dh) * 2.6);
+
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'Showing appreciation fell to Paulie Gualtieri, who had opinions about it.');
+  if (p.car) g.leaveCar();
+  g.setNight(0);
+  asOther(g, 'paulie', spot(bing.door, 0, 1.6), SOUTH);
+  await playing(g, 'Paulie', 'Soldier. You play him in this one');
+  const truck = propCar(g, bing.park, bing.park.h, 0x3b4a66, 'pickup'), chris = actor(g, 'christopher', spot(bing.door, 1.6, 2.6), WEST);
+  const coach = actor(g, 'hauser', spot(his.door, 0, Math.cos(dh) * 1.1), dh);
+  frame(g, p.pos, chris.group.position, { dist: 4.2 });
+  g.hud.fade(0, 1.2);
+  await titleCard(g, 'A Gift', 'From the fathers');
+  await talk(g, [
+    [CHRIS, 'Fifty inches. It is in the back room at the pawnbroker. He is expecting you.', chris],
+    [PAULIE, 'I am a made man, and I am delivering a television.', p],
+    [CHRIS, 'With a remote.', chris],
+  ]);
+  g.cam.fixed = null;
+  dismiss(g, chris);
+  p.locked = false;
+  await wantCar(g, truck, 'Get in the <b>pickup</b>.');
+  truck.driverless = false;
+  await reach(g, pawn.kerb, "<b>Drive</b> to the pawnbroker's.", { how: 'car', r: 7 });
+  p.locked = true;
+  truck.speed = 0;
+  await say(g, '', 'It took two men and a blanket, and Paulie supervised.');
+  p.locked = false;
+  const load = careful(g, 'The screen', 'Something inside the box went "tink". He turned round and went back for another.', () => { if (p.car) g.leaveCar(); truck.pos.set(pawn.kerb.x, 0, pawn.kerb.z); truck.heading = pawn.kerb.h; truck.speed = 0; g.enterCar(truck); });
+  await load.to(his.kerb, "<b>Drive</b> it to the coach's house. Glass side up.", truck);
+  load.stop();
+  await reach(g, step, 'Carry it to the <b>door</b>.', { r: 1.5, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, coach.group.position);
+  frame(g, p.pos, coach.group.position, { dist: 4 });
+  await talk(g, [
+    [HAUSER, 'What is this?', coach],
+    [PAULIE, 'A token. From the fathers. So you know how the team feels about you staying.', p],
+    [HAUSER, 'I cannot accept that. Please thank Mr. Soprano for me. But I am going, and it is not about a television.', coach],
+    [PAULIE, 'It has a picture inside the picture. You can watch two games.', p],
+    [HAUSER, 'Good night.', coach],
+  ]);
+  await say(g, '', 'Paulie left it on the lawn, on the principle that a gift cannot be handed back if nobody is holding it.');
+  g.cam.fixed = null;
+  dismiss(g, coach);
+  p.locked = false;
+  await wantCar(g, truck, 'Get in the <b>pickup</b>.');
+  const hush = banter(g, [[PAULIE, 'A university. What does a university want with soccer.'], [PAULIE, 'In my day you gave a man a television, he stayed where he was.']]);
+  await reach(g, bing.park, '<b>Drive</b> back to the Bing.', { how: 'car', r: 7 });
+  hush();
+  p.locked = true;
+  await fade(g, 1, 1);
+  g.removeCar(truck);
+  homeAsTony(g, tony);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 3. Boca ----------
+// A walk round the pond with Uncle Junior, who is back from Florida with something he does not want known.
+
+async function boca(g) {
+  const { park } = g.places, p = g.player, bench = park.bench, pond = park.pond;
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Boca', 'The park');
+  await phone(g, JUNIOR, 'I am back from Florida. Come and walk with me. The doctor says I should walk, and I will not do it alone, like a widow.');
+  g.hud.card();
+  const junior = actor(g, 'junior', spot(bench, 0, 0.2), SOUTH, 'sit'), mikey = actor(g, 'mikey', spot(park.kerb, -2, -2.4), WEST), car = propCar(g, spot(park.kerb, 0, -9), park.kerb.h, 0x55525a);
+  await reach(g, park.kerb, 'Drive to the <b>park</b>.');
+  await reach(g, spot(bench, 1.8, 1.6), 'He is on the <b>bench</b>.', { r: 1.6, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, junior.group.position);
+  shot(g, spot(bench, 0.6, 5), spot(bench, 0.4, 0.6), 1.6, 1.1);
+  await talk(g, [
+    [JUNIOR, 'Florida. Seventy-eight degrees, and everybody is dying. I loved it.', junior],
+    [TONY, 'I hear you had company.', p],
+    [JUNIOR, 'A friend. Sixteen years. It is nobody else\'s business. Help me up.', junior],
+  ]);
+  g.cam.fixed = null;
+  junior.set('idle');
+  junior.group.position.set(bench.x + 0.6, groundAt(bench.x, bench.z), bench.z + 1.4);
+  const walk = follower(g, junior, { gap: 1.5, pace: 2.6, runs: false });
+  walk.pos.copy(junior.group.position);
+  p.locked = false;
+  // Three stretches of path, and what gets said on each.
+  const legs = [
+    [spot(pond, 11.5, 4), [[TONY, 'Carmela hears things at the nail place. About Boca. About how attentive you are.'], [JUNIOR, 'Who said that? Who is saying that?'], [TONY, 'It is a compliment, Uncle Jun. In some circles.']]],
+    [spot(pond, 2, 12), [[JUNIOR, 'You think it is funny. A man of my age, in my position. If that goes round, they will make jokes at the table.'], [TONY, 'I would never.'], [JUNIOR, 'You are doing it now.']]],
+    [spot(pond, -11.5, 3), [[JUNIOR, 'At least I can talk to a woman without paying her by the hour. With a diploma on her wall.'], [TONY, '...What did you say?'], [JUNIOR, 'I said what I said. You walk on. My hip hurts.']]],
+  ];
+  for (const [at, lines] of legs) {
+    await reach(g, at, 'Walk round the <b>pond</b> with him. He does not hurry.', { r: 2.2, how: 'foot' });
+    for (const [who, text] of lines) await say(g, who, text);
+  }
+  p.locked = true;
+  walk.stay = true;
+  junior.group.rotation.y = toward(junior.group.position, p.pos);
+  frame(g, p.pos, junior.group.position, { dist: 4.4 });
+  await say(g, '', 'He ran through who knew, on the way back to the car. It was a short list, and he did not like one name on it.');
+  await say(g, '', 'That night Corrado Soprano ended sixteen years with one telephone call, so that there would be nothing left for anybody to laugh at.');
+  await cut(g, () => { walk.on = false; dismiss(g, junior, mikey); g.removeCar(car); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 4. What Meadow Said ----------
+// Something the team knows and the school does not. Then two men in a parked car, played as Silvio.
+
+async function whatMeadowSaid(g) {
+  const { home, bing, bingRoom: club, school } = g.places, p = g.player, tony = p.human, front = g.places.doors.find(d => d.name === 'home').outside, his = aHouse(g, school.gate, 300);
+  let sil, paulie, chris;
+
+  await g.wait(1);
+  g.hud.card('What Meadow Said', 'North Shore');
+  await say(g, '', 'On Monday Meadow came home from practice and did not go to her room.');
+  g.hud.card();
+  await reach(g, home.road, 'Drive <b>home</b>.');
+  await reach(g, front, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  await roomScene(g, inRoom(kitchen(g), [-3.6, 2.8], [-4, -1.5], 1.6, 1.15), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    meadow: actor(g, 'meadow', roomSpot(q, -4, 0.7), NORTH),
+    tony: actor(g, 'tony', roomSpot(q, -1.7, -1.5), WEST),
+  }), async cast => {
+    await talk(g, [
+      [MEADOW, 'Ally is in the hospital. She took something. They say she is going to be all right.', cast.meadow],
+      [CARMELA, 'Ally? Why would a girl like that...', cast.carmela],
+      [MEADOW, 'Because of Coach Hauser. He has been seeing her. Since the autumn. She is fifteen, Mom.', cast.meadow],
+      [TONY, '...Who else knows this?', cast.tony],
+      [MEADOW, 'The team. Not the school. She made every one of us swear.', cast.meadow],
+      [TONY, 'Go upstairs.', cast.tony],
+    ]);
+    await say(g, '', 'He stood in the kitchen for a while with one hand flat on the counter. Carmela knew the look, and did not ask what it meant.');
+  });
+  place(g, home.drive, EAST, home.car);
+  await fade(g, 0, 1);
+  p.locked = false;
+  const room = await intoBing(g, 'Drive to the <b>Bada Bing</b>.', c => {
+    sil = actor(g, 'silvio', spot(c.door, 2.2, -1.2), WEST); paulie = actor(g, 'paulie', spot(c.door, 0.8, -2.2), SOUTH); chris = actor(g, 'christopher', spot(c.door, -0.8, -2.2), SOUTH);
+  });
+  await cut(g, () => { place(g, room.door, NORTH, bing.park); frame(g, p.pos, paulie.group.position, { dist: 5 }); }, 0.4);
+  await talk(g, [
+    [TONY, 'The coach. He does not get as far as the university.', p],
+    [PAULIE, 'The television man? I carried a television up his path.', paulie],
+    [TONY, 'He has been at one of the girls. A child. She is in the hospital.', p],
+    [SILVIO, '...Say when.', sil],
+    [TONY, 'Find out where he is at night. Then you wait until I say.', p],
+  ]);
+  g.cam.fixed = null;
+  p.locked = false;
+  await walkOut(g, club, 'Go out to the <b>car</b>.');
+  dismiss(g, sil, paulie, chris);
+  // Silvio, that night, outside the school.
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'Evening practice finished at eight.');
+  g.setNight(1);
+  asOther(g, 'silvio', spot(school.gate, -14, 3), EAST);
+  await playing(g, 'Silvio Dante', "Tony's right hand. You play him in this one");
+  const mine = propCar(g, spot(school.gate, -14, 0), EAST, 0x23232b), wagon = propCar(g, school.gate, EAST, 0xb9a58a, 'suv');
+  const kid = actor(g, 'christopher', spot(school.gate, -12.4, 3.6), WEST), with_ = follower(g, kid);
+  g.cam.fixed = null;
+  await fade(g, 0, 1);
+  p.locked = false;
+  await wantCar(g, mine, 'Get in the <b>black sedan</b>.');
+  mine.driverless = false;
+  for (;;) {
+    dispatch(g, wagon, school.gate, his.kerb, 9);
+    if (await tail(g, wagon, his.kerb, "<b>Follow the</b> coach's wagon home. Stay back.")) break;
+    p.locked = true;
+    await say(g, CHRIS, 'We lost him. Go round. He will come out of the school gate again, he forgot his whistle.', 3.4);
+    await cut(g, () => { g.enterCar(mine); mine.pos.set(school.gate.x - 14, 0, school.gate.z); mine.heading = EAST; mine.speed = 0; wagon.pos.set(school.gate.x, 0, school.gate.z); wagon.sync?.(); });
+    p.locked = false;
+  }
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  with_.on = false;
+  await say(g, '', 'They parked under a tree with the engine off. Christopher ate sunflower seeds. The telephone did not ring.');
+  await fade(g, 1, 1);
+  dismiss(g, kid);
+  g.removeCar(mine); g.removeCar(wagon);
+  homeAsTony(g, tony);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 5. Hesitation ----------
+// A friend at the door, a doctor's question, and a car under a tree with its telephone switched off.
+
+async function hesitation(g) {
+  const { melfi, school } = g.places, p = g.player, front = g.places.doors.find(d => d.name === 'home').outside, his = aHouse(g, school.gate, 300), dh = his.door.h ?? SOUTH;
+  const office = g.places.doors.find(d => d.name === "Dr. Melfi's office"), along = { x: Math.sin(his.kerb.h), z: Math.cos(his.kerb.h) };
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('Hesitation', 'North Shore, nine at night');
+  const artie = actor(g, 'artie', spot(front, 0.3, 1.4), SOUTH);
+  await say(g, '', 'Artie Bucco came to the house that night, and would not come in.');
+  g.hud.card();
+  await reach(g, spot(front, 0.3, 3.4), 'Artie is at the <b>door</b>.', { r: 1.6, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, artie.group.position);
+  frame(g, p.pos, artie.group.position, { dist: 4 });
+  await talk(g, [
+    [ARTIE, 'Charmaine heard, from one of the mothers. And then I heard what you mean to do about it.', artie],
+    [TONY, 'You heard nothing.', p],
+    [ARTIE, 'I wanted to do it myself, Tony. I stood in my kitchen holding a knife. And then what am I? What do I tell my girl I am?', artie],
+    [TONY, 'You tell her nothing. That is how it is done.', p],
+    [ARTIE, 'There are police. It is what they are for. Just this one time, let it be them.', artie],
+    [TONY, 'Go home, Artie.', p],
+  ]);
+  await cut(g, () => { dismiss(g, artie); g.cam.fixed = null; });
+  p.locked = false;
+  await reach(g, melfi.kerb, "Drive to <b>Dr. Melfi's office</b>. She is seeing him late.");
+  await reach(g, office.outside, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  await therapy(g, [
+    [TONY, 'A man hurt a child. Everybody knows it. And I am supposed to wait for twelve people and a judge.'],
+    [MELFI, 'Why does it fall to you?'],
+    [TONY, 'Because I can. Because nobody else will.'],
+    [MELFI, 'Somebody else will. There is a whole machinery for it. It is slow, and it is often stupid, and it is not you.'],
+    [TONY, 'You want me to do nothing.'],
+    [MELFI, 'I want to know why doing nothing is the one thing you cannot bear.'],
+    [TONY, '...I have to make a telephone call.'],
+  ]);
+  if (p.car) g.leaveCar();
+  place(g, office.outside, SOUTH);
+  g.setNight(1);
+  g.cam.fixed = null;
+  await fade(g, 0, 1);
+  p.locked = false;
+  await say(g, TONY, 'Silvio. Pick up. ...Pick up.', 2.8);
+  await say(g, '', 'The telephone in the car under the tree had been switched off, the way he had taught them.');
+  // Get there before they stop waiting.
+  const sil = actor(g, 'silvio', { x: his.kerb.x - along.x * 9 + along.z * 2, z: his.kerb.z - along.z * 9 - along.x * 2 }, his.kerb.h), kid = actor(g, 'christopher', { x: his.kerb.x - along.x * 10.6 + along.z * 2.4, z: his.kerb.z - along.z * 10.6 - along.x * 2.4 }, his.kerb.h);
+  const theirs = propCar(g, { x: his.kerb.x - along.x * 12, z: his.kerb.z - along.z * 12 }, his.kerb.h, 0x23232b), coach = actor(g, 'hauser', spot(his.door, 0, Math.cos(dh) * 1.1), dh);
+  coach.group.visible = false;
+  for (;;) {
+    if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+    if (await against(g, his.kerb, "<b>Drive</b> to the coach's street before they stop waiting.", 105, { r: 7 })) break;
+    p.locked = true;
+    await fade(g, 1, 0.8);
+    await say(g, '', 'He was two minutes late. He was always going to be two minutes late, unless he drove it again.');
+    const c = p.car || g.tonyCar; g.enterCar(c); c.pos.set(melfi.kerb.x, 0, melfi.kerb.z); c.heading = melfi.kerb.h; c.speed = 0;
+    await fade(g, 0, 0.8);
+    p.locked = false;
+  }
+  p.locked = true;
+  await cut(g, () => {
+    const at = { x: his.kerb.x - along.x * 7 + along.z * 2.2, z: his.kerb.z - along.z * 7 - along.x * 2.2 };
+    place(g, at, toward(at, sil.group.position), his.kerb);
+    sil.group.rotation.y = kid.group.rotation.y = toward(sil.group.position, at);
+    frame(g, p.pos, sil.group.position, { dist: 4.6 });
+  });
+  await talk(g, [
+    [TONY, 'Go home.', p],
+    [SILVIO, 'Tone?', sil],
+    [CHRIS, 'We have been sitting here four hours.', kid],
+    [TONY, 'Somebody is going to telephone a detective tonight. Nobody will ever know who. Go home.', p],
+  ]);
+  // And then the other machinery.
+  const cars = [propCar(g, { x: his.kerb.x + along.x * 60, z: his.kerb.z + along.z * 60 }, his.kerb.h + Math.PI, 0xf4f4f0, 'police'), propCar(g, { x: his.kerb.x + along.x * 72, z: his.kerb.z + along.z * 72 }, his.kerb.h + Math.PI, 0xf4f4f0, 'police')];
+  let rolling = true;
+  g.updaters.push(dt => { if (!rolling) return false; for (const [k, c] of cars.entries()) { const stop = 6 + k * 8, d = (c.pos.x - his.kerb.x) * along.x + (c.pos.z - his.kerb.z) * along.z; if (d > stop) { c.pos.x -= along.x * 11 * dt; c.pos.z -= along.z * 11 * dt; c.sync?.(); } } return true; });
+  shot(g, between(his.kerb, his.door, -0.6), his.door, 1.5, 1.4);
+  await say(g, '', 'Twenty minutes later two cars came up the street with their lamps off, and stopped at the right house.');
+  coach.group.visible = true;
+  const cops = [actor(g, 'cop', spot(his.door, -0.9, Math.cos(dh) * 2.2), dh + Math.PI), actor(g, 'cop', spot(his.door, 0.9, Math.cos(dh) * 2.4), dh + Math.PI)];
+  await say(g, '', 'He came to the door in his socks. He did not ask them what it was about.');
+  await fade(g, 1, 1);
+  rolling = false;
+  dismiss(g, sil, kid, coach, ...cops);
+  for (const c of [theirs, ...cars]) g.removeCar(c);
+  g.cam.fixed = null;
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Respect +');
+}
+
+// ---------- 6. I Didn't Hurt Nobody ----------
+// The one time he did nothing. He celebrates it badly.
+
+async function didntHurtNobody(g) {
+  const { home, bing, bingRoom: club } = g.places, p = g.player, front = g.places.doors.find(d => d.name === 'home').outside;
+  let sil;
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card("I Didn't Hurt Nobody", 'The Bada Bing');
+  await say(g, '', 'It was on the eleven o\'clock news. Tony watched it from a bar stool.');
+  g.hud.card();
+  const room = await intoBing(g, 'Go to the <b>Bada Bing</b>.', c => { sil = actor(g, 'silvio', spot(c.door, 2.2, -1.2), WEST); });
+  await cut(g, () => { place(g, room.door, NORTH, bing.park); frame(g, p.pos, sil.group.position, { dist: 4.4 }); }, 0.4);
+  await talk(g, [
+    [SILVIO, 'That is four.', sil],
+    [TONY, 'I did not hurt nobody, Sil.', p],
+    [SILVIO, 'I know. I was there for it.', sil],
+    [TONY, 'Pour one for the machinery.', p],
+  ]);
+  g.cam.fixed = null;
+  p.locked = false;
+  await walkOut(g, club, 'Go out to the <b>car</b>. Carefully.');
+  dismiss(g, sil);
+  g.hud.panic(0.22); g.cam.sway = 1;
+  if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+  const mine = p.car;
+  const weave = careful(g, 'The car', 'He put it into a hedge. Somebody very kind backed it out for him and pointed him at the road again.', () => { g.enterCar(mine); mine.pos.set(bing.park.x, 0, bing.park.z); mine.heading = bing.park.h; mine.speed = 0; });
+  await weave.to(home.road, '<b>Drive</b> home. The road will not hold still.');
+  weave.stop();
+  await reach(g, front, 'Find the <b>front door</b>.', { r: 1.8, how: 'foot' });
+  g.hud.panic(0.12);
+  await roomScene(g, inRoom(kitchen(g), [-3.6, 2.8], [-4, -1.5], 1.5, 0.9), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    tony: actor(g, 'tony', roomSpot(q, -2, -0.2), WEST, 'crouch'),
+  }), async cast => {
+    await talk(g, [
+      [CARMELA, 'Tony? It was on the news. They arrested the coach from Verbum Dei.', cast.carmela],
+      [TONY, 'I did not hurt nobody.', cast.tony],
+      [CARMELA, 'What are you talking about? Get up off my floor.', cast.carmela],
+      [TONY, 'I did not hurt nobody, Carm. I got it right. One time.', cast.tony],
+    ]);
+    await say(g, '', 'She got him as far as the couch.');
+  }, { night: 1 });
+  g.hud.panic(0); g.cam.sway = 0;
+  await say(g, '', 'In a house across town Corrado Soprano sat with the lamps off, thinking about a nephew who told his troubles to a doctor, and what else a man like that might tell.');
+  g.setNight(0);
+  place(g, home.drive, EAST, home.car);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Episode nine complete', 5000);
+}
+
 // ---------- The episodes ----------
 
 const EPISODES = [
@@ -2341,6 +2747,8 @@ const EPISODES = [
     titles: ['Sacramental Wine', "The Principal's Office", '1967', 'Rideland', 'Loose Lips', 'Sundaes'] },
   { name: 'Episode Eight', title: 'The Legend of Tennessee Moltisanti', missions: [theWedding, springCleaning, badDreams, theBakery, theRaid, inThePaper],
     titles: ['The Wedding', 'Spring Cleaning', 'Bad Dreams', 'The Bakery', 'The Raid', 'In the Paper'] },
+  { name: 'Episode Nine', title: 'Boca', missions: [theCoach, aGift, boca, whatMeadowSaid, hesitation, didntHurtNobody],
+    titles: ['The Coach', 'A Gift', 'Boca', 'What Meadow Said', 'Hesitation', "I Didn't Hurt Nobody"] },
 ];
 
 // ---------- Things to do ----------
@@ -2440,7 +2848,7 @@ const HUBS = {
 const STARTS = {
   familyBusiness: 'bing', garbage: 'bing', insurance: 'bing', backRoom: 'bing', hijack: 'bing', sitDown: 'satriale', fortySixLong: 'bing', closingTime: 'bing', visitingHours: 'hospital', theMotel: 'bing', acceptance: 'bing',
   messageJob: 'bing', theTail: 'melfi', schoolyard: 'school', figurehead: 'bing', starterMotor: 'melfi', juniorsWeek: 'bing', complaints: 'bing', theBoard: 'melfi', sacramentalWine: 'school', principalsOffice: 'school',
-  nineteenSixtySeven: 'melfi', looseLips: 'home', sundaes: 'melfi', greenGrove: 'home', badDreams: 'bing', theBakery: 'bing', inThePaper: 'bing',
+  nineteenSixtySeven: 'melfi', looseLips: 'home', sundaes: 'melfi', greenGrove: 'home', badDreams: 'bing', theBakery: 'bing', inThePaper: 'bing', aGift: 'bing', didntHurtNobody: 'bing',
   armoured: 'yard', bearerBonds: 'bar', slick: 'precinct', eyesOn: 'precinct', theNextOne: 'bar', justine: 'precinct', coffee: 'precinct', kelso: 'bar', wheels: 'yard', hardware: 'yard', farEastPacific: 'kates',
   charleneSign: 'bar', laurenNight: 'precinct', theCrew: 'home',
 };

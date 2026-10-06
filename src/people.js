@@ -1123,6 +1123,7 @@ Object.assign(LOOKS, {
   kidb: { pattern: 'stripes', shirt: 0x9fd0f5, tee: true, pants: 0x3b6ea8, hair: 0xd9b25a, hairMesh: 'parted', height: 0.8, head: 1.2, bulk: 1.05 },
   psychologist: { body: 'female', jacket: 0x6f8a6a, shirt: 0xf5f0e6, pants: 0x3d4658, tucked: true, hair: 0x7a3b1a, hairMesh: 'long', glasses: 'clear', age: 0.4 },
   coach: { shirt: 0xd8342c, tee: true, pants: 0x23232b, shoes: 0xf2efe8, hair: 0x4a3324, hairMesh: 'buzzed', hat: 'cap', hatColor: 0xd8342c, bulk: 1.28, stubble: 0.3 },
+  hauser: { jacket: 0x2f56c8, shirt: 0xf4f4f0, tee: true, pants: 0x1c2740, shoes: 0xf2efe8, hair: 0xb9955a, hairMesh: 'parted', bulk: 1.02, age: 0.35 }, // a coach, in the school's colours
   // Episode six: the captains, a card player, a dealer, a man from New York, a waiter.
   jimmy: { jacket: 0x6f5a44, shirt: 0xf4f4f4, pants: 0x4a3324, hair: 0x2b1b12, hairStyle: 'receding', mustache: 0x2b1b12, bulk: 1.25, age: 0.6, face: { jaw: 0.15, cheeks: 0.5 } },
   larry: { jacket: 0x3d4658, shirt: 0xcfe8ff, tucked: true, pants: 0x3d4658, hair: 0x9a9690, hairMesh: 'parted', glasses: 'clear', bulk: 1.32, age: 0.8, face: { jowls: 0.6, cheeks: 0.6 } },
