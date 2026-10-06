@@ -887,7 +887,7 @@ async function counterSurveillance(g) {
 // Played as Hanna. A house he sleeps in, a wife who is finished waiting, a girl whose father did not come.
 
 async function justine(g) {
-  const { precinct } = g.places, p = g.player, neil = p.human, HOUSE = g.places.rooms.HOUSE, house = houseNear(g, precinct.kerb, 330);
+  const { precinct } = g.places, p = g.player, neil = p.human, HOUSE = g.places.rooms.JUSTINE, house = houseNear(g, precinct.kerb, 330);
 
   p.locked = true;
   await fade(g, 1, 1);
@@ -1140,7 +1140,7 @@ function carbine(g, rounds = 240) {
 // A man in the hills who reads other people's wires, and three jobs handed out in the yard.
 
 async function kelso(g) {
-  const { home, yard } = g.places, p = g.player, HOUSE = g.places.rooms.HOUSE, his = houseNear(g, home.road, 560);
+  const { home, yard } = g.places, p = g.player, HOUSE = g.places.rooms.KELSO, his = houseNear(g, home.road, 560);
 
   await g.wait(1);
   g.hud.card('Kelso', 'The hills');
@@ -1752,7 +1752,7 @@ const doorOf = (g, room, near0) => g.places.doors.filter(d => d.inside === room.
 // Neil goes to ask the man who dropped out why he dropped out.
 
 async function trejoHouse(g) {
-  const { home } = g.places, p = g.player, HOUSE = g.places.rooms.HOUSE, his = houseNear(g, home.road, 700);
+  const { home } = g.places, p = g.player, HOUSE = g.places.rooms.TREJO, his = houseNear(g, home.road, 700);
 
   await g.wait(1);
   g.hud.card('Trejo', 'Two days after the bank');
@@ -1789,7 +1789,7 @@ async function trejoHouse(g) {
 // The one Neil can find.
 
 async function vanZantHouse(g) {
-  const { home } = g.places, p = g.player, HOUSE = g.places.rooms.HOUSE, villa = g.places.flats.slice().sort((a, b) => a.kerb.z - b.kerb.z)[0];
+  const { home } = g.places, p = g.player, HOUSE = g.places.rooms.VANZANT, villa = g.places.flats.slice().sort((a, b) => a.kerb.z - b.kerb.z)[0];
 
   await g.wait(1);
   g.setNight(1);
@@ -1917,7 +1917,7 @@ async function charleneSign(g) {
 // Played as Hanna. The trap is set at the airport. Then he goes home.
 
 async function laurenNight(g) {
-  const { precinct, hospital, wardRoom } = g.places, p = g.player, neil = p.human, HOUSE = g.places.rooms.HOUSE, house = houseNear(g, precinct.kerb, 330);
+  const { precinct, hospital, wardRoom } = g.places, p = g.player, neil = p.human, HOUSE = g.places.rooms.JUSTINE, house = houseNear(g, precinct.kerb, 330);
 
   p.locked = true;
   await fade(g, 1, 1);

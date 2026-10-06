@@ -283,7 +283,7 @@ async function boot() {
   let streamIndex = 0;
   // The radar's landmarks: home, the family's places, and whatever is useful.
   const landmarks = (LA ? [
-    { ...places.home.spawn, label: 'H', name: "Neil's house", color: '#2f9c5a' }, { ...places.bank.door, label: '$', name: 'Far East Pacific Bank', color: '#d9a520' }, { ...places.kates.door, label: 'K', name: "Kate's diner", color: '#ff5fd2' },
+    { ...places.home.spawn, label: 'H', name: who === 'hanna' ? "McCauley's house (empty)" : "Neil's house", color: '#2f9c5a' }, { ...places.bank.door, label: '$', name: 'Far East Pacific Bank', color: '#d9a520' }, { ...places.kates.door, label: 'K', name: "Kate's diner", color: '#ff5fd2' },
     { ...places.truckstop.door, label: 'T', name: 'Truck stop', color: '#1f6b4a' }, { ...places.precinct.door, label: 'P', name: 'Major Crimes', color: '#2f56c8' }, { ...places.hospital.door, label: '+', name: 'Hospital', color: '#d8342c' },
     { ...places.drivein.lot, label: 'D', name: 'Drive-in', color: '#49a0d0' }, { ...places.depository.gate, label: 'M', name: 'Metals depository', color: '#8d8a8e' }, { ...places.bookstore.door, label: 'B', name: 'Bookstore', color: '#8a6f8f' },
     { ...places.airport.door, label: 'A', name: 'Airport', color: '#f4f2ee' }, { ...places.bar.door, label: 'N', name: "Nate's bar", color: '#e0a12c' },
@@ -670,7 +670,7 @@ async function boot() {
   const DENSE = new Set(['tower', 'lots', 'lowrise', 'bank', 'hotel', 'precinct', 'bookstore', 'depository', 'hesh', 'cafe', 'vesuvio', 'satriale', 'melfi', 'bing', 'travel', 'hospital', 'kates', 'truckstop']);
   const ROOM_SOUND = { BAR: 'bar', DINER: 'diner', FASTFOOD: 'diner', VESUVIO: 'diner', BEAN: 'diner', BANQUET: 'diner', LIQUOR: 'store', PAWN: 'store', STORE: 'store', KIOSK: 'store', BOOKS: 'store', PARTS: 'store',
     LAUNDRY: 'store', SHOWROOM: 'hall', GUNS: 'guns', CHURCH: 'church', BODYSHOP: 'garage', WAREHOUSE: 'garage', HOUSE: 'house', LIVIA: 'house', NEIL: 'house', UPSTAIRS: 'house', CARDROOM: 'house', SUITE: 'house', MOTEL: 'house',
-    OFFICE: 'office', FNOTE: 'office', SCHOOL: 'hall', GROVE: 'hall', BANK: 'hall', HOTEL: 'hall' };
+    JUSTINE: 'house', VANZANT: 'house', TREJO: 'house', KELSO: 'house', OFFICE: 'office', FNOTE: 'office', SCHOOL: 'hall', GROVE: 'hall', BANK: 'hall', HOTEL: 'hall' };
   const roomKinds = new Map();
   const roomKind = q => {
     if (!roomKinds.has(q)) {

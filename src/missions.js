@@ -582,7 +582,8 @@ export async function enter(g, room) {
   await fade(g, 1, 0.45);
   if (p.car) { p.car.speed = 0; g.leaveCar(); }
   g.sfx?.door();
-  const door = g.places.doors.filter(d => d.inside === room.inside).sort((a, b) => Math.hypot(a.outside.x - p.pos.x, a.outside.z - p.pos.z) - Math.hypot(b.outside.x - p.pos.x, b.outside.z - p.pos.z))[0]; // several shops share a room: the door he is standing at
+  const door = g.places.doors.filter(d => d.inside === room.inside).sort((a, b) => Math.hypot(a.outside.x - p.pos.x, a.outside.z - p.pos.z) - Math.hypot(b.outside.x - p.pos.x, b.outside.z - p.pos.z))[0]
+    || { inside: room.inside, outside: { x: p.pos.x, z: p.pos.z, h: p.heading + Math.PI }, name: 'the house' }; // a house of somebody's own: its door is wherever he came in // several shops share a room: the door he is standing at
   for (const h of door.hide || []) h.group.visible = false;
   p.inside = door;
   p.pos.set(room.inside.x, 0, room.inside.z); p.heading = g.cam.yaw = room.inside.h;

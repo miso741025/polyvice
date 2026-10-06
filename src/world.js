@@ -1026,7 +1026,7 @@ export function buildWorld(scene) {
     ruin.visible = false;
     places.vesuvio = {
       centre: { x, z }, door: { x, z: front + 3 }, seat: { x: x + 7.5, z: front + 2.8 }, kerb: { x: x - 4, z: c.z + 34, h: Math.PI / 2 },
-      back: { x: x - 5, z: back - 2.2 }, burn() { intact.visible = false; ruin.visible = true; }, restore() { intact.visible = true; ruin.visible = false; },
+      back: { x: x - 5, z: back - 2.2 }, burnt: false, burn() { intact.visible = false; ruin.visible = true; places.vesuvio.burnt = true; }, restore() { intact.visible = true; ruin.visible = false; places.vesuvio.burnt = false; },
     };
   }
 
@@ -2520,6 +2520,56 @@ export function buildWorld(scene) {
       q.window(-2, 5.22, 3, 1.4, 1.8, Math.PI);
       q.light(-4, 2.9, -1, 0xfff0d0, 40, 14); q.light(4, 2.9, -2, 0xfff6e0, 34, 12);
       q.person(pick(PED_ROOM_LOOKS), -4.4, 0.3, Math.PI, 'sit');
+      // Four houses the story goes into, each somebody's. They share the bones of the house above (the sofa, the table,
+      // the kitchen stand where scenes expect them) and nothing else: the money, the taste and the mess are their own.
+      const homeOf = (key, o, extra) => {
+        const q = rooms[key] = room(o.w ?? 16, 11, o.h ?? 3.2, { floor: o.floor ?? M.wood, floorTint: o.floorTint, wallTint: o.wall, ceil: o.ceil ?? 0xf6f6f2, doorX: 5 });
+        q.glowPanel(o.view, 7, 2.4, -3.5, -5.32, 1.3); for (let n = -1; n <= 1; n++) slab(o.trim, 0.08, 2.5, 0.08, q.X - 3.5 + n * 2.3, q.Y, q.Z - 5.28);
+        q.block(o.sofa, 4.6, 0.5, 1.2, -4.2, 0.4); q.block(o.sofa, 1.2, 0.5, 2.6, -6.4, -1.4); q.block(o.sofa, 4.6, 0.5, 0.3, -4.2, 1.05, M.plain, 0, 0.5);
+        q.block(o.table, 1.6, 0.4, 0.9, -3.8, -1.6, M.wood, 1); slab(o.rug, 5, 0.02, 3.6, q.X - 4, q.Y + 0.01, q.Z - 1);
+        q.block(0x1c1c22, 1.5, 1, 0.5, -3.8, -4.2, M.plain, 0, 0.3); q.glowPanel(o.tv ?? 0x9fd0f5, 1.3, 0.8, -3.8, -3.94, 0.9, Math.PI);
+        q.block(o.counter, 3.4, 0.92, 1.2, 3.4, -1.2, M.plain, 0); slab(o.top, 3.5, 0.05, 1.3, q.X + 3.4, q.Y + 0.92, q.Z - 1.2);
+        q.block(o.counter, 6, 0.92, 0.7, 4.6, -4.9, M.plain, 0); q.block(o.fridge ?? 0xc9cbd2, 0.9, 2, 0.8, 7.3, -3.6, M.plain, 0);
+        q.window(-2, 5.22, 3, 1.4, 1.8, Math.PI, o.glass);
+        q.light(-4, 2.9, -1, o.lamp ?? 0xfff0d0, 40, 14); q.light(4, 2.9, -2, 0xfff6e0, 34, 12);
+        extra(q);
+        return q;
+      };
+      // A lieutenant's house, which is his wife's: glass, steel, a television that is never off, nothing of his but a jacket on a chair.
+      homeOf('JUSTINE', { floor: M.paver, floorTint: 0x8d8a8e, wall: 0xdfe5ea, view: 0x1c2a52, trim: 0x23232b, sofa: 0x3d4658, table: 0x23232b, rug: 0xc9cbd2, counter: 0x23232b, top: 0xc9cbd2, glass: 0x2a3350, lamp: 0xcfe0ff }, q => {
+        for (let n = 0; n < 2; n++) slab(0x16161c, 1.6, 1.9, 0.05, q.X + 1.6 + n * 2.4, q.Y + 0.7, q.Z - 5.34); slab(0xd8342c, 0.5, 0.5, 0.03, q.X + 1.8, q.Y + 1.6, q.Z - 5.3, M.plain); slab(0xffe066, 0.7, 0.3, 0.03, q.X + 4.2, q.Y + 1.2, q.Z - 5.3, M.plain); // two big canvases
+        q.block(0x8d8a8e, 0.5, 0.9, 0.5, 6.6, 3.6, M.plain, 0); slab(0x16161c, 0.5, 0.8, 0.12, q.X + 6.6, q.Y + 0.9, q.Z + 3.84); slab(0x16161c, 0.46, 0.05, 0.46, q.X + 6.6, q.Y + 0.48, q.Z + 3.6); // a chair with a jacket over it
+        post(0xc9cbd2, 0.02, 1.7, q.X - 7, q.Y, q.Z + 3.6, 6); put(M.glow, new THREE.SphereGeometry(0.22, 10, 6).translate(q.X - 7, q.Y + 1.8, q.Z + 3.6), 0xfff6e0);                 // a floor lamp
+        for (let n = 0; n < 3; n++) { slab(0x8d8a8e, 0.4, 0.06, 0.4, q.X + 2.4 + n, q.Y + 0.62, q.Z - 0.1); post(0x8a8d96, 0.03, 0.62, q.X + 2.4 + n, q.Y, q.Z - 0.1, 4); }
+        slab(0xf4f4f0, 0.5, 0.02, 0.36, q.X + 3, q.Y + 0.98, q.Z - 1.2); post(0x2f5a3f, 0.04, 0.3, q.X + 4.2, q.Y + 0.97, q.Z - 1.3, 6); // a plate under foil, a bottle
+      });
+      // A financier's house in the hills: white on white, a bar, a wall of the city, art bought by the yard.
+      homeOf('VANZANT', { h: 3.6, floor: M.paver, floorTint: 0xf1ede4, wall: 0xf6f4ee, view: 0x24324c, trim: 0xd9a520, sofa: 0xf4f2ee, table: 0xc9cbd2, rug: 0xe9e2cf, counter: 0xf4f4f0, top: 0x23232b, glass: 0x2a3350 }, q => {
+        for (let n = 0; n < 12; n++) ball(n % 3 ? 0xffe2a6 : 0xff8a5c, 0.04, q.X - 6.6 + n * 0.56, q.Y + 0.7 + (n % 4) * 0.22, q.Z - 5.26, M.glow);            // the lights of the basin in the glass
+        q.block(0x3a2418, 2.6, 1.1, 0.7, 6.4, 3.4, M.wood, 2); for (let n = 0; n < 9; n++) post(BOTTLES[n % 6], 0.045, 0.32, q.X + 5.4 + n * 0.25, q.Y + 1.1, q.Z + 3.4, 6); slab(0xd6ecf5, 2.6, 1.2, 0.06, q.X + 6.4, q.Y + 1.5, q.Z + 3.9, M.glow); // the bar, lit from behind
+        for (const [x, hex] of [[1.6, 0x2f56c8], [3.6, 0xd8342c], [5.6, 0xf2c230]]) { slab(0xf4f4f0, 1.3, 1.3, 0.05, q.X + x, q.Y + 1.5, q.Z - 5.34); slab(hex, 0.9, 0.9, 0.03, q.X + x, q.Y + 1.7, q.Z - 5.3, M.plain); }
+        post(0xd9a520, 0.3, 1.1, q.X - 7.2, q.Y, q.Z + 3.6, 10); ball(0x1c1c22, 0.34, q.X - 7.2, q.Y + 1.44, q.Z + 3.6);                                        // a thing on a plinth
+        slab(0xd9a520, 0.9, 0.03, 0.5, q.X - 3.8, q.Y + 0.41, q.Z - 1.6); for (let n = 0; n < 2; n++) put(M.plain, new THREE.CylinderGeometry(0.05, 0.03, 0.14, 8).translate(q.X - 3.6 + n * 0.2, q.Y + 0.5, q.Z - 1.5), 0xf4f4f0); // a tray, two glasses
+        for (let n = 0; n < 3; n++) { slab(0xf4f2ee, 0.4, 0.06, 0.4, q.X + 2.4 + n, q.Y + 0.62, q.Z - 0.1); post(0xd9a520, 0.03, 0.62, q.X + 2.4 + n, q.Y, q.Z - 0.1, 4); }
+      });
+      // A driver's house: small, kept, a wife's hand everywhere. A calendar, a crucifix, a table laid for two.
+      homeOf('TREJO', { floor: M.gravel, floorTint: 0x8a6a5a, wall: 0xf2d9b0, view: 0x4a6a52, trim: 0x8a5a44, sofa: 0xb5523b, table: 0x8a5a44, rug: 0x2f7d46, counter: 0xe9e2cf, top: 0xc79a6a, fridge: 0xe9e2cf, glass: 0xffd9a8 }, q => {
+        slab(0xd9a520, 0.08, 0.5, 0.04, q.X + 0.4, q.Y + 2.2, q.Z - 5.34); slab(0xd9a520, 0.3, 0.08, 0.04, q.X + 0.4, q.Y + 2.3, q.Z - 5.34);
+        slab(0xf4f4f0, 0.6, 0.8, 0.03, q.X + 5.6, q.Y + 1.7, q.Z - 5.34, M.plain); slab(0xd8342c, 0.6, 0.2, 0.02, q.X + 5.6, q.Y + 2.2, q.Z - 5.32, M.plain);
+        q.block(0x8a5a44, 1.3, 0.76, 1.3, 5.5, 2.4, M.wood, 1); slab(0xf4f4f0, 1.4, 0.02, 1.4, q.X + 5.5, q.Y + 0.77, q.Z + 2.4);
+        for (const sx of [-1, 1]) { put(M.plain, new THREE.CylinderGeometry(0.16, 0.14, 0.02, 12).translate(q.X + 5.5 + sx * 0.36, q.Y + 0.8, q.Z + 2.4), 0xe9e2cf); chairAt({ x: q.X + 5.5 + sx * 1.05, z: q.Z + 2.4, h: -sx * Math.PI / 2 }, q.Y, 0x8a5a44); }
+        for (let n = 0; n < 5; n++) slab(0xe9e2cf, 0.34, 0.44, 0.03, q.X - 6.6 + n * 0.5, q.Y + 1.9, q.Z + 5.32, M.plain);                                      // photographs, in a row
+        for (let n = 0; n < 4; n++) ball([0x2f7d46, 0xd8342c, 0xf2c230, 0x2f7d46][n], 0.1, q.X + 2.6 + n * 0.4, q.Y + 1.03, q.Z - 1.2);                         // peppers on the counter
+      });
+      // A house on a hill full of other people's conversations: receivers, reels, a dish through the window, one armchair.
+      homeOf('KELSO', { floor: M.wood, floorTint: 0x6a4a34, wall: 0xd8c8b4, view: 0x8fb6d9, trim: 0x3a2418, sofa: 0x6f5a44, table: 0x3a2418, rug: 0x8a2f3a, counter: 0x6f5a44, top: 0x3a2418, fridge: 0xb9a58a, glass: 0xcfe0ff, tv: 0x4fd36a }, q => {
+        q.block(0x23232b, 4.4, 2.2, 0.6, 3.6, 4.4, M.plain, 0);
+        for (let n = 0; n < 12; n++) { slab(0x3a3a44, 1, 0.3, 0.05, q.X + 2 + (n % 4) * 1.1, q.Y + 0.4 + Math.floor(n / 4) * 0.6, q.Z + 4.08); ball([0x4fd36a, 0xff3b4a, 0xffe066][n % 3], 0.035, q.X + 1.7 + (n % 4) * 1.1, q.Y + 0.4 + Math.floor(n / 4) * 0.6, q.Z + 4.04, M.glow); }
+        for (const x of [2.4, 4.8]) for (const r of [0, 1]) put(M.plain, new THREE.CylinderGeometry(0.2, 0.2, 0.05, 14).rotateX(Math.PI / 2).translate(q.X + x + r * 0.5, q.Y + 2, q.Z + 4.06), 0xb9a58a); // tape reels
+        put(M.plain, new THREE.SphereGeometry(0.8, 12, 6, 0, Math.PI * 2, 0, 1.1).rotateX(-1.1).translate(q.X - 1, q.Y + 1.9, q.Z - 5.2), 0xc9cbd2);              // the dish, outside the glass
+        for (let n = 0; n < 6; n++) slab(0xb9a58a, 0.5 + (n % 2) * 0.1, 0.36, 0.4, q.X - 7 + (n % 2) * 0.1, q.Y + Math.floor(n / 2) * 0.37, q.Z + 3 + (n % 2) * 0.5); // boxes of paper
+        post(0x1c1c22, 0.02, 1.2, q.X - 3.8, q.Y + 0.4, q.Z - 1.6, 5); slab(0x1c1c22, 0.4, 0.26, 0.3, q.X - 3.4, q.Y + 0.4, q.Z - 1.5);                          // a microphone and a scanner on the table
+      });
     }
   }
 
@@ -2767,7 +2817,7 @@ export function buildWorld(scene) {
     { name: 'home', outside: { x: places.home.spawn.x, z: places.home.spawn.z - 2.6, h: 0 }, inside: places.houseRoom.inside },
     { name: "Dr. Melfi's office", outside: { x: places.melfi.door.x, z: places.melfi.door.z - 2.6, h: 0 }, inside: places.office.inside, hide: [places.office.cast.tony] },
     { name: 'the hospital', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: places.wardRoom.inside },
-    { name: 'Vesuvio', outside: { x: places.vesuvio.door.x, z: places.vesuvio.door.z - 1.4, h: 0 }, inside: rooms.VESUVIO.inside },
+    { name: 'Vesuvio', outside: { x: places.vesuvio.door.x, z: places.vesuvio.door.z - 1.4, h: 0 }, inside: rooms.VESUVIO.inside, closed: () => places.vesuvio.burnt }, // after the fire there is no dining room to walk into
     { name: 'Bean Scene', outside: { x: places.cafe.door.x, z: places.cafe.door.z - 1, h: 0 }, inside: rooms.BEAN.inside },
     { name: 'F-Note Records', outside: { x: places.hesh.door.x, z: places.hesh.door.z + 0.6, h: Math.PI }, inside: rooms.FNOTE.inside },
     { name: 'the body shop', outside: { x: places.bodyshop.door.x, z: places.bodyshop.door.z + 0.6, h: Math.PI }, inside: rooms.BODYSHOP.inside },
