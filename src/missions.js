@@ -5005,31 +5005,77 @@ async function closingTime(g) {
   g.hud.card();
   await reach(g, bing.door, 'Go to the <b>Bada Bing</b>.', { r: 4 });
 
-  await bingRoom(g, 'barCam', room => ({
-    tony: actor(g, 'tony', room.bar, NORTH),
-    georgie: actor(g, 'georgie', room.tender, SOUTH),
-    silvio: actor(g, 'silvio', room.stool, WEST),
-  }), async cast => {
-    await talk(g, [
-      [TONY, 'Georgie. Get me Green Grove on the phone. I want to know she ate.', cast.tony],
-      [GEORGIE, 'Sure, Tone. ...How do you get an outside line on this thing? It keeps ringing the kitchen.', cast.georgie],
-      [TONY, 'Push nine.', cast.tony],
-      [GEORGIE, "I pushed nine. Now it's beeping. Is it supposed to beep?", cast.georgie],
-    ]);
-    await punch(g, cast.tony, cast.georgie);
-    g.hud.flash('#ffffff', 0.4);
-    g.cam.sway = 1;
-    await punch(g, cast.tony, cast.georgie, true);
-    g.cam.sway = 0;
-    await say(g, '', "Tony took the receiver out of Georgie's hand and showed him how it worked. Several times.");
-    await talk(g, [[SILVIO, "He's fine. Georgie, you're fine. Put some ice on it.", cast.silvio]]);
-    await say(g, '', 'Nobody at the Bing asked Tony about his mother that night.');
-  });
-  g.setNight(0);
-  place(g, bing.door, SOUTH, bing.park);
-  const cad = propCar(g, spot(bing.park, 9, 6), EAST, 0xf4f4f0, 'coupe');
-  await fade(g, 0, 1.2);
+  // In the club, on his own feet: Georgie behind the bar with the house telephone, Silvio two stools down.
+  const room = g.places.bingRoom, bdoor = g.places.doors.find(d => d.inside === room.inside);
+  const stand = { x: room.tender.x - 0.3, z: room.bar.z - 0.45 }, behind = { x: room.tender.x - 0.3, y: room.y, z: room.tender.z + 0.15 };
+  let georgie, sil;
+  p.locked = true;
+  await fade(g, 1, 0.5);
+  if (p.car) { const car = p.car; g.leaveCar(); car.speed = 0; car.pos.set(bing.park.x, 0, bing.park.z); car.heading = bing.park.h; }
+  g.sfx?.door();
+  for (const a of room.ambient) a.group.visible = false;      // the scene has its own Georgie
+  p.inside = bdoor;
+  p.pos.set(room.inside.x, 0, room.inside.z); p.heading = g.cam.yaw = room.inside.h; g.cam.pitch = 0.2;
+  georgie = actor(g, 'georgie', behind, SOUTH);
+  { const st = room.stools[0]; sil = actor(g, 'silvio', st, WEST, 'sit'); sil.floorY = room.y; }
+  g.cam.fixed = null;
+  await fade(g, 0, 0.5);
   p.locked = false;
+  try {
+    await reach(g, stand, 'Find the <b>bar</b>. Georgie is behind it.', { r: 1.1, how: 'foot' });
+    p.locked = true;
+    p.pos.set(stand.x, 0, stand.z); p.heading = NORTH;
+    g.cam.fixed = { pos: new THREE.Vector3(stand.x - 2.9, room.y + 1.7, stand.z + 1.9), look: new THREE.Vector3(stand.x + 0.2, room.y + 1.3, stand.z - 1) };
+    await talk(g, [
+      [TONY, 'Georgie. Get me Green Grove on the phone. I want to know she ate.', p],
+    ]);
+    georgie.arm('phone'); georgie.layer('phone');          // he has the receiver; he does not have the idea
+    await talk(g, [
+      [GEORGIE, 'Sure, Tone. ...How do you get an outside line on this thing? It keeps ringing the kitchen.', georgie],
+      [TONY, 'Push nine.', p],
+      [GEORGIE, "I pushed nine. Now it's beeping. Is it supposed to beep?", georgie],
+      [SILVIO, 'Georgie. Give him the phone and walk away.', sil],
+    ]);
+    // The receiver comes across the bar, and then it goes back the other way. He does not move from where he stands:
+    // there is three feet of mahogany between them, and the cord reaches.
+    g.hud.objective('Take the <b>receiver</b> off him: press <b>F</b>.');
+    g.consume('KeyF'); await g.until(() => g.consume('KeyF'));
+    g.hud.objective();
+    georgie.layer(null); georgie.arm(false);
+    await handover(g, georgie, { hex: 0x16161c, sound: false });
+    p.locked = true;
+    const mine = p.human; mine.arm('phone'); p.onPhone = true;
+    for (let k = 0; k < 3; k++) {
+      g.hud.objective(`Show him how a telephone works: press <b>F</b>. &nbsp; <b>${'●'.repeat(k)}${'○'.repeat(3 - k)}</b>`);
+      g.consume('KeyF'); await g.until(() => g.consume('KeyF'));
+      mine.play(k % 2 ? 'jab' : 'cross', 'idle', 1.25);
+      await g.wait(0.26);
+      g.sfx?.punch?.(true); g.hud.flash('#ffffff', 0.18); g.cam.sway = 0.6;
+      if (k < 2) georgie.play('hitHead', 'idle'); else { georgie.after = null; georgie.set('down'); }
+      if (k === 0) say(g, GEORGIE, 'Tone! Tone, I pushed nine!', 1.6).catch(() => {});
+      await g.wait(0.55);
+      g.cam.sway = 0;
+    }
+    g.hud.objective();
+    mine.arm(false); p.onPhone = false; g.setWeapon(p.weapon, true);
+    // The receiver, swinging on its cord off the edge of the bar.
+    const cord = new THREE.Group(), blk = new THREE.MeshLambertMaterial({ color: 0x16161c });
+    const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.6, 4).translate(0, -0.3, 0), blk), set = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.2, 0.05).translate(0, -0.68, 0), blk); cord.add(wire, set);
+    cord.position.set(stand.x - 0.3, room.y + 1.2, room.bar.z - 0.72); g.track(cord);
+    const t0 = g.time; g.updaters.push(() => { if (!cord.parent) return false; cord.rotation.x = Math.sin((g.time - t0) * 4) * 0.5 * Math.exp(-(g.time - t0) * 0.35); return true; });
+    g.cam.fixed = { pos: new THREE.Vector3(stand.x + 3.4, room.y + 1.6, stand.z + 1.6), look: new THREE.Vector3(stand.x + 0.3, room.y + 1.2, stand.z - 0.6) };
+    await say(g, '', "Tony took the receiver out of Georgie's hand and showed him how it worked. Several times.");
+    await talk(g, [[SILVIO, "He's fine. Georgie, you're fine. Put some ice on it.", sil]]);
+    await say(g, '', 'Nobody at the Bing asked Tony about his mother that night.');
+    g.untrack(cord);
+  } finally { for (const a of room.ambient) a.group.visible = true; }
+  // He walks out on his own; the car is where he left it.
+  dismiss(g, georgie, sil);
+  g.cam.fixed = null;
+  p.locked = false;
+  await walkOut(g, room, 'Go out to the <b>street</b>: the green EXIT.');
+  g.setNight(0);
+  const cad = propCar(g, spot(bing.park, 9, 6), EAST, 0xf4f4f0, 'coupe');
   // And on his way out, a man who has decided tonight is a good night not to pay.
   await say(g, GEORGIE, 'Tone! The guy in the white coupe! Four hundred on the tab and he walked!', 3.2);
   if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
