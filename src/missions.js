@@ -601,7 +601,7 @@ function propCar(g, at, heading, color, kind = 'sedan') {
 }
 const between = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
 // Walk out of the room the player is in: a marker at its door, and then the street.
-async function walkOut(g, room, text) {
+export async function walkOut(g, room, text) {
   const p = g.player;
   g.hud.objective(text);
   const m = g.addMarker(room.inside.x, room.inside.z, 1.5);
@@ -1229,6 +1229,7 @@ export async function runStory(g) {
     if (from > 5) vesuvio?.burn();
     for (const d of home.ducks) d.group.visible = false;
     if (!g.arrived) { p.pos.set(home.wake.x, 0, home.wake.z); g.cam.yaw = p.heading = 0; g.cam.pitch = 0.22; }
+    if (!g.arrived && CITY === 'la' && from >= total) { const pr = g.places.precinct; p.pos.set(pr.door.x, 0, pr.door.z - 2); g.cam.yaw = p.heading = NORTH; g.tonyCar.pos.set(pr.kerb.x, 0, pr.kerb.z); g.tonyCar.heading = pr.kerb.h; } // the story is over: the lieutenant starts his day at Major Crimes
     g.cam.fixed = null;
     p.locked = false;
     g.hud.show(true);

@@ -107,7 +107,8 @@ async function boot() {
   let carry = null;
   try { carry = arrived ? JSON.parse(sessionStorage.getItem('crossing')) : null; } catch { /* nothing carried */ }
   sessionStorage.removeItem('crossing');
-  const local = LA ? 'neil' : 'tony', who = carry?.who || local;
+  const heatOver = LA && savedMission() >= storyList().reduce((n, e) => n + e.titles.length, 0); // after the runway, Los Angeles is Hanna's
+  const local = LA ? (heatOver ? 'hanna' : 'neil') : 'tony', who = carry?.who || local;
   const tony = makeLook(who); // the player: Tony Soprano in Vice City, Neil McCauley in Los Angeles, or a visitor from across the water
   scene.add(tony.group);
 

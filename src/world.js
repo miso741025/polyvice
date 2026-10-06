@@ -15,7 +15,8 @@ const HOTELS = LA ? ['HOTEL', 'PALMS', 'SUNSET', 'PACIFIC', 'WILSHIRE', 'ROOSEVE
 const CURB = 0.14;                       // sidewalk height
 const FLOOR = 3.4, GROUND = 4.2, BAY = 4; // storey height, shopfront height, width of one window bay
 const SPECIAL_LA = { '15,1': 'neil', '8,6': 'bank', '2,9': 'drivein', '6,9': 'kates', '3,5': 'truckstop', '10,3': 'hospital', '8,3': 'precinct', '6,2': 'depository', '10,8': 'bookstore',
-  '12,4': 'park', '4,11': 'park', '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '2,7': 'yard', '13,8': 'church', '1,10': 'containers' };
+  '12,4': 'park', '4,11': 'park', '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '2,7': 'yard', '13,8': 'church', '1,10': 'containers',
+  '15,12': 'hotel' };                  // chapter four: the hotel at the end of the runway
 const SPECIAL_VICE = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
   '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel',
   '13,0': 'college', '12,2': 'travel', // episode five: up the coast
@@ -662,6 +663,7 @@ export function buildWorld(scene) {
     else if (kind === 'bookstore') { buildBookstore(c); lots(c, i, [1, 1]); }
     else if (kind === 'apron' || kind === 'terminal' || kind === 'hangar') buildAirport(c, kind);
     else if (kind === 'containers') buildContainers(c);
+    else if (kind === 'hotel') buildHotel(c);
     else if (kind === 'college') buildCollege(c);
     else if (kind === 'travel') { buildTravel(c); lots(c, i, [-1, 1]); }
     else if (kind === 'manor') buildManor(c);
@@ -1658,6 +1660,24 @@ export function buildWorld(scene) {
     places.bookstore = { door: { x, z: front + 1.6, h: 0 }, kerb: { x, z: c.z + 34, h: Math.PI / 2 } };
   }
 
+  // ----- The airport hotel: a slab of rooms over a glass lobby, a canopy for the taxis, the runway at its back door -----
+  function buildHotel(c) {
+    const y = CURB, x = c.x, z = c.z - 12, front = z + 11;
+    building(x, z, 40, 22, 64, { style: 'office', tint: 0xffe2b8, fx: 0, fz: 0 });
+    slab(0x1a242c, 16, 4, 0.2, x, y, front + 0.06); for (let n = -3; n <= 3; n++) slab(0xc9cbd2, 0.1, 4, 0.24, x + n * 2.3, y, front + 0.08);        // the lobby's glass
+    slab(0xf0bf78, 14, 2.6, 0.06, x, y + 0.6, front + 0.2, M.glow);
+    slab(0xf4f4f0, 20, 0.5, 9, x, y + 4.6, front + 4.6); slab(0x1c2740, 20.4, 0.9, 9.4, x, y + 5.1, front + 4.6);
+    for (const s of [-1, 1]) for (const t of [1.2, 8]) { post(0xc9cbd2, 0.3, 4.6, x + s * 9, y, front + t, 10); collide(x + s * 9, front + t, 0.7, 0.7, 4.6, true); }
+    for (let n = -3; n <= 3; n++) { ball(0xffe2a6, 0.14, x + n * 2.6, y + 4.5, front + 4.6, M.glow); if (n % 3 === 0) halo(x + n * 2.6, y + 4.4, front + 4.6, 0xffd9a8, 4); }
+    sign(['AIRPORT REGENT', 'HOTEL  ·  COCKTAILS  ·  CONVENTIONS'], x, y + 7.6, front + 0.4, 0, { w: 16, h: 2.6, color: '#f4f4f0', bg: '#1c2740', size: 0.66 });
+    sign('REGENT', x, y + 60, front + 0.3, 0, { w: 14, h: 3, color: '#ff8a5c', bg: '#14080f', size: 0.9 }); halo(x, y + 60, front + 2, 0xff8a5c, 10);
+    flat(M.tarmac, 0xffffff, BLOCK - 4, 24, c.x, y + 0.015, c.z + 16, 5);
+    for (const s of [-1, 1]) { slab(0xb9a58a, 2, 0.8, 2, x + s * 13, y, front + 3, M.gravel, 2); ball(0x2f7d46, 1.1, x + s * 13, y + 1.6, front + 3); palms.push({ x: x + s * 24, z: c.z + 12 }); }
+    lamp(x, y + 4.2, front + 5, 0xffe2a6, 50, 22);
+    shopDoors.push({ shop: 'HOTEL', outside: { x, z: front + 1.8, h: 0 } });
+    places.hotel = { door: { x, z: front + 1.8, h: 0 }, kerb: { x: x + 6, z: c.z + 34, h: Math.PI / 2 }, forecourt: { x, z: c.z + 14 } };
+  }
+
   // ----- The container yard by the harbour: stacks three high in rows, a gantry crane, and a square of empty ground in the middle -----
   function buildContainers(c) {
     const y = 0.03, COLS = [0xd8342c, 0x2f56c8, 0x1f6b4a, 0xf2c230, 0x8d8a8e, 0xb5523b, 0x49a0d0];
@@ -2191,6 +2211,40 @@ export function buildWorld(scene) {
     q.light(0, 2.9, 0, 0xffe8c8, 34, 12);
     clerk(q, 0, -3.2, 0, { hairStyle: 'balding', hairMesh: undefined, age: 0.7, pattern: 'plaid', shirt: 0x8d93cc, sleeves: undefined });
   }
+  if (LA) { // The Regent's lobby: a long desk, two lifts, sofas round low tables, a carpet with a pattern nobody chose
+    const q = rooms.HOTEL = room(24, 14, 4.8, { floor: M.gravel, floorTint: 0x5a3a52, wallTint: 0xf2e6d2, ceil: 0xf6f1e6, door: 0x1a242c });
+    slab(0xd9a520, 20, 0.012, 0.3, q.X, q.Y + 0.005, q.Z + 1); slab(0xd9a520, 20, 0.012, 0.3, q.X, q.Y + 0.005, q.Z - 2);
+    counter(q, -6, -5, 9, 0x3a2418, 0); slab(0xd9a520, 9.2, 0.05, 0.9, q.X - 6, q.Y + 1.06, q.Z - 5); ball(0xd9a520, 0.08, q.X - 4, q.Y + 1.16, q.Z - 4.8);
+    slab(0x3a2418, 9, 2.4, 0.1, q.X - 6, q.Y + 1.4, q.Z - 6.84, M.wood, 2); for (let n = 0; n < 24; n++) slab(n % 5 ? 0xd9a520 : 0x3a2418, 0.12, 0.16, 0.04, q.X - 9.6 + (n % 12) * 0.62, q.Y + 2.4 + Math.floor(n / 12) * 0.5, q.Z - 6.78); // the keys
+    for (const lx of [5, 8]) { slab(0xc9cbd2, 2, 2.9, 0.12, q.X + lx, q.Y, q.Z - 6.82); slab(0x1c1c22, 0.04, 2.9, 0.14, q.X + lx, q.Y, q.Z - 6.8); slab(0xffe066, 0.5, 0.16, 0.05, q.X + lx, q.Y + 3.1, q.Z - 6.8, M.glow); }
+    sign('LIFTS', q.X + 6.5, q.Y + 3.7, q.Z - 6.84, 0, { w: 2.4, h: 0.6, color: '#f4f4f0', bg: '#1c2740', size: 0.8, glow: false });
+    slab(0xc8312a, 0.12, 0.34, 0.28, q.X - 11.62, q.Y + 1.3, q.Z + 1.5); slab(0xf4f4f0, 0.14, 0.08, 0.18, q.X - 11.6, q.Y + 1.4, q.Z + 1.5);           // the fire alarm
+    for (const [x, z] of [[-3, 2.6], [4, 2.6], [9, -1]]) { // a sofa either side of a low table
+      q.block(0x8a5a44, 1.2, 0.42, 1.2, x, z, M.wood, 1); ball(0xc8312a, 0.14, q.X + x, q.Y + 0.56, q.Z + z);
+      for (const sgn of [-1, 1]) { slab(0x2f4a44, 0.8, 0.45, 2, q.X + x + sgn * 1.5, q.Y, q.Z + z); slab(0x27403b, 0.2, 0.95, 2, q.X + x + sgn * 1.95, q.Y, q.Z + z); collide(q.X + x + sgn * 1.9, q.Z + z, 0.3, 2, 1); }
+    }
+    q.sofas = [[-3, 2.6], [4, 2.6], [9, -1]].flatMap(([x, z]) => [-1, 1].map(sgn => ({ x: q.X + x + sgn * 1.45, y: q.Y, z: q.Z + z, h: -sgn * Math.PI / 2 })));
+    for (const x of [-11, 11]) { post(0xb9a58a, 0.4, 0.8, q.X + x, q.Y, q.Z + 5.6, 10); put(M.plain, new THREE.ConeGeometry(0.7, 2.4, 7).translate(q.X + x, q.Y + 2, q.Z + 5.6), 0x2c5a34); }
+    for (const [x, z] of [[-5, 0], [5, 0]]) { post(0xd9a520, 0.02, 0.7, q.X + x, q.Y + 4.1, q.Z + z, 4); put(M.glow, new THREE.SphereGeometry(0.55, 10, 6).scale(1, 0.5, 1).translate(q.X + x, q.Y + 3.9, q.Z + z), 0xffe8c0); }
+    for (const x of [-7, 7]) q.window(x, 6.72, 6, 3, 2.4, Math.PI, 0x2a3350);
+    q.light(-5, 4.2, 0, 0xffe2b0, 120, 22); q.light(6, 4.2, -1, 0xffe2b0, 110, 22);
+    clerk(q, -6, -5.9, 0, { jacket: 0x8a1c2a, shirt: 0xf4f4f4, tie: 0x16161c, tucked: true, pants: 0x16161c });
+    q.lift = q.at(5, -5.4); q.alarm = q.at(-10.6, 1.5);
+  }
+  if (LA) { // The seventeenth floor: a corridor, a door, and a room with the curtains open on the runway lights
+    const q = rooms.SUITE = room(16, 10, 3, { floor: M.gravel, floorTint: 0x4a3a52, wallTint: 0xe9e2d2, ceil: 0xf6f1e6, doorX: 6, door: 0xc9cbd2 });
+    q.block(0xe9e2d2, 9.6, 3, 0.2, -3.2, 1.2, M.gravel, 3); q.block(0xe9e2d2, 5, 3, 0.2, 5.5, 1.2, M.gravel, 3);                                 // the corridor wall, with the room's door open in it
+    slab(0x3a2418, 0.1, 2.2, 1.2, q.X + 1.72, q.Y, q.Z + 0.56); sign('1709', q.X + 2.4, q.Y + 2.5, q.Z + 1.32, 0, { w: 0.9, h: 0.4, color: '#d9a520', bg: '#3a2418', size: 0.9, glow: false });
+    for (let n = 0; n < 4; n++) { slab(0x3a2418, 1, 2.2, 0.06, q.X - 6.5 + n * 2.6, q.Y, q.Z + 4.68); ball(0xffd9a8, 0.1, q.X - 5.2 + n * 2.6, q.Y + 2.3, q.Z + 4.6, M.glow); }  // other doors, other lamps
+    slab(0x8a1c2a, 15, 0.012, 1.6, q.X, q.Y + 0.005, q.Z + 3);
+    q.block(0xf4f4f0, 2.2, 0.55, 2, -5.6, -2.8, M.plain, 0); slab(0x8a2f3a, 2.2, 0.1, 1.3, q.X - 5.6, q.Y + 0.55, q.Z - 2.5); slab(0x3a2418, 2.4, 1.2, 0.12, q.X - 5.6, q.Y, q.Z - 3.9);  // the bed
+    q.block(0x3a2418, 1.6, 0.7, 0.5, 4.6, -1.6, M.wood, 1); q.block(0x1c1c22, 0.9, 0.7, 0.5, 4.6, -1.6, M.plain, 0, 0.7); q.glowPanel(0x9fd0f5, 0.7, 0.5, 4.6, -1.34, 1.05); // the television
+    q.block(0x8a5a44, 0.9, 0.72, 0.9, -1, -3.6, M.wood, 1); post(0x2f5a3f, 0.045, 0.3, q.X - 1, q.Y + 0.72, q.Z - 3.6, 6); slab(0xf4f4f0, 0.5, 0.03, 0.4, q.X - 0.8, q.Y + 0.73, q.Z - 3.4); // room service
+    q.glowPanel(0x1c2a52, 9, 2, -1, -4.84, 1.6); for (let n = 0; n < 9; n++) ball(n % 3 ? 0x4f8cff : 0xfff6e0, 0.05, q.X - 5 + n, q.Y + 0.9 + (n % 2) * 0.12, q.Z - 4.8, M.glow); // the window: the runway
+    for (const sx of [-5.8, 3.8]) slab(0x8a1c2a, 0.5, 2.6, 0.1, q.X + sx, q.Y + 0.2, q.Z - 4.78);
+    q.light(-2, 2.6, -2, 0xffd9a8, 36, 12); q.light(0, 2.6, 3, 0xffe8c8, 30, 12);
+    q.gap = q.at(2.3, 2.4); q.inroom = q.at(2.3, -0.4); q.bed = q.at(-2.6, -2); q.window0 = q.at(-1, -3);
+  }
   // A dining chair at a seat { x, z, h }: a thin seat on four legs and a back, facing h.
   const chairAt = (st, y, hex) => {
     slab(hex, 0.46, 0.07, 0.46, st.x, y + 0.4, st.z);
@@ -2498,7 +2552,7 @@ export function buildWorld(scene) {
   }
 
   const SHOP_ROOM = { BAR: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'FASTFOOD', DONUTS: 'FASTFOOD', BURGERS: 'FASTFOOD', 'AUTO PARTS': 'PARTS', LAUNDRY: 'LAUNDRY', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
-  const SHOP_NAME = { CARDROOM: 'room six', BANQUET: 'the Manor', BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
+  const SHOP_NAME = { HOTEL: 'the hotel', CARDROOM: 'room six', BANQUET: 'the Manor', BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
     HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the store', BOOKS: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office', SCHOOL: 'the hall' };
   places.rooms = rooms;
   places.parkedSpots = parkedSpots;
