@@ -24,6 +24,9 @@ export const colliders = [];
 // piers (and the bridge) run out over the water: { minZ, maxZ, ramp (x where it leaves the land), deck (x where it is level), maxX (its far end), y, dir (1 east, -1 west) }.
 // interiors are rooms built far out over the water; a player inside one is kept inside it. Each lists its `lights`.
 export const lowGround = [], piers = [], interiors = [];
+// Floors inside the rooms that are not at the usual level: an upper storey, a flight of stairs. Each is a rectangle
+// { minX, maxX, minZ, maxZ, y } or, for stairs, { ..., y0, y1, from, to } rising along z from `from` to `to`.
+export const floors = [];
 // Lawns, patios and paths laid a little above the sidewalk, by block: { x, z, hx, hz, y }. Feet stand on the highest one under them.
 export const raised = new Map();
 export function raise(x, z, w, d, y, kind = 'pave') {
@@ -44,6 +47,11 @@ export function surfaceAt(x, z) {
 }
 export const roomAt = (x, z, margin = 1) => interiors.find(q => x > q.minX - margin && x < q.maxX + margin && z > q.minZ - margin && z < q.maxZ + margin);
 export function groundAt(x, z) {
+  if (x > 2500) { // the rooms, out over the water: level, except where a house has an upstairs
+    let y = -0.1;
+    for (const f of floors) if (x > f.minX && x < f.maxX && z > f.minZ && z < f.maxZ) y = Math.max(y, f.y !== undefined ? f.y : f.y0 + (f.y1 - f.y0) * Math.max(0, Math.min(1, (z - f.from) / (f.to - f.from))));
+    return y;
+  }
   for (const p of piers) { // a pier or a bridge: up a ramp, then level; `dir` -1 runs west instead of east
     const s = p.dir || 1;
     if (z > p.minZ && z < p.maxZ && (x - p.ramp) * s > 0) return (x - p.deck) * s < 0 ? -0.1 + (p.y + 0.1) * (x - p.ramp) / (p.deck - p.ramp) : p.y;

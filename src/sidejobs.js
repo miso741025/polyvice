@@ -250,9 +250,52 @@ export function installSideJobs(g) {
     g.wait(3.4).then(() => { if (!g.missionActive) hud.subtitle(); }).catch(() => {});
   }
 
+  // The refrigerator, at home: the door swings open, he finds the gabagool, he eats a slice of it standing there.
+  let ate = -99;
+  async function gabagool() {
+    const f = places.houseRoom.fridge, door = f.door;
+    busy = true; p.locked = true;
+    try {
+      p.heading = Math.atan2(f.from.x - p.pos.x, f.from.z - p.pos.z);
+      p.human.play('interact', 'idle');
+      const swing = (to, secs) => { const from = door.rotation.y, t0 = g.time; return g.until(() => { const k = Math.min(1, (g.time - t0) / secs); door.rotation.y = from + (to - from) * k * k * (3 - 2 * k); return k >= 1; }); };
+      g.sfx?.click?.();
+      await swing(-1.9, 0.6);
+      await g.wait(0.5);
+      p.human.play('pickup', 'idle');
+      const slice = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.008, 12), new THREE.MeshLambertMaterial({ color: 0xc8503a })), marb = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.009, 8), new THREE.MeshLambertMaterial({ color: 0xf2c8b8 }));
+      slice.add(marb); slice.rotation.z = 1.3; g.scene.add(slice);
+      const y0 = groundAt(p.pos.x, p.pos.z), fx = Math.sin(p.heading), fz = Math.cos(p.heading), t0 = g.time;
+      hud.subtitle('', 'Gabagool. Out of the paper, standing up, with the door open.');
+      await g.until(() => { // from the shelf to his hand, and from his hand to his mouth
+        const t = g.time - t0, k = Math.min(1, t / 0.8), e = k * k * (3 - 2 * k), k2 = Math.max(0, Math.min(1, (t - 1.2) / 0.5));
+        const hx = p.pos.x + fx * 0.32, hz = p.pos.z + fz * 0.32;
+        slice.position.set(f.from.x + (hx - f.from.x) * e + (p.pos.x + fx * 0.14 - hx) * k2, f.from.y + (y0 + 1.15 - f.from.y) * e + k2 * 0.42, f.from.z + (hz - f.from.z) * e + (p.pos.z + fz * 0.14 - hz) * k2);
+        if (t > 1.15 && !p.topPose) p.topPose = 'phone';       // the hand goes up to his face
+        return t > 2.3;
+      });
+      g.scene.remove(slice);
+      await g.wait(0.7);
+      p.topPose = null;
+      p.health = Math.min(100, p.health + 12); hud.health(p.health);
+      hud.subtitle('', 'The only way.');
+      await swing(0, 0.5);
+      g.sfx?.door?.();
+      await g.wait(1.2);
+      if (!g.missionActive) hud.subtitle();
+    } catch { /* interrupted */ }
+    door.rotation.y = 0; p.topPose = null;
+    p.locked = false; busy = false; ate = g.time;
+  }
+
   const update = () => {
     if (!g.sideBusy) stakes.update();
     dates.update();
+    if (!busy && !p.locked && p.inside && places.houseRoom?.fridge && near(p.pos, places.houseRoom.fridge.at, 1.3) && g.time - ate > 8) {
+      hud.prompt('F  ·  Open the refrigerator');
+      if (g.consume('KeyF')) { hud.prompt(''); gabagool(); }
+      return;
+    }
     if (!busy && !g.missionActive && !g.sideBusy && !p.locked && p.inside && places.bingRoom?.front && near(p.pos, places.bingRoom.front, 1.8)) { // on the floor, in front of the girl at the middle pole
       hud.prompt(`G  ·  Ask her for a private dance ($${g.cash >= DANCE ? DANCE : 'not enough'})`);
       if (g.cash >= DANCE && g.consume('KeyG')) { hud.prompt(''); privateDance(); }

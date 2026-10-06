@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CITY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, mulberry32, groundAt } from './grid.js';
+import { CITY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, floors, mulberry32, groundAt } from './grid.js';
 import { makeHuman } from './people.js';
 import { box, makeLook, makeTony, makeDuck, Car } from './entities.js';
 
@@ -2145,11 +2145,12 @@ export function buildWorld(scene) {
   // ----- Inside the Soprano house: the kitchen, the table, and the den -----
   function buildHouseRoom() {
     const X = 2840, Y = -0.1, Z = 0, CREAM = 0xf3e9d8, WOOD = 0x8a5a44;
-    const q = { minX: X - 7.7, maxX: X + 7.7, minZ: Z - 5.7, maxZ: Z + 5.7, lights: [] };
+    const q = { minX: X - 8.85, maxX: X + 8.85, minZ: Z - 5.7, maxZ: Z + 19.35, lights: [] };   // both storeys: the upper one lies to the south (see the stairs, below)
     interiors.push(q);
     slab(0xd9b48a, 16, 0.2, 12, X, Y - 0.2, Z, M.wood, 2);
-    slab(0xf6f1e6, 16, 0.2, 12, X, Y + 3.4, Z);
-    for (const s of [-1, 1]) { slab(0xf6ead2, 16, 3.6, 0.3, X, Y, Z + s * 6.15); slab(0xf6ead2, 0.3, 3.6, 12, X + s * 8.15, Y, Z); }
+    slab(0xf6f1e6, 14.5, 0.2, 12, X - 0.75, Y + 3.4, Z); slab(0xf6f1e6, 1.5, 0.2, 7, X + 7.25, Y + 3.4, Z - 2.5);   // the ceiling, open over the stairs
+    slab(0xf6ead2, 16, 3.6, 0.3, X, Y, Z - 6.15); slab(0xf6ead2, 14.8, 3.6, 0.3, X - 0.9, Y, Z + 6.15); slab(0xf6ead2, 1.8, 3.2, 0.3, X + 7.4, Y, Z + 6.3);
+    for (const s of [-1, 1]) slab(0xf6ead2, 0.3, 3.6, 12, X + s * 8.15, Y, Z);
     // Kitchen along the west wall: counters, the island, the fridge and stove.
     slab(WOOD, 1, 0.9, 9, X - 7.4, Y, Z - 1, M.wood, 1); slab(0x2a2a30, 1.1, 0.05, 9.1, X - 7.4, Y + 0.9, Z - 1); collide(X - 7.4, Z - 1, 1, 9, 1);
     slab(WOOD, 7, 0.9, 1, X - 3.5, Y, Z - 5.4, M.wood, 1); slab(0x2a2a30, 7.1, 0.05, 1.1, X - 3.5, Y + 0.9, Z - 5.4); collide(X - 3.5, Z - 5.4, 7, 1, 1);
@@ -2169,7 +2170,6 @@ export function buildWorld(scene) {
     slab(0x3a2418, 1.4, 0.4, 0.7, X + 5.2, Y, Z - 2.6, M.wood, 1);
     slab(0x1c1c22, 1.3, 0.9, 0.5, X + 5.2, Y + 0.4, Z - 0.3); slab(0x9fd0f5, 1.1, 0.7, 0.04, X + 5.2, Y + 0.5, Z - 0.56, M.glow); collide(X + 5.2, Z - 0.3, 1.3, 0.5, 1.3); // television
     post(0x1c1c22, 0.03, 1.5, X + 7.2, Y, Z - 4.8, 6); put(M.glow, new THREE.ConeGeometry(0.32, 0.4, 12, 1, true).translate(X + 7.2, Y + 1.7, Z - 4.8), 0xffe2a6);
-    for (let n = 0; n < 7; n++) slab(0xd9b48a, 1.2, 0.2, 0.32, X + 7.3, Y + n * 0.3, Z + 1.6 + n * 0.32, M.wood, 1); collide(X + 7.3, Z + 2.6, 1.2, 2.4, 2);
     slab(0xe9e2cf, 1.6, 1.2, 0.05, X + 4, Y + 1.5, Z - 6, M.glow);                                 // a window on the garden
     slab(0x3a2418, 1.4, 2.8, 0.1, X + 2, Y, Z + 6.02);                                           // the front door
     // ----- The house, lived in (owner feedback: this is his home, it should look like one) -----
@@ -2223,7 +2223,6 @@ export function buildWorld(scene) {
       slab(0xd9c7a0, 1.5, 0.03, 0.9, X + 4.4, Y + 0.56, Z - 4.4); for (const [dx, hex] of [[-0.9, 0xd9a520], [0.6, 0x7a2f3a]]) slab(hex, 0.42, 0.34, 0.14, X + 5.2 + dx, Y + 0.62, Z - 4.62);                                           // a throw, cushions
       slab(0xe9e2cf, 0.3, 0.02, 0.22, X + 5.0, Y + 0.41, Z - 2.6); slab(0x1c1c22, 0.16, 0.03, 0.05, X + 5.5, Y + 0.41, Z - 2.5); put(M.plain, new THREE.CylinderGeometry(0.12, 0.08, 0.06, 12).translate(X + 4.7, Y + 0.44, Z - 2.75), 0xcfe8ff); // the guide, the remote, a dish of something
       slab(0x23232b, 0.5, 0.1, 0.34, X + 5.2, Y + 0.12, Z - 0.3); for (const s of [-1, 1]) slab(0x1c1c22, 0.28, 0.7, 0.3, X + 5.2 + s * 0.95, Y, Z - 0.3);                                                                              // the tape machine; speakers
-      post(0xb5523b, 0.24, 0.45, X + 7.4, Y, Z + 0.85, 10); ball(0x2f7d46, 0.45, X + 7.4, Y + 0.95, Z + 0.85); ball(0x3f9a5a, 0.3, X + 7.3, Y + 1.4, Z + 0.8); collide(X + 7.4, Z + 0.85, 0.6, 0.6, 1.4);
       const fan = new THREE.Group(); for (let n = 0; n < 4; n++) { const b = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.02, 0.2).translate(0.65, 0, 0), new THREE.MeshLambertMaterial({ color: 0x5a3320 })); b.rotation.y = n * Math.PI / 2; fan.add(b); }
       fan.position.set(X + 5.2, Y + 3.05, Z - 2.6); scene.add(fan); post(BRASS, 0.05, 0.3, X + 5.2, Y + 3.08, Z - 2.6, 8); ball(0xfff2c0, 0.11, X + 5.2, Y + 2.98, Z - 2.6, M.glow); updaters.push(t => { fan.rotation.y = t * 2.6; });
       // By the door: the hall table with the keys and the flowers, a mirror, coats, the clock; the banister.
@@ -2234,14 +2233,147 @@ export function buildWorld(scene) {
       post(0x3a2418, 0.03, 1.8, X + 3.5, Y, Z + 5.6, 6); for (let n = 0; n < 4; n++) slab(0x3a2418, 0.2, 0.03, 0.03, X + 3.5 + Math.cos(n * 1.57) * 0.1, Y + 1.7, Z + 5.6 + Math.sin(n * 1.57) * 0.1); slab(0x6f5a44, 0.3, 0.9, 0.16, X + 3.62, Y + 0.8, Z + 5.6); slab(0x23232b, 0.26, 0.7, 0.14, X + 3.4, Y + 0.95, Z + 5.68);
       slab(0x3a2418, 0.5, 2.1, 0.34, X + 5, Y, Z + 5.8, M.wood, 1); put(M.plain, new THREE.CylinderGeometry(0.17, 0.17, 0.03, 16).rotateX(Math.PI / 2).translate(X + 5, Y + 1.75, Z + 5.62), 0xf1ece0); slab(BRASS, 0.03, 0.5, 0.02, X + 5, Y + 0.8, Z + 5.62); ball(BRASS, 0.06, X + 5, Y + 0.78, Z + 5.62); collide(X + 5, Z + 5.8, 0.6, 0.4, 2.1);
       slab(0x8a2f3a, 0.9, 0.012, 0.6, X + 2, Y + 0.005, Z + 5.4);                                                                                                                              // the mat
-      for (let n = 0; n < 7; n++) post(0xffffff, 0.02, 0.9, X + 6.68, Y + n * 0.3 + 0.2, Z + 1.6 + n * 0.32, 4); put(M.plain, new THREE.BoxGeometry(0.06, 0.06, 2.9).rotateX(-Math.atan2(2.1, 2.24)).translate(X + 6.68, Y + 2.1, Z + 2.6), 0x5a3320); post(0x5a3320, 0.05, 1.15, X + 6.68, Y, Z + 1.4, 6); ball(0x5a3320, 0.07, X + 6.68, Y + 1.2, Z + 1.4);
-      for (let n = 0; n < 5; n++) { slab(0x3a2418, 0.03, 0.4, 0.32, X + 7.97, Y + 1.5 + n * 0.3, Z + 1.7 + n * 0.34); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac][n % 3], 0.035, 0.32, 0.24, X + 7.96, Y + 1.54 + n * 0.3, Z + 1.7 + n * 0.34); }   // the children, year by year, up the stairs
       slab(BRASS, 0.04, 0.5, 0.4, X + 7.96, Y + 1.7, Z - 0.6); slab(0x8a1c1c, 0.045, 0.42, 0.32, X + 7.95, Y + 1.74, Z - 0.6);
     }
-    roomLamp(q, X - 3.6, Y + 3.1, Z - 2, 0xfff0d0, 46, 14); roomLamp(q, X + 4.8, Y + 2.8, Z - 2.4, 0xffd9a8, 34, 12); roomLamp(q, X + 0.5, Y + 2.4, Z + 1.6, 0xffe8c0, 26, 9); roomLamp(q, X + 1.7, Y + 0.6, Z - 4.9, 0xff8a30, 12, 5);
+    roomLamp(q, X - 3.6, Y + 3.1, Z - 2, 0xfff0d0, 46, 14); roomLamp(q, X + 4.8, Y + 2.8, Z - 2.4, 0xffd9a8, 34, 12); roomLamp(q, X + 0.5, Y + 2.4, Z + 1.6, 0xffe8c0, 26, 9);
+    // ===== The stairs, and upstairs (owner: a house you walk up through, a room with a door for each of them, and a
+    // bathroom of his own). The upper storey is not over the lower one in plan: it lies to the south of it, a flight
+    // up, so that one height under any spot is still all the ground needs to know (`floors` in grid.js). From inside
+    // nobody can tell. =====
+    {
+      const H2 = 3.6, Y2 = Y + H2, WALL = 0xf6ead2, TRIM = 0xffffff, OAK = 0xb98a5e, BRASS = 0xd9a520, UP = 3.1;
+      const sz0 = 1.0, sz1 = 6.6, run = (sz1 - sz0) / 12;
+      floors.push({ minX: X + 6.55, maxX: X + 8.05, minZ: Z + sz0, maxZ: Z + sz1 + 0.05, y0: Y, y1: Y2, from: Z + sz0, to: Z + sz1 });
+      floors.push({ minX: X - 9.2, maxX: X + 9.2, minZ: Z + 6.3, maxZ: Z + 19.7, y: Y2 });
+      // The flight: twelve treads against the east wall, a rail on the open side, the wall carried up round the well.
+      for (let i = 0; i < 12; i++) { slab(OAK, 1.45, (i + 1) * (H2 / 12), run, X + 7.27, Y, Z + sz0 + (i + 0.5) * run, M.wood, 1); slab(0x8a2f3a, 0.8, 0.012, run - 0.04, X + 7.27, Y + (i + 1) * (H2 / 12), Z + sz0 + (i + 0.5) * run); }
+      for (let i = 0; i <= 12; i += 2) post(TRIM, 0.022, 0.95, X + 6.56, Y + i * (H2 / 12), Z + sz0 + i * run, 5);
+      put(M.plain, new THREE.BoxGeometry(0.07, 0.07, Math.hypot(sz1 - sz0, H2)).rotateX(-Math.atan2(H2, sz1 - sz0)).translate(X + 6.56, Y + H2 / 2 + 0.95, Z + (sz0 + sz1) / 2), 0x5a3320);
+      put(M.plain, new THREE.BoxGeometry(0.05, 0.05, Math.hypot(sz1 - sz0, H2)).rotateX(-Math.atan2(H2, sz1 - sz0)).translate(X + 7.94, Y + H2 / 2 + 0.95, Z + (sz0 + sz1) / 2), 0x5a3320);
+      post(0x5a3320, 0.06, 1.1, X + 6.56, Y, Z + sz0 - 0.05, 6); ball(0x5a3320, 0.08, X + 6.56, Y + 1.16, Z + sz0 - 0.05);
+      slab(WALL, 0.14, UP + 0.2, 5.3, X + 6.5, Y2, Z + 3.65); slab(WALL, 1.65, UP + 0.2, 0.14, X + 7.25, Y2, Z + sz0); slab(WALL, 0.3, UP + 0.2, 5.6, X + 8.15, Y2, Z + 3.5); slab(0xf6f1e6, 1.8, 0.2, 5.5, X + 7.3, Y2 + UP, Z + 3.6); // the well
+      for (let n = 0; n < 5; n++) { slab(0x3a2418, 0.03, 0.42, 0.34, X + 7.98, Y + 1.7 + n * 0.6, Z + 1.6 + n * 0.94); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac][n % 3], 0.035, 0.34, 0.26, X + 7.97, Y + 1.74 + n * 0.6, Z + 1.6 + n * 0.94); }         // the children, year by year, up the stairs
+      collide(X + 6.5, Z + 3.7, 0.16, 4.5, 8, true);                                                    // the rail: the flight is entered at its foot
+      // What holds the ground floor in now that the house is bigger than it: its side walls, and the wall the front door is in.
+      collide(X - 8.6, Z + 0.15, 1.2, 12.6, 8); collide(X + 8.65, Z + 0.15, 1.3, 12.6, 8); collide(X - 0.9, Z + 6.15, 14.8, 0.3, 8);
+
+      // ----- Upstairs -----
+      const lay = (tex, w, d, x, z, shiny = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), shiny ? new THREE.MeshPhongMaterial({ map: tex, shininess: shiny, specular: 0x555555 }) : new THREE.MeshLambertMaterial({ map: tex })); m.position.set(X + x, Y2 + 0.005, Z + z); scene.add(m); };
+      slab(0xc9a47a, 18.6, 0.2, 13.5, X, Y2 - 0.2, Z + 13, M.wood, 2); slab(0xf6f1e6, 18.6, 0.2, 13.5, X, Y2 + UP, Z + 13);
+      slab(WALL, 0.3, UP + 0.2, 13.5, X - 9.15, Y2, Z + 13); slab(WALL, 0.3, UP + 0.2, 13.5, X + 9.15, Y2, Z + 13); slab(WALL, 18.6, UP + 0.2, 0.3, X, Y2, Z + 19.65);
+      slab(WALL, 15.6, UP + 0.2, 0.3, X - 1.3, Y2, Z + 6.15); slab(WALL, 1.1, UP + 0.2, 0.3, X + 8.6, Y2, Z + 6.15);
+      // A wall from (x0, z0) to (x1, z1), with gaps for doors: [from, to] along its length. Each gap gets a head and an open door.
+      const wall = (x0, z0, x1, z1, gaps = []) => {
+        const alongX = z0 === z1, a0 = alongX ? x0 : z0, a1 = alongX ? x1 : z1;
+        let at = a0;
+        const piece = (p0, p1) => { if (p1 - p0 < 0.05) return; const mid = (p0 + p1) / 2, len = p1 - p0; if (alongX) { slab(WALL, len, UP, 0.16, X + mid, Y2, Z + z0); collide(X + mid, Z + z0, len, 0.3, 8); } else { slab(WALL, 0.16, UP, len, X + x0, Y2, Z + mid); collide(X + x0, Z + mid, 0.3, len, 8); } };
+        for (const [g0, g1, swing = 1] of gaps) {
+          piece(at, g0); at = g1;
+          const mid = (g0 + g1) / 2, len = g1 - g0;
+          if (alongX) { slab(WALL, len, UP - 2.15, 0.16, X + mid, Y2 + 2.15, Z + z0); for (const e of [g0, g1]) slab(TRIM, 0.07, 2.15, 0.2, X + e, Y2, Z + z0); slab(TRIM, len, 0.07, 0.2, X + mid, Y2 + 2.12, Z + z0); slab(0xefe4cf, 0.05, 2.05, len - 0.1, X + g0 + 0.06, Y2, Z + z0 + swing * (len / 2)); slab(BRASS, 0.07, 0.05, 0.05, X + g0 + 0.06, Y2 + 1, Z + z0 + swing * (len - 0.18)); }
+          else { slab(WALL, 0.16, UP - 2.15, len, X + x0, Y2 + 2.15, Z + mid); for (const e of [g0, g1]) slab(TRIM, 0.2, 2.15, 0.07, X + x0, Y2, Z + e); slab(TRIM, 0.2, 0.07, len, X + x0, Y2 + 2.12, Z + mid); slab(0xefe4cf, len - 0.1, 2.05, 0.05, X + x0 + swing * (len / 2), Y2, Z + g0 + 0.06); }
+        }
+        piece(at, a1);
+      };
+      wall(-9, 8.4, 9, 8.4, [[-5.6, -4.5], [0.1, 1.2], [3.55, 4.55], [6.7, 7.8]]);                      // the landing, and the four doors off it
+      wall(-1.6, 8.4, -1.6, 19.5); wall(3, 8.4, 3, 14.8); wall(5.2, 8.4, 5.2, 12.6); wall(3, 12.6, 5.2, 12.6); wall(-1.6, 14.8, 9, 14.8);
+      wall(-9, 15.6, -1.6, 15.6, [[-7.6, -6.6], [-3.9, -2.9]]); wall(-5.2, 15.6, -5.2, 19.5);
+      collide(X + 3.7, Z + 17.25, 10.4, 4.7, 8);                                                         // (nothing behind the children's rooms)
+      collide(X - 9.4, Z + 13, 0.8, 13.6, 9); collide(X + 9.4, Z + 13, 0.8, 13.6, 9); collide(X, Z + 19.9, 19.6, 0.8, 9);                  // the outside walls up here, tall enough to stop the camera as well
+      for (const s2 of [-1, 1]) { slab(TRIM, 18, 0.1, 0.04, X, Y2, Z + (s2 > 0 ? 8.3 : 6.32)); }
+      // The landing: a runner, the family along the wall, a table with flowers, the cupboard for the sheets, lights.
+      slab(0x8a2f3a, 15.2, 0.012, 1.1, X - 1.2, Y2 + 0.006, Z + 7.35); for (const s2 of [-1, 1]) slab(0xd9b25a, 15.2, 0.013, 0.05, X - 1.2, Y2 + 0.007, Z + 7.35 + s2 * 0.5);
+      for (let n = 0; n < 9; n++) { slab(0x3a2418, 0.5, 0.62, 0.03, X - 7.6 + n * 1.5, Y2 + 1.55, Z + 6.33); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac][n % 3], 0.42, 0.54, 0.035, X - 7.6 + n * 1.5, Y2 + 1.59, Z + 6.33); }
+      slab(0x5a3320, 1.3, 0.78, 0.36, X - 2.6, Y2, Z + 6.55, M.wood, 1); put(M.plain, new THREE.CylinderGeometry(0.09, 0.06, 0.26, 10).translate(X - 2.6, Y2 + 0.91, Z + 6.55), 0xf4f4f0); for (const [dx, hex] of [[-0.07, 0xff8ad8], [0.07, 0xffe066], [0, 0xd8342c]]) ball(hex, 0.07, X - 2.6 + dx, Y2 + 1.2 + Math.abs(dx), Z + 6.55); collide(X - 2.6, Z + 6.55, 1.4, 0.4, 5);
+      slab(0xefe4cf, 0.06, 2.1, 1, X - 8.97, Y2, Z + 7.35); slab(BRASS, 0.07, 0.05, 0.05, X - 8.93, Y2 + 1.05, Z + 7.7);
+      slab(0xc79a6a, 0.5, 0.6, 0.4, X + 5.4, Y2, Z + 6.6); slab(0xf4f4f0, 0.44, 0.1, 0.34, X + 5.4, Y2 + 0.6, Z + 6.6);                                    // the hamper
+      for (const lx of [-6, -1, 4]) put(M.glow, new THREE.CylinderGeometry(0.14, 0.14, 0.03, 10).translate(X + lx, Y2 + UP - 0.02, Z + 7.35), 0xfff2c0);
+
+      // ----- The master bedroom: x -9 to -1.6, z 8.4 to 15.6 -----
+      const bedroomRug = texture(128, 96, (c, w, h) => { c.fillStyle = '#d9c7a0'; c.fillRect(0, 0, w, h); c.strokeStyle = '#b9a276'; c.lineWidth = 4; c.strokeRect(8, 8, w - 16, h - 16); c.strokeStyle = '#8a6a44'; c.lineWidth = 1.5; c.strokeRect(16, 16, w - 32, h - 32); });
+      bedroomRug.wrapS = bedroomRug.wrapT = THREE.ClampToEdgeWrapping; lay(bedroomRug, 4.6, 3.6, -6.2, 11.9);
+      slab(0x8a5a44, 2.6, 0.45, 2.4, X - 7.6, Y2, Z + 11.9, M.wood, 1); slab(0xf1ede4, 2.5, 0.22, 2.3, X - 7.6, Y2 + 0.45, Z + 11.9); slab(0x7a1626, 1.5, 0.06, 2.32, X - 7, Y2 + 0.67, Z + 11.9); slab(0x8a5a44, 0.14, 1.25, 2.5, X - 8.9, Y2, Z + 11.9, M.wood, 1);
+      for (const sz of [-0.58, 0.58]) { slab(0xffffff, 0.5, 0.16, 0.8, X - 8.4, Y2 + 0.67, Z + 11.9 + sz); slab(0xd9a520, 0.3, 0.3, 0.5, X - 8, Y2 + 0.72, Z + 11.9 + sz * 0.9); }
+      for (let n = 0; n < 5; n++) ball(0x6a4634, 0.03, X - 8.82, Y2 + 0.95, Z + 10.9 + n * 0.5); slab(BRASS, 0.03, 0.42, 0.06, X - 8.98, Y2 + 2, Z + 11.9); slab(BRASS, 0.03, 0.06, 0.26, X - 8.98, Y2 + 2.24, Z + 11.9);
+      collide(X - 7.65, Z + 11.9, 2.7, 2.5, 5);
+      for (const [sz, mine] of [[-1.75, true], [1.75, false]]) { slab(0x5a3320, 0.5, 0.55, 0.6, X - 8.6, Y2, Z + 11.9 + sz, M.wood, 1); post(BRASS, 0.015, 0.3, X - 8.7, Y2 + 0.55, Z + 11.9 + sz, 5); put(M.glow, new THREE.ConeGeometry(0.18, 0.26, 10, 1, true).translate(X - 8.7, Y2 + 0.95, Z + 11.9 + sz), 0xffe2a6); collide(X - 8.6, Z + 11.9 + sz, 0.6, 0.7, 5);
+        if (mine) { slab(0x1c1c22, 0.1, 0.08, 0.18, X - 8.45, Y2 + 0.55, Z + 11.9 + sz + 0.15); slab(0xff2a4a, 0.01, 0.04, 0.12, X - 8.39, Y2 + 0.57, Z + 11.9 + sz + 0.15, M.glow); put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.09, 8).translate(X - 8.5, Y2 + 0.6, Z + 11.9 + sz - 0.18), 0xff8a30); put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.1, 8).translate(X - 8.4, Y2 + 0.6, Z + 11.9 + sz - 0.05), 0xcfe8ff); }
+        else { slab(0x3b6ea8, 0.28, 0.04, 0.2, X - 8.5, Y2 + 0.55, Z + 11.9 + sz); slab(0xefe4cf, 0.16, 0.08, 0.22, X - 8.45, Y2 + 0.55, Z + 11.9 + sz + 0.2); } }
+      for (const sx of [-0.1, 0.12]) slab(0x5a3320, 0.26, 0.05, 0.11, X - 6.1, Y2, Z + 10.5 + sx);                                                              // slippers, his side
+      slab(0x5a3320, 0.6, 0.95, 2.4, X - 1.95, Y2, Z + 11.9, M.wood, 1); for (let k = 0; k < 6; k++) slab(BRASS, 0.03, 0.03, 0.14, X - 2.26, Y2 + 0.25 + Math.floor(k / 2) * 0.28, Z + 11.3 + (k % 2) * 1.2); slab(0x1c1c22, 0.4, 0.75, 1.1, X - 1.95, Y2 + 0.95, Z + 11.9); slab(0x9fd0f5, 0.03, 0.6, 0.94, X - 2.17, Y2 + 1.03, Z + 11.9, M.glow);
+      for (let n = 0; n < 3; n++) put(M.plain, new THREE.CylinderGeometry(0.03, 0.035, 0.1 + (n % 2) * 0.05, 8).translate(X - 1.95, Y2 + 0.99, Z + 10.9 + n * 0.14), [0xd9a520, 0xcfe8ff, 0x8a1c2a][n]); for (let n = 0; n < 2; n++) slab(BRASS, 0.03, 0.24, 0.18, X - 1.85, Y2 + 0.95, Z + 12.75 + n * 0.24);
+      collide(X - 1.95, Z + 11.9, 0.7, 2.5, 5);
+      slab(0xefe4cf, 1.3, 0.74, 0.5, X - 5.25, Y2, Z + 15.25); put(M.plain, new THREE.CylinderGeometry(0.4, 0.4, 0.03, 20).rotateX(Math.PI / 2).scale(1, 1.25, 1).translate(X - 5.25, Y2 + 1.5, Z + 15.5), 0xb9c8d8); put(M.plain, new THREE.TorusGeometry(0.42, 0.03, 5, 22).scale(1, 1.25, 1).translate(X - 5.25, Y2 + 1.5, Z + 15.49), BRASS);
+      for (let n = 0; n < 5; n++) put(M.plain, new THREE.CylinderGeometry(0.025, 0.03, 0.08 + (n % 3) * 0.03, 8).translate(X - 5.6 + n * 0.16, Y2 + 0.8, Z + 15.3), [0xff8ad8, 0xd9a520, 0xcfe8ff, 0x8a5cff, 0xf4f4f0][n]); slab(0x8a1c2a, 0.2, 0.1, 0.14, X - 4.8, Y2 + 0.74, Z + 15.3); post(BRASS, 0.02, 0.4, X - 5.25, Y2, Z + 14.6, 5); post(0xff8ad8, 0.2, 0.08, X - 5.25, Y2 + 0.4, Z + 14.6, 12);
+      collide(X - 5.25, Z + 15.25, 1.4, 0.6, 5);
+      slab(0x2f4a44, 0.8, 0.42, 0.8, X - 2.6, Y2, Z + 9.3); slab(0x2f4a44, 0.8, 0.5, 0.16, X - 2.6, Y2 + 0.42, Z + 8.95); for (const s2 of [-1, 1]) slab(0x27403b, 0.14, 0.24, 0.8, X - 2.6 + s2 * 0.4, Y2 + 0.42, Z + 9.3); post(BRASS, 0.02, 1.5, X - 3.5, Y2, Z + 8.9, 5); put(M.glow, new THREE.ConeGeometry(0.22, 0.3, 10, 1, true).translate(X - 3.5, Y2 + 1.6, Z + 8.9), 0xffe2a6); collide(X - 2.6, Z + 9.3, 0.9, 0.9, 5);
+      for (const wz of [9.5, 14.3]) { slab(0xffd9a8, 0.04, 1.5, 1.2, X - 8.98, Y2 + 1.1, Z + wz, M.glow); for (const s2 of [-1, 1]) slab(0x7a2f3a, 0.1, 1.9, 0.3, X - 8.9, Y2 + 0.9, Z + wz + s2 * 0.72); slab(0x7a2f3a, 0.14, 0.22, 1.8, X - 8.88, Y2 + 2.7, Z + wz); }
+      put(M.glow, new THREE.SphereGeometry(0.24, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).translate(X - 5.4, Y2 + UP, Z + 12), 0xfff2c0);
+      slab(0xf4f4f0, 0.5, 0.9, 0.06, X - 6.2, Y2 + 0.9, Z + 15.5);                                                                                            // his robe, on the bathroom door
+      // His bathroom: x -9 to -5.2, z 15.6 to 19.5.
+      const tile = texture(64, 64, (c, w) => { c.fillStyle = '#eef2f0'; c.fillRect(0, 0, w, w); c.strokeStyle = '#b9c4c0'; c.lineWidth = 2; c.strokeRect(0, 0, w, w); c.strokeRect(0, 0, w / 2, w / 2); c.strokeRect(w / 2, w / 2, w / 2, w / 2); });
+      { const t = tile.clone(); t.needsUpdate = true; t.repeat.set(7, 7.5); lay(t, 3.7, 3.8, -7.1, 17.55, 60); }
+      for (const [w, d, x, z] of [[3.7, 0.03, -7.1, 19.47], [0.03, 3.8, -8.97, 17.55], [0.03, 3.8, -5.31, 17.55]]) slab(0xdfe8e6, w, 1.3, d, X + x, Y2, Z + z);
+      slab(0xf4f4f0, 2, 0.58, 0.9, X - 7.9, Y2, Z + 18.95); slab(0xdff2f6, 1.8, 0.03, 0.7, X - 7.9, Y2 + 0.5, Z + 18.95); post(0xc9cbd2, 0.02, 0.26, X - 8.75, Y2 + 0.58, Z + 18.95, 5); slab(0xc9cbd2, 0.16, 0.03, 0.03, X - 8.68, Y2 + 0.82, Z + 18.95); collide(X - 7.9, Z + 18.95, 2.1, 1, 5);      // the bath
+      for (const [w, d, x, z] of [[1.1, 0.03, -5.85, 18.4], [0.03, 1.05, -6.4, 18.95]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 2, d), new THREE.MeshPhongMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.25, shininess: 140, specular: 0xffffff, depthWrite: false })); m.position.set(X + x, Y2 + 1, Z + z); scene.add(m); }
+      slab(0xdfe8e6, 1.05, 0.06, 1, X - 5.85, Y2, Z + 18.95); post(0xc9cbd2, 0.015, 2, X - 5.4, Y2, Z + 19.3, 5); put(M.plain, new THREE.CylinderGeometry(0.1, 0.06, 0.05, 10).translate(X - 5.5, Y2 + 2, Z + 19.2), 0xc9cbd2); collide(X - 5.85, Z + 18.4, 1.2, 0.1, 5);                    // the shower
+      slab(0x5a3320, 0.55, 0.8, 2.2, X - 8.7, Y2, Z + 16.9, M.wood, 1); slab(0xf1ece0, 0.6, 0.05, 2.3, X - 8.7, Y2 + 0.8, Z + 16.9); for (const sz of [-0.55, 0.55]) { put(M.plain, new THREE.CylinderGeometry(0.2, 0.16, 0.06, 14).translate(X - 8.7, Y2 + 0.83, Z + 16.9 + sz), 0xf4f4f0); post(0xc9cbd2, 0.015, 0.16, X - 8.9, Y2 + 0.85, Z + 16.9 + sz, 5); }
+      slab(0xb9c8d8, 0.03, 1, 2.1, X - 8.96, Y2 + 1.2, Z + 16.9); for (let n = 0; n < 5; n++) ball(0xfff2c0, 0.05, X - 8.9, Y2 + 2.3, Z + 16 + n * 0.45, M.glow); collide(X - 8.7, Z + 16.9, 0.7, 2.3, 5);
+      for (let n = 0; n < 4; n++) put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.12, 6).translate(X - 8.6, Y2 + 0.91, Z + 16.6 + n * 0.12), [0x2f56c8, 0xff8a30, 0xf4f4f0, 0x2f7d46][n]); slab(0x23232b, 0.14, 0.04, 0.05, X - 8.55, Y2 + 0.86, Z + 17.3);                                // cologne, the pills, a razor
+      slab(0xf4f4f0, 0.5, 0.4, 0.42, X - 5.6, Y2, Z + 16.6); slab(0xf4f4f0, 0.16, 0.5, 0.42, X - 5.36, Y2 + 0.4, Z + 16.6); collide(X - 5.55, Z + 16.6, 0.6, 0.5, 5);
+      slab(0x7a1626, 0.04, 0.8, 0.5, X - 5.34, Y2 + 0.9, Z + 17.6); slab(0xf4f4f0, 0.04, 0.8, 0.5, X - 5.34, Y2 + 0.9, Z + 18); slab(0x9fd0f5, 0.9, 0.012, 0.6, X - 7.4, Y2 + 0.008, Z + 18.1); slab(0xc9cbd2, 0.34, 0.05, 0.34, X - 6.6, Y2, Z + 16.2);
+      put(M.glow, new THREE.CylinderGeometry(0.16, 0.16, 0.03, 10).translate(X - 7.1, Y2 + UP - 0.02, Z + 17.5), 0xf2f8ff);
+      // His clothes: x -5.2 to -1.6, z 15.6 to 19.5. Shirts down one side, suits down the other, shoes, a safe nobody mentions.
+      for (const [sx, cols] of [[-4.95, [0xf4f4f0, 0x9fd0f5, 0xffe066, 0x8a1c2a, 0x2f7d46, 0xff8a5c, 0x3b6ea8, 0xf4f4f0, 0x16161c, 0xd9c7a0]], [-1.85, [0x23232b, 0x3d4658, 0x4a4652, 0x6f5a44, 0x2a2a30, 0x8d8a8e, 0x23232b, 0x3d4658]]]) {
+        slab(0xc9cbd2, 0.03, 0.03, 3.4, X + sx, Y2 + 1.8, Z + 17.6); cols.forEach((hex, n) => slab(hex, 0.42, sx < -3 ? 0.75 : 1.1, 0.07, X + sx, Y2 + (sx < -3 ? 1.02 : 0.68), Z + 16.2 + n * (3 / cols.length)));
+        slab(0x5a3320, 0.4, 0.04, 3.4, X + sx, Y2 + 2.1, Z + 17.6, M.wood, 1); for (let n = 0; n < 5; n++) slab([0xd9c7a0, 0x8a6a44, 0xe9e2cf][n % 3], 0.34, 0.2, 0.44, X + sx, Y2 + 2.14, Z + 16.3 + n * 0.62);
+      }
+      for (let n = 0; n < 7; n++) { slab([0x23232b, 0x5a3320, 0xf2efe8][n % 3], 0.26, 0.09, 0.1, X - 4.9, Y2, Z + 16.2 + n * 0.42); slab([0x23232b, 0x5a3320, 0xf2efe8][n % 3], 0.26, 0.09, 0.1, X - 4.9, Y2, Z + 16.32 + n * 0.42); }
+      slab(0x3a3a44, 0.6, 0.7, 0.6, X - 3.4, Y2, Z + 19.1); put(M.plain, new THREE.CylinderGeometry(0.09, 0.09, 0.03, 12).rotateX(Math.PI / 2).translate(X - 3.4, Y2 + 0.42, Z + 18.78), 0xc9cbd2); collide(X - 3.4, Z + 19.1, 0.7, 0.7, 5);
+      slab(0xb9c8d8, 0.9, 1.8, 0.03, X - 3.4, Y2 + 0.2, Z + 15.72 + 0.0); put(M.glow, new THREE.CylinderGeometry(0.14, 0.14, 0.03, 10).translate(X - 3.4, Y2 + UP - 0.02, Z + 17.5), 0xfff2c0);
+      collide(X - 4.95, Z + 17.6, 0.5, 3.5, 5); collide(X - 1.85, Z + 17.6, 0.5, 3.5, 5);
+
+      // ----- AJ's room: x -1.6 to 3, z 8.4 to 14.8. An unmade bed, the console, the drums, what he took off. -----
+      slab(0x2f56c8, 4.2, 0.012, 3.2, X + 0.7, Y2 + 0.005, Z + 12);
+      slab(0x3b6ea8, 1.1, 0.42, 2.1, X - 0.9, Y2, Z + 13.5); slab(0xf1ede4, 1, 0.14, 0.5, X - 0.9, Y2 + 0.42, Z + 14.3); put(M.plain, new THREE.BoxGeometry(1.05, 0.08, 1.2).rotateY(0.25).translate(X - 0.8, Y2 + 0.46, Z + 13.1), 0x2f56c8); collide(X - 0.9, Z + 13.5, 1.2, 2.2, 5);
+      slab(0x1c1c22, 0.5, 0.5, 0.9, X + 2.65, Y2, Z + 10.2); slab(0x1c1c22, 0.4, 0.62, 0.8, X + 2.65, Y2 + 0.5, Z + 10.2); slab(0x7dffb0, 0.03, 0.46, 0.64, X + 2.43, Y2 + 0.58, Z + 10.2, M.glow); slab(0x8d8a8e, 0.2, 0.06, 0.3, X + 1.9, Y2 + 0.02, Z + 10.2); for (const s2 of [-1, 1]) slab(0x23232b, 0.1, 0.03, 0.14, X + 1.5, Y2 + 0.02, Z + 10.2 + s2 * 0.2); collide(X + 2.65, Z + 10.2, 0.6, 1, 5);
+      slab(0xd8342c, 0.5, 0.28, 0.5, X + 1.3, Y2, Z + 10.3);                                                                                                  // the beanbag he plays from
+      for (const [dx, dz, rr, hh] of [[1.9, 13.8, 0.3, 0.55], [2.5, 13.4, 0.22, 0.6], [1.4, 13.3, 0.2, 0.62], [2.2, 14.3, 0.34, 0.3]]) { put(M.plain, new THREE.CylinderGeometry(rr, rr, 0.26, 12).translate(X + dx, Y2 + hh, Z + dz), 0xd8342c); post(0xc9cbd2, 0.015, hh, X + dx, Y2, Z + dz, 4); } put(M.plain, new THREE.CylinderGeometry(0.24, 0.24, 0.02, 12).translate(X + 2.7, Y2 + 1.1, Z + 14), BRASS); post(0xc9cbd2, 0.012, 1.1, X + 2.7, Y2, Z + 14, 4); collide(X + 2.1, Z + 13.8, 1.5, 1.3, 5);
+      slab(0xe9e2d2, 1.3, 0.74, 0.6, X + 0.9, Y2, Z + 14.45, M.wood, 1); slab(0xe9e2cf, 0.44, 0.38, 0.4, X + 0.9, Y2 + 0.74, Z + 14.5); slab(0x9fd0f5, 0.34, 0.26, 0.02, X + 0.9, Y2 + 0.8, Z + 14.29, M.glow); slab(0x5a3320, 0.45, 0.06, 0.45, X + 0.9, Y2 + 0.45, Z + 13.75); collide(X + 0.9, Z + 14.45, 1.4, 0.7, 5);
+      for (let n = 0; n < 4; n++) slab([0xd8342c, 0x16161c, 0xf2c230, 0x2f7d46][n], 0.03, 0.9, 0.7, X - 1.5, Y2 + 1.4, Z + 9.3 + n * 1.1); for (let n = 0; n < 2; n++) slab([0x16161c, 0x8a1c1c][n], 0.7, 0.9, 0.03, X + 0.2 + n * 1.2, Y2 + 1.4, Z + 14.7);
+      slab(0x8a5a2a, 0.75, 0.04, 0.2, X + 0.4, Y2 + 0.05, Z + 11.4); for (const s2 of [-1, 1]) post(0x1c1c22, 0.03, 0.05, X + 0.4 + s2 * 0.25, Y2, Z + 11.4, 6); ball(0xd9722a, 0.13, X - 1.2, Y2 + 0.13, Z + 9.2);
+      for (const [dx, dz, hex] of [[0.2, 12.4, 0xd8342c], [1.2, 12.9, 0xe9e2cf], [-0.6, 11.2, 0x23232b]]) put(M.plain, new THREE.BoxGeometry(0.5, 0.05, 0.4).rotateY(dx).translate(X + dx, Y2 + 0.03, Z + dz), hex);
+      put(M.glow, new THREE.CylinderGeometry(0.14, 0.14, 0.03, 10).translate(X + 0.7, Y2 + UP - 0.02, Z + 11.6), 0xfff2c0);
+      // ----- The children's bathroom: x 3 to 5.2, z 8.4 to 12.6 -----
+      { const t = tile.clone(); t.needsUpdate = true; t.repeat.set(4, 7.5); lay(t, 2.1, 4, 4.1, 10.5, 60); }
+      slab(0xf4f4f0, 2, 0.58, 0.85, X + 4.1, Y2, Z + 12.1); slab(0xdff2f6, 1.8, 0.03, 0.65, X + 4.1, Y2 + 0.5, Z + 12.1); slab(0xf7c8d4, 1.9, 1.5, 0.03, X + 4.1, Y2 + 0.6, Z + 11.66); collide(X + 4.1, Z + 12.1, 2.1, 0.9, 5);
+      slab(0xf4f4f0, 0.5, 0.14, 0.4, X + 4.85, Y2 + 0.8, Z + 9.6); post(0xf4f4f0, 0.07, 0.8, X + 4.95, Y2, Z + 9.6, 8); slab(0xb9c8d8, 0.03, 0.6, 0.5, X + 5.09, Y2 + 1.3, Z + 9.6); slab(0xf4f4f0, 0.42, 0.4, 0.5, X + 3.35, Y2, Z + 10.4); slab(0xf4f4f0, 0.16, 0.5, 0.5, X + 3.14, Y2 + 0.4, Z + 10.4);
+      slab(0xff8ad8, 0.04, 0.7, 0.4, X + 3.12, Y2 + 0.9, Z + 9.1); slab(0x2f56c8, 0.04, 0.7, 0.4, X + 3.12, Y2 + 0.9, Z + 9.55); for (let n = 0; n < 6; n++) put(M.plain, new THREE.CylinderGeometry(0.025, 0.025, 0.1 + (n % 3) * 0.03, 6).translate(X + 4.7 + (n % 3) * 0.07, Y2 + 0.99, Z + 9.45 + Math.floor(n / 3) * 0.3), [0xff8ad8, 0x8a5cff, 0x49e0d0, 0x2f56c8, 0xf4f4f0, 0xffe066][n]);
+      put(M.glow, new THREE.CylinderGeometry(0.14, 0.14, 0.03, 10).translate(X + 4.1, Y2 + UP - 0.02, Z + 10.4), 0xf2f8ff);
+      // ----- Meadow's room: x 5.2 to 9, z 8.4 to 14.8, and the corner behind the bathroom. A made bed, a desk, books; pink where she allows it. -----
+      slab(0xf7a8c4, 3, 0.012, 2.4, X + 7.1, Y2 + 0.005, Z + 11.4);
+      slab(0xf7a8c4, 1.1, 0.42, 2.1, X + 8.3, Y2, Z + 13.5); slab(0xffffff, 1, 0.14, 0.5, X + 8.3, Y2 + 0.42, Z + 14.3); slab(0xc9b6f2, 1.05, 0.07, 1.3, X + 8.3, Y2 + 0.42, Z + 13.1); collide(X + 8.3, Z + 13.5, 1.2, 2.2, 5);
+      for (const [dx, hex] of [[8, 0xd9b25a], [8.3, 0xf4f4f0], [8.6, 0x8a5a44]]) { ball(hex, 0.13, X + dx, Y2 + 0.7, Z + 14.35); ball(hex, 0.08, X + dx, Y2 + 0.88, Z + 14.35); }
+      slab(0xe9e2d2, 0.7, 0.74, 1.6, X + 8.6, Y2, Z + 9.6, M.wood, 1); slab(0xe9e2cf, 0.45, 0.42, 0.5, X + 8.65, Y2 + 0.74, Z + 9.4); slab(0x9fd0f5, 0.02, 0.28, 0.36, X + 8.41, Y2 + 0.81, Z + 9.4, M.glow); slab(0x5a3320, 0.45, 0.06, 0.45, X + 7.8, Y2 + 0.45, Z + 9.6); for (let n = 0; n < 4; n++) slab(PASTELS[n], 0.2, 0.03 + n * 0.012, 0.28, X + 8.6, Y2 + 0.74 + n * 0.03, Z + 10.1); collide(X + 8.6, Z + 9.6, 0.8, 1.7, 5);
+      slab(0xe9e2d2, 1.8, 1.9, 0.4, X + 4.2, Y2, Z + 14.5, M.wood, 1); for (let n = 0; n < 24; n++) slab(PASTELS[n % 8], 0.12, 0.3 + (n % 3) * 0.03, 0.22, X + 3.5 + (n % 8) * 0.2, Y2 + 0.2 + Math.floor(n / 8) * 0.6, Z + 14.34); collide(X + 4.2, Z + 14.5, 1.9, 0.5, 5);
+      slab(0xefe4cf, 1.1, 0.74, 0.45, X + 4, Y2, Z + 12.95); put(M.plain, new THREE.CylinderGeometry(0.34, 0.34, 0.03, 18).rotateX(Math.PI / 2).translate(X + 4, Y2 + 1.4, Z + 12.72), 0xb9c8d8); for (let n = 0; n < 4; n++) put(M.plain, new THREE.CylinderGeometry(0.025, 0.03, 0.09, 6).translate(X + 3.7 + n * 0.16, Y2 + 0.79, Z + 12.95), [0xff8ad8, 0xc85cff, 0xcfe8ff, 0xd9a520][n]); collide(X + 4, Z + 12.95, 1.2, 0.6, 5);
+      for (let n = 0; n < 3; n++) slab([0xff5fd2, 0x49e0d0, 0xc9b6f2][n], 0.7, 0.9, 0.03, X + 5.9 + n * 1.1, Y2 + 1.5, Z + 14.7); slab(0xffe0ec, 0.04, 1.4, 1.2, X + 8.98, Y2 + 1.1, Z + 11.8, M.glow); for (const s2 of [-1, 1]) slab(0xf7a8c4, 0.08, 1.8, 0.3, X + 8.9, Y2 + 0.9, Z + 11.8 + s2 * 0.72);
+      put(M.glow, new THREE.CylinderGeometry(0.14, 0.14, 0.03, 10).translate(X + 7.1, Y2 + UP - 0.02, Z + 11.6), 0xfff2c0);
+      // Who is up here, most evenings.
+      const aj = makeLook('aj'), meadow = makeLook('meadow');
+      aj.group.position.set(X + 1.3, Y2 + 0.05, Z + 10.3); aj.group.rotation.y = Math.PI / 2; aj.set('sit'); scene.add(aj.group);
+      meadow.group.position.set(X + 7.8, Y2, Z + 9.6); meadow.group.rotation.y = Math.PI / 2; meadow.set('sit'); scene.add(meadow.group);
+      roomLamp(q, X - 1, Y2 + 2.7, Z + 7.3, 0xfff0d0, 30, 13); roomLamp(q, X - 5.4, Y2 + 2.7, Z + 12, 0xffe8c8, 40, 12); roomLamp(q, X + 4, Y2 + 2.7, Z + 11.4, 0xfff0e0, 36, 12);
+      places.house2 = { y: Y2, bedside: { x: X - 5.6, z: Z + 11.9 }, stairTop: { x: X + 7.25, z: Z + 7.2 }, stairFoot: { x: X + 7.25, z: Z + 0.3 }, bath: { x: X - 7.1, z: Z + 17.2 }, upstairs: [aj, meadow] };
+      places.beds = [{ x: X - 5.9, z: Z + 11.9, name: 'Sleep' }];
+    }
+    // The refrigerator door is its own piece, so that it can be opened (F, between jobs: sidejobs.js).
+    const fridgeDoor = new THREE.Group(), fd = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.28, 0.98).translate(0, 0.66, 0.49), new THREE.MeshLambertMaterial({ color: 0xe9e2d2 })), fh = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.04).translate(0.05, 0.9, 0.86), new THREE.MeshLambertMaterial({ color: 0xc9cbd2 }));
+    fridgeDoor.add(fd, fh); fridgeDoor.position.set(X - 6.77, Y + 0.04, Z + 4.01); scene.add(fridgeDoor);
+    slab(0xfff6d8, 0.02, 1.2, 0.9, X - 6.8, Y + 0.08, Z + 4.5, M.glow); for (let k = 0; k < 3; k++) { slab(0xcfe8ff, 0.3, 0.02, 0.86, X - 6.95, Y + 0.3 + k * 0.4, Z + 4.5); for (let n = 0; n < 4; n++) slab([0xd8342c, 0xf4f4f0, 0x2f7d46, 0xffe066, 0xc8705a, 0x8a5a2a][(n + k) % 6], 0.14, 0.16 + (n % 2) * 0.06, 0.14, X - 6.9, Y + 0.32 + k * 0.4, Z + 4.15 + n * 0.22); }
     const carmela = makeLook('carmela');
     carmela.group.position.set(X - 4, Y, Z - 3.6); carmela.group.rotation.y = Math.PI; scene.add(carmela.group);
-    places.houseRoom = { ambient: [carmela], inside: { x: X + 2, z: Z + 3.2, h: Math.PI } };
+    places.houseRoom = { ambient: [carmela], inside: { x: X + 2, z: Z + 3.2, h: Math.PI }, fridge: { door: fridgeDoor, at: { x: X - 6, z: Z + 4.5 }, from: { x: X - 6.8, y: Y + 0.8, z: Z + 4.5 } } };
   }
   buildHouseRoom();
 
@@ -2482,7 +2614,42 @@ export function buildWorld(scene) {
     for (const x of [-4, 4]) q.window(x, 5.72, 4.4, 1.8, 1.9, Math.PI);
     q.light(0, 3.1, -2, 0xfff0d0, 50, 15); q.light(0, 3.1, 3.5, 0xfff0d0, 30, 12);
     clerk(q, -1, -4.4, 0, { shirt: 0xf4f4f4, body: 'female', hair: 0xd9b25a, hairMesh: 'long', hat: undefined });
-    q.person(pick(PED_ROOM_LOOKS), -4.4, 2.2, Math.PI, 'sit');
+    q.person(pick(PED_ROOM_LOOKS), 5.1, 1.3, 0, 'sit');
+    { // The luncheonette, laid for breakfast (owner: he meets his detective here; they sit down). The two front booths
+      // get a bench on the other side of the table; every table gets what a table in a diner has on it.
+      const RED = 0xd8342c, CHROMEC = 0xc9cbd2, WHITE = 0xf4f4f0;
+      const check = texture(64, 64, (c, w) => { c.fillStyle = '#f1ece0'; c.fillRect(0, 0, w, w); c.fillStyle = '#23232b'; c.fillRect(0, 0, 32, 32); c.fillRect(32, 32, 32, 32); });
+      check.repeat.set(16, 12); { const m = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 11.4).rotateX(-Math.PI / 2), new THREE.MeshPhongMaterial({ map: check, shininess: 50, specular: 0x444444 })); m.position.set(q.X, q.Y + 0.025, q.Z); scene.add(m); }
+      for (const s2 of [-1, 1]) { slab(RED, 15.4, 0.14, 0.04, q.X, q.Y + 1.1, q.Z + s2 * 5.68); slab(RED, 0.04, 0.14, 11.4, q.X + s2 * 7.68, q.Y + 1.1, q.Z); slab(CHROMEC, 15.4, 0.04, 0.05, q.X, q.Y + 1.26, q.Z + s2 * 5.68); slab(CHROMEC, 0.05, 0.04, 11.4, q.X + s2 * 7.68, q.Y + 1.26, q.Z); }
+      q.booths = [];
+      for (const x of [-5.5, 5.5]) {
+        q.block(0x2f56c8, 2.4, 0.5, 0.7, x, 3.1); q.block(0x2a4ab0, 2.4, 0.7, 0.2, x, 3.35, M.plain, 0, 0.5);
+        q.booths.push({ north: { x: q.X + x, y: q.Y, z: q.Z + 1.32, h: 0 }, south: { x: q.X + x, y: q.Y, z: q.Z + 3.08, h: Math.PI }, table: { x: q.X + x, z: q.Z + 2.2 }, aisle: { x: q.X + x + (x < 0 ? 1.9 : -1.9), z: q.Z + 2.2 } });
+      }
+      for (const [x, z] of [[-5.5, 2.2], [-5.5, 5], [5.5, 2.2], [5.5, 5]]) { // on every table
+        const wallX = x < 0 ? x - 0.85 : x + 0.85;
+        slab(CHROMEC, 0.12, 0.16, 0.2, q.X + wallX, q.Y + 0.8, q.Z + z); slab(WHITE, 0.08, 0.1, 0.16, q.X + wallX, q.Y + 0.84, q.Z + z);                                                                // napkins
+        post(RED, 0.03, 0.18, q.X + wallX, q.Y + 0.8, q.Z + z - 0.25, 6); post(0xffe066, 0.03, 0.18, q.X + wallX, q.Y + 0.8, q.Z + z + 0.25, 6); post(CHROMEC, 0.025, 0.1, q.X + wallX + (x < 0 ? 0.14 : -0.14), q.Y + 0.8, q.Z + z - 0.1, 6); post(WHITE, 0.025, 0.1, q.X + wallX + (x < 0 ? 0.14 : -0.14), q.Y + 0.8, q.Z + z + 0.1, 6);
+        slab(0x8a1c1c, 0.22, 0.012, 0.3, q.X + x + 0.5, q.Y + 0.8, q.Z + z + 0.3); slab(0x8a1c1c, 0.22, 0.012, 0.3, q.X + x - 0.3, q.Y + 0.8, q.Z + z - 0.3);                                               // menus
+        slab(x < 0 ? 0x3a2418 : 0x3a2418, 0.3, 0.26, 0.1, q.X + (x < 0 ? x - 1.05 : x + 1.05), q.Y + 1.15, q.Z + z); slab(0xffb060, 0.2, 0.12, 0.02, q.X + (x < 0 ? x - 1.0 : x + 1.0), q.Y + 1.22, q.Z + z, M.glow);     // a little jukebox on the wall of each
+        post(0x23232b, 0.008, 1.2, q.X + x, q.Y + 2.4, q.Z + z, 4); put(M.glow, new THREE.ConeGeometry(0.24, 0.26, 10, 1, true).translate(q.X + x, q.Y + 2.3, q.Z + z), 0xffe2a6);                              // a lamp over it
+      }
+      // The counter: coffee on the warmers, a cake under glass, the register, pies turning, tickets on the wheel; behind, the grill.
+      for (const [cx, hex] of [[-3.2, 0x5a3320], [-2.8, 0xff8a30]]) { slab(0x23232b, 0.3, 0.06, 0.3, q.X + cx, q.Y + 1.14, q.Z - 3.5); put(M.plain, new THREE.CylinderGeometry(0.09, 0.1, 0.16, 10).translate(q.X + cx, q.Y + 1.28, q.Z - 3.5), 0xcfe8ff); put(M.plain, new THREE.CylinderGeometry(0.085, 0.095, 0.1, 10).translate(q.X + cx, q.Y + 1.25, q.Z - 3.5), hex); }
+      put(M.plain, new THREE.CylinderGeometry(0.24, 0.24, 0.03, 14).translate(q.X + 0.6, q.Y + 1.15, q.Z - 3.4), CHROMEC); put(M.plain, new THREE.CylinderGeometry(0.2, 0.2, 0.12, 14).translate(q.X + 0.6, q.Y + 1.22, q.Z - 3.4), 0xf2c8a0); { const dome = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshPhongMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.28, shininess: 160, specular: 0xffffff, depthWrite: false })); dome.position.set(q.X + 0.6, q.Y + 1.16, q.Z - 3.4); scene.add(dome); }
+      slab(0x23232b, 0.42, 0.3, 0.36, q.X + 5.6, q.Y + 1.13, q.Z - 3.4); slab(0x7dffb0, 0.3, 0.1, 0.02, q.X + 5.6, q.Y + 1.34, q.Z - 3.21, M.glow);
+      for (let n = 0; n < 6; n++) { put(M.plain, new THREE.CylinderGeometry(0.11, 0.11, 0.012, 12).translate(q.X - 3.5 + n * 1.5 + 0.3, q.Y + 1.14, q.Z - 3.05), WHITE); put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.08, 8).translate(q.X - 3.5 + n * 1.5 - 0.1, q.Y + 1.17, q.Z - 3.1), WHITE); }     // a place set at each stool
+      slab(0x8a8d96, 9, 0.5, 0.06, q.X + 1, q.Y + 2.1, q.Z - 4.86); slab(0xffb060, 8.6, 0.04, 0.2, q.X + 1, q.Y + 2.08, q.Z - 4.75, M.glow); for (let n = 0; n < 7; n++) slab(WHITE, 0.1, 0.16, 0.01, q.X - 1.6 + n * 0.45, q.Y + 1.98, q.Z - 4.7);                                  // the pass: lamps, tickets
+      sign(['TODAY', 'MEAT LOAF  4.95', 'PIE  1.50'], q.X - 5.2, q.Y + 2.5, q.Z - 5.66, 0, { w: 1.9, h: 1.1, color: '#f4f4f0', bg: '#1f3a2c', size: 0.5, glow: false });
+      put(M.plain, new THREE.CylinderGeometry(0.3, 0.3, 0.05, 20).rotateX(Math.PI / 2).translate(q.X + 5.6, q.Y + 2.7, q.Z - 5.66), WHITE); put(M.glow, new THREE.TorusGeometry(0.3, 0.025, 5, 22).translate(q.X + 5.6, q.Y + 2.7, q.Z - 5.63), 0x49e0d0);
+      post(RED, 0.16, 0.3, q.X - 7.2, q.Y + 0.9, q.Z + 0.2, 10); put(M.plain, new THREE.SphereGeometry(0.2, 10, 8).translate(q.X - 7.2, q.Y + 1.4, q.Z + 0.2), 0xcfe8ff); post(CHROMEC, 0.03, 0.9, q.X - 7.2, q.Y, q.Z + 0.2, 5);                                                    // gum, a penny
+      post(0x3a2418, 0.03, 1.8, q.X + 7.2, q.Y, q.Z + 0.2, 6); for (let n = 0; n < 4; n++) slab(0x3a2418, 0.2, 0.03, 0.03, q.X + 7.2 + Math.cos(n * 1.57) * 0.1, q.Y + 1.7, q.Z + 0.2 + Math.sin(n * 1.57) * 0.1); slab(0x6f5a44, 0.3, 0.9, 0.16, q.X + 7.1, q.Y + 0.8, q.Z + 0.2);
+      for (let n = 0; n < 5; n++) { slab(0x23232b, 0.03, 0.4, 0.5, q.X - 7.66, q.Y + 1.7, q.Z - 3.6 + n * 0.8); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac][n % 3], 0.035, 0.32, 0.42, q.X - 7.65, q.Y + 1.74, q.Z - 3.6 + n * 0.8); }                                               // everybody famous who ever ate here
+      q.person({ shirt: WHITE, tee: true, pants: 0x23232b, hair: 0x2b1b12, hat: 'cap', hatColor: 0xf4f4f0, bulk: 1.2, mustache: 0x2b1b12 }, 3.4, -4.5, Math.PI);                                                                                  // the cook, with his back to the room
+      q.person({ body: 'female', shirt: 0x9fd0f5, pants: 0x3b4a66, hair: 0x8d8a8e, hairMesh: 'long', age: 0.6 }, -0.5, -2.3, Math.PI, 'sit').group.position.y = q.Y + 0.27;
+      q.person({ shirt: 0x5c6157, sleeves: 'long', pants: 0x3a3a44, hair: 0x2b1b12, hat: 'cap', hatColor: 0x2f5a3f, bulk: 1.15 }, 2.5, -2.3, Math.PI, 'sit').group.position.y = q.Y + 0.27;
+      q.waitress = { x: q.X - 2.6, z: q.Z - 1.4 };
+    }
   }
   if (!LA) { // a liquor store: aisles of bottles, beer in the cold case, the register behind glass
     const q = rooms.LIQUOR = room(14, 12, 3.4, { floorTint: 0xc9c2b8, wallTint: 0xe9e2d2 });
@@ -2962,6 +3129,33 @@ export function buildWorld(scene) {
     Object.assign(o, { chair: { x: ox(0.5), y: Y, z: oz(-3.28), h: 0 }, guests, couch, desk: { x: ox(0.5), z: oz(-2.2) } });
     (places.stairs ??= []).push({ a: { x: q.X - 5.4, z: q.Z - 3.9, h: 0 }, b: { x: o.inside.x, z: o.inside.z + 1.2, h: Math.PI }, up: "Go through to Hesh's office", down: 'Back to reception' });
   }
+  { // Brendan Filone's place: one room and a bathroom, a couch that came with it, and forty DVD players he has not moved yet
+    const q = rooms.BRENDAN = room(10, 8, 3, { floor: M.wood, floorTint: 0x7a5a44, floorScale: 1.5, wall: M.plain, wallTint: 0xd8cdb4, ceil: 0xe9e2cf, door: 0x5a3320, doorX: -2.5, at: [2680, 26] });
+    const TILE = 0xdfe8e6, WHITE = 0xf4f4f0, CARD = 0xc79a6a;
+    // The bathroom, in the corner: two walls, a doorway, tile.
+    q.block(0xd8cdb4, 0.16, 3, 3.3, 1.9, -2.05); q.block(0xd8cdb4, 1.5, 3, 0.16, 4, -0.48); slab(0xd8cdb4, 1.5, 0.8, 0.16, q.X + 2.6, q.Y + 2.2, q.Z - 0.48);                                    // (the gap between x 1.9 and 3.25 is the door)
+    slab(TILE, 2.8, 0.012, 3.2, q.X + 3.3, q.Y + 0.006, q.Z - 2.1); for (let k = 0; k < 5; k++) slab(0xb9c8c8, 2.8, 0.014, 0.02, q.X + 3.3, q.Y + 0.007, q.Z - 3.5 + k * 0.7);
+    slab(TILE, 2.8, 1.5, 0.03, q.X + 3.3, q.Y, q.Z - 3.68); slab(TILE, 0.03, 1.5, 3.2, q.X + 4.68, q.Y, q.Z - 2.1);
+    q.block(WHITE, 1.9, 0.58, 0.9, 3.5, -3.1); slab(0xe9eeee, 1.7, 0.03, 0.7, q.X + 3.5, q.Y + 0.56, q.Z - 3.1); post(0xc9cbd2, 0.02, 0.24, q.X + 4.36, q.Y + 0.58, q.Z - 3.1, 5); slab(0xc9cbd2, 0.14, 0.03, 0.03, q.X + 4.3, q.Y + 0.8, q.Z - 3.1);        // the bath
+    slab(WHITE, 0.5, 0.14, 0.4, q.X + 4.4, q.Y + 0.8, q.Z - 1.3); post(WHITE, 0.07, 0.8, q.X + 4.5, q.Y, q.Z - 1.3, 8); slab(0xb9c8d8, 0.03, 0.6, 0.45, q.X + 4.66, q.Y + 1.3, q.Z - 1.3);                                              // basin, mirror
+    slab(WHITE, 0.4, 0.4, 0.5, q.X + 2.4, q.Y, q.Z - 3.3); slab(WHITE, 0.4, 0.5, 0.16, q.X + 2.4, q.Y + 0.4, q.Z - 3.56); slab(0x9fd0f5, 0.5, 0.012, 0.7, q.X + 3.4, q.Y + 0.008, q.Z - 2.2);                                              // the toilet; a mat
+    slab(0x2f56c8, 0.5, 0.9, 0.04, q.X + 2.02, q.Y + 0.8, q.Z - 2.4);                                                                                                                                                                  // a towel on the back of the wall
+    // The room: the couch, a television on a milk crate, a mattress, weights, a boombox, what a week of take-away leaves.
+    q.block(0x4a5a6a, 2.4, 0.5, 0.95, -2.6, -3.2); q.block(0x4a5a6a, 2.4, 0.5, 0.26, -2.6, -3.58, M.plain, 0, 0.5); slab(0x3a4a5a, 0.3, 0.3, 0.95, q.X - 3.7, q.Y + 0.5, q.Z - 3.2);
+    slab(0x2f56c8, 0.5, 0.4, 0.4, q.X - 2.6, q.Y, q.Z - 0.9); slab(0x1c1c22, 0.9, 0.7, 0.5, q.X - 2.6, q.Y + 0.4, q.Z - 0.9); q.glowPanel(0x9fd0f5, 0.74, 0.52, -2.6, -1.16, 0.75, Math.PI); slab(0x23232b, 0.34, 0.06, 0.24, q.X - 2.2, q.Y + 0.02, q.Z - 1.6); collide(q.X - 2.6, q.Z - 0.9, 1, 0.6, 1.1);
+    slab(0xe9e2cf, 1.5, 0.22, 2, q.X - 4, q.Y, q.Z + 1.6); slab(0x8a1c1c, 1.5, 0.06, 1.2, q.X - 4, q.Y + 0.22, q.Z + 2); slab(WHITE, 0.6, 0.12, 0.4, q.X - 4, q.Y + 0.22, q.Z + 0.85); collide(q.X - 4, q.Z + 1.6, 1.6, 2.1, 0.4);
+    put(M.plain, new THREE.CylinderGeometry(0.02, 0.02, 1.5, 6).rotateZ(Math.PI / 2).translate(q.X + 0.2, q.Y + 0.18, q.Z + 2.9), 0x8a8d96); for (const s2 of [-1, 1]) for (let k = 0; k < 2; k++) put(M.plain, new THREE.CylinderGeometry(0.18 - k * 0.04, 0.18 - k * 0.04, 0.05, 12).rotateZ(Math.PI / 2).translate(q.X + 0.2 + s2 * (0.62 - k * 0.07), q.Y + 0.18, q.Z + 2.9), 0x23232b);
+    slab(0x23232b, 0.6, 0.26, 0.2, q.X - 0.4, q.Y + 0.92, q.Z - 3.6); for (const s2 of [-1, 1]) put(M.plain, new THREE.CylinderGeometry(0.09, 0.09, 0.02, 10).rotateX(Math.PI / 2).translate(q.X - 0.4 + s2 * 0.2, q.Y + 1.05, q.Z - 3.49), 0x8d8a8e); slab(0x7dffb0, 0.1, 0.04, 0.01, q.X - 0.4, q.Y + 1.12, q.Z - 3.49, M.glow); // the radio, on
+    q.block(0x8a6a44, 0.9, 0.9, 0.5, -0.4, -3.6, M.wood, 1);
+    for (let k = 0; k < 14; k++) { const col = k % 4, row = Math.floor(k / 4); slab(CARD, 0.5, 0.42, 0.46, q.X - 0.9 + col * 0.54, q.Y + row * 0.43, q.Z + 3.3); slab(0x2f56c8, 0.51, 0.1, 0.47, q.X - 0.9 + col * 0.54, q.Y + row * 0.43 + 0.16, q.Z + 3.3); } collide(q.X - 0.1, q.Z + 3.3, 2.3, 0.6, 1.4); // the DVD players
+    for (let k = 0; k < 3; k++) slab(0xe9e2cf, 0.4, 0.04, 0.4, q.X - 1.2 + k * 0.03, q.Y + 0.01 + k * 0.045, q.Z - 2.1); for (let k = 0; k < 6; k++) post([0x8a5a2a, 0x2f7d46][k % 2], 0.03, 0.22, q.X - 1.9 + (k % 3) * 0.14, q.Y, q.Z - 2.3 + Math.floor(k / 3) * 0.3, 6);   // pizza boxes, bottles
+    slab(0xd8342c, 0.9, 1.2, 0.03, q.X - 2.6, q.Y + 1.5, q.Z - 3.68); slab(0x16161c, 0.7, 1, 0.035, q.X - 2.6, q.Y + 1.6, q.Z - 3.68); slab(0xf2c230, 0.5, 0.2, 0.04, q.X - 2.6, q.Y + 2.3, q.Z - 3.67);                                         // a poster of a car he will never own
+    q.block(WHITE, 0.6, 0.9, 1.6, -4.5, -1.2); slab(0x8a8d96, 0.62, 0.04, 1.62, q.X - 4.5, q.Y + 0.9, q.Z - 1.2); slab(0xc9cbd2, 0.4, 0.02, 0.5, q.X - 4.5, q.Y + 0.92, q.Z - 0.8); for (let k = 0; k < 4; k++) put(M.plain, new THREE.CylinderGeometry(0.12, 0.12, 0.012, 10).translate(q.X - 4.5, q.Y + 0.94 + k * 0.014, q.Z - 1.6), WHITE);
+    q.window(-1, 3.72, 2, 1.2, 1.8, Math.PI, 0xffd9a8); for (let k = 0; k < 8; k++) slab(0xb9a58a, 2, 0.02, 0.05, q.X - 1, q.Y + 1.28 + k * 0.15, q.Z + 3.66);
+    put(M.glow, new THREE.SphereGeometry(0.1, 8, 6).translate(q.X - 1.5, q.Y + 2.7, q.Z), 0xfff2c0); post(0x23232b, 0.008, 0.3, q.X - 1.5, q.Y + 2.7, q.Z, 3);                                                                              // a bare bulb
+    q.light(-1.5, 2.5, 0, 0xffe2b0, 34, 11); q.light(3.3, 2.4, -2.2, 0xdfeeff, 22, 6);
+    q.tub = { x: q.X + 4.25, y: q.Y + 0.28, z: q.Z - 3.1 }; q.tubMid = { x: q.X + 3.5, y: q.Y + 0.28, z: q.Z - 3.1 }; /* a body laid down lies back from where it stood: `tub` is the foot of the bath */ q.bathDoor = { x: q.X + 2.6, z: q.Z - 0.1 }; q.bath = { x: q.X + 3.2, z: q.Z - 1.9 }; q.radio = { x: q.X - 0.4, z: q.Z - 2.9 }; q.boxes = { x: q.X - 0.1, z: q.Z + 2.5 };
+  }
   { // Bonpensiero Bros.: a car up on the lift, tool chests, tyres, a girlie calendar
     const q = rooms.BODYSHOP = room(18, 14, 5, { floor: M.asphalt, floorTint: 0x6a6870, floorScale: 5, wall: M.brick, wallTint: 0x9a8a84, wallScale: 2, ceil: 0x3a3a44, doorX: 6 });
     for (const s of [-1, 1]) { for (const t of [-1, 1]) q.block(0xd8342c, 0.35, 1.7, 0.35, -3 + s * 1.5, -1.5 + t * 1.6); slab(0xd8342c, 0.3, 0.15, 3.6, q.X - 3 + s * 1.5, q.Y + 1.55, q.Z - 1.5); slab(0xd8342c, 3.4, 0.12, 0.3, q.X - 3, q.Y + 1.58, q.Z - 1.5 + s * 1.2); } // the two-post lift
@@ -3109,64 +3303,6 @@ export function buildWorld(scene) {
     sign('VERBUM DEI  ·  CLASS OF 1999', q.X, q.Y + 3, q.Z - 3.84, 0, { w: 7, h: 0.8, color: '#f6e7b4', bg: '#2c3a5a', size: 0.8, glow: false });
     q.light(-4, 3, 0, 0xf0f6ff, 40, 14); q.light(4, 3, 0, 0xf0f6ff, 40, 14);
     q.person(pick(KID_LOOKS), -2, 0, Math.PI / 2, 'talk'); q.person(pick(KID_LOOKS), -0.6, 0, -Math.PI / 2);
-  }
-
-  if (!LA) { // Upstairs at the Sopranos': the master bedroom, AJ's room and Meadow's, off a landing. Reached by the stairs in the den.
-    const q = rooms.UPSTAIRS = room(18, 11, 3.1, { floor: M.gravel, floorTint: 0xb9a58a, wall: M.plain, wallTint: 0xf3e6cf, door: 0xf3e9d8, at: [2840, -24] });
-    for (const x of [-1.5, 3.8]) { q.block(0xf3e6cf, 0.2, 3.1, 7, x, -1.8); }
-    for (const s of [-1, 1]) { slab(0xffffff, 17.4, 0.12, 0.04, q.X, q.Y, q.Z + s * 5.18); slab(0xffffff, 0.04, 0.12, 10.4, q.X + s * 8.68, q.Y, q.Z); } // the walls between the rooms; each is open to the landing
-    // The master bedroom: the big bed, two night tables, a dresser with a television on it.
-    q.block(0x8a5a44, 2.4, 0.45, 2.6, -5.8, -3.4, M.wood, 1); slab(0xf1ede4, 2.3, 0.2, 2.5, q.X - 5.8, q.Y + 0.45, q.Z - 3.4); slab(0x7a1626, 2.3, 0.06, 1.5, q.X - 5.8, q.Y + 0.65, q.Z - 2.9);
-    slab(0x8a5a44, 2.5, 1.1, 0.14, q.X - 5.8, q.Y, q.Z - 4.78); for (const sx of [-0.55, 0.55]) slab(0xffffff, 0.8, 0.16, 0.5, q.X - 5.8 + sx, q.Y + 0.65, q.Z - 4.3);
-    for (const sx of [-1.7, 1.7]) { q.block(0x5a3320, 0.6, 0.55, 0.5, -5.8 + sx, -4.5, M.wood, 1); put(M.glow, new THREE.ConeGeometry(0.2, 0.3, 10, 1, true).translate(q.X - 5.8 + sx, q.Y + 0.95, q.Z - 4.5), 0xffe2a6); }
-    q.block(0x5a3320, 2.2, 0.9, 0.6, -5.8, 1.4, M.wood, 1); slab(0x1c1c22, 1, 0.7, 0.4, q.X - 5.8, q.Y + 0.9, q.Z + 1.4); q.glowPanel(0x9fd0f5, 0.8, 0.5, -5.8, 1.19, 1.25, Math.PI);
-    q.window(-8.72, -2, 2.4, 1.4, 1.7, Math.PI / 2, 0xffd9a8);
-    { // The master bedroom, furnished: the wardrobe with the long mirror, her dressing table, his chair, what is on the night tables
-      const IVORY = 0xefe4cf, BRASS = 0xd9a520, B = (x, z) => [q.X + x, q.Z + z];
-      slab(0xd9c7a0, 4.2, 0.015, 2.6, q.X - 5.8, q.Y + 0.005, q.Z - 1.3); slab(0xc9b48a, 3.8, 0.017, 2.2, q.X - 5.8, q.Y + 0.006, q.Z - 1.3);
-      q.block(IVORY, 0.6, 2.4, 3.3, -1.95, -2.9); for (let n = 0; n < 4; n++) { slab(0xd8c8a8, 0.02, 2.2, 0.02, q.X - 2.26, q.Y + 0.1, q.Z - 4.5 + n * 0.82 + 0.4); slab(BRASS, 0.03, 0.14, 0.03, q.X - 2.27, q.Y + 1.1, q.Z - 4.5 + n * 0.82 + 0.3); } slab(0xb9c8d8, 0.02, 1.8, 0.66, q.X - 2.27, q.Y + 0.3, q.Z - 1.7);
-      slab(0x8a2f3a, 2.3, 0.1, 0.5, q.X - 5.8, q.Y + 0.66, q.Z - 2.35); for (const sx of [-0.5, 0.5]) slab(0xd9a520, 0.5, 0.3, 0.14, q.X - 5.8 + sx, q.Y + 0.8, q.Z - 4.05);                                           // the folded quilt, the good cushions
-      for (let n = 0; n < 5; n++) ball(0x6a4634, 0.03, q.X - 6.8 + n * 0.5, q.Y + 0.85, q.Z - 4.7); slab(BRASS, 0.06, 0.42, 0.03, q.X - 5.8, q.Y + 1.9, q.Z - 5.32); slab(BRASS, 0.26, 0.06, 0.03, q.X - 5.8, q.Y + 2.14, q.Z - 5.32);     // the cross over the bed
-      for (const sx of [-1.5, 1.5]) { slab(BRASS, 0.5, 0.64, 0.03, q.X - 5.8 + sx, q.Y + 1.6, q.Z - 5.32); slab(0xe9e2cf, 0.42, 0.56, 0.035, q.X - 5.8 + sx, q.Y + 1.64, q.Z - 5.32); }
-      slab(0x1c1c22, 0.18, 0.08, 0.1, q.X - 4.1, q.Y + 0.55, q.Z - 4.35); slab(0xff2a4a, 0.12, 0.04, 0.01, q.X - 4.1, q.Y + 0.57, q.Z - 4.29, M.glow);                                                               // 4:07, most nights
-      put(M.plain, new THREE.CylinderGeometry(0.03, 0.03, 0.09, 8).translate(q.X - 3.95, q.Y + 0.6, q.Z - 4.6), 0xff8a30); put(M.plain, new THREE.CylinderGeometry(0.035, 0.03, 0.1, 8).translate(q.X - 4.25, q.Y + 0.6, q.Z - 4.6), 0xcfe8ff); // the pills, the water
-      slab(0x3b6ea8, 0.2, 0.04, 0.28, q.X - 7.5, q.Y + 0.55, q.Z - 4.4); slab(IVORY, 0.22, 0.08, 0.16, q.X - 7.6, q.Y + 0.55, q.Z - 4.65);                                                                           // her book, the telephone
-      for (const s of [-1, 1]) slab(0x5a3320, 0.12, 0.05, 0.26, q.X - 4.35 + s * 0.09, q.Y, q.Z - 2.3);                                                                                                            // slippers
-      q.block(IVORY, 0.5, 0.74, 1.3, -8.4, 0.3); put(M.plain, new THREE.CylinderGeometry(0.42, 0.42, 0.03, 20).rotateZ(Math.PI / 2).scale(1, 1.25, 1).translate(q.X - 8.66, q.Y + 1.5, q.Z + 0.3), 0xb9c8d8); put(M.plain, new THREE.TorusGeometry(0.44, 0.03, 5, 22).rotateY(Math.PI / 2).scale(1, 1.25, 1).translate(q.X - 8.65, q.Y + 1.5, q.Z + 0.3), BRASS);
-      for (let n = 0; n < 5; n++) put(M.plain, new THREE.CylinderGeometry(0.025, 0.03, 0.08 + (n % 3) * 0.03, 8).translate(q.X - 8.45, q.Y + 0.8, q.Z - 0.1 + n * 0.16), [0xff8ad8, 0xd9a520, 0xcfe8ff, 0x8a5cff, 0xf4f4f0][n]); slab(0x8a1c2a, 0.2, 0.1, 0.14, q.X - 8.35, q.Y + 0.74, q.Z + 0.78);
-      post(BRASS, 0.02, 0.4, q.X - 7.7, q.Y, q.Z + 0.3, 5); post(0xff8ad8, 0.2, 0.08, q.X - 7.7, q.Y + 0.4, q.Z + 0.3, 12);
-      slab(0x2f4a44, 0.7, 0.4, 0.7, q.X - 2.6, q.Y, q.Z + 0.9); slab(0x2f4a44, 0.16, 0.5, 0.7, q.X - 2.28, q.Y + 0.4, q.Z + 0.9); slab(0xf4f4f0, 0.5, 0.5, 0.08, q.X - 2.5, q.Y + 0.45, q.Z + 0.58); collide(q.X - 2.6, q.Z + 0.9, 0.8, 0.8, 0.9); // his chair, and the white robe
-      for (const s of [-1, 1]) slab(0x7a2f3a, 0.1, 1.9, 0.34, q.X - 8.66, q.Y + 0.8, q.Z - 2 + s * 1.36); slab(0x7a2f3a, 0.14, 0.24, 3, q.X - 8.64, q.Y + 2.62, q.Z - 2);
-      slab(IVORY, 0.9, 2.1, 0.06, q.X - 2.9, q.Y, q.Z - 5.32); slab(BRASS, 0.05, 0.05, 0.06, q.X - 3.2, q.Y + 1.05, q.Z - 5.28); slab(0xfff2c0, 0.86, 0.02, 0.02, q.X - 2.9, q.Y + 0.01, q.Z - 5.28, M.glow);                // the bathroom, a light left on
-      put(M.glow, new THREE.SphereGeometry(0.22, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).translate(q.X - 5.2, q.Y + 3.1, q.Z - 1.6), 0xfff2c0);
-      for (let n = 0; n < 4; n++) put(M.plain, new THREE.CylinderGeometry(0.03, 0.035, 0.1 + (n % 2) * 0.05, 8).translate(q.X - 6.6 + n * 0.14, q.Y + 0.96, q.Z + 1.5), [0xd9a520, 0xcfe8ff, 0x8a1c2a, 0xf4f4f0][n]); for (let n = 0; n < 2; n++) slab(BRASS, 0.18, 0.24, 0.03, q.X - 5.0 + n * 0.26, q.Y + 0.9, q.Z + 1.55);
-      void B;
-      // The landing: a table with flowers under the photographs, a window at the end, lights; a few things on the children's floors.
-      q.block(0x5a3320, 1.3, 0.78, 0.36, -3, 5.0, M.wood, 1); put(M.plain, new THREE.CylinderGeometry(0.09, 0.06, 0.26, 10).translate(q.X - 3, q.Y + 0.91, q.Z + 5), 0xf4f4f0); for (const [dx, hex] of [[-0.07, 0xff8ad8], [0.07, 0xffe066], [0, 0xd8342c]]) ball(hex, 0.07, q.X - 3 + dx, q.Y + 1.2 + Math.abs(dx), q.Z + 5);
-      q.window(-8.72, 3.9, 1.4, 1.5, 1.7, Math.PI / 2, 0xffd9a8); for (const s of [-1, 1]) slab(0xd9c7a0, 0.08, 1.9, 0.3, q.X - 8.66, q.Y + 0.8, q.Z + 3.9 + s * 0.85);
-      for (const lx of [-5, 0, 5]) put(M.glow, new THREE.CylinderGeometry(0.12, 0.12, 0.03, 10).translate(q.X + lx, q.Y + 3.08, q.Z + 3.8), 0xfff2c0);
-      slab(0x8a5a2a, 0.75, 0.04, 0.2, q.X + 1.2, q.Y + 0.05, q.Z - 1.4); for (const s of [-1, 1]) post(0x1c1c22, 0.03, 0.05, q.X + 1.2 + s * 0.25, q.Y, q.Z - 1.4, 6);                                                  // the skateboard
-      for (const [dx, dz, hex] of [[0.9, -2.2, 0x2f56c8], [1.6, -2.6, 0xd8342c], [-0.5, -1.8, 0xe9e2cf]]) put(M.plain, new THREE.BoxGeometry(0.5, 0.05, 0.4).rotateY(dx).translate(q.X + dx, q.Y + 0.03, q.Z + dz), hex);   // clothes where they fell
-      slab(0xf7a8c4, 2.4, 0.015, 1.6, q.X + 6, q.Y + 0.005, q.Z - 1.8); for (const [dx, hex] of [[4.9, 0xd9b25a], [5.2, 0xf4f4f0], [5.5, 0x8a5a44]]) { ball(hex, 0.13, q.X + dx, q.Y + 0.7, q.Z - 4.3); ball(hex, 0.08, q.X + dx, q.Y + 0.88, q.Z - 4.3); } // bears she has not thrown out
-    }
-    // AJ's room: an unmade bed, a television with a console, a drum kit he never practises on.
-    q.block(0x3b6ea8, 1.1, 0.4, 2.1, 0.2, -3.7); slab(0xf1ede4, 1, 0.14, 0.5, q.X + 0.2, q.Y + 0.4, q.Z - 4.5); slab(0x2f56c8, 1.05, 0.07, 1.3, q.X + 0.2, q.Y + 0.4, q.Z - 3.2);
-    q.block(0x1c1c22, 0.9, 0.5, 0.5, 2.9, -4.5); slab(0x1c1c22, 0.8, 0.6, 0.4, q.X + 2.9, q.Y + 0.5, q.Z - 4.5); q.glowPanel(0x7dffb0, 0.65, 0.45, 2.9, -4.28, 0.8); slab(0x8d8a8e, 0.3, 0.06, 0.2, q.X + 2.9, q.Y + 0.02, q.Z - 3.7);
-    for (const [dx, dz, rr] of [[2.6, -1.2, 0.3], [3.1, -0.6, 0.22], [2.2, -0.5, 0.2]]) put(M.plain, new THREE.CylinderGeometry(rr, rr, 0.3, 12).translate(q.X + dx, q.Y + 0.55, q.Z + dz), 0xd8342c);
-    for (let n = 0; n < 3; n++) slab([0xd8342c, 0x1c1c22, 0xf2c230][n], 0.7, 0.9, 0.03, q.X - 0.8 + n * 1.1, q.Y + 1.6, q.Z - 5.32, M.plain); // posters
-    // Meadow's room: a made bed, a desk with a computer, a shelf of books, pink where she allows it.
-    q.block(0xf7a8c4, 1.1, 0.4, 2.1, 5.2, -3.7); slab(0xffffff, 1, 0.14, 0.5, q.X + 5.2, q.Y + 0.4, q.Z - 4.5); slab(0xc9b6f2, 1.05, 0.07, 1.3, q.X + 5.2, q.Y + 0.4, q.Z - 3.2);
-    q.block(0xe9e2d2, 1.6, 0.74, 0.7, 7.6, -1.5, M.wood, 1); slab(0xe9e2cf, 0.5, 0.42, 0.45, q.X + 7.6, q.Y + 0.74, q.Z - 1.5); q.glowPanel(0x9fd0f5, 0.36, 0.28, 7.36, -1.5, 0.96, -Math.PI / 2); slab(0x5a3320, 0.45, 0.06, 0.45, q.X + 6.7, q.Y + 0.45, q.Z - 1.5);
-    q.block(0xe9e2d2, 0.4, 1.8, 1.6, 8.3, -4, M.wood, 1); for (let n = 0; n < 10; n++) slab(PASTELS[n % 8], 0.22, 0.3, 0.12, q.X + 8.08, q.Y + 0.5 + Math.floor(n / 5) * 0.6, q.Z - 4.6 + (n % 5) * 0.28);
-    for (let n = 0; n < 2; n++) slab([0xff5fd2, 0x49e0d0][n], 0.7, 0.9, 0.03, q.X + 5 + n * 1.2, q.Y + 1.6, q.Z - 5.32, M.plain);
-    // The landing: a runner, the stairhead, family photographs.
-    slab(0x8a2f3a, 15, 0.02, 1.4, q.X, q.Y + 0.01, q.Z + 3.8); for (let n = 0; n < 6; n++) slab(0xe9e2cf, 0.5, 0.6, 0.03, q.X - 6 + n * 2.2, q.Y + 1.7, q.Z + 5.32, M.plain);
-    q.light(-5.8, 2.8, -2, 0xffe8c8, 34, 13); q.light(1.2, 2.8, -2.4, 0xfff0d0, 24, 10); q.light(6, 2.8, -2.4, 0xffe0ec, 24, 10); q.light(0, 2.8, 3.6, 0xfff0d0, 22, 12);
-    q.person('aj', 2.4, -3.2, 0).set('idle');
-    q.person('meadow', 6.7, -1.5, Math.PI / 2, 'sit');
-    const H = places.houseRoom.inside; // (X + 2, Z + 3.2) of the downstairs room
-    places.stairs = [...(places.stairs || []), { a: { x: H.x + 4.1, z: H.z - 0.7, h: -Math.PI / 2 }, b: { x: q.X + 7.6, z: q.Z + 3.8, h: -Math.PI / 2 }, up: 'Go upstairs', down: 'Go downstairs' }];
-    places.beds = [{ x: q.X - 4.2, z: q.Z - 3.2, name: 'Sleep' }];
   }
 
   // ----- Los Angeles has its own rooms: the same kinds of place, laid out and dressed differently -----
@@ -3603,7 +3739,7 @@ export function buildWorld(scene) {
       for (let k = 0; k < 5; k++) ball([RED, 0xffe066, 0x49a0d0, 0xf4f4f0, 0x2f7d46][(k + n) % 5], 0.16, sx - 1.2 + k * 0.6, y + 1.7, sz - 0.2); }
     for (let n = 0; n < 14; n++) { ball([0xffe066, 0xff5fd2, 0x49e0d0, 0xff8a5c][n % 4], 0.09, x - 12 + n * 1.6, y + 3.6 - Math.sin(n / 13 * Math.PI) * 0.5, z + 3, M.glow); if (n % 4 === 0) halo(x - 12 + n * 1.6, y + 3.4, z + 3, 0xffd9a8, 4); }
     for (const s of [0, 1]) post(CREAM, 0.06, 3.7, x - 12 + s * 20.8, y, z + 3, 6);
-    places.sounds.push({ kind: 'carousel', x: cx, z: cz, r: 110, vol: 1 });
+    places.sounds.push({ kind: 'carousel', x: cx, z: cz, r: 42, vol: 1 });
     places.rideland = { gate: { x: x - 13, z }, carousel: { x: cx, z: cz }, horses, wheel: { x: wx, z: wz }, booth: { x: x - 9, z: z + 6 }, hide: { x: x - 7.4, z: z + 7.6 }, stop: { x: SHORE - 5, z }, kerb: { x: nodeX(NX) + 3.6, z, h: 0 } };
   }
 
@@ -3615,6 +3751,22 @@ export function buildWorld(scene) {
     else if (Math.hypot(x - marsh.x, z - marsh.z) > 4) for (let k = 0; k < 4; k++) put(M.plain, new THREE.ConeGeometry(0.07, 1.5 + rand(), 4).translate(x + rand() - 0.5, 0.6, z + rand() - 0.5), k % 2 ? 0x6f8a4a : 0x4f6f3a);
   }
   places.marsh = marsh;
+  { // What the tide and the city have left out here, and what drifts over it at night.
+    const mx = marsh.x, mz = marsh.z, gy = (x, z) => groundAt(mx + x, mz + z), RUSTY = 0x8a4a2a, GREY = 0x8a8478;
+    put(M.wood, new THREE.CapsuleGeometry(0.62, 2.4, 4, 10).rotateZ(Math.PI / 2).scale(1, 0.55, 1).rotateY(0.5).translate(mx - 7.5, gy(-7.5, -6.5) + 0.3, mz - 6.5), 0x6a5a4a); slab(0x4a3a2a, 0.08, 0.1, 2.6, mx - 7.5, gy(-7.5, -6.5) + 0.6, mz - 6.5); collide(mx - 7.5, mz - 6.5, 3, 1.6, 0.8, true); // a boat, the wrong way up
+    for (const [x, z, len, t] of [[4.4, -7.4, 2.6, 0.4], [5.6, -6.6, 1.8, -0.7], [-2.6, -9, 2.2, 1.2]]) put(M.wood, new THREE.CylinderGeometry(0.12, 0.16, len, 6).rotateZ(Math.PI / 2).rotateY(t).translate(mx + x, gy(x, z) + 0.14, mz + z), 0x8a7a66);          // driftwood
+    post(RUSTY, 0.3, 0.9, mx + 6.8, gy(6.8, -3.4), mz - 3.4, 10); put(M.plain, new THREE.CylinderGeometry(0.3, 0.3, 0.9, 10).rotateZ(1.45).translate(mx + 8.2, gy(8.2, -4.4) + 0.3, mz - 4.4), RUSTY); collide(mx + 6.8, mz - 3.4, 0.7, 0.7, 0.9, true);
+    post(GREY, 0.05, 2, mx + 7.6, gy(7.6, 3), mz + 3, 5); sign(['NO DUMPING', 'CITY OF VICE'], mx + 7.6, gy(7.6, 3) + 1.9, mz + 3.04, 0, { w: 1.3, h: 0.7, color: '#16161c', bg: '#e9e2cf', size: 0.56, glow: false, also: [[mx + 7.6, gy(7.6, 3) + 1.9, mz + 2.96, Math.PI]] });
+    put(M.plain, new THREE.TorusGeometry(0.3, 0.12, 6, 14).rotateX(Math.PI / 2 - 0.3).translate(mx - 3.2, gy(-3.2, -8.4) + 0.14, mz - 8.4), 0x16161c);
+    for (let k = 0; k < 6; k++) post(0x5a4a3a, 0.09, 1.1 + (k % 3) * 0.3, mx - 12 - k * 1.3, -0.5, mz - 2.2 + (k % 2) * 1.6, 6);                                                        // what is left of a jetty, going out
+    slab(GREY, 0.7, 0.5, 0.45, mx + 2.6, gy(2.6, -9.6) + 0.1, mz - 9.6); for (const s2 of [-1, 1]) post(0x23232b, 0.06, 0.06, mx + 2.6 + s2 * 0.3, gy(2.6, -9.6), mz - 9.6, 6);               // a shopping trolley on its side, near enough
+    const mist = [0, 1, 2, 3, 4, 5].map(k => { const m = new THREE.Mesh(new THREE.PlaneGeometry(9 + k * 2, 1.6), new THREE.MeshBasicMaterial({ color: 0xcfd8e6, transparent: true, opacity: 0.08, depthWrite: false, side: THREE.DoubleSide })); m.rotation.y = k * 0.5; scene.add(m); return m; });
+    const flies = [0, 1, 2, 3, 4, 5, 6, 7].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 4), new THREE.MeshBasicMaterial({ color: 0xd8ff8a, transparent: true })); scene.add(m); return m; });
+    updaters.push(t => {
+      mist.forEach((m, k) => { m.position.set(mx - 4 + Math.sin(t * 0.05 + k * 1.7) * 9, 0.7 + (k % 3) * 0.35, mz + (k - 2.5) * 5 + Math.cos(t * 0.04 + k) * 3); m.material.opacity = 0.05 + 0.04 * Math.sin(t * 0.2 + k); });
+      flies.forEach((m, k) => { m.position.set(mx - 3 + Math.sin(t * 0.3 + k * 2.1) * 6 + Math.sin(t * 1.3 + k) * 0.4, 0.8 + Math.sin(t * 0.9 + k * 1.3) * 0.4, mz + Math.cos(t * 0.23 + k * 1.4) * 8); m.material.opacity = Math.max(0, Math.sin(t * 1.7 + k * 2.4)); });
+    });
+  }
 
   // ----- The bridge to the other island: a long deck out over the water, two towers, cables, lamps -----
   // Vice City's leaves from the west shore; Los Angeles's arrives on the east. Driving off the far end crosses over.

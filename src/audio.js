@@ -30,7 +30,7 @@ const gainAt = (v, to = dry) => { const g = ctx.createGain(); g.gain.value = v; 
 const filter = (type, f, q = 1, to = dry) => { const n = ctx.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = q; n.connect(to); return n; };
 const panTo = to => { const n = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain(); n.connect(to); return n; };
 const lfo = (hz, depth, param, type = 'sine') => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = hz; g.gain.value = depth; o.connect(g); g.connect(param); o.start(); return o; };
-const smooth = (param, v, k = 0.08) => param.setTargetAtTime(v, ctx.currentTime, k);
+const smooth = (param, v, k = 0.08) => { if (Number.isFinite(v)) param.setTargetAtTime(v, ctx.currentTime, k); }; // a value that is not a number would silence everything downstream of it
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 // ----- Buses -----
@@ -256,10 +256,12 @@ const WALTZ = [76, 79, 84, 79, 76, 79, 77, 81, 84, 81, 77, 81, 74, 79, 83, 79, 7
 let waltzTargets = [];
 every(0.3, (t, n) => {
   for (const to of waltzTargets) {
-    const bar = Math.floor(n / 6) % 4, beat = n % 3, pipe = filter('lowpass', 2600, 0.7, to);
-    tone('square', midi(WALTZ[n % 24]), t, 0.11, 0.015, 0.27, { to: pipe }); tone('square', midi(WALTZ[n % 24]), t, 0.06, 0.015, 0.27, { to: pipe, detune: 9 });
-    if (beat === 0) tone('triangle', midi(ROOTS[bar]), t, 0.3, 0.01, 0.34, { to });
-    else for (const k of [0, 4, 7]) tone('triangle', midi(ROOTS[bar] + 12 + k), t, 0.06, 0.01, 0.16, { to });
+    const bar = Math.floor(n / 6) % 4, beat = n % 3, pipe = filter('lowpass', 1500, 0.7, to);
+    // (The owner heard this as a slot machine: it was square waves, high and loud, all along the beach. It is a
+    // music box now: sine and triangle, an octave down, quiet, and only near the ride.)
+    tone('sine', midi(WALTZ[n % 24] - 12), t, 0.05, 0.02, 0.3, { to: pipe }); tone('triangle', midi(WALTZ[n % 24] - 12), t, 0.02, 0.02, 0.26, { to: pipe, detune: 5 });
+    if (beat === 0) tone('sine', midi(ROOTS[bar]), t, 0.1, 0.02, 0.36, { to });
+    else for (const k of [0, 7]) tone('sine', midi(ROOTS[bar] + 12 + k), t, 0.02, 0.02, 0.18, { to });
   }
 });
 
@@ -453,7 +455,7 @@ export const sfx = {
     for (const e of emitters) {
       const dx = e.x - ear.x, dz = e.z - ear.z, d = Math.hypot(dx, dz);
       e.level = d < e.r ? (1 - d / e.r) ** 2 * (e.vol ?? 1) : 0;
-      smooth(e.out.gain, e.level * (e.kind === 'water' ? 0.16 : e.kind === 'jets' ? 0.12 : e.kind === 'freeway' ? 0.14 : e.kind === 'film' ? 0.1 : e.kind === 'carousel' ? 0.5 : e.kind === 'club' ? 0.38 : 0.5), 0.15);
+      smooth(e.out.gain, e.level * (e.kind === 'water' ? 0.16 : e.kind === 'jets' ? 0.12 : e.kind === 'freeway' ? 0.14 : e.kind === 'film' ? 0.1 : e.kind === 'carousel' ? 0.22 : e.kind === 'club' ? 0.38 : 0.5), 0.15);
       if (e.pan.pan) smooth(e.pan.pan, d < 4 ? 0 : side(dx, dz) * Math.min(1, d / 14), 0.12);
     }
 

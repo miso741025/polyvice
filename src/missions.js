@@ -629,16 +629,17 @@ async function bingRoom(g, cam, arrange, play) {
 // A walk from here to there, through these points, at this pace; it resolves when he has arrived.
 export function walkTo(g, who, pts, pace = 1.3) {
   return new Promise((resolve, reject) => {
-    const pos = who.group.position; let k = 0, last = g.time;
+    const pos = who.group.position, mine = who.walking = {}; let k = 0, last = g.time;   // a new walk (or `who.walking = null`) ends the one before it
     who.set('walk', pace / 1.4);
     g.until(() => {
+      if (who.walking !== mine) return true;
       const to = pts[k], dx = to.x - pos.x, dz = to.z - pos.z, d = Math.hypot(dx, dz), dt = Math.min(0.1, g.time - last);
       last = g.time;
       if (d < 0.12) { k++; return k >= pts.length; }
       const step = Math.min(pace * dt, d);
       pos.x += dx / d * step; pos.z += dz / d * step; who.group.rotation.y = Math.atan2(dx, dz);
       return false;
-    }).then(() => { who.set('idle'); resolve(); }, reject);
+    }).then(() => { if (who.walking === mine) { who.walking = null; who.set('idle'); } resolve(); }, reject);
   });
 }
 // The ways of looking at the bed in Jackie's room: the room from the door, the man in the bed, whoever is standing over
@@ -4273,7 +4274,7 @@ function benefitDress(g) {
 // AJ's birthday, the second attempt. Everyone comes, including the two people who should not be talking.
 
 async function theParty(g) {
-  const { home, houseRoom, melfi } = g.places, p = g.player, UP = g.places.rooms.UPSTAIRS, K = kitchen(g), front = g.places.doors.find(d => d.name === 'home');
+  const { home, houseRoom, melfi, house2 } = g.places, p = g.player, K = kitchen(g), front = g.places.doors.find(d => d.name === 'home');
   const cast = {}, crowd = [];
 
   // He wakes upstairs in his own bed. The garden is already full: everything out there is in place before he comes down.
@@ -4310,7 +4311,7 @@ async function theParty(g) {
   }
   for (const a of houseRoom.ambient) a.group.visible = false;   // Carmela is out in the garden with everybody else
   p.inside = front;
-  p.pos.set(UP.X - 4.2, 0, UP.Z - 2.9); p.heading = g.cam.yaw = SOUTH; g.cam.pitch = 0.22;
+  p.pos.set(house2.bedside.x, 0, house2.bedside.z); p.heading = g.cam.yaw = EAST; g.cam.pitch = 0.22;
   g.cam.fixed = null;
   g.hud.card('The Party', "AJ's birthday, take two");
   await fade(g, 0, 1.2);
@@ -4319,14 +4320,9 @@ async function theParty(g) {
   g.hud.card();
   p.locked = false;
   g.setCheckpoint?.();
-  { // Down the stairs. (F at the stairhead does it too.)
-    const stair = (g.places.stairs || []).find(st => near(st.b, roomSpot(UP, 7.6, 3.8), 1.5));
-    g.hud.objective('Find the <b>stairs</b> at the far end of the landing, and go down.');
-    const m = g.addMarker(stair.b.x, stair.b.z, 1.4);
-    await g.until(() => near(p.pos, stair.b, 1.5) || p.pos.z > UP.Z + 12);
-    g.removeMarker(m); g.hud.objective();
-    if (p.pos.z < UP.Z + 12) { p.locked = true; await fade(g, 1, 0.35); p.pos.set(stair.a.x, 0, stair.a.z); p.heading = g.cam.yaw = stair.a.h; await fade(g, 0, 0.35); p.locked = false; }
-  }
+  // Out of the bedroom, along the landing, and down his own stairs.
+  await reach(g, house2.stairTop, 'Find the <b>stairs</b>: out of the bedroom door, and along the landing to the end.', { r: 1.3, how: 'foot' });
+  await reach(g, house2.stairFoot, 'Go down. Find the <b>kitchen</b>.', { r: 1.3, how: 'foot' });
   // The kitchen: Carmela has left the tray where he cannot miss it.
   const tray = new THREE.Group();
   { const steel = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.03, 0.4), new THREE.MeshLambertMaterial({ color: 0xc9cbd2 })); tray.add(steel);
@@ -5938,61 +5934,131 @@ async function acceptance(g) {
   const chris = makeLook('christopher');
   g.setPlayer(chris);
   place(g, bing.door, SOUTH);
-  { // First he goes looking.
-    g.cam.fixed = null;
-    const ride = propCar(g, bing.park, bing.park.h, 0x8a1c2a, 'coupe'), { cafe, motel, flat, diner } = g.places;
-    g.hud.fade(0, 1.2);
-    await playing(g, 'Christopher Moltisanti', "Tony's nephew. You play him in this one");
-    p.locked = false;
-    await wantCar(g, ride, 'Get in the <b>red coupe</b>, and go and look for Brendan.');
-    ride.driverless = false;
-    const notes = ["Brendan's car was not outside the cafe. Nobody inside had seen him since Tuesday.", 'At the motor lodge the night man looked at the floor, and said room nine was paid up and empty.',
-      "The curtains at Brendan's place were shut. They had been shut that morning too, which he had not thought about until now."];
-    await rounds(g, [cafe.kerb, motel.kerb, (flat || diner).kerb], '<b>Drive</b> round the places Brendan would be.', async k => { await say(g, '', notes[k]); });
-    await reach(g, bing.door, '<b>Drive</b> back to the Bing. Maybe he has turned up.', { r: 5 });
-    p.locked = true;
-    await fade(g, 1, 0.8);
-    if (p.car) g.leaveCar();
-    g.removeCar(ride);
-    place(g, bing.door, SOUTH);
-  }
-  mikey = actor(g, 'mikey', spot(bing.door, -1.2, 3.4), NORTH);
-  goon = actor(g, 'trucker', spot(bing.door, 1.6, 3.6), NORTH);
-  frame(g, p.pos, spot(bing.door, 0, 3.5), { dist: 4.6 });
+  // He goes looking: the cafe, the motor lodge, and last of all Brendan's own door.
+  g.cam.fixed = null;
+  const ride = propCar(g, bing.park, bing.park.h, 0x8a1c2a, 'coupe'), { cafe, motel, flat, diner } = g.places, FLAT = g.places.rooms.BRENDAN, home = flat || diner;
   g.hud.fade(0, 1.2);
-  await titleCard(g, 'Acceptance', 'The Bada Bing, late');
+  await playing(g, 'Christopher Moltisanti', "Tony's nephew. You play him in this one");
+  p.locked = false;
+  await wantCar(g, ride, 'Get in the <b>red coupe</b>, and go and look for Brendan.');
+  ride.driverless = false;
+  await reach(g, cafe.kerb, '<b>Drive</b> to the cafe. He is there most nights.', { how: 'car', r: 7 });
+  await say(g, '', "Brendan's car was not outside the cafe. Nobody inside had seen him since Tuesday.");
+  await reach(g, motel.kerb, '<b>Drive</b> to the motor lodge. He keeps a room.', { how: 'car', r: 7 });
+  await say(g, '', 'At the motor lodge the night man looked at the floor, and said room nine was paid up and empty.');
+  // His place. The body is there before Christopher is: in the bath, the water gone dark, the radio still on.
+  const tubWater = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.02, 0.66), new THREE.MeshLambertMaterial({ color: 0x5a1c24 })); tubWater.position.set(FLAT.tubMid.x, FLAT.tubMid.y + 0.24, FLAT.tubMid.z); g.track(tubWater);
+  const body = lying(g, 'brendan', FLAT.tub, EAST);
+  await reach(g, home.kerb, "<b>Drive</b> to Brendan's place.", { how: 'car', r: 7 });
+  await say(g, '', 'His car was in its space. The curtains were shut. They had been shut that morning too, which he had not thought about until now.', 4.6);
+  await reach(g, home.door, 'The door is not locked. Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  const way = await enter(g, FLAT);
+  await say(g, CHRIS, 'Brendan? ...You left the radio on, you mook.', 2.8);
+  await reach(g, FLAT.bathDoor, 'Find the <b>bathroom</b>: there is a light on in there.', { r: 1.1, how: 'foot' });
+  p.locked = true;
+  await cut(g, () => {
+    p.pos.set(FLAT.X + 2.45, 0, FLAT.Z - 1.9); p.heading = toward(p.pos, FLAT.tubMid);
+    g.cam.fixed = { pos: new THREE.Vector3(FLAT.X + 2.5, FLAT.Y + 1.95, FLAT.Z + 0.35), look: new THREE.Vector3(FLAT.tubMid.x - 0.2, FLAT.Y + 0.5, FLAT.tubMid.z) }; // from the doorway: his back, and over his shoulder what is in the bath
+  }, 0.5);
+  await say(g, '', 'Brendan was in the bath. The water had gone cold and dark, and there was a small hole where his left eye had been.', 4.6);
+  p.human.play('kneel', 'idle');
+  await talk(g, [[CHRIS, 'Brendan. ...Brendan, you stupid... You stupid...', p]]);
+  await say(g, '', 'A message job. The old men send them that way: through the eye, so that everybody who sees it knows what he saw that he should not have.', 5);
+  // And the men who sent it have been waiting for him to find it.
+  mikey = actor(g, 'mikey', { x: FLAT.inside.x + 0.2, y: FLAT.Y, z: FLAT.inside.z + 0.6 }, NORTH); mikey.arm(true);
+  goon = actor(g, 'trucker', { x: FLAT.inside.x - 0.9, y: FLAT.Y, z: FLAT.inside.z + 0.9 }, NORTH);
+  g.sfx?.door();
+  await cut(g, () => {
+    p.pos.set(FLAT.bathDoor.x - 0.4, 0, FLAT.bathDoor.z + 0.5); p.heading = toward(p.pos, mikey.group.position);
+    g.cam.fixed = inRoom(FLAT, [-3.9, -2.2], [0.6, 0.8], 1.6, 1.25).cam;
+  }, 0.35);
+  mikey.set('aim'); mikey.group.rotation.y = toward(mikey.group.position, p.pos);
+  walkTo(g, goon, [{ x: FLAT.X + 0.2, z: FLAT.Z + 0.6 }, { x: p.pos.x - 1, z: p.pos.z + 0.6 }], 1.5).then(() => { goon.group.rotation.y = toward(goon.group.position, p.pos); }).catch(() => {});
   await talk(g, [
-    [MIKEY, "Christopher Moltisanti. Junior wants a word. Get in the car.", mikey],
-    [CHRIS, "Where's Brendan?", p],
-    [MIKEY, "Brendan's in the bath. Get in the car, or we do the word here.", mikey],
+    [MIKEY, "Christopher Moltisanti. You found him. Good. That saves me describing it.", mikey],
+    [CHRIS, 'Mikey. He was a kid. He was a stupid kid.', p],
+    [MIKEY, "He was told. So were you. Junior wants a word. Hands where I can see them, and walk to the car.", mikey],
   ]);
   await fade(g, 1, 1.2);
+  for (const h of way.hide || []) h.group.visible = true;
+  p.inside = null;
+  g.untrack(tubWater); dismiss(g, body);
+  if (g.cars.includes(ride)) g.removeCar(ride);
   await say(g, '', 'They drove west, out past the last road, where the city stops and the reeds start.');
 
-  // On his knees in the marsh.
-  dismiss(g, mikey, goon);
-  place(g, spot(marsh, 2, 0), WEST);
-  p.pose = 'crouch';
-  mikey = actor(g, 'mikey', spot(marsh, 3.8, 0.4), WEST); mikey.arm(true); mikey.set('aim');
-  goon = actor(g, 'trucker', spot(marsh, 0, -2.6), SOUTH);
-  shot(g, spot(marsh, -3, 3.4), spot(marsh, 2.6, 0.2), 1.5, 0.9);
+  // The marsh. Their car on the hard ground with its lamps on; the reeds; the water. He is walked down to it.
+  const M0 = marsh, lamps = [];
+  const theirs = propCar(g, spot(M0, 10, 1.5), WEST, 0x16161c, 'sedan');
+  for (const s2 of [-1, 1]) { // the beams
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(1.2, 9, 12, 1, true).rotateZ(-Math.PI / 2).translate(-4.5, 0, 0), new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: 0.045, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.set(M0.x + 7.8, groundAt(M0.x + 8, M0.z) + 0.75, M0.z + 1.5 + s2 * 0.6); g.track(beam); lamps.push(beam);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff6d8 })); eye.position.set(M0.x + 7.75, groundAt(M0.x + 8, M0.z) + 0.75, M0.z + 1.5 + s2 * 0.6); g.track(eye); lamps.push(eye);
+  }
+  place(g, spot(M0, 6.2, 0.6), WEST);
+  mikey.walking = goon.walking = null;                 // (whatever they were doing in the flat, they are not doing it here)
+  mikey.group.position.set(M0.x + 7.6, groundAt(M0.x + 7.6, M0.z - 0.4), M0.z - 0.4); mikey.group.rotation.y = WEST; mikey.arm(true); mikey.set('aim');
+  goon.group.position.set(M0.x + 7.2, groundAt(M0.x + 7.2, M0.z + 3), M0.z + 3); goon.group.rotation.y = WEST; goon.set('idle');
+  const torch = new THREE.Mesh(new THREE.ConeGeometry(0.5, 3.2, 10, 1, true).rotateX(Math.PI / 2).translate(0, 0, 1.6), new THREE.MeshBasicMaterial({ color: 0xfff6d8, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  torch.position.set(0.25, 1.05, 0.2); goon.group.add(torch);
+  g.cam.fixed = null; g.cam.yaw = WEST; g.cam.pitch = 0.2;
   await fade(g, 0, 1.2);
+  // He walks, with the gun behind him. If he stops, he is told.
+  { const m = g.addMarker(M0.x + 0.6, M0.z + 0.2, 1.3); let nag = g.time + 4;
+    p.locked = false;
+    g.hud.objective('<b>Walk</b> down to the water. Do not turn round.');
+    await g.until(() => {
+      const mp = mikey.group.position, dx = p.pos.x - mp.x, dz = p.pos.z - mp.z, d = Math.hypot(dx, dz);
+      if (d > 1.9) { const step = Math.min(0.03, d - 1.8); mp.x += dx / d * step * 2; mp.z += dz / d * step * 2; mp.y = groundAt(mp.x, mp.z); mikey.group.rotation.y = Math.atan2(dx, dz); }
+      const gp = goon.group.position; gp.x += (p.pos.x + 1.6 - gp.x) * 0.02; gp.y = groundAt(gp.x, gp.z); goon.group.rotation.y = toward(gp, p.pos);
+      if (g.time > nag && p.motion === 'idle') { nag = g.time + 5; say(g, MIKEY, ['Walk.', 'Keep walking, Moltisanti.', 'I did not say stop.'][Math.floor(g.time) % 3], 1.8).catch(() => {}); }
+      return near(p.pos, m, 1.5);
+    });
+    g.removeMarker(m); g.hud.objective(); }
+  p.locked = true;
+  p.pos.set(M0.x + 0.6, 0, M0.z + 0.2); p.heading = WEST;
+  await say(g, MIKEY, 'That is far enough. On your knees. Look at the water.', 3);
+  g.hud.objective('On your knees: press <b>F</b>.');
+  g.consume('KeyF'); await g.until(() => g.consume('KeyF'));
+  g.hud.objective();
+  p.pose = 'crouch';
+  { const mp = mikey.group.position; mp.set(M0.x + 1.75, groundAt(M0.x + 1.75, M0.z + 0.5), M0.z + 0.5); mikey.group.rotation.y = toward(mp, p.pos); mikey.set('aim');
+    const gp = goon.group.position; gp.set(M0.x + 2.4, groundAt(M0.x + 2.4, M0.z - 2.4), M0.z - 2.4); goon.group.rotation.y = toward(gp, p.pos); }
+  shot(g, spot(M0, -3.4, 3), spot(M0, 1.4, 0.2), 1.1, 0.9);            // low, from the reeds: his face, the gun behind it, the lamps behind that
   await talk(g, [
-    [MIKEY, "Brendan Filone is in his bathtub with a hole where his eye was. You're the lucky one, Moltisanti.", mikey],
+    [MIKEY, "Brendan Filone is in his bathtub with a hole where his eye was. You saw. You're the lucky one, Moltisanti.", mikey],
     [CHRIS, 'Please. Mikey. Please.', p],
+  ]);
+  g.cam.fixed = { pos: new THREE.Vector3(M0.x + 4.2, groundAt(M0.x + 4, M0.z) + 1.75, M0.z + 1.6), look: new THREE.Vector3(M0.x + 0.4, groundAt(M0.x, M0.z) + 0.9, M0.z + 0.1) }; // over the gun
+  await talk(g, [
     [MIKEY, 'Junior says you get to live. Say thank you.', mikey],
     [CHRIS, 'Thank you. Thank you.', p],
   ]);
+  shot(g, spot(M0, -2.6, 1.2), spot(M0, 0.9, 0.3), 0.9, 0.95);         // close on him
+  await g.wait(1.4);
   mikey.play('shoot', 'aim');
-  g.hud.flash('#ffffff', 0.15);
+  g.sfx?.click?.();                                                     // the hammer, on nothing
   g.cam.sway = 1.2;
-  await g.wait(0.6);
+  p.human.play('hitHead', 'idle');
+  await g.wait(0.9);
   g.cam.sway = 0;
+  await say(g, '', 'He heard it. He was still there to hear it.', 2.8);
+  shot(g, spot(M0, -3.4, 3), spot(M0, 1.4, 0.2), 1.1, 0.9);
   await talk(g, [
     [MIKEY, "That one was empty. The next one won't be. Comley is finished. You are finished. Walk home.", mikey],
   ]);
-  await fade(g, 1, 1);
+  // They go back up to the car and leave him there; the lamps swing across him and are gone.
+  mikey.arm(false);
+  goon.group.remove(torch);
+  const back = [walkTo(g, mikey, [spot(M0, 8.6, 0.2)], 1.5), walkTo(g, goon, [spot(M0, 8.6, 2.8)], 1.5)];
+  g.cam.fixed = { pos: new THREE.Vector3(M0.x - 2.8, groundAt(M0.x - 2.8, M0.z) + 1.5, M0.z - 1.4), look: new THREE.Vector3(M0.x + 6, groundAt(M0.x, M0.z) + 1, M0.z + 1) };
+  await Promise.all(back);
+  g.sfx?.carDoor(); await g.wait(0.5); g.sfx?.carDoor();
   dismiss(g, mikey, goon);
+  { const t0 = g.time, x0 = theirs.pos.x, z0 = theirs.pos.z;
+    g.updaters.push(() => { const k = (g.time - t0) / 5; if (k > 1 || !g.cars.includes(theirs)) return false; theirs.heading = WEST + k * 2.6; theirs.pos.set(x0 + Math.sin(k * 2.6) * 6 + k * k * 30, 0, z0 + (1 - Math.cos(k * 2.6)) * 6); theirs.sync?.(); for (const l of lamps) l.visible = k < 0.25; return true; }); }
+  await say(g, '', 'The car turned on the hard ground. For a second the lamps were on him, and then they were on the road, and then there were no lamps.', 5);
+  await fade(g, 1, 1);
+  g.removeCar(theirs); for (const l of lamps) g.untrack(l);
   p.pose = null;
   g.cam.fixed = null; g.cam.yaw = EAST; p.heading = EAST;
   await fade(g, 0, 1);
@@ -6097,9 +6163,9 @@ async function theDream(g) {
     await g.wait(0.5);
   });
   { // He wakes in his own bed, upstairs.
-    const UP = g.places.rooms.UPSTAIRS;
+    const up = g.places.house2;
     p.inside = g.places.doors.find(d => d.name === 'home');
-    p.pos.set(UP.X - 4.2, 0, UP.Z - 2.9); p.heading = g.cam.yaw = SOUTH; g.cam.pitch = 0.22;
+    p.pos.set(up.bedside.x, 0, up.bedside.z); p.heading = g.cam.yaw = EAST; g.cam.pitch = 0.22;
     p.hidden = false; g.cam.fixed = null;
     g.tonyCar.pos.set(g.places.home.car.x, 0, g.places.home.car.z); g.tonyCar.heading = g.places.home.car.h; g.tonyCar.speed = 0;
     g.setNight(0);
@@ -6127,28 +6193,59 @@ async function theDream(g) {
   await say(g, '', 'A detective on the Vice City police owed Tony eleven thousand dollars. His name was Vin Makazian, and he ate breakfast at the same diner every day of his life.');
   g.hud.card();
   p.locked = false;
+  // He is in his booth already, as he is every morning: eggs, coffee, the paper folded to the racing.
+  const booth = DINER.booths[0], B = (dx, dz, yy = 0.8) => [booth.table.x + dx, DINER.Y + yy, booth.table.z + dz];
+  const mak = actor(g, 'makazian', { x: booth.north.x - 0.15, y: booth.north.y, z: booth.north.z }, SOUTH, 'sit');
+  const setting = [];
+  { const mk = (geo, hex, x, y, z) => { const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: hex })); m.position.set(x, y, z); g.track(m); setting.push(m); return m; };
+    mk(new THREE.CylinderGeometry(0.15, 0.15, 0.014, 14), 0xf4f4f0, ...B(-0.15, -0.22)); mk(new THREE.SphereGeometry(0.05, 8, 5).scale(1.2, 0.5, 1), 0xffe066, ...B(-0.2, -0.24, 0.82)); mk(new THREE.SphereGeometry(0.05, 8, 5).scale(1.2, 0.5, 1), 0xffe066, ...B(-0.08, -0.2, 0.82)); mk(new THREE.BoxGeometry(0.12, 0.02, 0.05), 0x8a3a22, ...B(-0.14, -0.3, 0.82));
+    mk(new THREE.CylinderGeometry(0.04, 0.035, 0.08, 8), 0xf4f4f0, ...B(0.2, -0.24, 0.84)); mk(new THREE.BoxGeometry(0.26, 0.012, 0.36), 0xe9e2cf, ...B(0.45, -0.12)); mk(new THREE.CylinderGeometry(0.04, 0.035, 0.08, 8), 0xf4f4f0, ...B(0.1, 0.26, 0.84)); }
   await reach(g, diner.kerb, 'Drive to the <b>diner</b>.');
-  await reach(g, diner.door, 'Go in and find <b>Makazian</b>.', { r: 1.8, how: 'foot' });
-
-  await roomScene(g, inRoom(DINER, [-1.6, 4.8], [-5, 1.9]), q => ({
-    mak: actor(g, 'makazian', roomSpot(q, -5.5, 1.35), SOUTH, 'sit'),
-    tony: actor(g, 'tony', roomSpot(q, -3.7, 2.2), WEST),
-    cook: actor(g, 'trucker', roomSpot(q, -1, -4.4), SOUTH),
-  }), async cast => {
-    await talk(g, [
-      [MAKAZIAN, "Tony. Have the eggs. The eggs are the only thing in here that aren't a crime.", cast.mak],
-      [TONY, 'I want a favour. A woman named Melfi. Doctor. Office on Ocean. I want to know who she is, who she sees, and whether she has a mouth.', cast.tony],
-      [MAKAZIAN, 'What kind of doctor?', cast.mak],
-      [TONY, "The kind you don't tell your friends about.", cast.tony],
-      [MAKAZIAN, '...A head doctor. You, with a head doctor.', cast.mak],
-      [TONY, "I'm asking about a doctor. That's all you heard. Say it back.", cast.tony],
-      [MAKAZIAN, "You're asking about a doctor. It takes two grand off what I owe.", cast.mak],
-      [TONY, 'It takes one. Eat your eggs.', cast.tony],
-    ]);
-  });
-  place(g, diner.door, diner.door.h);
-  await fade(g, 0, 1);
+  await reach(g, diner.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  for (const a2 of DINER.ambient) if (Math.hypot(a2.group.position.x - booth.north.x, a2.group.position.z - booth.north.z) < 2.2) a2.group.visible = false;
+  await enter(g, DINER);
+  await reach(g, booth.aisle, 'Find <b>Makazian</b>: the booth by the window on the left.', { r: 1.3, how: 'foot' });
+  p.locked = true;
+  const C = { two: inRoom(DINER, [-2.2, 2.2], [-5.6, 2.2], 1.4, 1.0).cam, onMak: { pos: new THREE.Vector3(booth.south.x + 0.75, DINER.Y + 1.32, booth.south.z + 0.5), look: new THREE.Vector3(booth.north.x - 0.1, DINER.Y + 1.08, booth.north.z) }, onTony: { pos: new THREE.Vector3(booth.north.x + 0.75, DINER.Y + 1.32, booth.north.z - 0.4), look: new THREE.Vector3(booth.south.x + 0.1, DINER.Y + 1.1, booth.south.z) } };
+  await cut(g, () => {
+    p.pos.set(booth.south.x + 0.15, 0, booth.south.z); p.heading = NORTH; p.pose = 'sit';     // he slides in across from him
+    g.cam.fixed = C.two;
+  }, 0.4);
+  mak.layer?.('say3', { once: true });                  // he points at the plate with his fork; he does not get up
+  await talk(g, [[MAKAZIAN, "Tony. Have the eggs. The eggs are the only thing in here that aren't a crime.", mak]]);
+  // The girl comes with the pot before anybody asks. That is why he eats here.
+  const girl = extraAt(g, { x: DINER.waitress.x, y: DINER.Y, z: DINER.waitress.z }, SOUTH, 'idle', { body: 'female', shirt: 0xf7a8c4, tee: true, pants: 0xf4f4f0, shoes: 0xf2efe8, hair: 0xb5392a, hairMesh: 'long' });
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.16, 10), new THREE.MeshLambertMaterial({ color: 0x5a3320 })); pot.position.set(0.28, 1.05, 0.18); girl.group.add(pot);
+  const pour = walkTo(g, girl, [{ x: booth.aisle.x + 0.3, z: booth.aisle.z - 0.9 }, { x: booth.aisle.x - 0.45, z: booth.aisle.z + 0.2 }], 1.4).then(async () => { girl.group.rotation.y = WEST; girl.play('interact', 'idle'); await g.wait(1.3); });
+  g.cam.fixed = C.onTony;
+  await talk(g, [[TONY, 'I want a favour. A woman named Melfi. Doctor. Office on Ocean. I want to know who she is, who she sees, and whether she has a mouth.', p]]);
+  await pour;
+  await say(g, 'Waitress', 'Warm that up for you, Vin? And for your friend. He looks like he could use it.', 3.2);
+  const off = walkTo(g, girl, [{ x: booth.aisle.x + 0.3, z: booth.aisle.z - 0.9 }, { x: DINER.waitress.x, z: DINER.waitress.z }], 1.4).then(() => g.untrack(girl.group));
+  g.cam.fixed = C.onMak;
+  await talk(g, [[MAKAZIAN, 'What kind of doctor?', mak]]);
+  g.cam.fixed = C.onTony;
+  await talk(g, [[TONY, "The kind you don't tell your friends about.", p]]);
+  g.cam.fixed = C.two;
+  mak.layer?.('nod', { once: true });                        // the fork goes down
+  await talk(g, [
+    [MAKAZIAN, '...A head doctor. You, with a head doctor.', mak],
+    [TONY, "I'm asking about a doctor. That's all you heard. Say it back.", p],
+  ]);
+  g.cam.fixed = C.onMak;
+  await talk(g, [[MAKAZIAN, "You're asking about a doctor. It takes two grand off what I owe.", mak]]);
+  g.cam.fixed = C.two;
+  await talk(g, [[TONY, 'It takes one. Eat your eggs.', p]]);
+  await off.catch(() => {});
+  // He leaves a ten under the saucer and goes. Makazian is still eating when the door shuts.
+  p.human.play?.('interact', 'idle');
+  { const bill = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.006, 0.07), new THREE.MeshLambertMaterial({ color: 0x86b87e })); bill.position.set(...B(0.12, 0.34, 0.81)); g.track(bill); setting.push(bill); }
+  await g.wait(0.9);
+  await cut(g, () => { p.pose = null; p.pos.set(booth.aisle.x, 0, booth.aisle.z); p.heading = EAST; g.cam.fixed = null; g.cam.yaw = EAST; }, 0.4);
   p.locked = false;
+  await walkOut(g, DINER, 'Go out to the <b>street</b>.');
+  dismiss(g, mak); for (const m of setting) g.untrack(m);
+  for (const a2 of DINER.ambient) a2.group.visible = true;
   await passed(g, 'Respect +');
 }
 
@@ -6161,7 +6258,7 @@ async function messageJob(g) {
 
   p.locked = true;
   await fade(g, 1, 1);
-  await say(g, '', 'Christopher had not heard from Brendan in two days. Adriana said to let it go.');
+  await say(g, '', 'Christopher had not slept since the marsh. Adriana said to let it go. He could not let it go.');
   if (p.car) g.leaveCar();
   g.setNight(0);
   const chris = makeLook('christopher');
@@ -6173,36 +6270,33 @@ async function messageJob(g) {
   g.hud.fade(0, 1.2);
   await titleCard(g, 'Message Job', 'The Bada Bing, noon');
   await talk(g, [
-    [ADRIANA, "He's with some girl. Or asleep. Chrissy, he's a grown man, sort of.", adriana],
-    [CHRIS, "He doesn't not call. Two days, Ade. Not since the thing with Junior's people.", p],
-    [ADRIANA, 'Then go look. And then come back and take me somewhere with tablecloths.', adriana],
+    [ADRIANA, 'You are not going back there. Chrissy. The police have not even been yet.', adriana],
+    [CHRIS, 'His mother is going to ask me for his things. He kept money in that place. I am not leaving it for the cops.', p],
+    [ADRIANA, 'Then go, and get it, and then come back and take me somewhere with tablecloths. Somewhere with people.', adriana],
   ]);
   await cut(g, () => { dismiss(g, adriana); g.cam.fixed = null; });
   p.locked = false;
   await reach(g, flat.kerb, "Drive to <b>Brendan's place</b>.");
   await reach(g, flat.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
-
-  await roomScene(g, inRoom(HOUSE, [1.8, 0.6], [-3.5, 3.8], 1.5, 0.7), q => {
-    const tub = new THREE.Group();
-    const white = new THREE.MeshLambertMaterial({ color: 0xf4f4f0 }), water = new THREE.MeshLambertMaterial({ color: 0x5a1c24 });
-    for (const [w, h, d, x, y, z] of [[1.9, 0.6, 0.9, 0, 0.3, 0], [0.08, 0.5, 0.08, 0.95, 0.85, 0.3]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), white); m.position.set(x, y, z); tub.add(m); }
-    const pool = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.02, 0.7), water); pool.position.set(0, 0.5, 0); tub.add(pool);
-    tub.position.set(q.X - 3.5, q.Y, q.Z + 3.8);
-    g.track(tub);
-    return {
-      brendan: lying(g, 'brendan', { x: q.X - 3.5, y: q.Y + 0.3, z: q.Z + 3.8 }, EAST),
-      chris: actor(g, 'christopher', roomSpot(q, -1.4, 2.4), WEST),
-      props: { group: tub },
-    };
-  }, async cast => {
-    await say(g, '', 'The door was open. The radio was on. Brendan was in the bath.');
-    await say(g, '', 'The water had gone cold and dark, and there was a small hole where his left eye had been. A message job. The old men send them that way.');
-    await talk(g, [
-      [CHRIS, 'Brendan. ...Brendan, you stupid... You stupid...', cast.chris],
-    ]);
-    await say(g, '', 'He did not call anybody. He went outside.');
-  });
+  { // The flat, by day. Somebody has let the water out. The radio is still on.
+    const FLAT = g.places.rooms.BRENDAN, bed = { x: FLAT.X - 3.1, z: FLAT.Z + 1.6 };
+    const way = await enter(g, FLAT);
+    await say(g, '', 'Somebody had let the water out of the bath and shut the bathroom door. Nobody had turned the radio off.', 4.4);
+    await reach(g, FLAT.radio, 'Find the <b>radio</b>, and turn it off.', { r: 1.2, how: 'foot' });
+    p.locked = true; p.heading = NORTH; p.human.play('interact', 'idle'); g.sfx?.click?.();
+    await g.wait(0.9); p.locked = false;
+    await reach(g, bed, 'Find what he kept under the <b>mattress</b>.', { r: 1.2, how: 'foot' });
+    p.locked = true; p.heading = WEST;
+    await handover(g, null, { from: { x: FLAT.X - 3.6, y: FLAT.Y + 0.2, z: FLAT.Z + 1.6 }, hex: 0x8a6a44, sound: false });
+    await say(g, '', 'A shoe box. Eleven hundred dollars, a photograph of the two of them at sixteen, and a napkin with Hollywood written on it.', 4.8);
+    await talk(g, [[CHRIS, 'Brendan. ...You stupid... You stupid...', p]]);
+    p.locked = false;
+    await walkOut(g, FLAT, 'Go out to the <b>street</b>.');
+    void way;
+  }
   // Mikey's people are waiting to make sure the message was received.
+  p.locked = true;
+  await fade(g, 1, 0.5);
   place(g, flat.door, flat.door.h);
   const goons = [actor(g, 'trucker', spot(flat.yard, -1.6, 0), toward(flat.yard, flat.door)), actor(g, 'kolar', spot(flat.yard, 1.4, 1.4), toward(flat.yard, flat.door))];
   await fade(g, 0, 1);

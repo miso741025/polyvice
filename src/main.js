@@ -684,7 +684,7 @@ async function boot() {
   const GREEN = new Set(['houses', 'park', 'church', 'home', 'livia', 'grove', 'neil', 'college', 'school', 'manor', 'motel', 'drivein']);
   const DENSE = new Set(['tower', 'lots', 'lowrise', 'bank', 'hotel', 'precinct', 'bookstore', 'depository', 'hesh', 'cafe', 'vesuvio', 'satriale', 'melfi', 'bing', 'travel', 'hospital', 'kates', 'truckstop']);
   const ROOM_SOUND = { BAR: 'bar', DINER: 'diner', FASTFOOD: 'diner', VESUVIO: 'diner', VKITCHEN: 'diner', BEAN: 'diner', BANQUET: 'diner', LIQUOR: 'store', PAWN: 'store', STORE: 'store', KIOSK: 'store', BOOKS: 'store', PARTS: 'store',
-    LAUNDRY: 'store', SHOWROOM: 'hall', GUNS: 'guns', CHURCH: 'church', BODYSHOP: 'garage', WAREHOUSE: 'garage', HOUSE: 'house', LIVIA: 'house', LIVIA_UP: 'house', NEIL: 'house', UPSTAIRS: 'house', CARDROOM: 'house', SUITE: 'house', MOTEL: 'house',
+    LAUNDRY: 'store', SHOWROOM: 'hall', GUNS: 'guns', CHURCH: 'church', BODYSHOP: 'garage', WAREHOUSE: 'garage', HOUSE: 'house', LIVIA: 'house', LIVIA_UP: 'house', BRENDAN: 'house', NEIL: 'house', UPSTAIRS: 'house', CARDROOM: 'house', SUITE: 'house', MOTEL: 'house',
     JUSTINE: 'house', VANZANT: 'house', TREJO: 'house', KELSO: 'house', OFFICE: 'office', FNOTE: 'office', HESH: 'office', SCHOOL: 'hall', HOSPITAL: 'hall', WARDHALL: 'hall', GROVE: 'hall', BANK: 'hall', HOTEL: 'hall' };
   const roomKinds = new Map();
   const roomKind = q => {
