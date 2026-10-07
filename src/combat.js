@@ -184,29 +184,156 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
   g.removeNpc = human => { const i = g.npcs.findIndex(n => n.human === human); if (i >= 0) g.npcs.splice(i, 1); };
 
   // Pull the driver out of a car on the road and take it. Cars flagged `driverless` are simply taken.
+  // ----- Car doors, and getting in and out by them -----
+  // A car is one piece, so a door is a second door laid over the first where its seams are drawn: hinged at the front,
+  // with the dark of the cabin behind it and a seat and a wheel painted flat on that. It exists only while somebody is
+  // getting in or out. `side` is 1 for the driver's (the car's left), -1 for the passenger's.
+  const doorPaints = new Map(), doorPaint = hex => doorPaints.get(hex) ?? doorPaints.set(hex, new THREE.MeshPhongMaterial({ color: hex, shininess: 90, specular: 0x777777 })).get(hex);
+  const cabinDark = new THREE.MeshBasicMaterial({ color: 0x0a0a0d }), cabinTrim = new THREE.MeshLambertMaterial({ color: 0x34343c }), doorGlass = new THREE.MeshPhongMaterial({ color: 0x141c2b, shininess: 120 });
+  const doorway = (car, side = 1) => { // where things are, in the world, at one of its front doors
+    const k = car.k, h = car.heading, zf = k.cowl[0] + 0.02, zr = k.pillars.length ? k.pillars[0] : k.roofR + 0.05, mid = (zf + zr) / 2;
+    const L = { x: Math.cos(h) * side, z: -Math.sin(h) * side }, f = { x: Math.sin(h), z: Math.cos(h) };
+    const at = (out, along) => ({ x: car.pos.x + L.x * out + f.x * along, z: car.pos.z + L.z * out + f.z * along });
+    return { k, zf, zr, L, f, at, seat: at(k.W / 2 - 0.42, mid - 0.1), stand: at(k.W / 2 + 0.62, zr + 0.3), thrown: at(k.W / 2 + 1.9, zr - 1.5), seatY: Math.max(-0.25, k.roof - 1.45), face: Math.atan2(-L.x, -L.z) };
+  };
+  const carDoor = (car, side = 1) => {
+    const { k, zf, zr } = doorway(car, side), len = zf - zr, sill = k.clear + 0.14, belt = Math.min(k.cowl[1], k.deck[1]) - 0.05, top = k.roof - 0.06, x = side * (k.W / 2 + 0.014);
+    const box = (w, hh, d, bx, by, bz, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, hh, d).translate(bx, by, bz), mat);
+    const hinge = new THREE.Group(), paint = doorPaint(car.color), in0 = -side * 0.125;
+    hinge.add(box(0.05, belt - sill, len, side * 0.015, (sill + belt) / 2, -len / 2, paint), box(0.014, belt - sill - 0.08, len - 0.1, -side * 0.016, (sill + belt) / 2, -len / 2, cabinTrim),
+      box(0.02, top - belt - 0.05, len - 0.14, in0, (belt + top) / 2, -len / 2 - 0.02, doorGlass), box(0.045, 0.045, len, in0, top, -len / 2, paint), box(0.045, top - belt, 0.05, in0, (belt + top) / 2, -len + 0.025, paint),
+      box(0.03, 0.035, 0.15, side * 0.045, belt - 0.07, -len + 0.2, new THREE.MeshLambertMaterial({ color: 0xc9cbd2 })));
+    hinge.position.set(x, 0, zf);
+    const hole = new THREE.Group();
+    hole.add(box(0.012, belt - sill, len - 0.04, 0, (sill + belt) / 2, -len / 2, cabinDark), box(0.016, 0.12, 0.5, side * 0.003, sill + 0.2, -len + 0.5, cabinTrim), box(0.016, belt - sill - 0.24, 0.14, side * 0.003, (sill + belt) / 2 + 0.1, -len + 0.2, cabinTrim));
+    const wheel = box(0.016, 0.3, 0.035, side * 0.003, 0, 0, cabinTrim); wheel.rotation.x = -0.5; wheel.position.set(0, belt - 0.2, -0.32); hole.add(wheel);
+    hole.position.set(side * (k.W / 2 + 0.004), 0, zf); hole.visible = false;
+    car.mesh.add(hinge, hole);
+    let run = 0, open = 0;
+    const set = v => { open = v; hinge.rotation.y = -side * 1.15 * v; hole.visible = v > 0.02; };
+    return {
+      set,
+      swing: (to, secs) => new Promise(done => { const from = open, t0 = g.time, me = ++run; g.updaters.push(() => { if (me !== run) { done(); return false; } const u = Math.min(1, (g.time - t0) / secs); set(from + (to - from) * u * u * (3 - 2 * u)); if (u < 1) return true; done(); return false; }); }),
+      remove: () => { run++; car.mesh.remove(hinge, hole); },
+    };
+  };
+  // Something done over a time: `step(u)` is called each frame with u from 0 to 1.
+  const over = (secs, step) => new Promise(done => { const t0 = g.time; g.updaters.push(() => { const u = Math.min(1, (g.time - t0) / Math.max(0.001, secs)); step(u); if (u < 1) return true; done(); return false; }); });
+  // The player runs to a door of a car: round the nearer end of it if he is on the other side.
+  const runToDoor = async (car, way) => {
+    const k = car.k, side = (p.pos.x - car.pos.x) * way.L.x + (p.pos.z - car.pos.z) * way.L.z, pts = [];
+    if (side < k.W / 2 - 0.1) { // the car is between him and the door
+      const along = (p.pos.x - car.pos.x) * way.f.x + (p.pos.z - car.pos.z) * way.f.z, end = (along > 0 ? 1 : -1) * (k.L / 2 + 0.75);
+      if (side < -(k.W / 2 - 0.1)) pts.push(way.at(-(k.W / 2 + 0.7), end));
+      pts.push(way.at(k.W / 2 + 0.7, end));
+    }
+    pts.push(way.stand);
+    p.pose = 'run';
+    for (const to of pts) {
+      const from = { x: p.pos.x, z: p.pos.z }, d = Math.hypot(to.x - from.x, to.z - from.z);
+      if (d < 0.05) continue;
+      p.heading = Math.atan2(to.x - from.x, to.z - from.z);
+      await over(d / 6.8, u => p.pos.set(from.x + (to.x - from.x) * u, 0, from.z + (to.z - from.z) * u));
+    }
+    p.pose = null;
+  };
+  // He folds himself in through the open door, and it shuts behind him.
+  const climbIn = async (car, way, door) => {
+    const from = { x: p.pos.x, z: p.pos.z }, h0 = p.heading, turn = wrapAngle(car.heading - h0);
+    p.pose = 'walk';
+    await over(0.3, u => { p.pos.set(from.x + (way.seat.x - from.x) * u, 0, from.z + (way.seat.z - from.z) * u); p.heading = h0 + turn * u; p.jumpY = Math.max(0, way.seatY) * u; });
+    p.pose = null; p.jumpY = 0;
+    if (!p.dying) g.enterCar(car);
+    door.swing(0, 0.24).then(() => door.remove());
+  };
+  const freeSide = car => { for (const side of [1, -1]) { const st = doorway(car, side).stand; if (!pushOut(new THREE.Vector3(st.x, 0, st.z), 0.4)) return side; } return 1; };
+  const SHOUTS = ['Hey! HEY!', "That's my car!", 'What are you doing?! Get off me!', 'Take it! Take it, just let go!', 'Are you out of your mind?!', 'Somebody call the police!'];
+
+  // Take a car that somebody is driving: to the driver's door, the door pulled open, the driver hauled out by his collar
+  // and put on the road, and in. (Owner: it used to be a step sideways and a man already lying there.)
   g.carjack = async car => {
     if (p.locked || p.car) return;
-    if (car.ai === 'police') { if (car.officer) retireOfficer(car); cops.cars.splice(cops.cars.indexOf(car), 1); car.mission = true; g.heat(1); }
+    const police = car.ai === 'police', uniform = police || car.kind === 'police';
+    if (police) { if (car.officer) retireOfficer(car); cops.cars.splice(cops.cars.indexOf(car), 1); car.mission = true; g.heat(1); }
+    if (!car.driverless && Math.abs(car.speed) > 2) g.sfx?.horn(0.8 + Math.random() * 0.3, 0.07);
     car.nav = null; car.speed = 0; car.ai = null;
-    const h = car.heading, door = { x: car.pos.x + Math.cos(h) * 1.5, z: car.pos.z - Math.sin(h) * 1.5 };
+    const side = car.driverless ? freeSide(car) : pushOut(new THREE.Vector3(doorway(car, 1).stand.x, 0, doorway(car, 1).stand.z), 0.4) ? -1 : 1, way = doorway(car, side);
+    let door = null, driver = null;
     p.locked = true;
-    p.pos.set(door.x + Math.cos(h) * 1.2, 0, door.z - Math.sin(h) * 1.2);
-    p.heading = Math.atan2(car.pos.x - p.pos.x, car.pos.z - p.pos.z);
-    p.human.play('interact', 'idle', 1.6);
-    if (!car.driverless) {
-      const driver = makeHuman(randomPedLook());
-      driver.group.position.set(door.x + Math.cos(h) * 0.4, groundAt(door.x, door.z), door.z - Math.sin(h) * 0.4);
-      driver.group.rotation.y = p.heading + Math.PI;
-      scene.add(driver.group);
-      driver.set('down');
-      const npc = g.addNpc(driver, { ai: null, cash: 0 });
-      npc.expires = g.time + 40;
-      g.heat(0.6);
-      g.wait(2.6).then(() => { if (!npc.dead) { driver.after = null; npc.ai = 'flee'; npc.threat = p.pos.clone(); } }).catch(() => {});
+    try {
+      await runToDoor(car, way);
+      if (p.dying || p.car) return;
+      p.heading = way.face;
+      door = carDoor(car, side);
+      p.human.play('interact', 'idle', 1.7);
+      await g.wait(0.16);
+      g.sfx?.carDoor();
+      await door.swing(1, 0.2);
+      if (!car.driverless) {
+        // The driver: at the wheel until a hand comes in for him.
+        driver = makeHuman(uniform ? { shirt: 0x24324c, sleeves: 'long', tucked: true, badge: true, pants: 0x1c2740, hair: 0x2b1b12, hairMesh: 'buzzed' } : randomPedLook());
+        const grp = driver.group, gy = groundAt(way.stand.x, way.stand.z), out = way.at(car.k.W / 2 + 0.75, way.zr - 0.25);
+        grp.position.set(way.seat.x, gy + way.seatY, way.seat.z); grp.rotation.y = car.heading;
+        driver.set('sit');
+        scene.add(grp);
+        const sub = document.getElementById('subtitle');
+        if (sub && !sub.textContent) { const line = SHOUTS[Math.floor(Math.random() * SHOUTS.length)]; g.hud.subtitle('Driver', line); g.wait(1.7).then(() => { if (sub.textContent.includes(line)) g.hud.subtitle(); }).catch(() => {}); }
+        await g.wait(0.14);
+        p.human.play('cross', 'idle', 1.0);                                // the haul
+        g.sfx?.punch(false);
+        // Out through the door, half standing, turned round by the arm that has him...
+        let afoot = false;
+        await over(0.28, u => {
+          grp.position.set(way.seat.x + (out.x - way.seat.x) * u, gy + way.seatY * (1 - u), way.seat.z + (out.z - way.seat.z) * u); grp.rotation.y = car.heading + side * 1.2 * u;
+          if (u > 0.42 && !afoot) { afoot = true; driver.play('hitChest', 'idle', 1.3); }       // clear of the sill he is on his feet, more or less
+        });
+        // ...and let go of: he goes down on the road behind the door, a few feet on.
+        driver.after = null; driver.set('down');
+        const npc = g.addNpc(driver, { ai: null, cash: 0 });
+        npc.expires = g.time + 40; npc.stunned = g.time + 2.4 + Math.random();
+        if (Math.random() < 0.25) npc.ai = 'brawler'; else { npc.ai = 'flee'; npc.threat = p.pos.clone(); }   // most run; one in four gets up wanting his car back
+        g.heat(0.6);
+        p.heading = Math.atan2(way.thrown.x - p.pos.x, way.thrown.z - p.pos.z);
+        over(0.5, u => { const e = 1 - (1 - u) * (1 - u); grp.position.set(out.x + (way.thrown.x - out.x) * e, groundAt(grp.position.x, grp.position.z), out.z + (way.thrown.z - out.z) * e); });
+        g.wait(0.42).then(() => g.sfx?.thump()).catch(() => {});
+        await g.wait(0.34);
+      }
+      if (p.dying || p.car) return;
+      await climbIn(car, way, door);
+      door = null;
+    } catch { /* the mission was restarted under him */ } finally {
+      door?.remove();
+      p.pose = null; p.jumpY = 0; p.locked = false;
     }
-    try { await g.wait(0.9); } catch { return; }
-    p.locked = false;
-    if (!p.car && !p.dying) g.enterCar(car);
+  };
+  // Get into a car that nobody is in: to the nearer door that can be opened, the door, and in.
+  g.boardCar = async car => {
+    if (p.locked || p.car) return;
+    const near1 = (p.pos.x - car.pos.x) * Math.cos(car.heading) - (p.pos.z - car.pos.z) * Math.sin(car.heading) >= 0 ? 1 : -1;
+    const blocked = sd => { const st = doorway(car, sd).stand; return pushOut(new THREE.Vector3(st.x, 0, st.z), 0.4); };
+    const side = !blocked(near1) ? near1 : !blocked(-near1) ? -near1 : near1, way = doorway(car, side);
+    let door = null;
+    p.locked = true;
+    try {
+      await runToDoor(car, way);
+      if (p.dying || p.car) return;
+      p.heading = way.face;
+      door = carDoor(car, side);
+      p.human.play('interact', 'idle', 1.8);
+      await g.wait(0.14);
+      await door.swing(1, 0.2);
+      await climbIn(car, way, door);
+      door = null;
+    } catch { /* the mission was restarted under him */ } finally {
+      door?.remove();
+      p.pose = null; p.jumpY = 0; p.locked = false;
+    }
+  };
+  // He has just stepped out: the door he came out of is open behind him, and swings to.
+  g.doorBehind = car => {
+    const side = (p.pos.x - car.pos.x) * Math.cos(car.heading) - (p.pos.z - car.pos.z) * Math.sin(car.heading) >= 0 ? 1 : -1, door = carDoor(car, side);
+    door.set(1);
+    g.wait(0.18).then(() => door.swing(0, 0.3)).then(() => door.remove()).catch(() => door.remove());
   };
   const targets = () => [...peds, ...g.npcs];
   // In the fight: coming at him, shooting at him, or the man a mission has sent him after.

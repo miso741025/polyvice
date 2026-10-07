@@ -451,7 +451,7 @@ async function boot() {
           .then(() => { car.hp = 100; g.pardon(); }).catch(() => {}).finally(() => { g.spraying = false; p.locked = false; });
       } else if (fix && g.cash >= 150 && g.consume('KeyR')) { g.addMoney(-150); car.hp = 100; sfx.cash(); }
       if (g.wanted >= 1 && !g.toldSpray && shop) { g.toldSpray = true; hud.subtitle('', `The ${LA ? 'parts store' : 'body shop'} will respray the car for $250. The police lose you. It is marked on the map.`); g.wait(5).then(() => { if (!g.missionActive) hud.subtitle(); }).catch(() => {}); }
-      if (!p.locked && g.consume('KeyF') && Math.abs(car.speed) < 4) g.leaveCar();
+      if (!p.locked && g.consume('KeyF') && Math.abs(car.speed) < 4) { g.leaveCar(); g.doorBehind?.(car); }
       return;
     }
 
@@ -509,7 +509,7 @@ async function boot() {
       if (d < best && !o.wreck) { best = d; nearest = o; }
     }
     hud.prompt(nearest ? (nearest.nav || nearest.ai ? 'F  ·  Take vehicle' : 'F  ·  Enter vehicle') : '');
-    if (nearest && g.consume('KeyF')) { hud.prompt(''); if (nearest.nav || nearest.ai) g.carjack(nearest); else g.enterCar(nearest); }
+    if (nearest && g.consume('KeyF')) { hud.prompt(''); if (nearest.nav || nearest.ai) g.carjack(nearest); else g.boardCar(nearest); }
   }
 
   const honk = car => { if (Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) < 45 && !p.inside) sfx.horn(0.6 + Math.random() * 0.6); };
