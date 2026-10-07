@@ -94,8 +94,8 @@ function installStakes(g) {
     const sum = Math.floor(due[m.st.key] || 0), man = m.man, pos = man.group.position;
     try {
       man.set('walk', 1);
-      let last = g.time;
-      await g.until(() => { const dx = p.pos.x - pos.x, dz = p.pos.z - pos.z, d = Math.hypot(dx, dz), dt = Math.min(0.1, g.time - last); last = g.time; if (d < 1.7) return true; const step = Math.min(2.4 * dt, d - 1.6); pos.x += dx / d * step; pos.z += dz / d * step; pos.y = groundAt(pos.x, pos.z); man.group.rotation.y = Math.atan2(dx, dz); return false; });
+      let then = g.time;                                // (not `last`: that is the record of when each place was collected)
+      await g.until(() => { const dx = p.pos.x - pos.x, dz = p.pos.z - pos.z, d = Math.hypot(dx, dz), dt = Math.min(0.1, g.time - then); then = g.time; if (d < 1.7) return true; const step = Math.min(2.4 * dt, d - 1.6); pos.x += dx / d * step; pos.z += dz / d * step; pos.y = groundAt(pos.x, pos.z); man.group.rotation.y = Math.atan2(dx, dz); return false; });
       man.set('idle'); man.group.rotation.y = Math.atan2(p.pos.x - pos.x, p.pos.z - pos.z); p.heading = Math.atan2(pos.x - p.pos.x, pos.z - p.pos.z);
       hud.subtitle(m.st.who, m.st.lines[Math.floor(Math.random() * m.st.lines.length)]);
       await g.wait(1.2);
@@ -107,14 +107,13 @@ function installStakes(g) {
       await g.until(() => { const k = Math.min(1, (g.time - t0 - 0.35) / 0.6), e = k * k * (3 - 2 * k); env.position.set(ax + (p.pos.x - ax) * (0.2 + e * 0.7), y0 + Math.sin(k * Math.PI) * 0.14, az + (p.pos.z - az) * (0.2 + e * 0.7)); env.rotation.y = p.heading; env.scale.setScalar(1 - e * 0.5); return k >= 1; });
       g.scene.remove(env);
       g.sfx?.cash();
+      last[m.st.key] = now();                          // the week starts again from today
+      g.scene.remove(m.mesh); { const i = g.blips.indexOf(m.blip); if (i >= 0) g.blips.splice(i, 1); } if (live.includes(m)) live.splice(live.indexOf(m), 1);   // and the ring is gone at once
       g.addMoney(sum);
       g.wait(2.2).then(() => { if (!g.missionActive) hud.subtitle('', 'The next envelope will be ready in a week.'); return g.wait(3); }).then(() => { if (!g.missionActive) hud.subtitle(); }).catch(() => {});
-      last[m.st.key] = now();                          // the week starts again from today
       await g.wait(1.6);
       if (!g.missionActive) hud.subtitle();
       // He goes back to his door; the ring is gone until there is something in it again.
-      g.scene.remove(m.mesh); const i = g.blips.indexOf(m.blip); if (i >= 0) g.blips.splice(i, 1);
-      live.splice(live.indexOf(m), 1);
       g.wait(6).then(() => g.scene.remove(man.group)).catch(() => g.scene.remove(man.group));
     } catch { /* killed, or a job began: nothing is owed for trying */ }
     p.locked = false; busy = false; g.sideBusy = false;
