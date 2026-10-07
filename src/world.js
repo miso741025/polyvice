@@ -360,8 +360,10 @@ export function buildWorld(scene) {
   // Signs share one texture; each gets a slot in it.
   const atlas = document.createElement('canvas');
   const AH = 4096; // tall enough for every sign in either city
-  atlas.width = 2048; atlas.height = AH;
-  const ag = atlas.getContext('2d'), shelves = [0, 0, 0, 0];
+  const AW = 4096; // eight columns of slots. (At four the atlas filled up before the city was finished, and whatever was built last went without its sign: the bridge's, for one.)
+  atlas.width = AW; atlas.height = AH;
+  const ag = atlas.getContext('2d'), shelves = [0, 0, 0, 0, 0, 0, 0, 0];
+  let signsLost = 0;
   M.sign = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(atlas) });
   M.sign.map.colorSpace = THREE.SRGBColorSpace; M.sign.map.anisotropy = 8;
   // text may be an array of rows. `turn` is the rotation about y of a sign that faces +z by default.
@@ -373,7 +375,7 @@ export function buildWorld(scene) {
     if (!slot) {
       const pw = w >= h ? 512 : Math.max(48, Math.round(256 * w / h)), ph = w >= h ? Math.max(48, Math.round(512 * h / w)) : 256;
       const col = shelves.indexOf(Math.min(...shelves)), px = col * 512, py = shelves[col];
-      if (py + ph > AH) return; // out of room: the city simply has one sign fewer
+      if (py + ph > AH) { if (!signsLost++) console.warn('sign atlas full: a sign was left out', rows); return; } // out of room: the city has one sign fewer, and says so
       shelves[col] += ph + 4;
       slots.set(key, slot = { px, py, pw, ph });
       ag.save();
@@ -394,7 +396,7 @@ export function buildWorld(scene) {
     }
     for (const [sx, sy, sz, st] of [[x, y, z, turn], ...also]) {
       const geo = new THREE.PlaneGeometry(w, h), uv = geo.attributes.uv;
-      for (let i = 0; i < 4; i++) uv.setXY(i, (slot.px + uv.getX(i) * slot.pw) / 2048, 1 - (slot.py + (1 - uv.getY(i)) * slot.ph) / AH);
+      for (let i = 0; i < 4; i++) uv.setXY(i, (slot.px + uv.getX(i) * slot.pw) / AW, 1 - (slot.py + (1 - uv.getY(i)) * slot.ph) / AH);
       put(M.sign, geo.rotateY(st).translate(sx, sy, sz));
     }
   }
@@ -3842,30 +3844,79 @@ export function buildWorld(scene) {
     const dir = LA ? 1 : -1, z = nodeZ(9), Y = 7, W = 14, GREY = 0x9a968e, STEEL_B = 0x8a2f2a;
     const x0 = LA ? SHORE : OX - ROAD / 2, ramp = x0 + dir * 2, deck = x0 + dir * 56, end = (LA ? bounds.maxX : bounds.minX) + dir * 460;
     piers.push({ minZ: z - W / 2 + 0.5, maxZ: z + W / 2 - 0.5, ramp, deck, maxX: end, y: Y, dir });
-    const len = Math.abs(end - deck), mid = (deck + end) / 2, rl = Math.abs(deck - ramp);
-    put(M.gravel, tiled(new THREE.BoxGeometry(rl + 0.4, 0.8, W), rl, 0.8, W, 6).rotateZ(dir * Math.atan2(Y + 0.1, rl)).translate((ramp + deck) / 2, (Y - 0.1) / 2 - 0.4, z), GREY);
-    slab(GREY, len, 1, W, mid, Y - 1, z, M.gravel, 6);
-    flat(M.asphalt, 0xffffff, len, W - 1.2, mid, Y + 0.02, z, 5);
-    for (let k = 0; k < len / 12; k++) flat(M.paint, 0xe8c64a, 5, 0.18, deck + dir * (6 + k * 12), Y + 0.04, z);
+    const len = Math.abs(end - deck), mid = (deck + end) / 2, rl = Math.abs(deck - ramp), CONC = 0xb9b3ba, RUST = 0x6a2420, edge = W / 2 - 0.2;
+    // ----- The approach: an embankment up from the shore road, tarmac on it, walls and rails each side, lamps -----
+    const th = Math.atan2(Y + 0.1, rl), sl = Math.hypot(rl, Y + 0.1), up = (t, lift = 0) => [ramp + (deck - ramp) * t, -0.1 + (Y + 0.1) * t + lift];
+    const sloped = (mat, hex, l, hh, d, t, lift, zz, tile) => { const [cx, cy] = up(t, lift + hh / 2); const geo = new THREE.BoxGeometry(l, hh, d); put(mat, (tile ? tiled(geo, l, hh, d, tile) : geo).rotateZ(dir * th).translate(cx, cy, zz), hex); };
+    { const wedge = new THREE.Shape(); wedge.moveTo(ramp, -0.6); wedge.lineTo(deck, -0.6); wedge.lineTo(deck, Y - 0.3); wedge.lineTo(ramp, -0.4); wedge.lineTo(ramp, -0.6);
+      put(M.plain, new THREE.ExtrudeGeometry(wedge, { depth: W, bevelEnabled: false }).translate(0, 0, z - W / 2), 0x8f8b84); }                                         // the bank itself: nothing shows under the ramp any more
+    put(M.gravel, tiled(new THREE.BoxGeometry(rl + 0.4, 0.8, W), rl, 0.8, W, 6).rotateZ(dir * th).translate((ramp + deck) / 2, (Y - 0.1) / 2 - 0.4, z), GREY);
+    sloped(M.asphalt, 0xffffff, sl, 0.05, W - 1.6, 0.5, 0, z, 5);
     for (const s of [-1, 1]) {
-      slab(0xb9b3ba, len, 1.1, 0.4, mid, Y, z + s * (W / 2 - 0.2));
+      sloped(M.paint, 0xe8c64a, sl, 0.012, 0.13, 0.5, 0.05, z + s * 0.16); sloped(M.paint, 0xf4f4f0, sl, 0.012, 0.14, 0.5, 0.05, z + s * (W / 2 - 1.15));      // double yellow, white edge lines
+      for (let k = 0; k < 6; k++) sloped(M.paint, 0xf4f4f0, 3, 0.012, 0.13, 0.1 + k * 0.16, 0.05, z + s * 3.25);                                                   // lane dashes
+      sloped(M.plain, CONC, sl, 1.1, 0.4, 0.5, 0, z + s * edge); sloped(M.plain, 0x8a8d96, sl, 0.07, 0.07, 0.5, 1.5, z + s * edge); sloped(M.plain, 0x8a8d96, sl, 0.07, 0.07, 0.5, 1.28, z + s * edge);
+      for (let k = 0; k <= 13; k++) { const [px, py] = up(k / 13, 1.05); slab(0x8a8d96, 0.08, 0.5, 0.08, px, py, z + s * edge); }
+      for (const t of [0.22, 0.6, 0.98]) { const [px, py] = up(t); post(STEEL, 0.09, 6, px, py, z + s * (W / 2 - 0.5)); ball(0xffe2a6, 0.26, px, py + 6.1, z + s * (W / 2 - 0.5), M.glow); halo(px, py + 6.1, z + s * (W / 2 - 0.5), 0xffb860, 4); }
+      // where the wall begins: a striped nose, and a reflector on it
+      slab(0xf2c230, 0.5, 1.3, 0.6, ramp - dir * 0.4, -0.1, z + s * edge); for (let k = 0; k < 3; k++) slab(0x16161c, 0.52, 0.2, 0.62, ramp - dir * 0.4, 0.1 + k * 0.42, z + s * edge); ball(0xff5a3c, 0.09, ramp - dir * 0.68, 1.0, z + s * edge, M.glow);
+    }
+    for (let k = 0; k < 4; k++) flat(M.paint, 0xf4f4f0, 0.5, 2.2, x0 - dir * 1.2, 0.03, z - 4.8 + k * 3.2);                                                         // a stop line of bars across the foot of it
+    // ----- The deck -----
+    slab(GREY, len, 1, W, mid, Y - 1, z, M.gravel, 6);
+    flat(M.asphalt, 0xffffff, len, W - 1.6, mid, Y + 0.02, z, 5);
+    for (const s of [-1, 1]) {
+      flat(M.paint, 0xe8c64a, len, 0.13, mid, Y + 0.04, z + s * 0.16); flat(M.paint, 0xf4f4f0, len, 0.14, mid, Y + 0.04, z + s * (W / 2 - 1.15));
+      for (let k = 0; k < len / 9; k++) flat(M.paint, 0xf4f4f0, 3, 0.13, deck + dir * (4 + k * 9), Y + 0.04, z + s * 3.25);
+      slab(CONC, len, 1.1, 0.4, mid, Y, z + s * edge);
+      slab(0x8a8d96, len, 0.07, 0.07, mid, Y + 1.5, z + s * edge); slab(0x8a8d96, len, 0.07, 0.07, mid, Y + 1.28, z + s * edge);                                    // a steel rail on the wall, on posts
+      for (let k = 0; k <= len / 4; k++) slab(0x8a8d96, 0.08, 0.5, 0.08, deck + dir * k * 4, Y + 1.05, z + s * edge);
+      slab(STEEL_B, len, 1.5, 0.45, mid, Y - 2.5, z + s * 4.6);                                                                                                          // the girders under it, seen from the beach
       // rails over the beach, so nobody steps off the side of the ramp
       collide((x0 + (LA ? bounds.maxX : bounds.minX)) / 2, z + s * (W / 2 + 0.2), Math.abs((LA ? bounds.maxX : bounds.minX) - x0) + 8, 0.5, Y + 2);
     }
-    for (let k = 0; k <= len / 46; k++) { // piles into the sea, lamps above them
+    for (let k = 0; k <= len / 46; k++) { // piles into the sea, lamps above them, a joint in the roadway over each
       const px = deck + dir * k * 46;
-      slab(GREY, 2.2, Y + 4, W - 3, px, -4, z, M.gravel, 4);
-      for (const s of [-1, 1]) { post(STEEL, 0.09, 6, px, Y, z + s * (W / 2 - 0.5)); ball(0xffe2a6, 0.26, px, Y + 6.1, z + s * (W / 2 - 0.5), M.glow); halo(px, Y + 6.1, z + s * (W / 2 - 0.5), 0xffb860, 4); }
+      slab(GREY, 2.2, Y + 4, W - 3, px, -4, z, M.gravel, 4); slab(0x7a766e, 3.4, 1.2, W - 1.6, px, -4.6, z);
+      slab(STEEL_B, 0.4, 1.3, 9.2, px + dir * 15, Y - 2.4, z); slab(STEEL_B, 0.4, 1.3, 9.2, px + dir * 31, Y - 2.4, z);
+      flat(M.paint, 0x23232b, 0.22, W - 1.6, px + dir * 0.6, Y + 0.035, z);
+      for (const s of [-1, 1]) { post(STEEL, 0.09, 6, px, Y, z + s * (W / 2 - 0.5)); slab(STEEL, 0.07, 0.07, 1.5, px, Y + 6, z + s * (W / 2 - 1.2)); ball(0xffe2a6, 0.26, px, Y + 5.9, z + s * (W / 2 - 1.9), M.glow); halo(px, Y + 5.9, z + s * (W / 2 - 1.9), 0xffb860, 4); }
+      if (k % 2 === 1) for (const s of [-1, 1]) { slab(0xf2c230, 0.3, 0.42, 0.2, px + dir * 23, Y + 1.1, z + s * (edge - 0.28)); ball(0x4a7dff, 0.06, px + dir * 23, Y + 1.6, z + s * (edge - 0.28), M.glow); }   // a call box
     }
     for (const t of [0.3, 0.72]) { // the towers and their cables
       const tx = deck + dir * len * t, H = 44;
-      for (const s of [-1, 1]) slab(STEEL_B, 2.2, H + 8, 2.2, tx, -6, z + s * (W / 2 + 1.2));
-      for (const hy of [Y + 12, Y + 26, H]) slab(STEEL_B, 1.6, 2.4, W + 2.4, tx, hy, z);
-      ball(0xff3b3b, 0.4, tx, H + 3.2, z, M.glow); halo(tx, H + 3.2, z, 0xff3030, 10);
-      for (const s of [-1, 1]) for (let n = 1; n <= 7; n++) for (const side of [-1, 1]) {
-        const reach = n * 14, dx = side * reach, drop = H - Y - 1, l = Math.hypot(reach, drop);
-        put(M.plain, new THREE.BoxGeometry(l, 0.18, 0.18).rotateZ(-side * Math.atan2(drop, reach)).translate(tx + dx / 2, Y + 1 + drop / 2, z + s * (W / 2 + 1.2)), 0xd8d0c4);
+      for (const s of [-1, 1]) {
+        const lz = z + s * (W / 2 + 1.2);
+        slab(STEEL_B, 2.2, H + 8, 2.2, tx, -6, lz); slab(RUST, 2.9, 1.1, 2.9, tx, Y - 0.2, lz); slab(RUST, 2.8, 0.7, 2.8, tx, H + 1.6, lz); slab(0x7a766e, 5, 5, 5, tx, -6, lz);   // a leg, its collar at the deck, its cap, its footing in the water
+        for (const ly of [Y + 9, Y + 22, Y + 33]) ball(0xfff2c0, 0.14, tx - dir * 1.16, ly, lz, M.glow);
       }
+      for (const hy of [Y + 12, Y + 26, H]) slab(STEEL_B, 1.6, 2.4, W + 2.4, tx, hy, z);
+      for (const [y0, y1] of [[Y + 14.4, Y + 26], [Y + 28.4, H]]) for (const s of [-1, 1]) put(M.plain, new THREE.BoxGeometry(0.5, 0.5, Math.hypot(y1 - y0, W + 0.4)).rotateX(s * Math.atan2(y1 - y0, W + 0.4)).translate(tx, (y0 + y1) / 2, z), RUST);   // the cross-bracing in each bay
+      ball(0xff3b3b, 0.4, tx, H + 3.2, z, M.glow); halo(tx, H + 3.2, z, 0xff3030, 10);
+      for (const s of [-1, 1]) for (let n = 1; n <= 9; n++) for (const side of [-1, 1]) {
+        const reach = n * 11, dx = side * reach, top = H - (9 - n) * 1.4, drop = top - Y - 1, l = Math.hypot(reach, drop), lz = z + s * (W / 2 + 1.2);
+        put(M.plain, new THREE.BoxGeometry(l, 0.13, 0.13).rotateZ(-side * Math.atan2(drop, reach)).translate(tx + dx / 2, Y + 1 + drop / 2, lz), 0xd8d0c4);
+        slab(RUST, 0.6, 0.5, 0.6, tx + dx, Y + 0.7, lz); slab(STEEL_B, 0.5, 0.3, 1.5, tx + dx, Y - 0.6, z + s * (W / 2 + 0.5));                                               // where each cable is made fast, on an outrigger
+      }
+    }
+    // ----- The toll plaza at the head of the deck: a canopy, a booth on an island between the lanes, the arms up -----
+    {
+      const tx = deck + dir * 14, face = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
+      slab(CONC, 8, 0.24, 1.7, tx, Y, z); collide(tx, z, 8, 1.7, Y + 3);
+      for (const e of [-1, 1]) { slab(0xf2c230, 0.5, 0.9, 1.7, tx + e * 4.2, Y, z); for (let k = 0; k < 2; k++) slab(0x16161c, 0.52, 0.2, 1.72, tx + e * 4.2, Y + 0.15 + k * 0.4, z); ball(0xffa325, 0.1, tx + e * 4.5, Y + 1.0, z, M.glow); }
+      slab(0xe9e2cf, 2.4, 2.3, 1.3, tx, Y + 0.24, z); slab(0xffe2a6, 2.44, 0.8, 1.34, tx, Y + 1.2, z, M.glow); slab(0x2f4a3c, 2.7, 0.14, 1.6, tx, Y + 2.54, z); slab(0xe9e2cf, 0.12, 0.8, 1.36, tx, Y + 1.2, z);
+      for (const s of [-1, 1]) {
+        post(0x55525a, 0.2, 5.4, tx, Y, z + s * (edge - 0.1), 8);
+        slab(0xfff2c0, 1.6, 0.05, 0.6, tx, Y + 5.36, z + s * 3.25, M.glow); halo(tx, Y + 5.2, z + s * 3.25, 0xffe2a6, 4);
+        for (const e of [-1, 1]) slab(0x3dff7a, 0.06, 0.5, 0.5, tx + e * 2.82, Y + 4.75, z + s * 3.25, M.glow);                                                          // a green light over each lane, both ways
+        slab(0x55525a, 0.16, 1.0, 0.16, tx - dir * 3.2, Y + 0.24, z + s * 0.6); put(M.plain, new THREE.BoxGeometry(0.09, 3.2, 0.09).translate(0, 1.6, 0).rotateX(s * 0.3).translate(tx - dir * 3.2, Y + 1.15, z + s * 0.6), 0xf4f4f0);
+        put(M.plain, new THREE.BoxGeometry(0.1, 0.6, 0.1).translate(0, 2.9, 0).rotateX(s * 0.3).translate(tx - dir * 3.2, Y + 1.15, z + s * 0.6), 0xd8342c);              // the arm, up, red at its end
+        slab(0x8a8d96, 0.5, 0.9, 0.4, tx - dir * 1.9, Y + 0.24, z + s * 1.02); slab(0x16161c, 0.3, 0.2, 0.06, tx - dir * 1.9, Y + 0.95, z + s * 1.24);                     // the basket the exact change goes in
+      }
+      post(0x55525a, 0.16, 2.9, tx, Y + 2.6, z, 8);
+      slab(0x2f4a3c, 5.6, 0.5, W + 0.8, tx, Y + 5.4, z); slab(0xf4f4f0, 5.7, 0.12, W + 0.9, tx, Y + 5.4, z);
+      sign(['TOLL  $1.00', 'EXACT CHANGE  ·  NO PENNIES'], tx - dir * 2.86, Y + 6.5, z, face, { w: 9, h: 1.5, color: '#f4f4f0', bg: '#1f6b4a', size: 0.5, glow: false });
+      for (const s of [-1, 1]) { post(0x8a8d96, 0.05, 2.6, tx + dir * 12, Y, z + s * (edge - 0.5), 5); sign(s * dir > 0 ? ['NO STOPPING', 'ON BRIDGE'] : ['SPEED', 'LIMIT 45'], tx + dir * 11.94, Y + 2.3, z + s * (edge - 0.5), face, { w: 1.5, h: 1.1, color: '#16161c', bg: '#f4f4f0', size: 0.5, glow: false }); }
     }
     // The sign over the on-ramp.
     const there = LA ? 'VICE CITY' : 'LOS ANGELES', sx = x0 + dir * 10;

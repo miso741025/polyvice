@@ -107,7 +107,7 @@ export function pushOut(pos, r) {
     return hit;
   }
   // The island's edge, except along a pier, which carries on over the water between its rails.
-  const pier = piers.find(p => pos.z > p.minZ && pos.z < p.maxZ && (pos.x - p.deck) * (p.dir || 1) > 0);
+  const pier = piers.find(p => pos.z > p.minZ && pos.z < p.maxZ && (pos.x - p.ramp) * (p.dir || 1) > 0); // from the foot of its ramp: the bridge's ramp crosses the island's edge before it is level, and a car on it was stopped there as if by a wall
   const west = pier && pier.dir === -1;
   const out = pier && (west ? pos.x < bounds.minX + r : pos.x > bounds.maxX - r);
   const x = clamp(pos.x, (west ? pier.maxX : bounds.minX) + r, (pier && !west ? pier.maxX : bounds.maxX) - r);
