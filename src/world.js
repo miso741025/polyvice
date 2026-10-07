@@ -3156,6 +3156,74 @@ export function buildWorld(scene) {
     q.light(-1.5, 2.5, 0, 0xffe2b0, 34, 11); q.light(3.3, 2.4, -2.2, 0xdfeeff, 22, 6);
     q.tub = { x: q.X + 4.25, y: q.Y + 0.28, z: q.Z - 3.1 }; q.tubMid = { x: q.X + 3.5, y: q.Y + 0.28, z: q.Z - 3.1 }; /* a body laid down lies back from where it stood: `tub` is the foot of the bath */ q.bathDoor = { x: q.X + 2.6, z: q.Z - 0.1 }; q.bath = { x: q.X + 3.2, z: q.Z - 1.9 }; q.radio = { x: q.X - 0.4, z: q.Z - 2.9 }; q.boxes = { x: q.X - 0.1, z: q.Z + 2.5 };
   }
+  { // Christopher Moltisanti's place: rented, and furnished out of the back of trucks. A leather couch in front of a television too big
+    // for the room, a kitchen he does not cook in, a desk with a computer and one page, a bedroom behind a partition, a bathroom.
+    const q = rooms.CHRIS = room(12, 9, 3, { floor: M.wood, floorTint: 0x8a6a4a, floorScale: 1.5, wall: M.plain, wallTint: 0xd9d2c4, ceil: 0xeeeae0, door: 0x3a2418, doorX: 1.2, at: [2600, 30] });
+    const X = q.X, Y = q.Y, Z = q.Z, LEATHER = 0x1a1a1e, CHROME = 0xc9cbd2, WHITE = 0xf4f4f0, OAK = 0x9a7448, TILE = 0xdfe6e8, PART = 0xd9d2c4, INK = 0x16161c;
+    // Partitions: the bedroom (south-west), the bathroom (south-east). The front door opens between them.
+    q.block(PART, 0.16, 3, 3.3, -1.2, 2.55); q.block(PART, 2.1, 3, 0.16, -4.65, 0.9); slab(PART, 2.4, 0.8, 0.16, X - 2.4, Y + 2.2, Z + 0.9);              // (the opening into the bedroom is x -3.6 to -1.2)
+    q.block(PART, 0.16, 3, 2.6, 3.0, 2.9); q.block(PART, 1.7, 3, 0.16, 4.85, 1.6); slab(PART, 1.0, 0.8, 0.16, X + 3.5, Y + 2.2, Z + 1.6);                // (the bathroom door is x 3.0 to 4.0)
+    // ----- The living room -----
+    slab(0x5a2a2e, 3.6, 0.012, 2.8, X - 3.7, Y + 0.006, Z - 1.8); slab(0x3a1c20, 3.3, 0.014, 2.5, X - 3.7, Y + 0.007, Z - 1.8);                                // a rug
+    q.block(INK, 0.5, 0.5, 2.2, -5.35, -1.8); slab(0x2a2a30, 0.46, 0.02, 2.16, X - 5.35, Y + 0.5, Z - 1.8);                                                 // the unit under the television
+    slab(INK, 0.12, 0.95, 1.5, X - 5.42, Y + 0.56, Z - 1.8); slab(0x23232b, 0.3, 0.06, 0.6, X - 5.35, Y + 0.52, Z - 1.8);                                    // the television: thirty-six inches, fell off a truck
+    slab(0x2a2a30, 0.36, 0.09, 0.44, X - 5.3, Y + 0.3, Z - 1.8); slab(0x7dffb0, 0.01, 0.02, 0.1, X - 5.11, Y + 0.34, Z - 1.7, M.glow);                       // the video recorder, its clock unset
+    for (const s2 of [-1, 1]) { q.block(INK, 0.34, 1.1, 0.34, -5.4, -1.8 + s2 * 1.45); for (let k = 0; k < 2; k++) put(M.plain, new THREE.CylinderGeometry(0.1 - k * 0.04, 0.1 - k * 0.04, 0.02, 12).rotateZ(Math.PI / 2).translate(X - 5.22, Y + 0.4 + k * 0.42, Z - 1.8 + s2 * 1.45), 0x55525a); } // speakers
+    { // the screen is its own mesh: it flickers
+      const tv = new THREE.Mesh(new THREE.PlaneGeometry(1.34, 0.8).rotateY(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x8fb4e0 })); tv.position.set(X - 5.35, Y + 1.05, Z - 1.8); scene.add(tv);
+      const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.8).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x8fb4e0, transparent: true, opacity: 0.1, depthWrite: false })); glow.position.set(X - 3.9, Y + 0.02, Z - 1.8); scene.add(glow);
+      updaters.push(t => { const k = 0.62 + 0.2 * Math.sin(t * 7.3) * Math.sin(t * 2.1) + (Math.sin(t * 0.9) > 0.86 ? 0.25 : 0); tv.material.color.setRGB(0.45 * k + 0.1, 0.62 * k, 0.9 * k); glow.material.opacity = 0.05 + k * 0.09; });
+    }
+    // The couch: black leather, facing the screen. Its back is to the kitchen.
+    q.block(LEATHER, 0.95, 0.42, 2.3, -2.5, -1.8); slab(LEATHER, 0.26, 0.5, 2.3, X - 2.1, Y + 0.42, Z - 1.8); for (const s2 of [-1, 1]) slab(0x232328, 0.95, 0.24, 0.24, X - 2.5, Y + 0.42, Z - 1.8 + s2 * 1.03);
+    for (const s2 of [-1, 1]) slab(0x26262c, 0.62, 0.1, 0.98, X - 2.62, Y + 0.42, Z - 1.8 + s2 * 0.5); slab(0x8a1c2a, 0.12, 0.34, 0.4, X - 2.28, Y + 0.52, Z - 2.55);
+    q.block(INK, 0.6, 0.36, 1.2, -3.9, -1.8); slab(0x55606a, 0.56, 0.015, 1.16, X - 3.9, Y + 0.36, Z - 1.8);                                                 // a smoked-glass table
+    slab(0xe9e2cf, 0.4, 0.04, 0.4, X - 3.9, Y + 0.375, Z - 2.1); slab(0xd8342c, 0.3, 0.005, 0.3, X - 3.9, Y + 0.416, Z - 2.1); post(0x9a9690, 0.09, 0.03, X - 3.85, Y + 0.375, Z - 1.5, 10); slab(INK, 0.06, 0.03, 0.18, X - 4.0, Y + 0.375, Z - 1.3); // a pizza box, an ashtray, the remote
+    for (let k = 0; k < 3; k++) post([0x8a5a2a, 0x2f7d46, 0x8a5a2a][k], 0.03, 0.22, X - 3.75 + k * 0.09, Y + 0.375, Z - 1.72 - (k % 2) * 0.1, 6);
+    post(CHROME, 0.02, 1.7, X - 5.3, Y, Z - 3.85, 6); post(INK, 0.16, 0.02, X - 5.3, Y, Z - 3.85, 10); put(M.glow, new THREE.CylinderGeometry(0.12, 0.2, 0.26, 12).translate(X - 5.3, Y + 1.72, Z - 3.85), 0xffe2b0);    // a floor lamp
+    // Tapes. He has every gangster picture ever put on one, and has opinions about all of them.
+    q.block(OAK, 2.0, 1.7, 0.34, -3.9, -4.0, M.wood, 1); for (let r = 0; r < 4; r++) { slab(0x2a2018, 1.9, 0.03, 0.3, X - 3.9, Y + 0.3 + r * 0.4, Z - 3.98); for (let k = 0; k < 15; k++) slab([INK, 0xd8342c, 0xf2c230, 0x2f56c8, WHITE, 0x23232b][(k * 5 + r * 3) % 6], 0.1, 0.3, 0.2, X - 4.78 + k * 0.125, Y + 0.33 + r * 0.4, Z - 3.94); }
+    for (const [px, hex, band] of [[-5.0, 0x16161c, 0xd8342c], [-2.6, 0x1c2a3a, 0xf2c230]]) { slab(INK, 0.8, 1.1, 0.03, X + px, Y + 1.75, Z - 4.18); slab(hex, 0.72, 1.0, 0.035, X + px, Y + 1.8, Z - 4.18); slab(band, 0.5, 0.14, 0.04, X + px, Y + 1.92, Z - 4.175); slab(0xe9e2cf, 0.3, 0.3, 0.04, X + px, Y + 2.25, Z - 4.175); } // two film posters, framed
+    // The desk: a computer, a printer, and the page he has been on for a month.
+    q.block(OAK, 1.5, 0.74, 0.7, -1.3, -3.82, M.wood, 1); slab(0xd8d2c0, 0.44, 0.38, 0.4, X - 1.5, Y + 0.84, Z - 3.92); slab(0xc9c2b0, 0.3, 0.1, 0.3, X - 1.5, Y + 0.74, Z - 3.92); q.glowPanel(0xbfe0ff, 0.36, 0.28, -1.5, -3.71, 1.03, 0);
+    slab(0xd8d2c0, 0.46, 0.03, 0.17, X - 1.5, Y + 0.74, Z - 3.6); slab(0xd8d2c0, 0.4, 0.16, 0.34, X - 0.85, Y + 0.74, Z - 3.9); slab(WHITE, 0.22, 0.02, 0.3, X - 0.85, Y + 0.9, Z - 3.86); for (let k = 0; k < 5; k++) slab(WHITE, 0.22, 0.004, 0.3, X - 1.95 + k * 0.006, Y + 0.74 + k * 0.004, Z - 3.6 + k * 0.01);
+    chairAt({ x: X - 1.4, z: Z - 3.0, h: Math.PI }, Y, INK); collide(X - 1.4, Z - 3.0, 0.5, 0.5, 0.9);
+    { // a fan over the couch, turning
+      const fan = new THREE.Group(), wood = new THREE.MeshLambertMaterial({ color: 0x5a3a24 }); for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.02, 0.17), wood); b.position.set(Math.cos(k * Math.PI / 2) * 0.62, 0, Math.sin(k * Math.PI / 2) * 0.62); b.rotation.y = -k * Math.PI / 2; fan.add(b); }
+      fan.position.set(X - 3.2, Y + 2.72, Z - 1.8); scene.add(fan); post(0xb08d57, 0.03, 0.3, X - 3.2, Y + 2.72, Z - 1.8, 6); post(0xb08d57, 0.11, 0.1, X - 3.2, Y + 2.66, Z - 1.8, 10); updaters.push(t => { fan.rotation.y = t * 2.6; });
+    }
+    // ----- The kitchen: units down the north wall and round the corner, a breakfast bar dividing it from the couch -----
+    q.block(WHITE, 0.72, 1.85, 0.7, 1.4, -3.85); slab(0xdfe3e6, 0.7, 0.02, 0.02, X + 1.4, Y + 1.25, Z - 3.49); slab(CHROME, 0.03, 0.4, 0.03, X + 1.68, Y + 1.4, Z - 3.48); slab(CHROME, 0.03, 0.5, 0.03, X + 1.68, Y + 0.6, Z - 3.48);          // the refrigerator
+    slab(0xf2c230, 0.2, 0.14, 0.006, X + 1.3, Y + 1.5, Z - 3.495); slab(0xd8342c, 0.12, 0.12, 0.006, X + 1.52, Y + 1.62, Z - 3.495);                                                                              // a take-away menu under a magnet
+    q.block(0x7a5a3c, 3.9, 0.9, 0.62, 3.75, -3.89, M.wood, 1); slab(0x2a2a30, 3.94, 0.04, 0.66, X + 3.75, Y + 0.9, Z - 3.89); q.block(0x7a5a3c, 0.62, 0.9, 2.5, 5.39, -2.3, M.wood, 1); slab(0x2a2a30, 0.66, 0.04, 2.5, X + 5.39, Y + 0.9, Z - 2.3);
+    for (let k = 0; k < 6; k++) { slab(0x6a4c30, 0.58, 0.01, 0.01, X + 2.1 + k * 0.65, Y + 0.62, Z - 3.575); slab(CHROME, 0.14, 0.02, 0.02, X + 2.1 + k * 0.65, Y + 0.72, Z - 3.57); slab(0x5a4028, 0.01, 0.86, 0.01, X + 1.8 + k * 0.65, Y + 0.02, Z - 3.575); }   // doors and drawers
+    slab(WHITE, 0.62, 0.9, 0.62, X + 2.45, Y, Z - 3.89); slab(INK, 0.6, 0.02, 0.6, X + 2.45, Y + 0.94, Z - 3.89); for (const [bx, bz] of [[-0.15, -0.14], [0.15, -0.14], [-0.15, 0.14], [0.15, 0.14]]) put(M.plain, new THREE.TorusGeometry(0.085, 0.012, 4, 12).rotateX(Math.PI / 2).translate(X + 2.45 + bx, Y + 0.965, Z - 3.89 + bz), 0x55525a); slab(INK, 0.5, 0.36, 0.01, X + 2.45, Y + 0.3, Z - 3.575); // the stove
+    slab(0xb8bcc4, 0.7, 0.02, 0.44, X + 4.1, Y + 0.93, Z - 3.89); slab(0x8a8d96, 0.6, 0.01, 0.34, X + 4.1, Y + 0.945, Z - 3.89); post(CHROME, 0.015, 0.26, X + 4.1, Y + 0.94, Z - 4.1, 5); slab(CHROME, 0.02, 0.02, 0.16, X + 4.1, Y + 1.18, Z - 4.02);      // the sink
+    for (let k = 0; k < 4; k++) put(M.plain, new THREE.CylinderGeometry(0.11, 0.11, 0.012, 10).translate(X + 3.55, Y + 0.95 + k * 0.014, Z - 3.85), WHITE); slab(INK, 0.24, 0.34, 0.26, X + 5.1, Y + 0.94, Z - 3.9); slab(CHROME, 0.2, 0.05, 0.2, X + 5.1, Y + 1.28, Z - 3.9); post(WHITE, 0.035, 0.08, X + 5.1, Y + 0.94, Z - 3.68, 8); // plates, the espresso machine, a cup
+    slab(0x7a5a3c, 3.2, 0.7, 0.36, X + 3.4, Y + 1.75, Z - 4.02, M.wood, 1); for (let k = 0; k < 5; k++) slab(0x5a4028, 0.01, 0.66, 0.01, X + 1.9 + k * 0.64, Y + 1.77, Z - 3.835); slab(0xc9cbd2, 0.62, 0.1, 0.4, X + 2.45, Y + 1.6, Z - 4.0);                    // wall cupboards, the hood
+    q.window(4.1, -4.19, 0.9, 0.56, 1.3, 0, 0x5a6a8a); for (let k = 0; k < 5; k++) slab(0xe9e2cf, 0.9, 0.015, 0.03, X + 4.1, Y + 1.06 + k * 0.12, Z - 4.17);                                                             // a window over the sink, the blind down
+    slab(0xe9e2cf, 0.4, 0.04, 0.4, X + 5.35, Y + 0.94, Z - 2.9); slab(0xe9e2cf, 0.4, 0.04, 0.4, X + 5.36, Y + 0.98, Z - 2.88); slab(0x8a5a2a, 0.3, 0.3, 0.2, X + 5.4, Y + 0.94, Z - 1.6); for (let k = 0; k < 3; k++) post(0x2f7d46, 0.035, 0.28, X + 5.38, Y + 0.94, Z - 2.25 + k * 0.12, 6); // more boxes, a paper bag, wine
+    q.block(0x7a5a3c, 0.5, 1.05, 2.0, 0.55, -3.2, M.wood, 1); slab(0x2a2a30, 0.62, 0.04, 2.1, X + 0.5, Y + 1.05, Z - 3.2);                                                                                          // the breakfast bar
+    for (const bz of [-3.7, -2.7]) { post(CHROME, 0.025, 0.72, X - 0.1, Y, Z + bz, 6); post(CHROME, 0.16, 0.02, X - 0.1, Y, Z + bz, 10); post(0x8a1c2a, 0.19, 0.07, X - 0.1, Y + 0.72, Z + bz, 12); } collide(X - 0.1, Z - 3.2, 0.4, 1.4, 0.8);
+    slab(0x23232b, 0.16, 0.05, 0.22, X + 0.5, Y + 1.09, Z - 2.5); slab(0x7dffb0, 0.05, 0.012, 0.03, X + 0.5, Y + 1.14, Z - 2.45, M.glow); slab(0xf2c230, 0.3, 0.012, 0.22, X + 0.5, Y + 1.09, Z - 3.6);              // the answering machine; the racing form
+    // ----- By the door -----
+    slab(0x4a4038, 1.0, 0.012, 0.6, X + 1.2, Y + 0.006, Z + 3.6); slab(OAK, 0.9, 0.04, 0.24, X - 0.1, Y + 1.0, Z + 4.05, M.wood, 1); post(0x8a8d96, 0.1, 0.05, X - 0.1, Y + 1.04, Z + 4.05, 10);                            // a mat; a shelf with a bowl for the keys
+    slab(OAK, 1.0, 0.05, 0.04, X + 2.2, Y + 1.75, Z + 4.17, M.wood, 1); for (let k = 0; k < 3; k++) { slab(CHROME, 0.03, 0.03, 0.08, X + 1.85 + k * 0.35, Y + 1.74, Z + 4.12); slab([0x1a1a1e, 0x3a2a1c, 0x2c3a5a][k], 0.3, 0.75, 0.1, X + 1.85 + k * 0.35, Y + 0.95, Z + 4.08); } // three jackets on hooks
+    // ----- The bedroom -----
+    q.block(0x2a2018, 2.1, 0.34, 1.7, -4.6, 2.7); slab(0x121216, 2.0, 0.14, 1.6, X - 4.6, Y + 0.34, Z + 2.7); slab(0x8a1c2a, 1.2, 0.05, 1.62, X - 4.2, Y + 0.48, Z + 2.7); for (const s2 of [-1, 1]) slab(WHITE, 0.4, 0.12, 0.6, X - 5.35, Y + 0.48, Z + 2.7 + s2 * 0.4); slab(0x2a2018, 0.1, 1.0, 1.8, X - 5.62, Y, Z + 2.7); // the bed: black sheets
+    q.block(0x2a2018, 0.45, 0.5, 0.45, -5.4, 1.4); post(CHROME, 0.015, 0.3, X - 5.4, Y + 0.5, Z + 1.4, 5); put(M.glow, new THREE.CylinderGeometry(0.09, 0.14, 0.2, 10).translate(X - 5.4, Y + 0.9, Z + 1.4), 0xffc890); slab(0x7dffb0, 0.16, 0.07, 0.08, X - 5.38, Y + 0.5, Z + 1.56, M.glow); // lamp, clock radio
+    post(CHROME, 0.02, 1.75, X - 1.55, Y, Z + 1.7, 5); post(CHROME, 0.02, 1.75, X - 1.55, Y, Z + 3.9, 5); slab(CHROME, 0.03, 0.03, 2.2, X - 1.55, Y + 1.72, Z + 2.8); for (let k = 0; k < 8; k++) slab([0x1a1a1e, 0x8a1c2a, 0x2c3a5a, 0xf4f4f0, 0x3a2a1c, 0x23232b, 0x49e0d0, 0xe9e2cf][k], 0.42, 0.85 + (k % 3) * 0.12, 0.2, X - 1.62, Y + 0.84 - (k % 3) * 0.12, Z + 1.85 + k * 0.27); collide(X - 1.62, Z + 2.8, 0.5, 2.3, 1.8); // a rail of leather and track suits
+    for (let k = 0; k < 5; k++) slab([0xd8342c, WHITE, 0xf2c230, INK, 0x2f56c8][k], 0.34, 0.13, 0.22, X - 2.4 + (k % 2) * 0.03, Y + Math.floor(k / 2) * 0.13, Z + 4.02 - (k % 2 ? 0 : 0) ); slab(0xb9c8d8, 0.7, 1.5, 0.03, X - 3.6, Y + 0.4, Z + 4.18); slab(OAK, 0.78, 1.58, 0.02, X - 3.6, Y + 0.36, Z + 4.19); // shoe boxes; a long mirror
+    put(M.plain, new THREE.CylinderGeometry(0.02, 0.02, 1.2, 6).rotateZ(Math.PI / 2).translate(X - 2.6, Y + 0.18, Z + 1.5), 0x8a8d96); for (const s2 of [-1, 1]) for (let k = 0; k < 2; k++) put(M.plain, new THREE.CylinderGeometry(0.18 - k * 0.04, 0.18 - k * 0.04, 0.05, 12).rotateZ(Math.PI / 2).translate(X - 2.6 + s2 * (0.48 + k * 0.06), Y + 0.18, Z + 1.5), INK); // a barbell
+    // ----- The bathroom -----
+    slab(TILE, 2.55, 0.012, 2.5, X + 4.4, Y + 0.006, Z + 2.95); for (let k = 0; k < 5; k++) slab(0xb9c8c8, 2.55, 0.014, 0.02, X + 4.4, Y + 0.007, Z + 1.9 + k * 0.5); slab(TILE, 0.03, 1.5, 2.5, X + 5.68, Y, Z + 2.95); slab(TILE, 2.55, 1.5, 0.03, X + 4.4, Y, Z + 4.18);
+    slab(WHITE, 0.4, 0.4, 0.5, X + 5.3, Y, Z + 2.1); slab(WHITE, 0.16, 0.5, 0.4, X + 5.56, Y + 0.4, Z + 2.1); slab(WHITE, 0.5, 0.14, 0.4, X + 3.45, Y + 0.8, Z + 3.0); post(WHITE, 0.07, 0.8, X + 3.4, Y, Z + 3.0, 8); slab(0xb9c8d8, 0.03, 0.6, 0.45, X + 3.1, Y + 1.3, Z + 3.0); // toilet, basin, mirror
+    q.block(WHITE, 1.0, 0.12, 1.0, 5.15, 3.65); post(CHROME, 0.015, 2.1, X + 4.65, Y, Z + 3.15, 5); slab(CHROME, 0.02, 0.02, 1.0, X + 4.65, Y + 2.08, Z + 3.65); slab(0x9fd0f5, 0.02, 1.8, 0.9, X + 4.65, Y + 0.25, Z + 3.7); post(CHROME, 0.012, 0.3, X + 5.6, Y + 1.9, Z + 3.65, 4); // the shower, its curtain
+    slab(0x8a1c2a, 0.04, 0.8, 0.5, X + 3.1, Y + 0.7, Z + 3.8); slab(0x3a2a52, 0.5, 0.012, 0.7, X + 4.4, Y + 0.008, Z + 2.9);                                                                                      // a towel, a mat
+    q.light(-3.4, 2.4, -1.4, 0xffd9a8, 30, 11); q.light(3.6, 2.6, -2.4, 0xfff0d0, 30, 10); q.light(-4, 2.3, 2.6, 0xffb890, 20, 7); q.light(4.4, 2.5, 2.9, 0xdfeeff, 18, 5);
+    for (const [lx, lz] of [[3.6, -2.4], [1.2, 2.6]]) { put(M.glow, new THREE.SphereGeometry(0.12, 8, 6).translate(X + lx, Y + 2.86, Z + lz), 0xfff2c0); post(CHROME, 0.14, 0.03, X + lx, Y + 2.95, Z + lz, 10); }
+    Object.assign(q, { couch: { x: X - 2.62, y: Y, z: Z - 1.3, h: -Math.PI / 2 }, tv: { x: X - 5.35, z: Z - 1.8 }, drawer: { x: X + 3.4, z: Z - 3.05 }, deskAt: { x: X - 1.4, z: Z - 2.6 }, bed: { x: X - 4.6, z: Z + 2.7 } });
+  }
   { // Bonpensiero Bros.: a car up on the lift, tool chests, tyres, a girlie calendar
     const q = rooms.BODYSHOP = room(18, 14, 5, { floor: M.asphalt, floorTint: 0x6a6870, floorScale: 5, wall: M.brick, wallTint: 0x9a8a84, wallScale: 2, ceil: 0x3a3a44, doorX: 6 });
     for (const s of [-1, 1]) { for (const t of [-1, 1]) q.block(0xd8342c, 0.35, 1.7, 0.35, -3 + s * 1.5, -1.5 + t * 1.6); slab(0xd8342c, 0.3, 0.15, 3.6, q.X - 3 + s * 1.5, q.Y + 1.55, q.Z - 1.5); slab(0xd8342c, 3.4, 0.12, 0.3, q.X - 3, q.Y + 1.58, q.Z - 1.5 + s * 1.2); } // the two-post lift
@@ -3558,7 +3626,7 @@ export function buildWorld(scene) {
   }
 
   const SHOP_ROOM = { BAR: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'FASTFOOD', DONUTS: 'FASTFOOD', BURGERS: 'FASTFOOD', 'AUTO PARTS': 'PARTS', LAUNDRY: 'LAUNDRY', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
-  const SHOP_NAME = { HOTEL: 'the hotel', CARDROOM: 'room six', BANQUET: 'the Manor', BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
+  const SHOP_NAME = { CHRIS: "Christopher's place", HOTEL: 'the hotel', CARDROOM: 'room six', BANQUET: 'the Manor', BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
     HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the store', BOOKS: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office', SCHOOL: 'the hall' };
   places.rooms = rooms;
   places.parkedSpots = parkedSpots;
@@ -3841,6 +3909,11 @@ export function buildWorld(scene) {
     collide(q.minX - 0.6, (q.minZ + q.maxZ) / 2, 1.2, q.maxZ - q.minZ, 4); collide(q.maxX + 0.6, (q.minZ + q.maxZ) / 2, 1.2, q.maxZ - q.minZ, 4);
   }
   // Doors between the street and the rooms: stand at `outside` and press F.
+  if (!LA && rooms.CHRIS && places.satriale && places.flats) { // one of the houses is Christopher's: a few minutes' drive from the pork store, and not Brendan's
+    const s = places.satriale.kerb, off = f => Math.abs(Math.hypot(f.kerb.x - s.x, f.kerb.z - s.z) - 240);
+    const f = places.flats.filter(f => f.door !== places.flat.door).sort((a, b) => off(a) - off(b))[0], d = f && shopDoors.find(d => d.outside === f.door);
+    if (d) { d.shop = 'CHRIS'; places.chris = { door: f.door, kerb: f.kerb }; }
+  }
   const shopList = shopDoors.map(d => ({ name: SHOP_NAME[d.shop], outside: d.outside, inside: rooms[SHOP_ROOM[d.shop] ?? d.shop].inside }));
   places.doors = LA ? [
     { name: 'the hospital', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: rooms.HOSPITAL.inside },

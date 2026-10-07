@@ -7,9 +7,11 @@
 const ctx = new (window.AudioContext || window.webkitAudioContext)();
 const master = ctx.createGain();
 master.gain.value = 0.7;
-// Everything goes through a gentle limiter, so a gunfight on top of traffic on top of the sea does not clip.
+// Everything goes through a limiter, so a gunfight on top of traffic on top of the sea does not clip. It is only for
+// peaks. (Owner: "a lot of noise". It used to be a compressor from -16 dB: that puts some six decibels of make-up gain on
+// everything quiet, which is the beds of filtered noise, and lets every kick drum and passing car duck them and swell back.)
 const limiter = ctx.createDynamicsCompressor();
-limiter.threshold.value = -16; limiter.knee.value = 12; limiter.ratio.value = 5; limiter.attack.value = 0.004; limiter.release.value = 0.2;
+limiter.threshold.value = -5; limiter.knee.value = 4; limiter.ratio.value = 14; limiter.attack.value = 0.003; limiter.release.value = 0.1;
 master.connect(limiter); limiter.connect(ctx.destination);
 const probe = ctx.createAnalyser(); probe.fftSize = 2048; limiter.connect(probe); // for sfx.meter(): how loud it really is
 
@@ -36,18 +38,18 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 // ----- Buses -----
 // dry: the short sounds (shots, doors, steps), which also feed the reverb. world: everything out of doors, shut
 // behind a low-pass when the listener is in a room. rooms: what a room sounds like from inside.
-const dry = ctx.createGain(); dry.connect(master);
+const dry = ctx.createGain(); dry.gain.value = 0.62; dry.connect(master);
 const ambient = ctx.createGain(); ambient.connect(master); // the setting for how much of the world to hear
 const worldLP = ctx.createBiquadFilter(); worldLP.type = 'lowpass'; worldLP.frequency.value = 20000; worldLP.Q.value = 0.3; worldLP.connect(ambient);
 const world = ctx.createGain(); world.connect(worldLP);
 const rooms = ctx.createGain(); rooms.gain.value = 0; rooms.connect(ambient);
 const verb = ctx.createConvolver();
 verb.buffer = (() => { // a room's worth of echo: noise that dies away
-  const len = ctx.sampleRate * 2.4, b = ctx.createBuffer(2, len, ctx.sampleRate);
-  for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+  const len = Math.floor(ctx.sampleRate * 1.5), b = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); let v = 0; for (let i = 0; i < len; i++) { v += ((Math.random() * 2 - 1) - v) * 0.35; d[i] = v * 1.6 * Math.pow(1 - i / len, 4.2); } } // (the noise is smoothed: a tail of white noise is a hiss after every footstep)
   return b;
 })();
-const wet = ctx.createGain(); wet.gain.value = 0.04; verb.connect(wet); wet.connect(master);
+const wet = ctx.createGain(); wet.gain.value = 0.02; verb.connect(wet); { const dark = ctx.createBiquadFilter(); dark.type = 'lowpass'; dark.frequency.value = 3000; dark.Q.value = 0.4; wet.connect(dark); dark.connect(master); }
 dry.connect(verb); rooms.connect(verb);
 
 const env = (param, t0, peak, attack, decay, floor = 0.0001) => {
@@ -98,7 +100,7 @@ const GEARS = [0, 8, 16, 25, 35, 60];
 const revs = v => { const k = Math.max(0, GEARS.findIndex(g => v < g) - 1), lo = GEARS[k], hi = GEARS[k + 1] ?? 80; return { gear: k, frac: Math.min(1, (v - lo) / (hi - lo)) }; };
 // The road under the tyres, and the air over the roof: both grow with speed.
 const road = (() => { const out = gainAt(0, master), bp = filter('lowpass', 420, 0.6, out), s = noise(BROWN); s.connect(bp); s.start(); return { out, bp }; })();
-const rush = (() => { const out = gainAt(0, master), hp = filter('bandpass', 1100, 0.4, out), s = noise(); s.connect(hp); s.start(); return { out }; })();
+const rush = (() => { const out = gainAt(0, master), hp = filter('bandpass', 700, 0.5, out), s = noise(); s.connect(hp); s.start(); return { out }; })();
 // Tyres: a squeal while sliding.
 const skid = (() => {
   const out = gainAt(0, master), bp = filter('bandpass', 1800, 6, out), s = noise();
@@ -114,25 +116,25 @@ const sea = (() => {
   const lp = filter('lowpass', 420, 0.7, out), s = noise(BROWN), swell = gainAt(0.9, lp);
   s.connect(swell); s.start();
   lfo(0.11, 190, lp.frequency); lfo(0.11, 0.35, swell.gain);
-  const foam = gainAt(0.05, out), bp = filter('bandpass', 2600, 0.5, foam), w = noise();
+  const foam = gainAt(0.018, out), bp = filter('bandpass', 1700, 0.6, foam), w = noise();
   w.connect(bp); w.start();
-  lfo(0.085, 0.045, foam.gain); lfo(0.19, 700, bp.frequency);
+  lfo(0.085, 0.016, foam.gain); lfo(0.19, 400, bp.frequency);
   return { out, pan };
 })();
 // The city: the far hum of traffic and air conditioning.
 const city = (() => {
   const out = gainAt(0, world), lp = filter('lowpass', 210, 0.6, out), s = noise(BROWN);
   s.connect(lp); s.start();
-  const air = gainAt(0.05, out), bp = filter('bandpass', 950, 0.4, air), a = noise();
+  const air = gainAt(0.014, out), bp = filter('bandpass', 700, 0.6, air), a = noise();
   a.connect(bp); a.start();
-  lfo(0.05, 0.02, air.gain);
+  lfo(0.05, 0.006, air.gain);
   return { out };
 })();
 // The wind: a band of noise that wanders, louder on the pier and the bridge.
 const wind = (() => {
-  const out = gainAt(0, world), bp = filter('bandpass', 480, 0.9, out), s = noise();
+  const out = gainAt(0, world), bp = filter('bandpass', 360, 1.1, out), s = noise();
   s.connect(bp); s.start();
-  lfo(0.07, 240, bp.frequency); lfo(0.23, 90, bp.frequency);
+  lfo(0.07, 150, bp.frequency); lfo(0.23, 60, bp.frequency);
   return { out };
 })();
 // Crickets, after dark where there is grass: two of them, a little apart in pitch and to either side.
@@ -143,7 +145,7 @@ const crickets = (() => {
     if (p.pan) p.pan.value = side;
     o.type = 'sine'; o.frequency.value = f;
     chirp.gain.value = 0.5; gate.gain.value = 0.5;
-    lfo(31 + side * 4, 0.5, chirp.gain, 'square'); lfo(rate, 0.5, gate.gain, 'square');
+    lfo(31 + side * 4, 0.5, chirp.gain, 'sine'); lfo(rate, 0.5, gate.gain, 'sine');   // (square gates made them a buzz)
     o.connect(chirp); chirp.connect(gate); gate.connect(p); o.start();
   }
   return { out };
@@ -158,7 +160,7 @@ const siren = (() => {
 })();
 // Other people's cars: the nearest four each get an engine of their own, to the left or the right of the listener.
 const passers = [0, 1, 2, 3].map(() => {
-  const pan = panTo(world), out = gainAt(0, pan), lp = filter('lowpass', 520, 1.2, out), o = ctx.createOscillator(), t = noise(BROWN), tg = gainAt(0.9, lp);
+  const pan = panTo(world), out = gainAt(0, pan), lp = filter('lowpass', 520, 1.2, out), o = ctx.createOscillator(), t = noise(BROWN), tg = gainAt(0.3, lp);
   o.type = 'sawtooth'; o.frequency.value = 70;
   const og = gainAt(0.35, lp);
   o.connect(og); t.connect(tg); o.start(); t.start();
@@ -171,10 +173,10 @@ let emitters = [];
 function emitter(e) {
   const pan = panTo(world), out = gainAt(0, pan), v = { ...e, out, pan, level: 0, in: out, next: 0 };
   if (e.kind === 'water') { // a fountain, a pond, a pool filter: a bright trickle that never repeats
-    const bp = filter('bandpass', 1900, 1.4, out), s = noise(), g = gainAt(0.5, bp);
+    const bp = filter('bandpass', 1400, 1.6, out), s = noise(), g = gainAt(0.5, bp);
     s.connect(g); s.start();
     const wob = noise(BROWN), wl = ctx.createBiquadFilter(), wg = ctx.createGain();
-    wl.type = 'lowpass'; wl.frequency.value = 9; wg.gain.value = 5200;
+    wl.type = 'lowpass'; wl.frequency.value = 9; wg.gain.value = 1100;
     wob.connect(wl); wl.connect(wg); wg.connect(bp.frequency); wob.start();
   } else if (e.kind === 'jets') { // the airport: a turbine's whine over a low roar
     const bp = filter('bandpass', 2900, 9, out), s = noise(), g = gainAt(0.5, bp);
@@ -199,11 +201,11 @@ function emitter(e) {
 // ----- Rooms -----
 // A murmur of people, a refrigerator's hum, a church's held breath, a grill; each room asks for some of each.
 const walla = (() => {
-  const out = gainAt(0, rooms), bp = filter('bandpass', 520, 0.9, out), s = noise(), g = gainAt(0.6, bp);
+  const out = gainAt(0, filter('lowpass', 1100, 0.5, rooms)), bp = filter('bandpass', 420, 1.1, out), s = noise(BROWN), g = gainAt(1.6, bp);   // (brown noise, and nothing above a kilohertz: as white noise it was a hiss with a pulse)
   s.connect(g); s.start();
-  const hi = filter('bandpass', 1500, 1.2, out), h = noise(), hg = gainAt(0.2, hi);
+  const hi = filter('bandpass', 900, 1.4, out), h = noise(BROWN), hg = gainAt(0.5, hi);
   h.connect(hg); h.start();
-  for (const [node, depth] of [[g, 0.5], [hg, 0.18]]) { const m = noise(BROWN), ml = ctx.createBiquadFilter(), mg = ctx.createGain(); ml.type = 'lowpass'; ml.frequency.value = 3; mg.gain.value = depth * 6; m.connect(ml); ml.connect(mg); mg.connect(node.gain); m.start(); }
+  for (const [node, depth] of [[g, 1.3], [hg, 0.45]]) { const m = noise(BROWN), ml = ctx.createBiquadFilter(), mg = ctx.createGain(); ml.type = 'lowpass'; ml.frequency.value = 3; mg.gain.value = depth * 6; m.connect(ml); ml.connect(mg); mg.connect(node.gain); m.start(); }
   return { out };
 })();
 const hum = (() => {
@@ -221,17 +223,17 @@ const sizzle = (() => { const out = gainAt(0, rooms), hp = filter('highpass', 52
 const music = (() => { const out = gainAt(0, rooms), lp = filter('lowpass', 6500, 0.6, out); return { out, in: lp }; })();
 // What each kind of room is made of. verb: how much it rings.
 const ROOMS = {
-  bar: { walla: 0.2, music: 0.5, clink: 3, verb: 0.1 },
-  diner: { walla: 0.19, sizzle: 0.03, clink: 2.4, verb: 0.09 },
-  hall: { walla: 0.1, clink: 5, verb: 0.24 },
+  bar: { walla: 0.11, music: 0.42, clink: 4, verb: 0.07 },
+  diner: { walla: 0.1, sizzle: 0.004, clink: 3.4, verb: 0.06 },
+  hall: { walla: 0.06, clink: 7, verb: 0.14 },
   store: { hum: 0.018, verb: 0.07, chime: true },
-  guns: { hum: 0.03, range: 3, verb: 0.2 },
-  church: { drone: 0.02, verb: 0.4 },
-  garage: { hum: 0.04, clank: 3.5, verb: 0.3 },
-  house: { hum: 0.01, tick: true, verb: 0.07 },
+  guns: { hum: 0.02, range: 3, verb: 0.12 },
+  church: { drone: 0.02, verb: 0.24 },
+  garage: { hum: 0.025, clank: 5, verb: 0.16 },
+  house: { hum: 0.006, tick: true, verb: 0.04 },
   office: { tick: true, verb: 0.05 },
-  ward: { hum: 0.02, beep: true, verb: 0.1 },
-  plain: { hum: 0.01, verb: 0.1 },
+  ward: { hum: 0.012, beep: true, verb: 0.07 },
+  plain: { hum: 0.006, verb: 0.06 },
 };
 
 // ----- Things that happen in time: a beat, a waltz, a clock -----
@@ -244,8 +246,8 @@ let clubTargets = [];
 every(0.25, (t, n) => {
   for (const to of clubTargets) {
     if (n % 2 === 0) tone('sine', 68, t, 0.9, 0.004, 0.2, { to, slide: 38 });
-    else burst(7200, 0.8, t, 0.1, 0.002, 0.04, 'highpass', to);
-    if (n % 8 === 4) burst(1800, 0.9, t, 0.22, 0.002, 0.11, 'bandpass', to);
+    else burst(5200, 1.2, t, 0.03, 0.002, 0.03, 'bandpass', to);
+    if (n % 8 === 4) burst(1500, 1.1, t, 0.1, 0.002, 0.09, 'bandpass', to);
     const bass = [33, 0, 0, 33, 0, 36, 0, 31][n % 8];
     if (bass) { const lp = filter('lowpass', 420, 2, to); tone('sawtooth', midi(bass), t, 0.32, 0.01, 0.2, { to: lp }); }
     if (n % 16 === 0 || n % 16 === 6 || n % 16 === 11) for (const k of [57, 60, 64]) tone('triangle', midi(k + (Math.floor(n / 16) % 2 ? 2 : 0)), t, 0.045, 0.01, 0.3, { to });
@@ -416,12 +418,12 @@ export const sfx = {
     const quiet = radio.playing ? 0.6 : 1, car = bed('car', master, inCar ? (0.3 + throttle * 0.14) * quiet : 0, 0.15, 0.6 + (v < 0.6 ? throttle * 0.35 : 0.12 + frac * 0.85));
     smooth(engine.a.frequency, fire, 0.07); smooth(engine.b.frequency, fire * 2.01, 0.07); smooth(engine.c.frequency, fire / 2, 0.07);
     smooth(engine.f1.frequency, 300 + fire * 2.2, 0.1); smooth(engine.f2.frequency, 720 + fire * 5, 0.1);
-    smooth(engine.rasp.gain, inCar ? throttle * 0.03 + frac * 0.012 : 0, 0.1);
+    smooth(engine.rasp.gain, inCar ? throttle * 0.014 + frac * 0.006 : 0, 0.1);
     smooth(engine.out.gain, inCar && !car ? (0.07 + throttle * 0.05 + frac * 0.025) * quiet : 0, 0.35); // it comes up over a second, so getting in is not a jolt
-    smooth(road.out.gain, inCar ? Math.min(0.16, v / 40 * 0.16) * (surface === 'sand' || surface === 'grass' ? 1.5 : 1) : 0, 0.3);
+    smooth(road.out.gain, inCar ? Math.min(0.08, v / 40 * 0.08) * (surface === 'sand' || surface === 'grass' ? 1.5 : 1) : 0, 0.3);
     smooth(road.bp.frequency, surface === 'wood' ? 260 : 300 + v * 8, 0.3);
-    smooth(rush.out.gain, inCar ? Math.min(0.012, (v / 38) ** 2 * 0.012) : 0, 0.4);
-    smooth(skid.out.gain, inCar ? sliding * 0.2 : 0, 0.04);
+    smooth(rush.out.gain, inCar ? Math.min(0.005, (v / 38) ** 2 * 0.005) : 0, 0.4);
+    smooth(skid.out.gain, inCar ? sliding * 0.11 : 0, 0.04);
 
     // Indoors the street is behind a wall.
     smooth(worldLP.frequency, inside ? 480 : 20000, 0.12); smooth(world.gain, inside ? 0.22 : 1, 0.12);
@@ -437,11 +439,11 @@ export const sfx = {
     }
     covered = Math.min(1, covered);
     const surf = bed('beach', world, shore * 0.6 + exposed * 0.2, 0.6) ? 0 : 1, synth = 1 - covered;
-    smooth(sea.out.gain, (0.02 + shore * 0.27 + exposed * 0.1) * surf, 0.4);
+    smooth(sea.out.gain, (0.008 + shore * 0.17 + exposed * 0.06) * surf, 0.4);
     if (sea.pan.pan) smooth(sea.pan.pan, exposed > 0.5 ? 0 : side(seaward.x, seaward.z) * (0.25 + shore * 0.6), 0.3);
-    smooth(city.out.gain, (0.04 + dense * 0.09) * (1 - night * 0.45) * (1 - exposed * 0.6) * synth, 0.5);
-    smooth(wind.out.gain, 0.012 + shore * 0.02 + exposed * 0.06 + (1 - dense) * 0.01, 0.5);
-    smooth(crickets.out.gain, night * green * 0.05 * (1 - shore * 0.5) * synth, 0.8);
+    smooth(city.out.gain, (0.03 + dense * 0.06) * (1 - night * 0.45) * (1 - exposed * 0.6) * synth, 0.5);
+    smooth(wind.out.gain, 0.003 + shore * 0.008 + exposed * 0.03 + (1 - dense) * 0.003, 0.5);
+    smooth(crickets.out.gain, night * green * 0.016 * (1 - shore * 0.5) * synth, 0.8);
     smooth(siren.out.gain, police * 0.12, 0.2);
     for (const [k, voice] of passers.entries()) {
       const c = cars[k];
@@ -449,13 +451,13 @@ export const sfx = {
       const d = Math.hypot(c.dx, c.dz), sp = Math.abs(c.speed);
       smooth(voice.o.frequency, (c.heavy ? 34 : 50) + sp * (c.heavy ? 3 : 4.6), 0.1);
       smooth(voice.lp.frequency, 320 + sp * 26, 0.1);
-      smooth(voice.out.gain, Math.min(0.3, (0.25 + sp / 18) * (c.heavy ? 1.2 : 0.85) / (1 + (d / 9) ** 2)), 0.09);
+      smooth(voice.out.gain, Math.min(0.16, (0.14 + sp / 30) * (c.heavy ? 1.2 : 0.85) / (1 + (d / 9) ** 2)), 0.09);
       if (voice.pan.pan) smooth(voice.pan.pan, side(c.dx, c.dz) * 0.9, 0.08);
     }
     for (const e of emitters) {
       const dx = e.x - ear.x, dz = e.z - ear.z, d = Math.hypot(dx, dz);
       e.level = d < e.r ? (1 - d / e.r) ** 2 * (e.vol ?? 1) : 0;
-      smooth(e.out.gain, e.level * (e.kind === 'water' ? 0.16 : e.kind === 'jets' ? 0.12 : e.kind === 'freeway' ? 0.14 : e.kind === 'film' ? 0.1 : e.kind === 'carousel' ? 0.22 : e.kind === 'club' ? 0.38 : 0.5), 0.15);
+      smooth(e.out.gain, e.level * (e.kind === 'water' ? 0.06 : e.kind === 'jets' ? 0.07 : e.kind === 'freeway' ? 0.09 : e.kind === 'film' ? 0.05 : e.kind === 'carousel' ? 0.22 : e.kind === 'club' ? 0.38 : 0.5), 0.15);
       if (e.pan.pan) smooth(e.pan.pan, d < 4 ? 0 : side(dx, dz) * Math.min(1, d / 14), 0.12);
     }
 
@@ -468,7 +470,7 @@ export const sfx = {
     const ownMusic = radio.playing ? 0 : R.music || 0;
     smooth(walla.out.gain, R.walla || 0, 0.3); smooth(hum.out.gain, R.hum || 0, 0.3); smooth(drone.out.gain, R.drone || 0, 0.6);
     smooth(sizzle.out.gain, R.sizzle || 0, 0.3); smooth(music.out.gain, ownMusic, 0.25);
-    smooth(wet.gain, inside ? R.verb ?? 0.1 : 0.035, 0.2);
+    smooth(wet.gain, inside ? R.verb ?? 0.06 : 0.018, 0.2);
     if (room !== st.room) {
       if (R.chime) { tone('sine', 1318, now + 0.25, 0.09, 0.005, 0.5); tone('sine', 1046, now + 0.6, 0.09, 0.005, 0.8); } // the bell over a shop door
       st.room = room;
@@ -476,7 +478,7 @@ export const sfx = {
     if (R.clink && now > st.clink) { st.clink = now + rnd(2.5, 7) * R.clink; const f = rnd(2300, 3600), to = spotAt(1, rnd(-0.8, 0.8), rooms); tone('sine', f, now, 0.035, 0.002, 0.12, { to }); if (Math.random() < 0.5) tone('sine', f * 1.19, now + 0.07, 0.03, 0.002, 0.1, { to }); }
     if (R.clank && now > st.clank) { st.clank = now + rnd(4, 10) * R.clank; const to = spotAt(1, rnd(-0.7, 0.7), rooms); if (Math.random() < 0.5) { burst(1100, 5, now, 0.2, 0.002, 0.2, 'bandpass', to); tone('triangle', rnd(320, 520), now, 0.08, 0.002, 0.3, { to }); } else for (let k = 0; k < 9; k++) burst(2400, 3, now + k * 0.045, 0.1, 0.002, 0.025, 'bandpass', to); }
     if (R.range && now > st.range) { st.range = now + rnd(2.5, 7) * R.range; const to = filter('lowpass', 500, 0.7, spotAt(1, rnd(-0.3, 0.3), rooms)); burst(260, 1.1, now, 0.5, 0.004, 0.2, 'lowpass', to); }
-    if (R.tick && now > st.tick) { st.tick = now + 1; burst(st.n ? 3300 : 2700, 6, now, 0.03, 0.001, 0.02, 'bandpass', rooms); st.n = !st.n; }
+    if (R.tick && now > st.tick) { st.tick = now + 1; burst(st.n ? 2300 : 1900, 6, now, 0.012, 0.001, 0.02, 'bandpass', rooms); st.n = !st.n; }
     if (R.beep && now > st.beep) { st.beep = now + 1.6; tone('sine', 880, now, 0.012, 0.005, 0.07, { to: rooms }); }
 
     // Feet. His walk is a brisk one: three steps a second, four at a run.
@@ -556,6 +558,18 @@ export const sfx = {
     if (!live()) return;
     const t = ctx.currentTime;
     burst(700, 2, t, 0.3, 0.003, 0.05); burst(180, 1, t + 0.06, 0.4, 0.004, 0.12, 'lowpass');
+  },
+  // The lid of a trunk: the latch going up; coming down, the weight of it. And something heavy landing inside.
+  trunk(shut) {
+    if (!live()) return;
+    const t = ctx.currentTime;
+    if (shut) { burst(150, 0.9, t, 0.6, 0.003, 0.16, 'lowpass'); burst(900, 1.2, t + 0.01, 0.16, 0.002, 0.05); tone('sine', 72, t, 0.2, 0.004, 0.14, { slide: 45 }); }
+    else { burst(1800, 2, t, 0.14, 0.002, 0.03); burst(320, 1, t + 0.06, 0.1, 0.02, 0.22, 'lowpass'); }
+  },
+  thump() {
+    if (!live()) return;
+    const t = ctx.currentTime;
+    burst(110, 0.8, t, 0.55, 0.004, 0.2, 'lowpass'); tone('sine', 58, t, 0.22, 0.004, 0.18, { slide: 38 });
   },
   carDoor() {
     if (!live()) return;
