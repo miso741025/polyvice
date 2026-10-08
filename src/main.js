@@ -607,11 +607,11 @@ async function boot() {
     if (car && car.speed > 3 && g.time - cam.lastMouse > 1.2) cam.yaw += wrapAngle(car.heading - cam.yaw) * (1 - Math.exp(-3 * dt));
     const aiming = p.aiming && !car;
     const dist = car ? 6.2 + car.reach * 2.5 : aiming ? 2.6 : 5.2, cp = Math.cos(cam.pitch);
-    focus.set(p.pos.x, (car ? 1.9 : aiming ? 1.5 : 1.6) + groundAt(p.pos.x, p.pos.z), p.pos.z);
+    focus.set(p.pos.x, (car ? 1.9 + (car.alt || 0) : aiming ? 1.5 : 1.6) + groundAt(p.pos.x, p.pos.z), p.pos.z); // (a spinner in the air takes the camera up with it)
     if (aiming) { focus.x -= Math.cos(cam.yaw) * 0.75; focus.z += Math.sin(cam.yaw) * 0.75; } // over the right shoulder
     tmp.set(-Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp);
     want.copy(focus).addScaledVector(tmp, dist);
-    const clear = clearRatio(focus, want);
+    const clear = car && car.alt > 2 ? 1 : clearRatio(focus, want); // (nothing to hide behind up there)
     want.copy(focus).addScaledVector(tmp, dist * clear);
     if (want.y < 0.5) want.y = 0.5;
     camera.position.lerp(want, 1 - Math.exp(-14 * dt));

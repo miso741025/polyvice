@@ -1763,7 +1763,9 @@ export function buildWorld(scene) {
       for (let n = 0; n < 8; n++) slab(0x3a3a44, 0.06, 3, 0.06, gx - 2.9, y, gz - 15 + n * 4.3); slab(0xdfe8d0, 0.5, 0.5, 0.5, gx, y + 3, gz - 16);
     }
     const hx = c.x + 18, hz = c.z + 12;
-    slab(0x6a6a5a, 10, 6.4, 9, hx, y, hz, M.siding, 1.2); collide(hx, hz, 10, 9, 6.4); gable(0x3a3a3a, 9.6, 2.4, 11, hx, y + 6.4, hz, Math.PI / 2, M.plain);
+    slab(0x5a4634, 10, 6.4, 9, hx, y, hz, M.wood, 1.6); collide(hx, hz, 10, 9, 6.4); gable(0x3a3230, 9.6, 2.4, 11, hx, y + 6.4, hz, Math.PI / 2, M.plain);
+    for (let k = 0; k < 7; k++) slab(0x3a2c20, 10.1, 0.08, 0.06, hx, y + 0.8 + k * 0.8, hz + 4.52); for (const s2 of [-1, 1]) post(0x3a2c20, 0.16, 6.4, hx + s2 * 4.9, y, hz + 4.4, 6); slab(0x3a2c20, 4, 0.2, 2.2, hx + 1, y + 2.9, hz + 5.5); for (const s2 of [-1, 1]) post(0x3a2c20, 0.08, 2.9, hx + 1 + s2 * 1.7, y, hz + 6.4, 6); // log courses, corner posts, a porch roof over the door
+    post(0x55525a, 0.22, 2.2, hx + 3.5, y + 6.4, hz - 2, 8); for (let k = 0; k < 4; k++) slab(0x2a2a30, 0.8, 0.5, 0.8, hx - 3.6 + k * 0.9, y, hz + 5.4); // a stovepipe; firewood stacked along the front
     windowAt(hx - 2.5, y + 1.4, hz + 4.5, 1.6, 1.3, 0, 1, true); windowAt(hx + 3, y + 4.4, hz + 4.5, 1.4, 1.1, 0, 1, false); slab(0x2a2a30, 1.3, 2.6, 0.14, hx + 1, y, hz + 4.55);
     slab(0x4a4a52, 3, 1.8, 3, hx - 7, y, hz + 2); post(0x3a3a44, 0.08, 4, hx - 7, y + 1.8, hz + 2, 5); put(M.plain, new THREE.BoxGeometry(1.6, 0.2, 0.2).translate(hx - 7, y + 5.8, hz + 2), 0x8a8d96); // the pump and its wind vane
     { const tx = c.x - 20, tz = c.z + 20;                                                                                                                                 // the tree: dead, and a stone at its foot
@@ -3763,6 +3765,27 @@ export function buildWorld(scene) {
       q.light(0, 2.6, 0, 0x9fd0f5, 20, 7); q.light(-3, 2.2, -2, 0xffd9a8, 10, 4);
       Object.assign(q, { bed: { x: q.X - 3, y: q.Y, z: q.Z - 2.2 }, chair: { x: q.X + 1.2, y: q.Y, z: q.Z + 1.3, h: Math.PI }, joi: { x: q.X - 0.6, z: q.Z - 0.4 }, screen: { x: q.X + 1.5, z: q.Z - 3 } });
     }
+    { // Sapper's farmhouse: one room of timber, low beams, a stove with the kettle on, a table laid for one, a cot, shelves of
+      // jars with the grubs in them, boots by the door, a piano nobody has played in years. He lives alone; nobody else is here.
+      const q = rooms.FARMHOUSE = room(10, 8, 2.9, { floor: M.wood, floorTint: 0x5a4634, floorScale: 1.6, wall: M.wood, wallTint: 0x6a5240, wallScale: 1.6, ceil: 0x3a2c20, door: 0x3a2c20, doorX: 2.5 });
+      const X = q.X, Y = q.Y, Z = q.Z, TIMBER = 0x3a2c20, IRON = 0x2a2a30, TIN = 0x8a8d96;
+      for (const bz of [-2.6, -0.8, 1, 2.8]) slab(TIMBER, 9.4, 0.22, 0.26, X, Y + 2.68, Z + bz); for (const s2 of [-1, 1]) slab(TIMBER, 0.26, 2.9, 7.4, X + s2 * 4.7, Y, Z); for (let k = 0; k < 6; k++) { slab(0x4a3828, 9.4, 0.05, 0.03, X, Y + 0.45 + k * 0.45, Z - 3.7); slab(0x4a3828, 9.4, 0.05, 0.03, X, Y + 0.45 + k * 0.45, Z + 3.7); } // beams, corner posts, the log courses on the walls
+      q.block(IRON, 1.1, 1.0, 0.8, 3.6, -3.0); slab(IRON, 1.2, 0.08, 0.9, X + 3.6, Y + 1.0, Z - 3.0); post(IRON, 0.1, 1.6, X + 3.9, Y + 1.08, Z - 3.1, 8); slab(0xff7a20, 0.5, 0.26, 0.04, X + 3.6, Y + 0.3, Z - 2.58, M.glow); // the stove, lit, its pipe
+      put(M.plain, new THREE.CylinderGeometry(0.12, 0.15, 0.2, 10).translate(X + 3.4, Y + 1.08, Z - 2.9), TIN); put(M.plain, new THREE.TorusGeometry(0.09, 0.012, 5, 12).rotateX(Math.PI / 2).translate(X + 3.4, Y + 1.32, Z - 2.9), TIN); // the kettle
+      const steam = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), new THREE.MeshBasicMaterial({ color: 0xdfe8f0, transparent: true, opacity: 0.25, depthWrite: false })); steam.position.set(X + 3.4, Y + 1.5, Z - 2.9); scene.add(steam);
+      updaters.push(t => { const u = (t * 0.6) % 1; steam.position.y = Y + 1.4 + u * 0.8; steam.scale.setScalar(0.6 + u * 1.2); steam.material.opacity = 0.22 * (1 - u); });
+      q.block(0x6a5240, 1.6, 0.76, 0.9, 1.4, -0.4, M.wood, 1); slab(0xe9e2cf, 0.3, 0.03, 0.3, X + 1.0, Y + 0.76, Z - 0.4); post(TIN, 0.05, 0.12, X + 1.5, Y + 0.76, Z - 0.5, 8); slab(0x8a5a2a, 0.22, 0.06, 0.3, X + 1.9, Y + 0.76, Z - 0.3); // the table: one plate, one cup, a loaf
+      chairAt({ x: X + 1.4, z: Z + 0.5, h: Math.PI }, Y, 0x4a3828); collide(X + 1.4, Z + 0.5, 0.5, 0.5, 0.9);
+      q.block(0x4a3828, 2.1, 0.4, 0.9, -3.4, -2.9); slab(0x6a6a5a, 2.0, 0.12, 0.8, X - 3.4, Y + 0.4, Z - 2.9); slab(0x8a8478, 0.4, 0.1, 0.5, X - 4.2, Y + 0.52, Z - 2.9); slab(0x3a4a3a, 1.2, 0.05, 0.82, X - 3.0, Y + 0.52, Z - 2.9); // the cot, a pillow, a blanket
+      q.block(0x4a3828, 0.4, 2.2, 3.0, -4.4, 1.6, M.wood, 1); for (let r = 0; r < 4; r++) for (let k = 0; k < 6; k++) { put(M.plain, new THREE.CylinderGeometry(0.09, 0.09, 0.2, 8).translate(X - 4.3, Y + 0.3 + r * 0.5, Z + 0.4 + k * 0.46), [0xb9a58a, 0xc9b79c, 0x9a8a6a][(k + r) % 3]); slab(TIN, 0.19, 0.02, 0.19, X - 4.3, Y + 0.4 + r * 0.5, Z + 0.4 + k * 0.46); } // shelves of jars: what the farm makes
+      q.block(0x2a2420, 1.5, 1.05, 0.6, -2.0, 3.1); slab(0xe9e2cf, 1.3, 0.04, 0.14, X - 2.0, Y + 0.82, Z + 2.88); for (let k = 0; k < 9; k++) slab(0x16161c, 0.05, 0.03, 0.08, X - 2.6 + k * 0.15, Y + 0.84, Z + 2.84); slab(0x2a2420, 1.5, 0.5, 0.1, X - 2.0, Y + 1.05, Z + 3.35); // the piano, its lid shut
+      for (const s2 of [0, 0.3]) { slab(0x2a2420, 0.14, 0.3, 0.3, X + 3.2 + s2, Y, Z + 3.1); slab(0x2a2420, 0.14, 0.12, 0.14, X + 3.2 + s2, Y + 0.3, Z + 3.2); } slab(0x6a5240, 1.0, 0.04, 0.3, X + 3.0, Y + 1.9, Z + 3.6); slab(0x4a4a52, 0.5, 0.7, 0.08, X + 2.8, Y + 1.0, Z + 3.6); // boots by the door; a coat on a peg
+      q.window(-1, -3.72, 1.6, 1.0, 1.5, Math.PI, 0x3a4a44); for (let k = 0; k < 2; k++) slab(TIMBER, 0.06, 1.0, 0.04, X - 1.4 + k * 0.8, Y + 1.0, Z - 3.68); q.window(4.72, 1, 1.2, 0.9, 1.5, -Math.PI / 2, 0x3a4a44); // small windows, the greenhouses' glow beyond
+      put(M.glow, new THREE.SphereGeometry(0.09, 8, 6).translate(X + 0.5, Y + 2.2, Z - 0.6), 0xffd9a8); post(TIMBER, 0.01, 0.48, X + 0.5, Y + 2.2, Z - 0.6, 3); put(M.plain, new THREE.ConeGeometry(0.22, 0.14, 10, 1, true).translate(X + 0.5, Y + 2.32, Z - 0.6), TIN); // one lamp on a flex over the table
+      slab(0x5a4a3a, 0.7, 0.014, 2.2, X + 2.2, Y + 0.006, Z + 1.4); slab(0x3a2c20, 0.3, 0.012, 0.3, X + 3.2, Y + 0.006, Z + 2.9); // a runner, mud at the door
+      q.light(0.5, 2.1, -0.6, 0xffd9a8, 22, 7); q.light(3.6, 1.2, -2.8, 0xff8a30, 14, 4);
+      Object.assign(q, { table: { x: X + 1.4, z: Z + 0.2 }, stove: { x: X + 3.2, z: Z - 2.4 }, cot: { x: X - 3.4, z: Z - 2.9 } });
+    }
     { // Baseline: a white room with one chair and a lens in the wall. Nothing else, so that nothing else is in your head.
       const q = rooms.BASELINE = room(7, 7, 3.2, { floor: M.plain, floorTint: 0xe9e9ee, wall: M.plain, wallTint: 0xf4f4f6, ceil: 0xffffff, door: 0xcfd8dc, doorX: 0 });
       q.block(0x2a2a30, 0.6, 0.5, 0.6, 0, -1.4); put(M.plain, new THREE.BoxGeometry(0.6, 0.6, 0.06).translate(0, 0.8, -0.3).translate(q.X, q.Y, q.Z - 1.4), 0x2a2a30);
@@ -4161,7 +4184,6 @@ export function buildWorld(scene) {
     const f = places.flats.filter(f => f.door !== places.flat.door).sort((a, b) => off(a) - off(b))[0], d = f && shopDoors.find(d => d.outside === f.door);
     if (d) { d.shop = 'CHRIS'; places.chris = { door: f.door, kerb: f.kerb }; }
   }
-  if (NEXUS) rooms.FARMHOUSE = rooms.HOUSE; // the farmhouse is a house inside
   const shopList = shopDoors.map(d => { const q = rooms[SHOP_ROOM[d.shop] ?? d.shop]; return q && { name: SHOP_NAME[d.shop], outside: d.outside, inside: q.inside }; }).filter(Boolean);
   places.doors = NEXUS ? [
     { name: 'the morgue', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: rooms.HOSPITAL.inside },

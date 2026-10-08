@@ -514,7 +514,7 @@ function paint(B, o) {
       const dn = Math.hypot(x, y - neck.y, z - neck.z);
       if (turtle && dn < 0.1 && y > neck.y - 0.09) { set(turtle, 0.9 + 0.18 * ((((i * 2654435761) >>> 20) & 3) / 3)); shade = 0; return true; } // a roll-neck, ribbed
       if (dn < 0.062) return false;
-      if (collar && dn < 0.125 && y > neck.y - 0.115 && !(front && Math.abs(x) < 0.03 && y < neck.y - 0.06)) { set(collar, 0.82 + 0.36 * ((((i * 2246822519) >>> 22) & 7) / 7)); shade = 0; return true; } // fleece: a collar that stands up, mottled
+      if (collar && dn < 0.125 * (o.collarSize ?? 1) && y > neck.y - 0.115 * (o.collarSize ?? 1) && !(front && Math.abs(x) < 0.03 * (o.collarSize ?? 1) && y < neck.y - 0.06)) { set(collar, 0.82 + 0.36 * ((((i * 2246822519) >>> 22) & 7) / 7)); shade = 0; return true; } // fleece: a collar that stands up, mottled
       // The body is widened into its clothes after painting (see shaped), unevenly by height;
       // measure across the finished cloth so edges and prints come out straight.
       const w0 = Math.max(0.03, prof.w(y)), wide = lerp(Math.max(w0, prof.chestW * fill) / w0, 1, smooth((y - prof.chestY) / 0.1));
@@ -872,7 +872,8 @@ const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true
 //   pattern    'blocks' | 'plaid' | 'paisley' | 'palms' | 'stripes' | 'pinstripe' | 'check' printed shirt
 //   jacket     colour of an open jacket worn over the shirt; jacketPattern prints the jacket; tie adds a tie in that colour
 //   coat       colour of a long coat (a jacket that falls to the knee: coatLen metres below the waist, 0.5 by default)
-//   collar     colour of a thick fleece collar on the coat or jacket; turtle colour of a roll-neck under it
+//   collar     colour of a thick fleece collar on the coat or jacket (collarSize scales it; 1 = a band at the neck, 1.6 spreads over the shoulders); turtle colour of a roll-neck under it
+//   sheen      0..1: the cloth catches the light (leather, a waxed coat); the body gets a Phong material
 //   open       colour of an undershirt showing through an unbuttoned shirt or track top
 //   tank       the undershirt is a low-cut tank
 //   sleeves    'short' | 'long'
@@ -899,7 +900,7 @@ export function makeHuman(opts = {}) {
     if (!n.isSkinnedMesh) return;
     if (n.name === B.bodyName) {
       n.geometry = shaped(B, o);
-      n.material = new THREE.MeshLambertMaterial({ map: textures.get(key) });
+      n.material = o.sheen ? new THREE.MeshPhongMaterial({ map: textures.get(key), shininess: 18 + o.sheen * 40, specular: new THREE.Color().setScalar(0.12 + o.sheen * 0.3) }) : new THREE.MeshLambertMaterial({ map: textures.get(key) });
       n.castShadow = true;
     } else if (/brow/i.test(n.name)) n.material = hairMat('brow', o.brows ?? o.hair, false);
   });
@@ -919,6 +920,28 @@ export function makeHuman(opts = {}) {
   };
   if (hairMesh && hairMeshes[hairMesh]) wear(hairGeo(B, hairMesh, o), hairMat(hairMesh, o.hair, o.hairSides !== undefined), hairScale, hairShift).castShadow = true;
   if (beardMesh) wear(hairGeo(B, 'beard', o), hairMat('beard', o.beard ?? o.hair, false));
+  // A coat has a body of its own: painted cloth on a lean figure reads as a wetsuit (owner, on K). So a coat also gets
+  // geometry: a skirt that hangs from the hips, open at the front, riding on the pelvis; and the fleece collar is a ring
+  // on the shoulders. The legs swing through the skirt's back when he runs, which a coat does not mind much.
+  if (o.coat !== undefined && o.coatSkirt !== false) {
+    const J = B.J, len = (o.coatLen ?? 0.5) + 0.06, top = J.waistY - 0.02, rTop = (B.female ? 0.19 : 0.215) * (o.bulk > 1 ? 1 + (o.bulk - 1) * 0.6 : 1), rBot = rTop + 0.035 + len * 0.07;
+    const geo = new THREE.CylinderGeometry(rTop, rBot, len, 18, 1, true, Math.PI * 0.2, Math.PI * 1.6);  // the gap is the front
+    geo.rotateY(Math.PI); geo.scale(1, 1, 0.84); geo.translate(0, top - len / 2, J.midZ - 0.01);
+    const skirt = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: o.coat, side: THREE.DoubleSide }));
+    skirt.castShadow = true;
+    let pelvis; root.traverse(n => { if (n.isBone && n.name === 'pelvis') pelvis = n; });
+    root.add(skirt); root.updateMatrixWorld(true); (pelvis || root).attach(skirt);
+    // the hem, a little heavier
+    const hem = new THREE.Mesh(new THREE.TorusGeometry(rBot, 0.012, 5, 24, Math.PI * 1.6).rotateZ(Math.PI * 0.7).rotateX(Math.PI / 2).scale(1, 1, 0.84).translate(0, top - len, J.midZ - 0.01), new THREE.MeshLambertMaterial({ color: new THREE.Color(o.coat).multiplyScalar(0.7) }));
+    root.add(hem); root.updateMatrixWorld(true); (pelvis || root).attach(hem);
+  }
+  if (o.collar !== undefined && o.collarRing !== false) {
+    const J = B.J, k = o.collarSize ?? 1, geo = new THREE.TorusGeometry(0.105 * k, 0.034 * k, 8, 20).rotateX(Math.PI / 2).scale(1.15, 1, 0.9).translate(0, J.neck.y - 0.045 - 0.02 * k, J.neck.z - 0.01);
+    const ring = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: o.collar }));
+    ring.castShadow = true;
+    let spine; root.traverse(n => { if (n.isBone && /^spine_0?3$/.test(n.name)) spine = n; }); if (!spine) root.traverse(n => { if (n.isBone && !spine && /^neck/.test(n.name)) spine = n; });
+    root.add(ring); root.updateMatrixWorld(true); (spine || root).attach(ring);
+  }
   if (glasses) {
     const geo = glassesGeo(B), gs = glassesScale ? [glassesScale, glassesScale, 1] : null, N = B.nose;
     const seat = gs && [0, (N.y + 0.042 - B.topY * 0.94) * (1 - glassesScale), 0]; // scale about the bridge, not the crown
@@ -1049,7 +1072,7 @@ export function updatePeople(dt, eye) {
 // Hesh runs his record label in this world; Furio only arrives late in the storyline.
 export const LOOKS = {
   // ----- Nexus (Blade Runner 2049). Generic figures in the film's wardrobe: build, hair and clothes, not anybody's face. -----
-  k: { coat: 0x2f3a2e, coatLen: 0.55, collar: 0xb9a58a, shirt: 0x2a2a30, turtle: 0x2a2a30, pants: 0x23232b, shoes: 0x1c1c22, hair: 0x3a2a1c, hairMesh: 'buzzed', hairScale: [1.02, 1.1, 1.04], bulk: 1.02, stubble: 0.25, face: { jaw: 0.08, brow: 0.3, cheeks: -0.3 } },
+  k: { coat: 0x3a4238, coatLen: 0.52, sheen: 0.14, collar: 0xbfb49e, collarSize: 1.5, shirt: 0x3a3d44, turtle: 0x3a3d44, pants: 0x23242a, shoes: 0x1c1c22, hair: 0x5a4328, hairMesh: 'parted', hairScale: [1.0, 0.92, 1.02], hairShift: [0, -0.004, 0], bulk: 1.06, height: 1.04, stubble: 0.15, face: { jaw: 0.1, brow: 0.3, cheeks: -0.35, chin: 0.1 } },
   joi: { body: 'female', coat: 0xdfe8f0, coatLen: 0.5, shirt: 0xffd9a8, pants: 0xcfd8e6, shoes: 0xdfe8f0, hair: 0x1c1410, hairMesh: 'long', hairScale: [1.06, 0.82, 1.06], skin: [1.02, 0.98, 0.98] },
   joshi: { body: 'female', coat: 0x1c1c22, coatLen: 0.4, shirt: 0x2a2a30, turtle: 0x2a2a30, pants: 0x1c1c22, hair: 0x2b1b12, hairMesh: 'parted', hairScale: [1.04, 0.96, 1.08], age: 0.4, face: { cheeks: -0.3, jaw: -0.1 } },
   luv: { body: 'female', coat: 0xf4f4f6, coatLen: 0.55, shirt: 0xf4f4f6, turtle: 0xf4f4f6, pants: 0xf4f4f6, shoes: 0xf4f4f6, hair: 0x111111, hairMesh: 'long', hairScale: [1.04, 0.78, 1.04], skin: [1, 0.97, 0.96], face: { cheeks: -0.5, jaw: -0.15 } },

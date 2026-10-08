@@ -69,10 +69,10 @@ async function proteinFarm(g) {
   dismiss(g, sapper);
   await enter(g, HOUSE);
   // Inside: it starts with a kettle and ends on the floor.
-  const sap = actor(g, 'sapper', roomSpot(HOUSE, 2, -2), toward(roomSpot(HOUSE, 2, -2), HOUSE.inside));
+  const sap = actor(g, 'sapper', { x: HOUSE.stove.x - 0.6, y: HOUSE.Y, z: HOUSE.stove.z + 0.6 }, toward(HOUSE.stove, HOUSE.inside)); // at his stove, with his back half turned
   p.locked = true;
-  p.pos.set(HOUSE.X - 1, 0, HOUSE.Z + 0.5); p.heading = toward(p.pos, sap.group.position);
-  g.cam.fixed = inRoom(HOUSE, [-4, 3], [1, -1.5], 1.6, 1.1).cam;
+  p.pos.set(HOUSE.X + 0.2, 0, HOUSE.Z + 1.2); p.heading = toward(p.pos, sap.group.position);
+  g.cam.fixed = inRoom(HOUSE, [-3.2, 2.6], [2.2, -1.6], 1.5, 1.05).cam;
   await talk(g, [
     [SAPPER, 'I have seen a thing you have not. Something no one made. It changed me. It would change you too, if you let it.', sap],
     [K, 'I am not here to be changed.', p],
@@ -87,7 +87,7 @@ async function proteinFarm(g) {
   await g.until(() => foe.dead || sap.state === 'down');
   g.hud.objective();
   p.locked = true;
-  await cut(g, () => { g.cam.fixed = inRoom(HOUSE, [-3, 2.5], [1.5, -2], 1.5, 0.6).cam; p.heading = toward(p.pos, sap.group.position); }, 0.4);
+  await cut(g, () => { g.cam.fixed = inRoom(HOUSE, [-3.6, 1.2], [1.5, -1.5], 1.4, 0.5).cam; p.heading = toward(p.pos, sap.group.position); }, 0.4);
   await say(g, '', 'K took the eye for the record, and the rest of him was no longer anybody\'s problem. Outside, the rain had not stopped.', 4.4);
   await say(g, K, "Joshi. Morton's retired. There is something here I want the drone to look at before I go.", 3.8);
   g.cam.fixed = null; p.locked = false;
