@@ -556,7 +556,7 @@ export function buildWorld(scene) {
       if (rand() < 0.55 && h < 90) {
         const name = pick(SHOPS), neon = neonFor(name);
         sign(name, x + ax * (w / 2 + 0.62) + (az ? 2.6 : 0), CURB + 3.1, z + az * (d / 2 + 0.62) + (ax ? 2.6 : 0), facing(ax, az), { w: 3.6, h: 0.9, color: neon, bg: '#0c0c12', size: 0.8 });
-        halo(x + ax * (w / 2 + 1.2) + (az ? 2.6 : 0), CURB + 3.1, z + az * (d / 2 + 1.2) + (ax ? 2.6 : 0), hexOf(neon), 10);
+        halo(x + ax * (w / 2 + 1.2) + (az ? 2.6 : 0), CURB + 3.1, z + az * (d / 2 + 1.2) + (ax ? 2.6 : 0), hexOf(neon), 4); // (the big halo is for signs high up: at eye level it fills the screen)
         for (let k = 0; k < 3; k++) ball(hexOf(neon), 0.14, x + ax * (w / 2 + 0.9) + (az ? -1.5 + k * 1.5 : 0), CURB + 3.5 + (k % 2) * 0.3, z + az * (d / 2 + 0.9) + (ax ? -1.5 + k * 1.5 : 0), M.glow);   // lanterns
         shopDoors.push({ shop: name, outside: { x: x + ax * (w / 2 + 1.6), z: z + az * (d / 2 + 1.6), h: Math.atan2(ax, az) }, kerb: { x: x + ax * (w / 2 + 9), z: z + az * (d / 2 + 9), h: ax ? 0 : Math.PI / 2 } });
       }
