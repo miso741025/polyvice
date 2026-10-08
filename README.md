@@ -1,4 +1,4 @@
-# Vice
+# polyvice
 
 A GTA-style open-world game that runs in the browser (Three.js, no build step). One engine, three worlds, each with its own story written as mission scripts:
 
