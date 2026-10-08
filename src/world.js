@@ -18,7 +18,7 @@ const SPECIAL_LA = { '15,1': 'neil', '8,6': 'bank', '2,9': 'drivein', '6,9': 'ka
   '12,4': 'park', '4,11': 'park', '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '2,7': 'yard', '13,8': 'church', '1,10': 'containers',
   '15,12': 'hotel' };                  // chapter four: the hotel at the end of the runway
 // Nexus: the same bones as Los Angeles, with the story's own places on them. The ocean side is a wall now.
-const SPECIAL_NX = { '15,1': 'kblock', '8,6': 'wallace', '8,3': 'precinct', '10,3': 'hospital', '10,8': 'stelline', '1,10': 'orphanage', '0,2': 'farm', '2,7': 'yard', '1,8': 'yard', '13,8': 'market',
+const SPECIAL_NX = { '15,1': 'kblock', '8,6': 'wallace', '7,5': 'moat', '8,5': 'moat', '9,5': 'moat', '7,6': 'moat', '9,6': 'moat', '7,7': 'moat', '8,7': 'moat', '9,7': 'moat', '8,3': 'precinct', '10,3': 'hospital', '10,8': 'stelline', '1,10': 'orphanage', '0,2': 'farm', '2,7': 'yard', '1,8': 'yard', '13,8': 'market',
   '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '15,12': 'hotel' };
 const SPECIAL_VICE = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
   '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel',
@@ -723,16 +723,16 @@ export function buildWorld(scene) {
     return 'city';
   };
   for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
-    const c = blockCenter(i, j), core = LA && Math.abs(i - 8) <= 2 && Math.abs(j - 6) <= 1; // the downtown core: nothing but towers
+    const c = blockCenter(i, j), core = LA && !NEXUS && Math.abs(i - 8) <= 2 && Math.abs(j - 6) <= 1; // the downtown core: nothing but towers (on Nexus the middle is Wallace's lake, and nothing near it is allowed its height)
     const kind = (NEXUS ? SPECIAL_NX : LA ? SPECIAL_LA : SPECIAL_VICE)[`${i},${j}`] ?? (LA && i === 11 ? 'river' : core ? 'tower' : pickBlock(district(i, j), i, j));
     if (kind === 'bing') { // a ring of sidewalk around a car park at road level
       for (const s of [-1, 1]) {
         slab(0xffffff, BLOCK, CURB, 5, c.x, 0, c.z + s * (BLOCK / 2 - 2.5), M.paver, 6);
         slab(0xffffff, 5, CURB, BLOCK - 10, c.x + s * (BLOCK / 2 - 2.5), 0, c.z, M.paver, 6);
       }
-    } else if (kind !== 'river' && kind !== 'home') slab(NEXUS ? 0x5a5a62 : LA ? 0xcfcfd2 : 0xffffff, BLOCK, CURB, BLOCK, c.x, 0, c.z, M.paver, 6); // the house lays its own, around the pool
+    } else if (kind !== 'river' && kind !== 'home' && kind !== 'moat') slab(NEXUS ? 0x5a5a62 : LA ? 0xcfcfd2 : 0xffffff, BLOCK, CURB, BLOCK, c.x, 0, c.z, M.paver, 6); // the house lays its own, around the pool
     (places.kinds ??= {})[i + ',' + j] = kind; // what each block is, for whoever needs to know (the sound of the place, for one)
-    if (kind !== 'river') {
+    if (kind !== 'river' && kind !== 'moat') {
       for (const sx of [-1, 1]) for (const sz of NEXUS ? [] : LA ? [0] : [-14, 14]) palms.push({ x: c.x + sx * 28.8, z: c.z + sz }); // one tall palm a side in Los Angeles, two in Vice City
       furniture(c, i, j);
     }
@@ -741,6 +741,7 @@ export function buildWorld(scene) {
     if (kind === 'neil') buildNeil(c);
     else if (kind === 'kblock') buildKBlock(c);
     else if (kind === 'wallace') buildWallace(c);
+    else if (kind === 'moat') buildMoat(c);
     else if (kind === 'stelline') buildStelline(c);
     else if (kind === 'orphanage') buildOrphanage(c);
     else if (kind === 'farm') buildFarm(c);
@@ -1785,19 +1786,35 @@ export function buildWorld(scene) {
     };
     places.kblock = { door: places.home.door, kerb: { x: c.x - 18, z: c.z + 34, h: Math.PI / 2 } };
   }
-  // ----- Wallace: a black ziggurat the height of the sky, slit with amber, standing in its own water -----
+  // ----- Wallace: a black ziggurat a quarter of a kilometre high, alone in a lake the size of nine blocks, slit with amber -----
+  // (Owner: not big enough, not alone enough. In the film it stands apart from everything, and nothing near it is its size.)
   function buildWallace(c) {
-    const y = CURB, BLK = 0x16161a, AMBER = 0xffb347;
-    flat(M.paint, 0x2a2a30, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z);
-    put(M.pool, new THREE.PlaneGeometry(BLOCK - 8, BLOCK - 8).rotateX(-Math.PI / 2).translate(c.x, y + 0.12, c.z), 0x1a2a3a);                         // the moat
-    const tiers = [[52, 0, 26], [44, 26, 30], [34, 56, 34], [24, 90, 40], [12, 130, 30]];
-    for (const [w, y0, h] of tiers) { slab(BLK, w, h, w, c.x, y + y0, c.z, M.gravel, 8); collide(c.x, c.z, w, w, y + y0 + h); for (let k = 0; k < h / 5; k++) for (const s2 of [-1, 1]) { slab(AMBER, w - 4, 0.22, 0.06, c.x, y + y0 + 2.5 + k * 5, c.z + s2 * (w / 2 + 0.02), M.glow); slab(AMBER, 0.06, 0.22, w - 4, c.x + s2 * (w / 2 + 0.02), y + y0 + 2.5 + k * 5, c.z, M.glow); } }
-    ball(0xff3b3b, 0.5, c.x, y + 161, c.z, M.glow); halo(c.x, y + 161, c.z, 0xff3030, 10);
-    slab(0x2a2a30, 8, 0.3, 32, c.x, y + 0.1, c.z + 14); for (let k = 0; k < 6; k++) for (const s2 of [-1, 1]) { post(BLK, 0.5, 6, c.x + s2 * 3.6, y, c.z + 4 + k * 4.6, 4); slab(AMBER, 0.2, 0.2, 0.2, c.x + s2 * 3.6, y + 6, c.z + 4 + k * 4.6, M.glow); } // the causeway across the water, lit
-    slab(0x16161c, 3.2, 5, 0.3, c.x, y, c.z + 26.1); slab(AMBER, 0.14, 4.6, 0.1, c.x, y + 0.2, c.z + 26.3, M.glow);                                      // the door: a slit of light
-    sign(['WALLACE'], c.x, y + 7.5, c.z + 26.3, 0, { w: 7, h: 1.2, color: '#ffb347', bg: '#101012', size: 0.8, glow: true });
-    shopDoors.push({ shop: 'ARCHIVE', outside: { x: c.x, z: c.z + 28.4, h: Math.PI } });
-    places.wallace = { door: { x: c.x, z: c.z + 28.4 }, kerb: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 }, plaza: { x: c.x, z: c.z + 31 } };
+    const y = CURB, BLK = 0x111114, AMBER = 0xffb347;
+    put(M.pool, new THREE.PlaneGeometry(BLOCK + 4, BLOCK + 4).rotateX(-Math.PI / 2).translate(c.x, y - 0.05, c.z), 0x1a2a3a); flat(M.paint, 0x060608, BLOCK + 4, BLOCK + 4, c.x, y - 0.08, c.z);
+    const tiers = [[62, 0, 44], [54, 44, 52], [44, 96, 58], [32, 154, 56], [18, 210, 40]];
+    for (const [w, y0, h] of tiers) {
+      slab(BLK, w, h, w, c.x, y + y0, c.z, M.gravel, 10); collide(c.x, c.z, w, w, y + y0 + h);
+      slab(0x1c1c22, w + 1.2, 1.2, w + 1.2, c.x, y + y0 + h - 1.2, c.z);                                                                           // the lip of each step
+      for (let k = 0; k < h / 6; k++) for (const s2 of [-1, 1]) { slab(AMBER, w - 6, 0.5, 0.08, c.x, y + y0 + 3 + k * 6, c.z + s2 * (w / 2 + 0.03), M.glow); slab(AMBER, 0.08, 0.5, w - 6, c.x + s2 * (w / 2 + 0.03), y + y0 + 3 + k * 6, c.z, M.glow); }
+      for (const s2 of [-1, 1]) for (let k = 0; k < w / 8; k++) { slab(BLK, 1.4, h, 2.2, c.x - w / 2 + 4 + k * 8, y + y0, c.z + s2 * (w / 2 + 0.8)); slab(BLK, 2.2, h, 1.4, c.x + s2 * (w / 2 + 0.8), y + y0, c.z - w / 2 + 4 + k * 8); }   // ribs up every face
+    }
+    for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; ball(0x49e0ff, 0.3, c.x + Math.cos(a) * 7, y + 250.2, c.z + Math.sin(a) * 7, M.glow); } flat(M.paint, 0x1c1c22, 16, 16, c.x, y + 250.05, c.z); // the landing pad on the summit, ringed in blue
+    ball(0xff3b3b, 0.7, c.x, y + 254, c.z, M.glow); halo(c.x, y + 254, c.z, 0xff3030, 10); post(0x55525a, 0.2, 4, c.x, y + 250, c.z, 6);
+    for (const s2 of [-1, 1]) { slab(BLK, 20, 120, 20, c.x + s2 * 36, y - 2, c.z - 36, M.gravel, 8); collide(c.x + s2 * 36, c.z - 36, 20, 20, y + 118); for (let k = 0; k < 18; k++) slab(AMBER, 14, 0.4, 0.08, c.x + s2 * 36, y + 4 + k * 6, c.z - 25.97, M.glow); ball(0xff3b3b, 0.4, c.x + s2 * 36, y + 118.5, c.z - 36, M.glow); } // two lesser stacks behind it, in the water
+    slab(0x2a2a30, 10, 0.4, 36, c.x, y + 0.1, c.z + 16); for (let k = 0; k < 7; k++) for (const s2 of [-1, 1]) { post(BLK, 0.6, 7, c.x + s2 * 4.6, y, c.z + 2 + k * 4.8, 4); slab(AMBER, 0.3, 0.3, 0.3, c.x + s2 * 4.6, y + 7, c.z + 2 + k * 4.8, M.glow); } // the causeway across the water, lit
+    slab(0x16161c, 4, 7, 0.3, c.x, y, c.z + 31.1); slab(AMBER, 0.2, 6.4, 0.1, c.x, y + 0.3, c.z + 31.3, M.glow);                                      // the door: a slit of light, seven metres high
+    sign(['WALLACE'], c.x, y + 10, c.z + 31.3, 0, { w: 12, h: 2, color: '#ffb347', bg: '#0a0a0c', size: 0.8, glow: true });
+    shopDoors.push({ shop: 'ARCHIVE', outside: { x: c.x, z: c.z + 33.4, h: Math.PI } });
+    places.wallace = { door: { x: c.x, z: c.z + 33.4 }, kerb: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 }, plaza: { x: c.x, z: c.z + 34 }, summit: { x: c.x, y: y + 250, z: c.z } };
+  }
+  // ----- The lake round Wallace: black water to the kerb, a low rim, and the city's roads crossing it as causeways -----
+  function buildMoat(c) {
+    const y = CURB;
+    flat(M.paint, 0x060608, BLOCK + 4, BLOCK + 4, c.x, y - 0.08, c.z); put(M.pool, new THREE.PlaneGeometry(BLOCK + 2, BLOCK + 2).rotateX(-Math.PI / 2).translate(c.x, y - 0.04, c.z), 0x1a2a3a);
+    lowGround.push({ x: c.x, z: c.z, half: BLOCK / 2 });
+    for (const s2 of [-1, 1]) { slab(0x2a2a30, BLOCK + 2, 0.5, 0.6, c.x, y - 0.1, c.z + s2 * (BLOCK / 2 + 0.7)); slab(0x2a2a30, 0.6, 0.5, BLOCK + 2, c.x + s2 * (BLOCK / 2 + 0.7), y - 0.1, c.z); }   // the rim along the road
+    for (let k = 0; k < 4; k++) for (const s2 of [-1, 1]) { const px = c.x - 22 + k * 15; post(0x55525a, 0.08, 3.2, px, y, c.z + s2 * (BLOCK / 2 + 0.7), 5); ball(0xffb347, 0.14, px, y + 3.3, c.z + s2 * (BLOCK / 2 + 0.7), M.glow); halo(px, y + 3.3, c.z + s2 * (BLOCK / 2 + 0.7), 0xffb347, 4); }
+    for (let k = 0; k < 3; k++) post(0x1c1c22, 0.5, 1.2 + k * 0.3, c.x + (k - 1) * 18, y - 0.3, c.z + (k % 2 ? 12 : -14), 6);                        // posts standing in the water
   }
   // ----- Stelline: a white compound under a dome, the one clean building in the city -----
   function buildStelline(c) {

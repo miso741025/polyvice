@@ -792,7 +792,7 @@ async function boot() {
     places.update(g.time);
     { // Lights on the cars after dark: beams on the road from everything near, and the spot on his own.
       const dark = Math.max(0, Math.min(1, (g.night - 0.35) / 0.4));
-      for (const car of cars) { const b = car.mesh.userData.beam; if (!b) continue; const d = Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z); b.material.opacity = d < 160 && !car.wreck && (car.nav || car.ai || car === p.car || car.mission) ? dark * 0.32 : 0; }
+      for (const car of cars) { const b = car.mesh.userData.beam; if (!b) continue; const d = Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z); b.material.opacity = d < 160 && !car.wreck && (car === p.car || ((car.nav || car.ai) && Math.abs(car.speed) > 0.5)) ? dark * 0.32 : 0; } // (a parked car's lamps are off: the pale wedge on the road at K's spawn was his own spinner's)
       if (p.car) { if (headLight.parent !== p.car.mesh) p.car.mesh.add(headLight); headLight.intensity = dark * 90 * (p.car.wreck ? 0 : 1); } else headLight.intensity = 0;
     }
 
