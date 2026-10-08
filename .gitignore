@@ -5,3 +5,5 @@ music/*
 !music/README.md
 sounds/*
 !sounds/README.md
+# Pictures the game takes of itself (character sheets) stay local.
+shots/

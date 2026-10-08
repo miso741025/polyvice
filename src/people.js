@@ -572,7 +572,7 @@ function paint(B, o) {
         hair = th > 1.15 && y < topY - 0.045;
         bottom = th < 2 ? lerp(topY - 0.085, topY - 0.2, (th - 1.35) / 0.65) : topY - 0.2;
       } else {
-        const frontLine = o.hairStyle === 'receding' ? (th < 0.4 ? topY - 0.022 : topY - 0.008) : topY - 0.035;
+        const frontLine = o.hairStyle === 'receding' ? (th < 0.4 ? topY - 0.022 : topY - 0.008) : o.hairStyle === 'fringe' ? (th < 0.7 ? topY - 0.1 + Math.abs(x) * 0.25 : topY - 0.035) : topY - 0.035; // a fringe: hair painted down over the forehead to the brows
         bottom = th < 0.75 ? frontLine : th < 1.35 ? lerp(frontLine, topY - 0.085, (th - 0.75) / 0.6) : th < 2 ? lerp(topY - 0.085, topY - 0.2, (th - 1.35) / 0.65) : topY - 0.2;
       }
       r = d[o4] * tint[0]; gr = d[o4 + 1] * tint[1]; b = d[o4 + 2] * tint[2];
@@ -874,6 +874,7 @@ const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true
 //   coat       colour of a long coat (a jacket that falls to the knee: coatLen metres below the waist, 0.5 by default)
 //   collar     colour of a thick fleece collar on the coat or jacket (collarSize scales it; 1 = a band at the neck, 1.6 spreads over the shoulders); turtle colour of a roll-neck under it
 //   sheen      0..1: the cloth catches the light (leather, a waxed coat); the body gets a Phong material
+//   coatAlpha  0..1 makes the coat's skirt see-through (a clear plastic raincoat); hairStyle 'fringe' paints bangs
 //   open       colour of an undershirt showing through an unbuttoned shirt or track top
 //   tank       the undershirt is a low-cut tank
 //   sleeves    'short' | 'long'
@@ -881,7 +882,7 @@ const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true
 //   stripe     colour of side stripes down arms and legs (tracksuit)
 export function makeHuman(opts = {}) {
   const o = { body: 'male', shirt: 0xffffff, pants: 0x23232b, hair: 0x2b1b12, bulk: 1, height: 1, head: 1.06, hairStyle: 'short', sleeves: 'short', ...opts };
-  if (o.coat !== undefined && o.jacket === undefined) o.jacket = o.coat; // a coat is a jacket that goes on down
+  if (o.coat !== undefined && o.jacket === undefined && o.coatAlpha === undefined) o.jacket = o.coat; // a coat is a jacket that goes on down (a see-through one is geometry only)
   const B = bodies[o.body];
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';
@@ -924,19 +925,24 @@ export function makeHuman(opts = {}) {
   // geometry: a skirt that hangs from the hips, open at the front, riding on the pelvis; and the fleece collar is a ring
   // on the shoulders. The legs swing through the skirt's back when he runs, which a coat does not mind much.
   if (o.coat !== undefined && o.coatSkirt !== false) {
-    const J = B.J, len = (o.coatLen ?? 0.5) + 0.06, top = J.waistY - 0.02, rTop = (B.female ? 0.19 : 0.215) * (o.bulk > 1 ? 1 + (o.bulk - 1) * 0.6 : 1), rBot = rTop + 0.035 + len * 0.07;
+    const J = B.J, len = (o.coatLen ?? 0.5) + 0.06, top = J.waistY - 0.02, rTop = (B.female ? 0.175 : 0.195) * (o.bulk > 1 ? 1 + (o.bulk - 1) * 0.6 : 1), rBot = rTop + 0.025 + len * 0.05;
     const geo = new THREE.CylinderGeometry(rTop, rBot, len, 18, 1, true, Math.PI * 0.2, Math.PI * 1.6);  // the gap is the front
     geo.rotateY(Math.PI); geo.scale(1, 1, 0.84); geo.translate(0, top - len / 2, J.midZ - 0.01);
-    const skirt = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: o.coat, side: THREE.DoubleSide }));
+    const skirt = new THREE.Mesh(geo, o.coatAlpha !== undefined ? new THREE.MeshPhongMaterial({ color: o.coat, side: THREE.DoubleSide, transparent: true, opacity: o.coatAlpha, shininess: 90, specular: 0xffffff, depthWrite: false }) : new THREE.MeshLambertMaterial({ color: o.coat, side: THREE.DoubleSide }));
     skirt.castShadow = true;
     let pelvis; root.traverse(n => { if (n.isBone && n.name === 'pelvis') pelvis = n; });
     root.add(skirt); root.updateMatrixWorld(true); (pelvis || root).attach(skirt);
     // the hem, a little heavier
     const hem = new THREE.Mesh(new THREE.TorusGeometry(rBot, 0.012, 5, 24, Math.PI * 1.6).rotateZ(Math.PI * 0.7).rotateX(Math.PI / 2).scale(1, 1, 0.84).translate(0, top - len, J.midZ - 0.01), new THREE.MeshLambertMaterial({ color: new THREE.Color(o.coat).multiplyScalar(0.7) }));
     root.add(hem); root.updateMatrixWorld(true); (pelvis || root).attach(hem);
+    if (o.coatAlpha !== undefined) { // a clear coat covers the body too: a shell from the shoulders to the waist, on the spine
+      const shell = new THREE.Mesh(new THREE.CylinderGeometry(rTop + 0.035, rTop + 0.01, J.shoulder.y - J.waistY + 0.02, 18, 1, true, Math.PI * 0.12, Math.PI * 1.76).rotateY(Math.PI).scale(1, 1, 0.8).translate(0, (J.shoulder.y + J.waistY) / 2 - 0.01, J.midZ), skirt.material);
+      let spine2; root.traverse(n => { if (n.isBone && /^spine_0?2$/.test(n.name)) spine2 = n; });
+      root.add(shell); root.updateMatrixWorld(true); (spine2 || pelvis || root).attach(shell);
+    }
   }
   if (o.collar !== undefined && o.collarRing !== false) {
-    const J = B.J, k = o.collarSize ?? 1, geo = new THREE.TorusGeometry(0.105 * k, 0.034 * k, 8, 20).rotateX(Math.PI / 2).scale(1.15, 1, 0.9).translate(0, J.neck.y - 0.045 - 0.02 * k, J.neck.z - 0.01);
+    const J = B.J, k = o.collarSize ?? 1, geo = new THREE.TorusGeometry(0.1 * k, 0.026 * k, 8, 20).rotateX(Math.PI / 2).scale(1.15, 1, 0.9).translate(0, J.neck.y - 0.045 - 0.02 * k, J.neck.z - 0.01);
     const ring = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: o.collar }));
     ring.castShadow = true;
     let spine; root.traverse(n => { if (n.isBone && /^spine_0?3$/.test(n.name)) spine = n; }); if (!spine) root.traverse(n => { if (n.isBone && !spine && /^neck/.test(n.name)) spine = n; });
@@ -1072,8 +1078,8 @@ export function updatePeople(dt, eye) {
 // Hesh runs his record label in this world; Furio only arrives late in the storyline.
 export const LOOKS = {
   // ----- Nexus (Blade Runner 2049). Generic figures in the film's wardrobe: build, hair and clothes, not anybody's face. -----
-  k: { coat: 0x3a4238, coatLen: 0.52, sheen: 0.14, collar: 0xbfb49e, collarSize: 1.5, shirt: 0x3a3d44, turtle: 0x3a3d44, pants: 0x23242a, shoes: 0x1c1c22, hair: 0x5a4328, hairMesh: 'parted', hairScale: [1.0, 0.92, 1.02], hairShift: [0, -0.004, 0], bulk: 1.06, height: 1.04, stubble: 0.15, face: { jaw: 0.1, brow: 0.3, cheeks: -0.35, chin: 0.1 } },
-  joi: { body: 'female', coat: 0xdfe8f0, coatLen: 0.5, shirt: 0xffd9a8, pants: 0xcfd8e6, shoes: 0xdfe8f0, hair: 0x1c1410, hairMesh: 'long', hairScale: [1.06, 0.82, 1.06], skin: [1.02, 0.98, 0.98] },
+  k: { coat: 0x3a4238, coatLen: 0.52, sheen: 0.14, collar: 0xbfb49e, collarSize: 1.3, shirt: 0x3a3d44, turtle: 0x3a3d44, pants: 0x23242a, shoes: 0x1c1c22, hair: 0x5a4328, hairMesh: 'parted', hairScale: [1.0, 0.92, 1.02], hairShift: [0, -0.004, 0], bulk: 1.06, height: 1.04, stubble: 0.15, face: { jaw: 0.1, brow: 0.3, cheeks: -0.35, chin: 0.1 } },
+  joi: { body: 'female', coat: 0xdfe8f0, coatLen: 0.5, coatAlpha: 0.42, sheen: 0.9, collar: 0xe9eef4, collarSize: 0.9, shirt: 0x16161c, turtle: 0x16161c, pants: 0x1c1c22, shoes: 0x16161c, hair: 0x111111, hairStyle: 'fringe', hairMesh: 'long', hairScale: [1.06, 0.74, 1.06], hairShift: [0, 0.004, 0], skin: [1.02, 0.98, 0.98], face: { cheeks: -0.3, chin: -0.1 } }, // the clear raincoat over black, the black bob with the fringe
   joshi: { body: 'female', coat: 0x1c1c22, coatLen: 0.4, shirt: 0x2a2a30, turtle: 0x2a2a30, pants: 0x1c1c22, hair: 0x2b1b12, hairMesh: 'parted', hairScale: [1.04, 0.96, 1.08], age: 0.4, face: { cheeks: -0.3, jaw: -0.1 } },
   luv: { body: 'female', coat: 0xf4f4f6, coatLen: 0.55, shirt: 0xf4f4f6, turtle: 0xf4f4f6, pants: 0xf4f4f6, shoes: 0xf4f4f6, hair: 0x111111, hairMesh: 'long', hairScale: [1.04, 0.78, 1.04], skin: [1, 0.97, 0.96], face: { cheeks: -0.5, jaw: -0.15 } },
   wallace: { coat: 0x1a1a1e, coatLen: 0.7, shirt: 0x1a1a1e, turtle: 0x1a1a1e, pants: 0x1a1a1e, hair: 0x8a8278, hairMesh: 'parted', hairScale: [1.02, 1.0, 1.06], bulk: 0.92, age: 0.5, skin: [1.02, 1, 0.96], face: { cheeks: -0.5, chin: 0.2 } },

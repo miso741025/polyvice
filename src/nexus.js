@@ -44,7 +44,7 @@ async function proteinFarm(g) {
   await phone(g, JOSHI, 'A farm on the north edge. One of the old Nexus-8s, registered to nobody. Bring him in or bring in what is left. Either is fine.');
   await say(g, K, 'On my way.', 1.8);
   p.locked = false;
-  await wantCar(g, g.tonyCar, 'Take the <b>spinner</b>. Space lifts it; Shift brings it down.');
+  await wantCar(g, g.tonyCar, 'Take the <b>spinner</b>. Hold Shift to lift off and climb; Ctrl brings it down.');
   await reach(g, farm.gate, '<b>Fly</b> out to the protein farm, on the north edge of the city.', { how: 'car', r: 9 });
   p.locked = true;
   land(g, farm.gate);

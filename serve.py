@@ -23,6 +23,17 @@ class NoCache(SimpleHTTPRequestHandler):
         self.send_header('Accept-Ranges', 'bytes')
         super().end_headers()
 
+    def do_POST(self):
+        # /shot/<name>.png: a picture the game made of itself (character sheets, from lineup.html), kept in shots/.
+        path = self.path.split('?')[0]
+        if path.startswith('/shot/') and path.endswith('.png') and '/' not in path[6:]:
+            os.makedirs('shots', exist_ok=True)
+            n = int(self.headers.get('Content-Length', '0'))
+            with open(os.path.join('shots', path[6:]), 'wb') as f:
+                f.write(self.rfile.read(n))
+            self.send_response(204); self.end_headers(); return
+        self.send_response(404); self.end_headers()
+
     def do_GET(self):
         # /music/list.json and /sounds/list.json: what is in those folders right now, so songs and
         # recordings can be dropped in without touching the code.

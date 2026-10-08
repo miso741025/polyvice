@@ -428,9 +428,10 @@ async function boot() {
   function updatePlayer(dt) {
     const car = p.car;
     if (car) {
-      const flying = car.kind === 'spinner' && (car.alt > 0.5 || (!p.locked && keys.Space));
-      if (flying) { // a spinner: Space climbs, Shift sinks; it stays up until it is brought down
-        car.lift = p.locked ? -1 : (keys.Space ? 1 : 0) - (keys.ShiftLeft || keys.ShiftRight ? 1 : 0);
+      const up = keys.ShiftLeft || keys.ShiftRight, down = keys.ControlLeft || keys.ControlRight;
+      const flying = car.kind === 'spinner' && (car.alt > 0.5 || (!p.locked && up));
+      if (flying) { // a spinner: Shift climbs, Ctrl sinks (as the helicopters in the games this is modelled on); it stays up until it is brought down
+        car.lift = p.locked ? -1 : (up ? 1 : 0) - (down ? 1 : 0);
         car.fly(dt, p.locked ? 0 : (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), p.locked ? 0 : (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), car.lift);
         if (car.alt > 0.5) { const before = car.pos.clone(); if (pushOutAbove(car.pos, car.reach, car.alt + groundAt(car.pos.x, car.pos.z) + 0.5)) { const jolt = before.distanceTo(car.pos) * 8; if (jolt > 1) { sfx.crash(Math.min(1, jolt / 10)); g.hurtCar(car, jolt * 2); car.speed *= 0.3; } } }
       }
