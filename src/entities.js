@@ -379,7 +379,7 @@ function buildCar(kind) {
 const trimMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 40, specular: 0x262626, side: THREE.DoubleSide });
 const lightMat = new THREE.MeshBasicMaterial({ vertexColors: true });
 let beamTex = null;
-const beamMap = () => beamTex ??= (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d'); const gr = x.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 128); const side = x.createLinearGradient(0, 0, 64, 0); side.addColorStop(0, 'rgba(0,0,0,1)'); side.addColorStop(0.3, 'rgba(0,0,0,0)'); side.addColorStop(0.7, 'rgba(0,0,0,0)'); side.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = side; x.fillRect(0, 0, 64, 128); const t = new THREE.CanvasTexture(c); return t; })();
+const beamMap = () => beamTex ??= (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d'); const gr = x.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,255,255,0.55)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.22)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 128); const side = x.createLinearGradient(0, 0, 64, 0); side.addColorStop(0, 'rgba(0,0,0,1)'); side.addColorStop(0.45, 'rgba(0,0,0,0)'); side.addColorStop(0.55, 'rgba(0,0,0,0)'); side.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = side; x.fillRect(0, 0, 64, 128); const t = new THREE.CanvasTexture(c); return t; })();
 const wheelMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 const paints = new Map();
 const paintMat = color => paints.get(color) ?? paints.set(color, new THREE.MeshPhongMaterial({ color, shininess: 90, specular: 0x777777 })).get(color);
@@ -395,7 +395,7 @@ function makeCarMesh(color, kind) {
   g.userData.reach = k.L / 2 - 1; // how far the collision circles sit from the centre
   { // Headlamp beams: a pale wedge laid on the road ahead, shown after dark (owner: cars had no lights at night).
     const L = k.L, geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-k.W * 0.42, 0.05, L / 2, k.W * 0.42, 0.05, L / 2, k.W * 1.1, 0.05, L / 2 + 16, -k.W * 1.1, 0.05, L / 2 + 16]), 3));
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-k.W * 0.4, 0.05, L / 2, k.W * 0.4, 0.05, L / 2, k.W * 0.85, 0.05, L / 2 + 13, -k.W * 0.85, 0.05, L / 2 + 13]), 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
     geo.setIndex([0, 1, 2, 0, 2, 3]);
     const beam = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: beamMap(), color: 0xfff2c0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));

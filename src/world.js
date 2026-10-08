@@ -196,6 +196,34 @@ function facade(style, rand) {
   return { map, glow };
 }
 
+// Nexus: the face of a megablock. Raw concrete, a dense grid of small windows (two rows to a floor, most of them lit a
+// different colour from the next), a slab line at each floor. Sixteen tiles, like the other facades, so no two bays repeat.
+function facadeMega(rand) {
+  const S = 512, C = 128;
+  const draw = (g, e) => {
+    g.fillStyle = '#1e1f24'; g.fillRect(0, 0, S, S); e.fillStyle = '#000'; e.fillRect(0, 0, S, S);
+    grain(g, S, S, 9000, 0.05, rand, 3);
+    const LIT = ['#ffb55a', '#ffd9a0', '#bcd3ff', '#8fd0ff', '#ffe9c4', '#ff8a5c'];
+    for (let ty = 0; ty < 4; ty++) for (let tx = 0; tx < 4; tx++) {
+      const x0 = tx * C, y0 = ty * C, cols = 3 + Math.floor(rand() * 2), rows = 2, dead = rand() < 0.3, share = dead ? 0.08 : 0.3 + rand() * 0.25; // some bays are mostly dark: not every floor is let
+      g.fillStyle = '#2b2c33'; g.fillRect(x0, y0 + C - 6, C, 6); g.fillStyle = '#121317'; g.fillRect(x0, y0 + C - 8, C, 2);   // the floor slab, and its shadow
+      const ww = Math.floor((C - 16) / cols) - 6, wh = 38;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const x = x0 + 8 + c * (ww + 6) + 3, y = y0 + 10 + r * 56, lit = rand() < share, dim = rand() < 0.6;
+        g.fillStyle = '#0c0d12'; g.fillRect(x - 2, y - 2, ww + 4, wh + 4);
+        if (lit) { const col = LIT[Math.floor(rand() * LIT.length)]; g.fillStyle = col; g.fillRect(x, y, ww, wh); e.fillStyle = dim ? '#3a2a18' : col; e.fillRect(x, y, ww, wh); if (rand() < 0.4) { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x, y, ww * 0.4, wh); } }
+        else { g.fillStyle = '#171a24'; g.fillRect(x, y, ww, wh); g.fillStyle = 'rgba(120,140,170,.12)'; g.fillRect(x, y, ww, wh * 0.3); }
+        g.fillStyle = '#34353c'; g.fillRect(x - 3, y + wh + 2, ww + 6, 3);                                                   // a sill
+      }
+      if (rand() < 0.3) { g.fillStyle = '#2a2b31'; g.fillRect(x0 + 2, y0, 6, C); }                                            // a duct down the face
+      for (let k = 0; k < 40; k++) { g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(x0 + rand() * C, y0 + rand() * C, 2, 10 + rand() * 40); }  // rain stains
+    }
+  };
+  let glow;
+  const map = texture(S, S, g => { glow = texture(S, S, e => draw(g, e)); });
+  return { map, glow };
+}
+
 // The ground floor of ordinary buildings: four shopfronts, each with a name band, plate glass and a tiled base.
 function shopfronts(rand) {
   const W = 512, H = 128, C = 128;
@@ -270,6 +298,7 @@ export function buildWorld(scene) {
     pool: new THREE.MeshBasicMaterial({ map: T.halo, vertexColors: true, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
   M.office.emissiveIntensity = NEXUS ? 1.05 : 0.6;
+  if (NEXUS) { M.mega = lit(facadeMega(rand)); M.mega.emissiveIntensity = 0.8; }
   if (NEXUS) for (const m of [M.shop, M.deco, M.balcony, M.stucco]) m.emissiveIntensity = 1.1;
 
   // Everything static is collected per material and merged into one mesh each at the end.
@@ -489,7 +518,54 @@ export function buildWorld(scene) {
     }
   };
   // fx, fz: which sides of the building face a street (-1, 0 or 1).
+  // ----- Nexus: a megablock. (Owner: no old houses; the film's miniature sets.) Concrete, no colour but what the windows give;
+  // tiers that step back; vertical fins; a strip of light along every edge; a plinth with a slit of a door; antennae; and on
+  // some of them a word down the face in neon, three storeys tall. The shops the story needs keep their doors at the foot.
+  function megablock(x, z, w, d, h, { fx = 0, fz = 1 } = {}) {
+    h = Math.max(24, Math.round(h * 1.3 / FLOOR) * FLOOR);
+    const CONC = 0x3a3b42, DARK = 0x202026, base = 4.2, strip = pick([0x49e0ff, 0xffb347, 0xff3fa8, 0xdfeeff, 0x49e0ff]), hexOf = css => parseInt(css.slice(1), 16);
+    const tiers = h > 100 ? [[1, 0.52], [0.72, 0.3], [0.46, 0.18]] : h > 50 ? [[1, 0.68], [0.64, 0.32]] : [[1, 1]];
+    let y0 = CURB + base, topY = y0;
+    slab(DARK, w + 1.2, base, d + 1.2, x, CURB, z, M.gravel, 4); collide(x, z, w + 1.2, d + 1.2, CURB + base);        // the plinth
+    slab(strip, w + 1.3, 0.12, d + 1.3, x, CURB + base - 0.12, z, M.glow);                                                  // lit along its top
+    for (const [k, [sw, sh]] of tiers.entries()) {
+      const tw = Math.round(w * sw), td = Math.round(d * sw), th = Math.max(FLOOR, Math.round(h * sh / FLOOR) * FLOOR), floors = th / FLOOR;
+      put(M.mega, walls(tw, th, td, x, y0, z, floors), 0xffffff); collide(x, z, tw, td, y0 + th);
+      for (const s of [-1, 1]) { slab(strip, tw + 0.2, 0.1, 0.1, x, y0 + th - 0.1, z + s * (td / 2 + 0.05), M.glow); slab(strip, 0.1, 0.1, td + 0.2, x + s * (tw / 2 + 0.05), y0 + th - 0.1, z, M.glow); }   // the edge light
+      slab(CONC, tw + 0.6, 0.5, td + 0.6, x, y0 + th - 0.5, z);                                                             // a lip at the top of each tier
+      if (th > 20) for (const s of [-1, 1]) for (let f = -tw / 2 + 3; f < tw / 2 - 1; f += 6) slab(DARK, 0.5, th - 1, 0.9, x + f, y0, z + s * (td / 2 + 0.3));   // fins, on the long faces
+      if (th > 20) for (const s of [-1, 1]) for (let f = -td / 2 + 3; f < td / 2 - 1; f += 6) slab(DARK, 0.9, th - 1, 0.5, x + s * (tw / 2 + 0.3), y0, z + f);
+      y0 += th; topY = y0;
+      if (k < tiers.length - 1) { slab(0x2a2b31, tw - 1, 0.2, td - 1, x, y0, z); for (let n = 0; n < 3; n++) slab(0x55565e, 2.2, 1.4, 1.6, x + (rand() - 0.5) * (tw - 8), y0, z + (rand() - 0.5) * (td - 8)); } // plant on the setback
+    }
+    flat(M.gravel, 0x2a2b31, Math.round(w * tiers[tiers.length - 1][0]) - 0.6, Math.round(d * tiers[tiers.length - 1][0]) - 0.6, x, topY + 0.02, z, 5);
+    for (let n = 0; n < 2 + Math.floor(rand() * 3); n++) { const ax = x + (rand() - 0.5) * (w * tiers[tiers.length - 1][0] - 6), az = z + (rand() - 0.5) * (d * tiers[tiers.length - 1][0] - 6), ah = 4 + rand() * 9; post(0x8a8d96, 0.07, ah, ax, topY, az, 5); if (n === 0 || rand() < 0.4) { ball(0xff3b3b, 0.22, ax, topY + ah + 0.1, az, M.glow); halo(ax, topY + ah + 0.1, az, 0xff3030, 4); } }
+    if (rand() < 0.35) for (let k = 0; k < 3; k++) slab(0x55565e, 3, 1.6, 2, x + (rand() - 0.5) * (w * 0.4), topY, z + (rand() - 0.5) * (d * 0.4));   // roof plant
+    // The word down the face.
+    if (rand() < 0.3 && h > 30) {
+      const name = pick([...HOTELS, 'SOY', 'OFFWORLD', 'PACHINKO', 'VOID', 'ATARI', 'LUCKY']), neon = neonFor(name), n = name.length, sh = Math.min(h - base - 6, n * 2.4), fzz = z + fz * (d / 2 + 0.75);
+      slab(DARK, 1.2, sh + 1, 1.2, x - w / 2 + 3, CURB + base + 2, fzz - fz * 0.2);
+      sign(name.split(''), x - w / 2 + 3, CURB + base + 2 + sh / 2, fzz + fz * 0.42, facing(0, fz), { w: 2.2, h: sh, color: neon, bg: '#0c0c12', size: 0.8 });
+      halo(x - w / 2 + 3, CURB + base + sh * 0.6, fzz + fz * 1.2, hexOf(neon), 10);
+    }
+    // Doors at the foot, with the shop's name in neon beside each, and what every door on Nexus has: a slit of light.
+    for (const [ax, az] of [[fx, 0], [0, fz]]) {
+      if (!ax && !az) continue;
+      const dx = x + ax * (w / 2 + 0.6), dz = z + az * (d / 2 + 0.6);
+      slab(0x16161c, ax ? 0.2 : 1.6, 3.2, az ? 0.2 : 1.6, dx, CURB, dz); slab(0xffd9a8, ax ? 0.22 : 0.16, 2.9, az ? 0.22 : 0.16, dx, CURB + 0.15, dz, M.glow);
+      if (rand() < 0.55 && h < 90) {
+        const name = pick(SHOPS), neon = neonFor(name);
+        sign(name, x + ax * (w / 2 + 0.62) + (az ? 2.6 : 0), CURB + 3.1, z + az * (d / 2 + 0.62) + (ax ? 2.6 : 0), facing(ax, az), { w: 3.6, h: 0.9, color: neon, bg: '#0c0c12', size: 0.8 });
+        halo(x + ax * (w / 2 + 1.2) + (az ? 2.6 : 0), CURB + 3.1, z + az * (d / 2 + 1.2) + (ax ? 2.6 : 0), hexOf(neon), 10);
+        for (let k = 0; k < 3; k++) ball(hexOf(neon), 0.14, x + ax * (w / 2 + 0.9) + (az ? -1.5 + k * 1.5 : 0), CURB + 3.5 + (k % 2) * 0.3, z + az * (d / 2 + 0.9) + (ax ? -1.5 + k * 1.5 : 0), M.glow);   // lanterns
+        shopDoors.push({ shop: name, outside: { x: x + ax * (w / 2 + 1.6), z: z + az * (d / 2 + 1.6), h: Math.atan2(ax, az) }, kerb: { x: x + ax * (w / 2 + 9), z: z + az * (d / 2 + 9), h: ax ? 0 : Math.PI / 2 } });
+      }
+      for (let k = 0; k < 2; k++) { const px = x + ax * (w / 2 + 0.65) + (az ? (k ? 8 : -8) : 0), pz = z + az * (d / 2 + 0.65) + (ax ? (k ? 8 : -8) : 0); slab(0x2a2b31, ax ? 0.3 : 0.5, 3.6, az ? 0.3 : 0.5, px, CURB, pz); } // pipes down the plinth
+      slab(0x2a2b31, ax ? 0.5 : w + 1, 0.5, az ? 0.5 : d + 1, x + ax * (w / 2 + 0.85), CURB + 3.6, z + az * (d / 2 + 0.85)); // and one along it
+    }
+  }
   function building(x, z, w, d, h, { style, tint, fx = 0, fz = 1 } = {}) {
+    if (NEXUS) return megablock(x, z, w, d, h, { fx, fz });
     style ??= LA ? (h >= 24 ? 'office' : h <= 12 ? 'stucco' : pick(['stucco', 'office', 'balcony', 'stucco']))
       : h >= 30 ? pick(['office', 'office', 'deco', 'balcony']) : h <= 12 ? pick(['stucco', 'deco']) : pick(['deco', 'balcony', 'stucco', 'balcony']);
     const office = style === 'office', base = office ? 0 : GROUND;
