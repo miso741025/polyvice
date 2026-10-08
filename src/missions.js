@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { CITY, near, clamp, bounds, SHORE, groundAt, pushOut, colliders, nodeX, nodeZ, NX, NZ } from './grid.js';
+import { CITY, STORY_KEY, near, clamp, bounds, SHORE, groundAt, pushOut, colliders, nodeX, nodeZ, NX, NZ } from './grid.js';
 import { HEAT } from './heat.js';
 import { NEXUS_STORY } from './nexus.js';
+import { BLADE_STORY } from './bladerunner.js';
 import { makeLook, makeHuman, randomPedLook, Car, roam, nearestNode } from './entities.js';
 
 // The story is written as plain async functions: each `await` waits on the game loop
@@ -18,12 +19,12 @@ export const NORTH = Math.PI, SOUTH = 0, EAST = Math.PI / 2, WEST = -Math.PI / 2
 
 // ---------- Saving: the number of the next mission, and the money ----------
 
-const SAVE = CITY === 'la' ? 'heat-la.save' : CITY === 'nexus' ? 'br-nexus.save' : 'sopranos-vice.save';
+const SAVE = CITY === 'la' ? 'heat-la.save' : CITY === 'nexus' ? (STORY_KEY === '2019' ? 'br-2019.save' : 'br-nexus.save') : 'sopranos-vice.save';
 const readSave = () => { try { return JSON.parse(localStorage.getItem(SAVE)) || {}; } catch { return {}; } };
 export const savedMission = () => readSave().mission || 0;
 export function clearSave() { try { localStorage.removeItem(SAVE); } catch { /* storage unavailable: nothing to clear */ } }
 // For the settings menu: every chapter with its mission titles, and a way to put the save at any one of them.
-export const storyList = () => (CITY === 'la' ? HEAT : CITY === 'nexus' ? NEXUS_STORY : EPISODES).map(e => ({ name: e.name, title: e.title, titles: e.titles }));
+export const storyList = () => (CITY === 'la' ? HEAT : CITY === 'nexus' ? (STORY_KEY === '2019' ? BLADE_STORY : NEXUS_STORY) : EPISODES).map(e => ({ name: e.name, title: e.title, titles: e.titles }));
 export function jumpTo(n, cash) { save(n, cash); }
 function save(mission, cash, more = {}) { try { localStorage.setItem(SAVE, JSON.stringify({ ...readSave(), mission, cash, ...more })); } catch { /* play on without saving */ } }
 // Everything beside the mission number: each character's pockets, what each mission paid, who has been introduced.
@@ -3385,7 +3386,7 @@ async function offer(g, mission, title, straight) {
   }
 }
 export async function runStory(g) {
-  const STORY = CITY === 'la' ? HEAT : CITY === 'nexus' ? NEXUS_STORY : EPISODES; // each city tells its own
+  const STORY = CITY === 'la' ? HEAT : CITY === 'nexus' ? (STORY_KEY === '2019' ? BLADE_STORY : NEXUS_STORY) : EPISODES; // each city tells its own
   const total = STORY.reduce((n, e) => n + e.missions.length, 0);
   const saved = readSave(), from = clamp(saved.mission || 0, 0, total);
   if (from > 0) { // pick up a saved game at home

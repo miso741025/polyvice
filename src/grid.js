@@ -5,6 +5,8 @@
 // Three worlds share the engine: Vice City (The Sopranos), Los Angeles (Heat) and Nexus, a planet seen from Vice City's sky (Blade Runner 2049).
 const want = new URLSearchParams(location.search).get('city');
 export const CITY = want === 'la' ? 'la' : want === 'nexus' ? 'nexus' : 'vice';
+// Nexus tells two stories in one city: 2049 (K) by default, and ?story=2019 (Deckard, the first film).
+export const STORY_KEY = CITY === 'nexus' && new URLSearchParams(location.search).get('story') === '2019' ? '2019' : CITY === 'nexus' ? '2049' : '';
 export const NX = 16, NZ = 13, BLOCK = 60, ROAD = 16, CELL = BLOCK + ROAD, LANE = 3.6;
 export const OX = -NX * CELL / 2, OZ = -NZ * CELL / 2;
 

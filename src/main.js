@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CITY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, pushOutAbove, groundAt, surfaceAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
+import { CITY, STORY_KEY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, pushOutAbove, groundAt, surfaceAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
 import { makeLook, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
@@ -110,7 +110,7 @@ async function boot() {
   try { carry = arrived ? JSON.parse(sessionStorage.getItem('crossing')) : null; } catch { /* nothing carried */ }
   sessionStorage.removeItem('crossing');
   const heatOver = LA && savedMission() >= storyList().reduce((n, e) => n + e.titles.length, 0); // after the runway, Los Angeles is Hanna's
-  const local = NEXUS ? 'k' : LA ? (heatOver ? 'hanna' : 'neil') : 'tony', who = carry?.who || local;
+  const local = NEXUS ? (STORY_KEY === '2019' ? 'deckard' : 'k') : LA ? (heatOver ? 'hanna' : 'neil') : 'tony', who = carry?.who || local;
   const tony = makeLook(who); // the player: Tony Soprano in Vice City, Neil McCauley in Los Angeles, or a visitor from across the water
   scene.add(tony.group);
 
@@ -374,7 +374,8 @@ async function boot() {
   hud.fade(0, 1.2);
   // Each city has its own title, and a way across to the other.
   if (LA) { document.body.classList.add('la'); document.querySelector('.logo .sop').textContent = 'Heat'; document.querySelector('.logo .vc').textContent = 'Los Angeles'; document.title = 'Heat: Los Angeles'; g.setNight(0); }
-  if (NEXUS) { document.body.classList.add('nexus'); document.querySelector('.logo .sop').textContent = 'Blade Runner'; document.querySelector('.logo .vc').textContent = 'Nexus'; document.title = 'Blade Runner: Nexus'; g.setNight(1); }
+  if (NEXUS) { document.body.classList.add('nexus'); document.querySelector('.logo .sop').textContent = 'Blade Runner'; document.querySelector('.logo .vc').textContent = STORY_KEY === '2019' ? 'Nexus 2019' : 'Nexus 2049'; document.title = STORY_KEY === '2019' ? 'Blade Runner: Nexus 2019' : 'Blade Runner: Nexus 2049'; g.setNight(1);
+    const yearBtn = document.getElementById('year'); if (yearBtn) { yearBtn.hidden = false; yearBtn.textContent = STORY_KEY === '2019' ? 'The other story · 2049 (K)' : 'The other story · 2019 (Deckard)'; yearBtn.addEventListener('click', () => { location.search = STORY_KEY === '2019' ? '?city=nexus' : '?city=nexus&story=2019'; }); } }
   const otherBtn = document.getElementById('other');
   if (otherBtn) { // (an old cached page may not have the button)
     otherBtn.textContent = LA ? 'Vice City · The Sopranos' : 'Los Angeles · Heat';

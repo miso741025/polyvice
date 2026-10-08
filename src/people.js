@@ -1089,6 +1089,17 @@ export const LOOKS = {
   stelline: { body: 'female', jacket: 0xf4f4f6, shirt: 0xe9e9ee, pants: 0xf4f4f6, shoes: 0xf4f4f6, hair: 0x7a3b1a, hairMesh: 'long', hairScale: [1.04, 1.02, 1.04], skin: [1.04, 1.0, 0.98], bulk: 0.9 },
   mariette: { body: 'female', coat: 0x3a2a3a, coatLen: 0.4, shirt: 0xff3fa8, pants: 0x1c1c22, hair: 0xff3fa8, hairMesh: 'long', hairScale: [1.02, 0.8, 1.02] },
   freysa: { body: 'female', coat: 0x4a4a52, coatLen: 0.55, shirt: 0x3a3a44, turtle: 0x3a3a44, pants: 0x2a2a30, hair: 0xdcdad4, hairMesh: 'parted', age: 0.6, glasses: 'clear' },
+  // ----- Blade Runner (2019). Deckard's crumpled trench coat and loosened tie; Gaff's dandy hat and cane; Bryant's shirtsleeves; Rachael's shoulders and the rolled hair; the four Nexus-6.
+  deckard: { coat: 0x5a5046, coatLen: 0.5, collar: 0x5a5046, collarSize: 1.0, shirt: 0xe9e2d2, tie: 0x3a2a2a, tucked: true, pants: 0x3a3a3a, shoes: 0x2a2420, hair: 0x2b1b12, hairMesh: 'parted', hairScale: [1.02, 1.0, 1.04], stubble: 0.45, age: 0.35, bulk: 1.02, face: { jaw: 0.1, cheeks: -0.2 } },
+  gaff: { coat: 0x2a2a34, coatLen: 0.5, shirt: 0xf4f4f0, tie: 0x8a1c2a, tucked: true, pants: 0x2a2a34, hair: 0x111111, hairMesh: 'parted', hat: 'fedora', hatColor: 0x2a2a34, hatBand: 0x8a1c2a, glasses: 'clear', age: 0.5, bulk: 0.92 },
+  bryant: { shirt: 0xf4f4f0, sleeves: 'long', tie: 0x4a3a2a, tucked: true, pants: 0x4a4a52, hair: 0x9a9690, hairStyle: 'receding', age: 0.8, bulk: 1.28, belly: 0.03, stubble: 0.3, face: { jowls: 0.5, cheeks: 0.4 } },
+  rachael: { body: 'female', jacket: 0x16161c, shirt: 0xf4f4f0, pants: 0x16161c, tucked: true, hair: 0x1c1410, hairMesh: 'long', hairScale: [1.16, 0.86, 1.1], hairShift: [0, 0.01, 0], skin: [1.03, 0.98, 0.97], face: { cheeks: -0.3, chin: -0.1 } },
+  roy: { coat: 0x2a2420, coatLen: 0.55, collar: 0x3a3028, collarSize: 1.1, shirt: 0x2a2420, turtle: 0x2a2420, pants: 0x1c1c22, hair: 0xe9e2cf, hairMesh: 'buzzed', hairScale: [1.04, 1.12, 1.04], bulk: 1.14, height: 1.05, face: { jaw: 0.2, brow: 0.5, cheeks: -0.4 } },
+  pris: { body: 'female', shirt: 0x16161c, tee: true, pants: 0x16161c, hair: 0xf2e6c8, hairMesh: 'long', hairScale: [1.2, 0.9, 1.2], skin: [1.04, 1.0, 1.0], face: { cheeks: -0.2 } },
+  zhora: { body: 'female', coat: 0xdfe8f0, coatLen: 0.45, coatAlpha: 0.4, shirt: 0x8a1c2a, pants: 0x1c1c22, hair: 0x3a1a10, hairMesh: 'long', hairScale: [1.1, 1.0, 1.1], dark: true },
+  leon: { jacket: 0x4a3a2a, shirt: 0x8a8d96, sleeves: 'long', pants: 0x3a3a3a, hair: 0x2b1b12, hairMesh: 'buzzed', bulk: 1.2, height: 1.04, face: { jaw: 0.25, brow: 0.4, neck: 0.4 } },
+  tyrell: { jacket: 0x3a3a44, shirt: 0xf4f4f0, tie: 0x2a2a34, tucked: true, pants: 0x3a3a44, hair: 0x9a9690, hairStyle: 'receding', glasses: 'clear', glassesScale: 1.5, age: 0.7, bulk: 0.94 },
+  sebastian: { jacket: 0x6a5a4a, shirt: 0xd9c7a0, sleeves: 'long', pants: 0x4a4a52, hair: 0x7a3b1a, hairMesh: 'parted', age: 0.5, bulk: 0.9, face: { cheeks: -0.3 } },
   replicant: { coat: 0x2a2a30, coatLen: 0.5, shirt: 0x3a3a44, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', bulk: 1.1 },
   pussy: { // the biggest man in the room: a round face on no neck, slicked hair, a loose two-piece in powder blue
     jacket: 0xa9bcd8, pants: 0xa9bcd8, shirt: 0xece6dc, pattern: 'stripes', tucked: true, shoes: 0xe9e4da, chain: true,

@@ -135,6 +135,8 @@ body.nexus .logo .vc { color: #49e0ff; text-shadow: 3px 3px 0 #1a2a40; }
 body.nexus #title { background: radial-gradient(ellipse at 50% 80%, rgba(80, 30, 10, .55), rgba(6, 6, 10, .85)); }
 #third { margin-top: 8px; background: none; border: 2px solid #ffb347; color: #ffb347; font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 3px; padding: 6px 18px; cursor: pointer; }
 #third:hover { background: #ffb347; color: #0b0b18; }
+#year { margin-top: 8px; background: none; border: 2px solid #ff3fa8; color: #ff3fa8; font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 3px; padding: 6px 18px; cursor: pointer; }
+#year:hover { background: #ff3fa8; color: #0b0b18; }
 
 /* Shown while the browser is still holding the sound back. */
 #mute { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 30; display: none; padding: 8px 16px; background: rgba(20, 8, 15, .85); border: 2px solid #ff5fd2;
