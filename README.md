@@ -34,7 +34,6 @@ WASD move / drive · Mouse look · Shift run (in a spinner: climb; Ctrl sinks) �
 - `src/sidejobs.js` – what there is to do between missions
 - `src/audio.js` – all sound, synthesised
 - `lineup.html` – renders character sheets (front / side / back) to `shots/`
-- `HANDOFF.md` – working notes for whoever picks the project up next
 - `assets/models/` – character models and animations
 
 ## Credits

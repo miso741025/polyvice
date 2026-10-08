@@ -7,3 +7,6 @@ sounds/*
 !sounds/README.md
 # Pictures the game takes of itself (character sheets) stay local.
 shots/
+# Working notes and tooling stay on this computer.
+notes/
+.claude/
