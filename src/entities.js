@@ -197,6 +197,7 @@ export class Ped {
     if (threat && Math.hypot(threat.x - this.pos.x, threat.z - this.pos.z) < 22) this.flee(threat, 7);
 
     for (const car of cars) {
+      if ((car.alt || 0) > 1.6) continue; // a spinner overhead is nothing to run from
       if (Math.abs(car.speed) > 3 && Math.hypot(car.pos.x - this.pos.x, car.pos.z - this.pos.z) < 1.8 + car.reach * 0.5) {
         // Thrown the way the car is going, harder the faster it was, with a little sideways from where it hit.
         const s = Math.abs(car.speed), fx = Math.sin(car.heading) * Math.sign(car.speed), fz = Math.cos(car.heading) * Math.sign(car.speed);

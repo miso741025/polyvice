@@ -119,7 +119,7 @@ async function baseline(g) {
   // The baseline: a chair, a lens, and words read back as flat as he can make them.
   p.locked = true;
   p.pos.set(TEST.chair.x, 0, TEST.chair.z); p.heading = TEST.chair.h; p.pose = 'sit';
-  g.cam.fixed = { pos: new THREE.Vector3(TEST.lens.x, TEST.Y + 1.5, TEST.lens.z + 0.6), look: new THREE.Vector3(TEST.chair.x, TEST.Y + 1.2, TEST.chair.z) };
+  g.cam.fixed = { pos: new THREE.Vector3(TEST.lens.x + 0.12, TEST.Y + 1.4, TEST.lens.z + 0.3), look: new THREE.Vector3(TEST.chair.x, TEST.Y + 1.1, TEST.chair.z) }; // from the lens: his face, and nothing else in the room
   await say(g, '', 'The room is white so that nothing in it is yours. A voice gives you words, and you give them back without anything attached.', 4.6);
   const WORDS = ['Within the cells.', 'A tall white fountain.', 'Interlocked.', 'What it is to be held.', 'Interlocked.', 'A system of cells within cells.', 'Against the dark.', 'Interlocked.'];
   let miss = 0;

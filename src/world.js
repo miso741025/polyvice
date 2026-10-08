@@ -3788,9 +3788,9 @@ export function buildWorld(scene) {
     }
     { // Baseline: a white room with one chair and a lens in the wall. Nothing else, so that nothing else is in your head.
       const q = rooms.BASELINE = room(7, 7, 3.2, { floor: M.plain, floorTint: 0xe9e9ee, wall: M.plain, wallTint: 0xf4f4f6, ceil: 0xffffff, door: 0xcfd8dc, doorX: 0 });
-      q.block(0x2a2a30, 0.6, 0.5, 0.6, 0, -1.4); put(M.plain, new THREE.BoxGeometry(0.6, 0.6, 0.06).translate(0, 0.8, -0.3).translate(q.X, q.Y, q.Z - 1.4), 0x2a2a30);
+      q.block(0x2a2a30, 0.6, 0.5, 0.6, 0, -1.4); put(M.plain, new THREE.BoxGeometry(0.6, 0.6, 0.06).translate(0, 0.8, 0.3).translate(q.X, q.Y, q.Z - 1.4), 0x2a2a30); // (its back is on the south side: the sitter faces the lens)
       put(M.plain, new THREE.CylinderGeometry(0.4, 0.4, 0.16, 20).rotateX(Math.PI / 2).translate(q.X, q.Y + 1.5, q.Z - 3.4), 0x2a2a30); put(M.glow, new THREE.CylinderGeometry(0.22, 0.22, 0.2, 20).rotateX(Math.PI / 2).translate(q.X, q.Y + 1.5, q.Z - 3.4), 0x8f7bff);
-      slab(0xcfd8dc, 2.4, 0.6, 0.02, q.X, q.Y + 2.4, q.Z - 3.47); q.light(0, 3, 0, 0xffffff, 40, 9);
+      slab(0xcfd8dc, 2.4, 0.6, 0.02, q.X, q.Y + 2.4, q.Z - 3.47); q.light(0, 3, 0, 0xffffff, 40, 9); q.light(0, 1.5, -2.8, 0xb8a8ff, 10, 4); // and the lens lights the face it reads
       Object.assign(q, { chair: { x: q.X, y: q.Y, z: q.Z - 1.4, h: Math.PI }, lens: { x: q.X, z: q.Z - 3.4 } });
     }
     { // The Wallace archive: a hall of black stone under a skin of water, and amber light that moves on everything

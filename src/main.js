@@ -443,7 +443,7 @@ async function boot() {
       if (!p.locked && g.consume('KeyH')) sfx.horn();
       // Shove other cars out of the way.
       for (const o of cars) {
-        if (o === car || Math.hypot(o.pos.x - car.pos.x, o.pos.z - car.pos.z) > 6) continue;
+        if (o === car || Math.abs((o.alt || 0) - (car.alt || 0)) > 1.6 || Math.hypot(o.pos.x - car.pos.x, o.pos.z - car.pos.z) > 6) continue; // (a spinner overhead touches nothing on the road)
         let hit = false;
         for (const [ax, az] of circlesOf(car)) for (const [bx, bz] of circlesOf(o)) {
           const dx = ax - bx, dz = az - bz, d = Math.hypot(dx, dz);
@@ -501,7 +501,7 @@ async function boot() {
       if (d < 0.75 && d > 1e-4) { p.pos.x = ped.pos.x + dx / d * 0.75; p.pos.z = ped.pos.z + dz / d * 0.75; if (p.motion === 'sprint') ped.shove(p.pos); }
     }
     for (const o of cars) {
-      if (Math.abs(o.pos.x - p.pos.x) > 5 || Math.abs(o.pos.z - p.pos.z) > 5) continue;
+      if ((o.alt || 0) > 1.6 || Math.abs(o.pos.x - p.pos.x) > 5 || Math.abs(o.pos.z - p.pos.z) > 5) continue;
       for (const [cx, cz] of circlesOf(o)) {
         const dx = p.pos.x - cx, dz = p.pos.z - cz, d = Math.hypot(dx, dz);
         if (d < 1.6 && d > 1e-4) { p.pos.x = cx + dx / d * 1.6; p.pos.z = cz + dz / d * 1.6; }
@@ -527,7 +527,7 @@ async function boot() {
     let nearest = null, best = 4.2;
     if (!p.locked && !p.inside) for (const o of cars) {
       const d = Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z);
-      if (d < best && !o.wreck) { best = d; nearest = o; }
+      if (d < best && !o.wreck && (o.alt || 0) < 1.6) { best = d; nearest = o; }
     }
     hud.prompt(nearest ? (nearest.nav || nearest.ai ? 'F  ·  Take vehicle' : 'F  ·  Enter vehicle') : '');
     if (nearest && g.consume('KeyF')) { hud.prompt(''); if (nearest.nav || nearest.ai) g.carjack(nearest); else g.boardCar(nearest); }
@@ -535,7 +535,7 @@ async function boot() {
 
   const honk = car => { if (Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) < 45 && !p.inside) sfx.horn(0.6 + Math.random() * 0.6); };
   function updateCars(dt) {
-    const obstacles = cars.map(c => c.pos);
+    const obstacles = cars.filter(c => (c.alt || 0) < 1.6).map(c => c.pos); // traffic does not brake for something flying over it
     if (!p.car && !p.hidden) obstacles.push(p.pos);
     for (const car of cars) {
       if (car.ai) { car.spinWheels(dt); continue; } // driven by combat.js
