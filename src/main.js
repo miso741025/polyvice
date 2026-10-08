@@ -216,10 +216,11 @@ async function boot() {
       sun.intensity = 2.3 - k * 1.75; sun.color.set(0xffcf9e).lerp(tmpColor.set(0x9db4ff), k);
       scene.fog.color.set(LA ? 0xa8b4d6 : 0xf2a0b4).lerp(tmpColor.set(0x120f26), k);
       if (LA) { hemi.color.lerp(tmpColor.set(0xc8d6ff), 0.5); sun.color.lerp(tmpColor.set(0xffe6c8), 0.4); }
-      if (NEXUS) { // no day on Nexus: a city that lights itself, under rain, in a haze the colour of rust
-        hemi.intensity = 0.55; hemi.color.set(0x5a6a88); hemi.groundColor.set(0x2a1c14);
-        sun.intensity = 0.5; sun.color.set(0x9fb0d0);
-        scene.fog.color.set(0x1a1618); scene.fog.near = 60; scene.fog.far = 520;
+      if (NEXUS) { // no day on Nexus: a city that lights itself, under rain, in a haze the colour of rust (2019: sodium orange, thicker)
+        const old = STORY_KEY === '2019';
+        hemi.intensity = old ? 0.5 : 0.55; hemi.color.set(old ? 0x7a6a58 : 0x5a6a88); hemi.groundColor.set(old ? 0x3a2414 : 0x2a1c14);
+        sun.intensity = 0.5; sun.color.set(old ? 0xd0a070 : 0x9fb0d0);
+        scene.fog.color.set(old ? 0x24180f : 0x1a1618); scene.fog.near = old ? 40 : 60; scene.fog.far = old ? 420 : 520;
       }
       places.setNight(k);
     },

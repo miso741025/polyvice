@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CITY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, floors, mulberry32, groundAt } from './grid.js';
+import { CITY, STORY_KEY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, floors, mulberry32, groundAt } from './grid.js';
 import { makeHuman } from './people.js';
 import { box, makeLook, makeTony, makeDuck, Car } from './entities.js';
 
-const NEXUS = CITY === 'nexus', LA = CITY !== 'vice'; // Nexus is laid out like Los Angeles (its story's city), and dressed in the dark
+const NEXUS = CITY === 'nexus', LA = CITY !== 'vice', OLD = NEXUS && STORY_KEY === '2019'; // OLD: the city thirty years earlier, in the first film's dress: pipes on everything, fire on the horizon, warmer light // Nexus is laid out like Los Angeles (its story's city), and dressed in the dark
 // Vice City is pastel deco under a pink sky. Los Angeles is concrete, stucco and glass: beige, bone, grey, terracotta.
 const PASTELS = NEXUS ? [0x3a3a40, 0x2e2e34, 0x44444c, 0x383a3e, 0x4a4446, 0x2a2c30, 0x3e3a44, 0x34383c] : LA ? [0xe9e2d2, 0xd9c7a0, 0xf4f2ee, 0xc9b79c, 0xb9b3ba, 0xd08a6c, 0xdfe5ea, 0xa9b4c0] : [0xf7a8c4, 0x8fe0d4, 0xffd3a1, 0xc9b6f2, 0xfff1c9, 0x9fd0f5, 0xf5f5f0, 0xff9e8a];
 const GLASS_TINTS = NEXUS ? [0x1a2028, 0x202a36, 0x161a22, 0x2a2430] : LA ? [0x9fb8d0, 0xb8c8d8, 0x8fa6c4, 0xcfe0ee] : [0xffffff, 0xcfe8ff, 0xffd9e8, 0xd6fff4];
-const NEONS = NEXUS ? ['#49e0ff', '#ff3fa8', '#ff8a2c', '#f4f4f0', '#8f7bff', '#ffe066'] : LA ? ['#ff5a4a', '#ffe066', '#6fb0ff', '#ffffff', '#ff8a5c', '#7dffb0'] : ['#ff5fd2', '#49e0d0', '#ffe066', '#ff8a5c', '#8f7bff', '#7dffb0'];
+const NEONS = OLD ? ['#ff8a2c', '#ff3fa8', '#ffe066', '#49e0ff', '#ff5a4a', '#f4f4f0'] : NEXUS ? ['#49e0ff', '#ff3fa8', '#ff8a2c', '#f4f4f0', '#8f7bff', '#ffe066'] : LA ? ['#ff5a4a', '#ffe066', '#6fb0ff', '#ffffff', '#ff8a5c', '#7dffb0'] : ['#ff5fd2', '#49e0d0', '#ffe066', '#ff8a5c', '#8f7bff', '#7dffb0'];
 const SHOPS = NEXUS ? ['NOODLES', 'PHARMA', 'LIQUOR', 'PAWN', 'DINER', 'BAR', 'GUNS', 'AUTO PARTS', 'LAUNDRY', 'PACHINKO', 'RAMEN', 'VIDEO', 'RECORDS'] : LA ? ['TACOS', 'DONUTS', 'LIQUOR', 'PAWN', 'DINER', 'BAR', 'GUNS', 'AUTO PARTS', 'LAUNDRY', 'CHECKS CASHED', 'BURGERS', 'VIDEO', 'RECORDS']
   : ['CAFE', 'PAWN', 'LIQUOR', 'DELI', 'VIDEO', 'SURF', 'PIZZA', 'RECORDS', 'BAR', 'TAILOR', 'CIGARS', 'DINER', 'GUNS'];
 const HOTELS = NEXUS ? ['HOTEL', 'CAPSULE', 'SECTOR 9', 'OFFWORLD', 'TANNHAUSER', 'VOIGHT'] : LA ? ['HOTEL', 'PALMS', 'SUNSET', 'PACIFIC', 'WILSHIRE', 'ROOSEVELT'] : ['HOTEL', 'OCEAN', 'PALMS', 'DECO', 'VICE', 'CORAL', 'MIAMI'];
@@ -205,12 +205,15 @@ function facadeMega(rand, kind = 0) {
     grain(g, S, S, 9000, 0.05, rand, 3);
     const LIT = ['#ffb55a', '#ffd9a0', '#bcd3ff', '#8fd0ff', '#ffe9c4', '#ff8a5c'];
     for (let ty = 0; ty < 4; ty++) for (let tx = 0; tx < 4; tx++) {
-      const x0 = tx * C, y0 = ty * C, cols = kind === 1 ? 6 + Math.floor(rand() * 3) : kind === 2 ? 1 : 3 + Math.floor(rand() * 2), rows = kind === 1 ? 1 : 2, dead = rand() < (kind === 2 ? 0.5 : 0.3), share = dead ? 0.08 : kind === 2 ? 0.5 : 0.3 + rand() * 0.25; // some bays are mostly dark: not every floor is let
+      const x0 = tx * C, y0 = ty * C, cols = kind === 1 ? 6 + Math.floor(rand() * 3) : kind === 2 ? 1 : kind === 3 ? 2 : kind === 4 ? 5 : 3 + Math.floor(rand() * 2), rows = kind === 1 || kind === 3 ? 1 : 2, dead = rand() < (kind === 2 ? 0.5 : 0.3), share = dead ? 0.08 : kind === 2 ? 0.5 : kind === 4 ? 0.7 : 0.3 + rand() * 0.25; // some bays are mostly dark: not every floor is let
+      if (kind === 3) { g.fillStyle = '#4a4038'; g.fillRect(x0, y0, C, C); grain(g, C, C, 500, 0.08, rand, 2); g.fillStyle = '#5a4a3c'; g.fillRect(x0, y0 + 8, C, 4); for (let k = 0; k < 3; k++) { const px = x0 + 10 + k * 46 + rand() * 10; g.fillStyle = '#2e2a28'; g.fillRect(px, y0, 7, C); g.fillStyle = '#6a6058'; g.fillRect(px + 1, y0, 2, C); } } // old masonry, with ducts run down the outside of it
+      if (kind === 4) { g.fillStyle = '#0e0e12'; g.fillRect(x0, y0, C, C); }
       g.fillStyle = '#2b2c33'; g.fillRect(x0, y0 + C - 6, C, 6); g.fillStyle = '#121317'; g.fillRect(x0, y0 + C - 8, C, 2);   // the floor slab, and its shadow
-      const ww = Math.floor((C - 16) / cols) - 6, wh = kind === 1 ? 96 : kind === 2 ? 14 : 38;
+      const ww = Math.floor((C - 16) / cols) - 6, wh = kind === 1 ? 96 : kind === 2 ? 14 : kind === 3 ? 70 : kind === 4 ? 6 : 38;
       if (kind === 2) { g.fillStyle = '#26272d'; g.fillRect(x0 + 4, y0 + 4, C - 8, C - 14); g.fillStyle = '#17181c'; g.fillRect(x0 + 4, y0 + 60, C - 8, 3); } // a panel, with a seam across it
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-        const x = x0 + 8 + c * (ww + 6) + 3, y = kind === 2 ? y0 + 100 : y0 + 10 + r * 56, lit = rand() < share, dim = rand() < 0.6;
+        const x = x0 + 8 + c * (ww + 6) + 3, y = kind === 2 ? y0 + 100 : kind === 3 ? y0 + 24 : kind === 4 ? y0 + 20 + r * 60 : y0 + 10 + r * 56, lit = rand() < share, dim = rand() < 0.6;
+        if (kind === 4 && lit) { g.fillStyle = '#ff9a3c'; g.fillRect(x, y, ww, wh); e.fillStyle = dim ? '#7a3a10' : '#ff9a3c'; e.fillRect(x, y, ww, wh); continue; }
         g.fillStyle = '#0c0d12'; g.fillRect(x - 2, y - 2, ww + 4, wh + 4);
         if (lit) { const col = LIT[Math.floor(rand() * LIT.length)]; g.fillStyle = col; g.fillRect(x, y, ww, wh); e.fillStyle = dim ? '#3a2a18' : col; e.fillRect(x, y, ww, wh); if (rand() < 0.4) { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x, y, ww * 0.4, wh); } }
         else { g.fillStyle = '#171a24'; g.fillRect(x, y, ww, wh); g.fillStyle = 'rgba(120,140,170,.12)'; g.fillRect(x, y, ww, wh * 0.3); }
@@ -299,7 +302,7 @@ export function buildWorld(scene) {
     pool: new THREE.MeshBasicMaterial({ map: T.halo, vertexColors: true, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
   M.office.emissiveIntensity = NEXUS ? 1.05 : 0.6;
-  if (NEXUS) { M.megas = [0, 1, 2].map(k => { const m = lit(facadeMega(rand, k)); m.emissiveIntensity = k === 2 ? 1.1 : 0.8; return m; }); M.mega = M.megas[0]; }
+  if (NEXUS) { M.megas = (OLD ? [3, 3, 4, 0] : [0, 1, 2]).map(k => { const m = lit(facadeMega(rand, k)); m.emissiveIntensity = k === 2 ? 1.1 : 0.8; return m; }); M.mega = M.megas[0]; }
   if (NEXUS) for (const m of [M.shop, M.deco, M.balcony, M.stucco]) m.emissiveIntensity = 1.1;
 
   // Everything static is collected per material and merged into one mesh each at the end.
@@ -555,6 +558,13 @@ export function buildWorld(scene) {
     flat(M.gravel, 0x2a2b31, Math.round(w * tiers[tiers.length - 1][0]) - 0.6, Math.round(d * tiers[tiers.length - 1][0]) - 0.6, x, topY + 0.02, z, 5);
     for (let n = 0; n < 2 + Math.floor(rand() * 3); n++) { const ax = x + (rand() - 0.5) * (w * tiers[tiers.length - 1][0] - 6), az = z + (rand() - 0.5) * (d * tiers[tiers.length - 1][0] - 6), ah = 4 + rand() * 9; post(0x8a8d96, 0.07, ah, ax, topY, az, 5); if (n === 0 || rand() < 0.4) { ball(0xff3b3b, 0.22, ax, topY + ah + 0.1, az, M.glow); halo(ax, topY + ah + 0.1, az, 0xff3030, 4); } }
     if (rand() < 0.35) for (let k = 0; k < 3; k++) slab(0x55565e, 3, 1.6, 2, x + (rand() - 0.5) * (w * 0.4), topY, z + (rand() - 0.5) * (d * 0.4));   // roof plant
+    if (OLD) { // the retrofit: pipes and ducts run up the outside, with valves and vents, because nobody builds new, they add on
+      for (const [ax, az] of [[fx, 0], [0, fz], [-fx, 0], [0, -fz]]) { if (!ax && !az) continue; const n = 2 + Math.floor(rand() * 4), hh = CURB + base + h * (0.5 + rand() * 0.45);
+        for (let k = 0; k < n; k++) { const t = (rand() - 0.5) * (ax ? d : w) * 0.8, px = x + ax * (w / 2 + 0.5) + (az ? t : 0), pz = z + az * (d / 2 + 0.5) + (ax ? t : 0), r = 0.18 + rand() * 0.25;
+          post([0x4a4a52, 0x5a4a3a, 0x3a3a44][k % 3], r, hh - CURB, px, CURB, pz, 8); if (rand() < 0.5) { slab(0x55525a, r * 2.4, 0.3, r * 2.4, px, CURB + 3 + rand() * 8, pz); put(M.plain, new THREE.TorusGeometry(r + 0.1, 0.05, 5, 12).rotateX(Math.PI / 2).translate(px, CURB + 1.5 + rand() * 3, pz), 0x8a1c2a); }
+          if (rand() < 0.4) { ball(0xffb347, 0.16, px, hh + 0.2, pz, M.glow); } } }
+      slab(0x3a3a44, w + 1.6, 0.35, 0.35, x, CURB + base + 2.2, z + fz * (d / 2 + 0.7)); for (let k = 0; k < 3; k++) slab(0x3a3a44, 0.35, 0.35, d + 1.6, x - w / 2 + 2 + k * (w / 2 - 1), CURB + base + 6 + k * 3, z); // conduits along and across
+    }
     // The word down the face.
     if (rand() < 0.3 && h > 30) {
       const name = pick([...HOTELS, 'SOY', 'OFFWORLD', 'PACHINKO', 'VOID', 'ATARI', 'LUCKY']), neon = neonFor(name), n = name.length, sh = Math.min(h - base - 6, n * 2.4), fzz = z + fz * (d / 2 + 0.75);
@@ -1839,7 +1849,7 @@ export function buildWorld(scene) {
     for (const s2 of [-1, 1]) { slab(BLK, 20, 120, 20, c.x + s2 * 36, y - 2, c.z - 36, M.gravel, 8); collide(c.x + s2 * 36, c.z - 36, 20, 20, y + 118); for (let k = 0; k < 18; k++) slab(AMBER, 14, 0.4, 0.08, c.x + s2 * 36, y + 4 + k * 6, c.z - 25.97, M.glow); ball(0xff3b3b, 0.4, c.x + s2 * 36, y + 118.5, c.z - 36, M.glow); } // two lesser stacks behind it, in the water
     slab(0x2a2a30, 10, 0.4, 36, c.x, y + 0.1, c.z + 16); for (let k = 0; k < 7; k++) for (const s2 of [-1, 1]) { post(BLK, 0.6, 7, c.x + s2 * 4.6, y, c.z + 2 + k * 4.8, 4); slab(AMBER, 0.3, 0.3, 0.3, c.x + s2 * 4.6, y + 7, c.z + 2 + k * 4.8, M.glow); } // the causeway across the water, lit
     slab(0x16161c, 4, 7, 0.3, c.x, y, c.z + 31.1); slab(AMBER, 0.2, 6.4, 0.1, c.x, y + 0.3, c.z + 31.3, M.glow);                                      // the door: a slit of light, seven metres high
-    sign(['WALLACE'], c.x, y + 10, c.z + 31.3, 0, { w: 12, h: 2, color: '#ffb347', bg: '#0a0a0c', size: 0.8, glow: true });
+    sign([OLD ? 'TYRELL' : 'WALLACE'], c.x, y + 10, c.z + 31.3, 0, { w: 12, h: 2, color: '#ffb347', bg: '#0a0a0c', size: 0.8, glow: true });
     shopDoors.push({ shop: 'ARCHIVE', outside: { x: c.x, z: c.z + 33.4, h: Math.PI } });
     places.wallace = { door: { x: c.x, z: c.z + 33.4 }, kerb: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 }, plaza: { x: c.x, z: c.z + 34 }, summit: { x: c.x, y: y + 250, z: c.z } };
   }
@@ -4383,6 +4393,23 @@ export function buildWorld(scene) {
         n++;
       }
       updaters.push(t => { for (const { m, k } of holos) m.material.opacity = 0.55 + 0.25 * Math.sin(t * 1.3 + k) + (Math.sin(t * 17 + k * 5) > 0.93 ? 0.3 : 0); });
+    }
+    if (OLD) { // 2019: refinery stacks that breathe fire along the edges of the city, and an airship over it with a searchlight and an advert
+      const flames = [];
+      for (const [fx2, fz2] of [[bounds.minX - 40, bounds.minZ + 120], [bounds.minX - 60, bounds.maxZ - 160], [-200, bounds.maxZ + 70], [240, bounds.maxZ + 90], [bounds.minX - 30, 40], [60, bounds.minZ - 60]]) {
+        post(0x2a2a30, 2.2, 46, fx2, -1, fz2, 10); post(0x3a3a44, 2.8, 4, fx2, 44, fz2, 10); for (let k = 0; k < 5; k++) slab(0x3a3a44, 0.4, 44, 0.4, fx2 + Math.cos(k * 1.26) * 3, -1, fz2 + Math.sin(k * 1.26) * 3);
+        const fl = new THREE.Mesh(new THREE.ConeGeometry(4, 14, 9).translate(0, 7, 0), new THREE.MeshBasicMaterial({ color: 0xff7a20, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })); fl.position.set(fx2, 48, fz2); scene.add(fl);
+        const core = new THREE.Mesh(new THREE.ConeGeometry(2, 9, 8).translate(0, 4.5, 0), new THREE.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })); core.position.set(fx2, 48, fz2); scene.add(core);
+        const lamp = new THREE.PointLight(0xff8a30, 0, 160, 1.4); lamp.position.set(fx2, 54, fz2); scene.add(lamp);
+        flames.push({ fl, core, lamp, ph: Math.random() * 9 });
+      }
+      updaters.push(t => { for (const f of flames) { const k = 0.5 + 0.5 * Math.sin(t * 7 + f.ph) * Math.sin(t * 2.3 + f.ph * 2), burst = Math.sin(t * 0.6 + f.ph) > 0.7 ? 1 : 0.35; f.fl.scale.set(1 + k * 0.3, (0.6 + k * 0.8) * (0.5 + burst), 1 + k * 0.3); f.core.scale.set(1, (0.5 + k * 0.7) * (0.5 + burst), 1); f.fl.rotation.y = t * 2; f.lamp.intensity = 400 * burst * (0.6 + k * 0.4); } });
+      const ship = new THREE.Group(), hull = new THREE.Mesh(new THREE.CapsuleGeometry(9, 40, 6, 14).rotateZ(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a3a44 })), gondola = new THREE.Mesh(new THREE.BoxGeometry(14, 3, 4).translate(0, -10, 0), new THREE.MeshLambertMaterial({ color: 0x1c1c22 }));
+      const ad = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), new THREE.MeshBasicMaterial({ map: texture(512, 170, (cv, W, H) => { cv.fillStyle = '#101018'; cv.fillRect(0, 0, W, H); cv.fillStyle = '#ff8a2c'; cv.font = 'bold 64px "Bebas Neue", sans-serif'; cv.textAlign = 'center'; cv.fillText('A NEW LIFE AWAITS YOU', W / 2, 70); cv.fillStyle = '#49e0ff'; cv.font = 'bold 44px "Bebas Neue", sans-serif'; cv.fillText('IN THE OFF-WORLD COLONIES', W / 2, 130); }), transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+      const beam = new THREE.Mesh(new THREE.ConeGeometry(14, 90, 12, 1, true).translate(0, -45, 0), new THREE.MeshBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      for (const s2 of [-1, 1]) { const l = new THREE.Mesh(new THREE.SphereGeometry(0.6, 6, 5), new THREE.MeshBasicMaterial({ color: s2 > 0 ? 0xff2a3c : 0x3dff7a })); l.position.set(s2 * 20, 2, 0); ship.add(l); }
+      ad.position.set(0, 0, 9.5); beam.position.set(0, -11, 0); ship.add(hull, gondola, ad, beam); scene.add(ship);
+      updaters.push(t => { const a = t * 0.018; ship.position.set(Math.cos(a) * 420, 150 + Math.sin(t * 0.3) * 4, Math.sin(a) * 300); ship.rotation.y = -a + Math.PI / 2; beam.rotation.z = Math.sin(t * 0.4) * 0.5; beam.rotation.x = Math.cos(t * 0.31) * 0.4; ad.material.opacity = 0.7 + 0.25 * Math.sin(t * 3); });
     }
     if (places.wallace) { // the one that dances on the plaza by the water, eight storeys tall, lit from inside
       const her = makeHuman({ body: 'female', shirt: 0x9fd0f5, tee: true, pants: 0x49e0ff, hair: 0x1c1c3a, hairMesh: 'long', hairScale: [1.05, 1.1, 1.05] });
