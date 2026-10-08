@@ -198,18 +198,19 @@ function facade(style, rand) {
 
 // Nexus: the face of a megablock. Raw concrete, a dense grid of small windows (two rows to a floor, most of them lit a
 // different colour from the next), a slab line at each floor. Sixteen tiles, like the other facades, so no two bays repeat.
-function facadeMega(rand) {
+function facadeMega(rand, kind = 0) {
   const S = 512, C = 128;
   const draw = (g, e) => {
     g.fillStyle = '#1e1f24'; g.fillRect(0, 0, S, S); e.fillStyle = '#000'; e.fillRect(0, 0, S, S);
     grain(g, S, S, 9000, 0.05, rand, 3);
     const LIT = ['#ffb55a', '#ffd9a0', '#bcd3ff', '#8fd0ff', '#ffe9c4', '#ff8a5c'];
     for (let ty = 0; ty < 4; ty++) for (let tx = 0; tx < 4; tx++) {
-      const x0 = tx * C, y0 = ty * C, cols = 3 + Math.floor(rand() * 2), rows = 2, dead = rand() < 0.3, share = dead ? 0.08 : 0.3 + rand() * 0.25; // some bays are mostly dark: not every floor is let
+      const x0 = tx * C, y0 = ty * C, cols = kind === 1 ? 6 + Math.floor(rand() * 3) : kind === 2 ? 1 : 3 + Math.floor(rand() * 2), rows = kind === 1 ? 1 : 2, dead = rand() < (kind === 2 ? 0.5 : 0.3), share = dead ? 0.08 : kind === 2 ? 0.5 : 0.3 + rand() * 0.25; // some bays are mostly dark: not every floor is let
       g.fillStyle = '#2b2c33'; g.fillRect(x0, y0 + C - 6, C, 6); g.fillStyle = '#121317'; g.fillRect(x0, y0 + C - 8, C, 2);   // the floor slab, and its shadow
-      const ww = Math.floor((C - 16) / cols) - 6, wh = 38;
+      const ww = Math.floor((C - 16) / cols) - 6, wh = kind === 1 ? 96 : kind === 2 ? 14 : 38;
+      if (kind === 2) { g.fillStyle = '#26272d'; g.fillRect(x0 + 4, y0 + 4, C - 8, C - 14); g.fillStyle = '#17181c'; g.fillRect(x0 + 4, y0 + 60, C - 8, 3); } // a panel, with a seam across it
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-        const x = x0 + 8 + c * (ww + 6) + 3, y = y0 + 10 + r * 56, lit = rand() < share, dim = rand() < 0.6;
+        const x = x0 + 8 + c * (ww + 6) + 3, y = kind === 2 ? y0 + 100 : y0 + 10 + r * 56, lit = rand() < share, dim = rand() < 0.6;
         g.fillStyle = '#0c0d12'; g.fillRect(x - 2, y - 2, ww + 4, wh + 4);
         if (lit) { const col = LIT[Math.floor(rand() * LIT.length)]; g.fillStyle = col; g.fillRect(x, y, ww, wh); e.fillStyle = dim ? '#3a2a18' : col; e.fillRect(x, y, ww, wh); if (rand() < 0.4) { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x, y, ww * 0.4, wh); } }
         else { g.fillStyle = '#171a24'; g.fillRect(x, y, ww, wh); g.fillStyle = 'rgba(120,140,170,.12)'; g.fillRect(x, y, ww, wh * 0.3); }
@@ -298,7 +299,7 @@ export function buildWorld(scene) {
     pool: new THREE.MeshBasicMaterial({ map: T.halo, vertexColors: true, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
   M.office.emissiveIntensity = NEXUS ? 1.05 : 0.6;
-  if (NEXUS) { M.mega = lit(facadeMega(rand)); M.mega.emissiveIntensity = 0.8; }
+  if (NEXUS) { M.megas = [0, 1, 2].map(k => { const m = lit(facadeMega(rand, k)); m.emissiveIntensity = k === 2 ? 1.1 : 0.8; return m; }); M.mega = M.megas[0]; }
   if (NEXUS) for (const m of [M.shop, M.deco, M.balcony, M.stucco]) m.emissiveIntensity = 1.1;
 
   // Everything static is collected per material and merged into one mesh each at the end.
@@ -521,16 +522,29 @@ export function buildWorld(scene) {
   // ----- Nexus: a megablock. (Owner: no old houses; the film's miniature sets.) Concrete, no colour but what the windows give;
   // tiers that step back; vertical fins; a strip of light along every edge; a plinth with a slit of a door; antennae; and on
   // some of them a word down the face in neon, three storeys tall. The shops the story needs keep their doors at the foot.
+  function megablockTower(x, z, w, d, h, skin, tiers, strip) {
+    const CONC = 0x3a3b42, DARK = 0x202026; let y0 = CURB + 4.2;
+    for (const [sw, sh] of tiers) {
+      const tw = Math.round(w * sw), td = Math.round(d * sw), th = Math.max(FLOOR, Math.round(h * sh / FLOOR) * FLOOR);
+      put(skin, walls(tw, th, td, x, y0, z, th / FLOOR), 0xffffff); collide(x, z, tw, td, y0 + th);
+      for (const s of [-1, 1]) { slab(strip, tw + 0.2, 0.1, 0.1, x, y0 + th - 0.1, z + s * (td / 2 + 0.05), M.glow); slab(strip, 0.1, 0.1, td + 0.2, x + s * (tw / 2 + 0.05), y0 + th - 0.1, z, M.glow); }
+      slab(CONC, tw + 0.6, 0.5, td + 0.6, x, y0 + th - 0.5, z); if (th > 20) for (const s of [-1, 1]) for (let f = -tw / 2 + 3; f < tw / 2 - 1; f += 6) slab(DARK, 0.5, th - 1, 0.9, x + f, y0, z + s * (td / 2 + 0.3));
+      y0 += th;
+    }
+    post(0x8a8d96, 0.07, 7, x, y0, z, 5); ball(0xff3b3b, 0.22, x, y0 + 7.1, z, M.glow); halo(x, y0 + 7.1, z, 0xff3030, 4);
+  }
   function megablock(x, z, w, d, h, { fx = 0, fz = 1 } = {}) {
     h = Math.max(24, Math.round(h * 1.3 / FLOOR) * FLOOR);
     const CONC = 0x3a3b42, DARK = 0x202026, base = 4.2, strip = pick([0x49e0ff, 0xffb347, 0xff3fa8, 0xdfeeff, 0x49e0ff]), hexOf = css => parseInt(css.slice(1), 16);
-    const tiers = h > 100 ? [[1, 0.52], [0.72, 0.3], [0.46, 0.18]] : h > 50 ? [[1, 0.68], [0.64, 0.32]] : [[1, 1]];
+    const skin = pick(M.megas), shape = pick(['step', 'step', 'slab', 'needle', 'twin', 'terrace']);
+    const tiers = shape === 'slab' ? [[1, 1]] : shape === 'needle' ? [[0.7, 0.4], [0.5, 0.35], [0.3, 0.25]] : shape === 'terrace' ? [[1, 0.3], [0.85, 0.25], [0.7, 0.2], [0.55, 0.15], [0.4, 0.1]] : h > 100 ? [[1, 0.52], [0.72, 0.3], [0.46, 0.18]] : h > 50 ? [[1, 0.68], [0.64, 0.32]] : [[1, 1]];
+    if (shape === 'twin') { for (const s2 of [-1, 1]) megablockTower(x + s2 * w * 0.27, z, w * 0.42, d * 0.8, h * (s2 < 0 ? 1 : 0.8), skin, [[1, 0.7], [0.7, 0.3]], strip); slab(DARK, w + 1.2, base, d + 1.2, x, CURB, z, M.gravel, 4); collide(x, z, w + 1.2, d + 1.2, CURB + base); slab(strip, w + 1.3, 0.12, d + 1.3, x, CURB + base - 0.12, z, M.glow); slab(0x2a2b31, w * 0.1, 2, d * 0.6, x, CURB + base + h * 0.35, z); return; }
     let y0 = CURB + base, topY = y0;
     slab(DARK, w + 1.2, base, d + 1.2, x, CURB, z, M.gravel, 4); collide(x, z, w + 1.2, d + 1.2, CURB + base);        // the plinth
     slab(strip, w + 1.3, 0.12, d + 1.3, x, CURB + base - 0.12, z, M.glow);                                                  // lit along its top
     for (const [k, [sw, sh]] of tiers.entries()) {
       const tw = Math.round(w * sw), td = Math.round(d * sw), th = Math.max(FLOOR, Math.round(h * sh / FLOOR) * FLOOR), floors = th / FLOOR;
-      put(M.mega, walls(tw, th, td, x, y0, z, floors), 0xffffff); collide(x, z, tw, td, y0 + th);
+      put(skin, walls(tw, th, td, x, y0, z, floors), 0xffffff); collide(x, z, tw, td, y0 + th);
       for (const s of [-1, 1]) { slab(strip, tw + 0.2, 0.1, 0.1, x, y0 + th - 0.1, z + s * (td / 2 + 0.05), M.glow); slab(strip, 0.1, 0.1, td + 0.2, x + s * (tw / 2 + 0.05), y0 + th - 0.1, z, M.glow); }   // the edge light
       slab(CONC, tw + 0.6, 0.5, td + 0.6, x, y0 + th - 0.5, z);                                                             // a lip at the top of each tier
       if (th > 20) for (const s of [-1, 1]) for (let f = -tw / 2 + 3; f < tw / 2 - 1; f += 6) slab(DARK, 0.5, th - 1, 0.9, x + f, y0, z + s * (td / 2 + 0.3));   // fins, on the long faces
@@ -740,6 +754,7 @@ export function buildWorld(scene) {
 
     if (kind === 'neil') buildNeil(c);
     else if (kind === 'kblock') buildKBlock(c);
+    else if (kind === 'precinct' && NEXUS) buildPolice(c);
     else if (kind === 'wallace') buildWallace(c);
     else if (kind === 'moat') buildMoat(c);
     else if (kind === 'stelline') buildStelline(c);
@@ -1785,6 +1800,27 @@ export function buildWorld(scene) {
       drive: { x: c.x - 18, z: c.z + 20 }, road: { x: c.x - 18, z: c.z + 34 }, ducks: [],
     };
     places.kblock = { door: places.home.door, kerb: { x: c.x - 18, z: c.z + 34, h: Math.PI / 2 } };
+  }
+  // ----- Police headquarters on Nexus: one brutalist slab of rain-stained concrete, a landing deck for the spinners, and a great
+  // round emblem over a mouth of an entrance. (Owner: the Los Angeles precinct looked like an old building with lights on it.)
+  function buildPolice(c) {
+    const y = CURB, CONC = 0x33343a, DARK = 0x1c1d22, BLUE = 0x4a7dff, W = 52, D = 44, H = 74, hx = c.x, hz = c.z - 4;
+    flat(M.paint, 0x26272d, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z);
+    slab(CONC, W, H, D, hx, y, hz, M.gravel, 9); collide(hx, hz, W, D, y + H);
+    for (let k = 1; k < H / 7; k++) { slab(DARK, W + 0.8, 0.9, D + 0.8, hx, y + k * 7, hz); if (k % 2) for (const s2 of [-1, 1]) slab(0x8fb0ff, W - 10, 0.25, 0.08, hx, y + k * 7 + 3.5, hz + s2 * (D / 2 + 0.03), M.glow); } // bands, and a thin line of light between some
+    for (let k = 0; k < 60; k++) slab(0x1a1b20, 0.6, 3 + rand() * 12, 0.06, hx - W / 2 + 2 + rand() * (W - 4), y + rand() * (H - 16), hz + D / 2 + 0.05);                           // rain stains down the face
+    slab(DARK, 16, 14, 6, hx, y, hz + D / 2 - 2.9); slab(0xffd9a8, 14, 12, 0.1, hx, y + 1, hz + D / 2 - 5.8, M.glow); collide(hx, hz + D / 2 - 2.9, 16, 6, y + 14);                  // the mouth: a recess the height of four floors, lit from the back
+    for (const s2 of [-1, 1]) slab(CONC, 2, 14, 7, hx + s2 * 9, y, hz + D / 2 - 2.4);
+    put(M.glow, new THREE.TorusGeometry(9, 0.5, 8, 48).translate(hx, y + 34, hz + D / 2 + 0.6), BLUE); put(M.plain, new THREE.CylinderGeometry(8.4, 8.4, 0.4, 48).rotateX(Math.PI / 2).translate(hx, y + 34, hz + D / 2 + 0.3), DARK); // the emblem: a ring of light on a black disc
+    sign(['POLICE'], hx, y + 34, hz + D / 2 + 0.62, 0, { w: 12, h: 3, color: '#dfeeff', bg: '#101014', size: 0.9, glow: true }); halo(hx, y + 34, hz + D / 2 + 3, 0x6fa0ff, 10);
+    sign(['NEXUS POLICE DEPARTMENT', 'HEADQUARTERS · SECTOR 9'], hx, y + 16, hz + D / 2 + 0.1, 0, { w: 18, h: 2.6, color: '#8fb0ff', bg: '#16161c', size: 0.6, glow: false });
+    slab(DARK, W - 8, 0.6, D - 8, hx, y + H, hz); for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; ball(BLUE, 0.3, hx + Math.cos(a) * 11, y + H + 0.9, hz + Math.sin(a) * 11, M.glow); } flat(M.paint, 0x2a2b31, 24, 24, hx, y + H + 0.65, hz); // the landing deck, ringed
+    post(0x8a8d96, 0.14, 16, hx + 18, y + H, hz - 14, 6); ball(0xff3b3b, 0.4, hx + 18, y + H + 16.2, hz - 14, M.glow); halo(hx + 18, y + H + 16.2, hz - 14, 0xff3030, 4);
+    slab(CONC, 18, 22, 14, hx - 26, y, hz + 8, M.gravel, 6); collide(hx - 26, hz + 8, 18, 14, y + 22); for (let k = 1; k < 3; k++) slab(DARK, 18.6, 0.8, 14.6, hx - 26, y + k * 7, hz + 8);   // a lower wing
+    for (const s2 of [-1, 1]) { post(0x55525a, 0.12, 6, hx + s2 * 12, y, c.z + 26, 6); slab(0xdfeeff, 1.2, 0.1, 0.4, hx + s2 * 12, y + 6, c.z + 26, M.glow); halo(hx + s2 * 12, y + 5.9, c.z + 26, 0xcfe0ff, 4); }
+    parkedSpots.push({ x: hx - 6, z: c.z + 31.6, h: Math.PI / 2, kind: 'police' }, { x: hx + 6, z: c.z + 31.6, h: Math.PI / 2, kind: 'police' });
+    shopDoors.push({ shop: 'OFFICE', outside: { x: hx, z: hz + D / 2 + 2.4, h: Math.PI } });
+    places.precinct = { door: { x: hx, z: hz + D / 2 + 2.4, h: Math.PI }, kerb: { x: hx + 10, z: c.z + 34, h: Math.PI / 2 }, deck: { x: hx, y: y + H + 0.65, z: hz } };
   }
   // ----- Wallace: a black ziggurat a quarter of a kilometre high, alone in a lake the size of nine blocks, slit with amber -----
   // (Owner: not big enough, not alone enough. In the film it stands apart from everything, and nothing near it is its size.)
