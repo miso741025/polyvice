@@ -23,7 +23,9 @@ scene.add(hemi);
 const SUN_DIR = new THREE.Vector3(0.75, 0.6, 0.3).normalize();
 const sun = new THREE.DirectionalLight(0xffcf9e, 2.3);
 // The player's own headlamps: a spot that rides on whatever he is driving, lit after dark.
-const headLight = new THREE.SpotLight(0xfff2c0, 0, 70, 0.55, 0.5, 1.2); headLight.position.set(0, 1.0, 1.6); headLight.target.position.set(0, -0.6, 30); headLight.add(headLight.target);
+const headLight = new THREE.SpotLight(0xfff2c0, 0, 70, 0.55, 0.5, 1.2);
+// A fill that follows the player on Nexus, so he reads in the dark wherever he stands (the games this is modelled on do the same).
+const fill = new THREE.SpotLight(0xcfd8ff, 0, 9, 0.42, 1, 2); scene.add(fill); scene.add(fill.target); // a narrow soft cone on him alone, so the ground does not get a pool headLight.position.set(0, 1.0, 1.6); headLight.target.position.set(0, -0.6, 30); headLight.add(headLight.target);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.bias = -0.0006;
@@ -218,9 +220,9 @@ async function boot() {
       if (LA) { hemi.color.lerp(tmpColor.set(0xc8d6ff), 0.5); sun.color.lerp(tmpColor.set(0xffe6c8), 0.4); }
       if (NEXUS) { // no day on Nexus: a city that lights itself, under rain, in a haze the colour of rust (2019: sodium orange, thicker)
         const old = STORY_KEY === '2019';
-        hemi.intensity = old ? 0.5 : 0.55; hemi.color.set(old ? 0x7a6a58 : 0x5a6a88); hemi.groundColor.set(old ? 0x3a2414 : 0x2a1c14);
-        sun.intensity = 0.5; sun.color.set(old ? 0xd0a070 : 0x9fb0d0);
-        scene.fog.color.set(old ? 0x24180f : 0x1a1618); scene.fog.near = old ? 40 : 60; scene.fog.far = old ? 420 : 520;
+        hemi.intensity = old ? 0.95 : 1.0; hemi.color.set(old ? 0x9a8a78 : 0x7a8aa8); hemi.groundColor.set(old ? 0x4a3020 : 0x3a2c28); // (owner: too dark to read the people; lifted)
+        sun.intensity = 0.9; sun.color.set(old ? 0xe0b890 : 0xb8c8e8);
+        scene.fog.color.set(old ? 0x2a1e14 : 0x201c22); scene.fog.near = old ? 50 : 70; scene.fog.far = old ? 460 : 560;
       }
       places.setNight(k);
     },
@@ -792,6 +794,7 @@ async function boot() {
     sun.position.copy(focus).addScaledVector(SUN_DIR, 200);
     places.sky.position.copy(camera.position);
     places.update(g.time);
+    if (NEXUS) { fill.intensity = p.car ? 0 : 14; const gy = groundAt(p.pos.x, p.pos.z); fill.position.set(p.pos.x - Math.sin(g.cam.yaw) * 2.2, gy + 3.4, p.pos.z - Math.cos(g.cam.yaw) * 2.2); fill.target.position.set(p.pos.x, gy + 1.0, p.pos.z); } // from over the camera's shoulder, aimed at him
     { // Lights on the cars after dark: beams on the road from everything near, and the spot on his own.
       const dark = Math.max(0, Math.min(1, (g.night - 0.35) / 0.4));
       for (const car of cars) { const b = car.mesh.userData.beam; if (!b) continue; const d = Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z); b.material.opacity = d < 160 && !car.wreck && (car === p.car || ((car.nav || car.ai) && Math.abs(car.speed) > 0.5)) ? dark * 0.32 : 0; } // (a parked car's lamps are off: the pale wedge on the road at K's spawn was his own spinner's)
