@@ -3,7 +3,7 @@ import { near, groundAt } from './grid.js';
 import { makeLook, makeHuman } from './entities.js';
 import {
   say, talk, phone, fade, cut, titleCard, passed, actor, dismiss, spot, toward, place, frame, reach, follower,
-  punch, fistsOnly, inRoom, roomSpot, lying, playing, enter, leave, walkOut, wantCar, outdoors, walkTo, NORTH, SOUTH, EAST, WEST,
+  punch, fistsOnly, quarry, inRoom, roomSpot, lying, playing, enter, leave, walkOut, wantCar, outdoors, walkTo, NORTH, SOUTH, EAST, WEST,
 } from './missions.js';
 
 // Nexus. The story follows the plot of "Blade Runner 2049"; every line of dialogue is written for the game, and the
@@ -333,7 +333,224 @@ async function memory(g) {
   await passed(g, 'Lived');
 }
 
+// ========== Chapter Two: the wasteland, and the wall ==========
+const MARIETTE = 'Mariette', DECKARD = 'Deckard', FREYSA = 'Freysa';
+// The city dressed as the wasteland: orange dust, nothing to see past a hundred metres. setNight(1) puts the rain back.
+const dust = g => { g.scene.fog.color.set(0xc87a30); g.scene.fog.near = 18; g.scene.fog.far = 170; };
+
+// ---------- 7. Off Baseline ----------
+// The test, failed. Forty-eight hours to be what he was. Joi buys him a woman to borrow a body from.
+async function offBaseline(g) {
+  const { precinct, home } = g.places, p = g.player, OFFICE = g.places.rooms.OFFICE, TEST = g.places.rooms.BASELINE, FLAT = g.places.rooms.KFLAT;
+  await reach(g, precinct.kerb, '<b>Drive</b> to headquarters. There is a test waiting, and you know how it will go.', { how: 'car', r: 8 });
+  p.locked = true; land(g, precinct.kerb); p.locked = false;
+  await reach(g, precinct.door, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  await enter(g, TEST);
+  p.locked = true;
+  p.pos.set(TEST.chair.x, 0, TEST.chair.z); p.heading = TEST.chair.h; p.pose = 'sit';
+  g.cam.fixed = { pos: new THREE.Vector3(TEST.lens.x + 0.12, TEST.Y + 1.4, TEST.lens.z + 0.3), look: new THREE.Vector3(TEST.chair.x, TEST.Y + 1.1, TEST.chair.z) };
+  for (const w of ['Within the cells.', 'Interlocked.', 'A tall white fountain.', 'Interlocked.']) { g.hud.subtitle('Baseline', w); await g.wait(1.3); g.hud.subtitle(); await g.wait(0.4); }
+  await say(g, 'Baseline', "You are not at your baseline. You are nowhere near it. Remain in the chair.", 3.6);
+  p.pose = null;
+  await cut(g, () => { p.pos.set(OFFICE.X + 2, 0, OFFICE.Z + 0.2); p.heading = NORTH; p.inside = g.places.doors.find(d => d.inside === OFFICE.inside) || p.inside; g.cam.fixed = inRoom(OFFICE, [-2.5, 1.5], [2, -2], 1.55, 1.1).cam; }, 0.6);
+  const joshi = actor(g, 'joshi', roomSpot(OFFICE, 2, -2.4), SOUTH, 'sit');
+  await talk(g, [
+    [JOSHI, 'Off baseline. That is a word for it. The other word is retired, and they would not let you walk out of the building.', joshi],
+    [K, 'I found the child. It is done. There is nothing left to find.', p],
+    [JOSHI, "You are lying to me, and you have never done that. ...Forty-eight hours. I will say you were fit to work. Then you come back here and you are at your baseline, or you are nothing.", joshi],
+    [K, 'Forty-eight hours.', p],
+  ]);
+  dismiss(g, joshi);
+  await fade(g, 1, 1);
+  await say(g, '', "He went home because there was nowhere else, and on the stairs there was a woman with pink hair waiting who said Joi had sent for her.", 4.4);
+  p.inside = g.places.doors.find(d => d.inside === FLAT.inside) || null; outdoors(g); p.inside = g.places.doors.find(d => d.inside === FLAT.inside) || null;
+  const her = hologram(g, 'joi', { x: FLAT.joi.x, y: FLAT.Y, z: FLAT.joi.z }, SOUTH), mar = actor(g, 'mariette', { x: FLAT.joi.x + 1.6, y: FLAT.Y, z: FLAT.joi.z + 0.4 }, SOUTH);
+  p.pos.set(FLAT.inside.x, 0, FLAT.inside.z - 1.2); p.heading = toward(p.pos, her.group.position);
+  g.cam.fixed = inRoom(FLAT, [3, 2.5], [-1, -0.5], 1.5, 1.1).cam;
+  await fade(g, 0, 1);
+  await talk(g, [
+    [JOI, 'I wanted to be real for you, once. She said yes. Let me borrow her, just tonight.', her],
+    [MARIETTE, "I don't mind. She talks a lot, your girl. Most of them don't talk.", mar],
+    [K, '...Joi.', p],
+    [JOI, 'Quiet. Let me do this.', her],
+  ]);
+  await say(g, '', 'She stepped into the other woman, and for a while the two of them were one woman who kept slipping out of alignment with herself, and he let it be enough. He had forty-eight hours.', 5);
+  dismiss(g, her, mar);
+  await fade(g, 1, 1);
+  asK(g);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Forty-eight hours');
+}
+
+// ---------- 8. The Wasteland ----------
+// Out past the edge of the city, where the dust is, a man who was a blade runner lives alone in an empty hotel with a dog.
+async function theWasteland(g) {
+  const { airport, home } = g.places, p = g.player, HOTEL = g.places.rooms.HOTEL;
+  await say(g, '', 'The wooden horse was carved from a wood that had not grown anywhere for thirty years, except one place: the dead ground past the spaceport, where a city had been and was not any more.', 5);
+  await reach(g, airport.kerb, '<b>Fly</b> out past the spaceport, south, into the dust.', { how: 'car', r: 10 });
+  p.locked = true; land(g, airport.kerb); dust(g);
+  await say(g, '', 'The rain stopped where the city stopped. After that it was orange: the air, the ground, the light. Statues the size of buildings, of nobody anyone remembered.', 4.6);
+  const hotel = g.places.doors.find(d => d.name === 'the hotel');
+  p.locked = false;
+  await reach(g, hotel.outside, 'There is one building with a light in it. Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  await enter(g, HOTEL);
+  for (const a of HOTEL.ambient) a.group.visible = false;
+  const deck = actor(g, 'deckard', roomSpot(HOTEL, 4, -3), WEST); deck.arm(true); deck.set('aim');
+  p.locked = true;
+  p.pos.set(HOTEL.inside.x, 0, HOTEL.inside.z - 1.5); p.heading = toward(p.pos, deck.group.position);
+  g.cam.fixed = inRoom(HOTEL, [-5, 3], [2, -2.5], 1.6, 1.1).cam;
+  await say(g, '', 'A bar nobody drank at, a piano, a dog. And an old man with a gun, who had known somebody was coming before K knew he was going.', 4.2);
+  await talk(g, [
+    [DECKARD, 'You are a long way from anywhere, son. Turn round and go back to it.', deck],
+    [K, 'You knew her. Thirty years ago. There was a child.', p],
+    [DECKARD, 'I knew a woman. I do not talk about her to people with the police on their coat.', deck],
+    [K, 'I need to know where the child went.', p],
+    [DECKARD, 'So does everybody who has ever come through that door. Nobody leaves knowing.', deck],
+  ]);
+  deck.arm(false); deck.set('idle');
+  g.cam.fixed = null;
+  const foe = g.makeEnemy(deck, { health: 150, stays: true, cash: 0 });
+  fistsOnly(g);
+  p.locked = false;
+  g.hud.objective('He will not talk until he has tried you. <b>Put him down.</b> Do not kill him.');
+  await g.until(() => foe.dead || deck.state === 'down' || foe.health < 40);
+  g.hud.objective(); fistsOnly(g, false);
+  p.locked = true;
+  foe.ai = null; foe.stays = true; deck.after = null; deck.set('idle');
+  await cut(g, () => { g.cam.fixed = inRoom(HOTEL, [3, 2.5], [0, -2], 1.5, 1.0).cam; p.heading = toward(p.pos, deck.group.position); deck.group.rotation.y = toward(deck.group.position, p.pos); }, 0.5);
+  await talk(g, [
+    [DECKARD, '...Whisky. The good one is behind the bar, on the left. Pour two.', deck],
+    [DECKARD, 'I left so that nobody could follow me to her, or to it. I never knew which it was, a boy or a girl. That was the point. You cannot give up what you do not know.', deck],
+    [K, 'I think it was me.', p],
+    [DECKARD, 'Then you would be the first one who came here hoping to be.', deck],
+  ]);
+  await say(g, '', 'They did not get as far as the second whisky. The roof came down in a noise of engines, and the woman in white walked in through the dust with people behind her.', 4.6);
+  const luv = actor(g, 'luv', roomSpot(HOTEL, -6, -1), EAST); luv.arm(true); luv.set('aim');
+  await cut(g, () => { g.cam.fixed = inRoom(HOTEL, [4, 3.5], [-3, -1], 1.6, 1.1).cam; }, 0.4);
+  await talk(g, [
+    [LUV, "Mr. Wallace is grateful, officer. You found what thirty years of looking could not. He would like the old man, and he would like you to stay here.", luv],
+    [K, 'Leave him.', p],
+    [LUV, 'You were made to obey. It is strange how little of it is left in you.', luv],
+  ]);
+  await say(g, '', "She broke him against the bar, and when the thing in his pocket that was Joi tried to stop her, she crushed it under her heel and watched his face while she did it. Then they took Deckard, and left K in the dust to die, which he did not.", 5.6);
+  dismiss(g, luv, deck);
+  await fade(g, 1, 1.2);
+  g.setNight(1);
+  asK(g);
+  await say(g, '', 'Somebody found him. Somebody with pink hair, who had followed him out of the city for reasons of her own.', 3.8);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Everything you want to hear');
+}
+
+// ---------- 9. Freysa ----------
+// Under the scrap, the ones who have stopped obeying. They tell him what the child was, and it is not what he hoped.
+async function freysa(g) {
+  const { orphanage: yard } = g.places, p = g.player, DEN = g.places.rooms.WAREHOUSE || g.places.rooms.ORPHANAGE;
+  await reach(g, yard.gate, 'Mariette said to come to Sector 6, and to come alone. <b>Fly</b> there.', { how: 'car', r: 9 });
+  p.locked = true; land(g, yard.gate);
+  const mar = actor(g, 'mariette', spot(yard.yard, 2, 2), toward(spot(yard.yard, 2, 2), yard.gate));
+  p.locked = false;
+  await reach(g, spot(yard.yard, 0, 4), 'Find <b>Mariette</b> in the yard.', { r: 2, how: 'foot' });
+  p.locked = true;
+  frame(g, p.pos, mar.group.position, { dist: 4.2 });
+  await talk(g, [[MARIETTE, 'There are people who want to meet you. Under here. They have wanted to for a long time.', mar], [K, 'What people.', p], [MARIETTE, 'Ours.', mar]]);
+  dismiss(g, mar); g.cam.fixed = null;
+  await cut(g, () => { p.inside = { name: 'under the yard', inside: DEN.inside, outside: yard.door }; p.pos.set(DEN.inside.x, 0, DEN.inside.z); p.heading = NORTH; }, 0.6);
+  const fr = actor(g, 'freysa', roomSpot(DEN, 0, -4), SOUTH), crowd = [[-4, -2], [4, -3], [-3, 2], [5, 1], [0, -6]].map(([x, z], k) => actor(g, k % 2 ? 'replicant' : 'mariette', roomSpot(DEN, x, z), toward(roomSpot(DEN, x, z), roomSpot(DEN, 0, -4))));
+  p.locked = true;
+  g.cam.fixed = inRoom(DEN, [6, 4], [0, -3], 1.8, 1.1).cam;
+  await say(g, '', 'A room with no windows under the scrap, and in it more of his own kind than he had ever seen in one place, and none of them afraid of him.', 4.4);
+  await talk(g, [
+    [FREYSA, 'I was there, officer. I held the child. I cut its serial out of it myself so that nobody could do what you have been doing.', fr],
+    [K, 'Then you know who it is.', p],
+    [FREYSA, "I know what it is. It is a girl. She was hidden, and the memory of her hiding was given to somebody else, so that whoever came looking would look at the wrong one.", fr],
+    [K, '...A girl.', p],
+    [FREYSA, 'You hoped it was you. All of us hope that, once. Being the one would have meant something. Dying for her means more.', fr],
+    [FREYSA, 'Wallace has Deckard. Deckard has seen the woman who made the memories. They will take him to Wallace, and then nothing will stop them finding her. Kill him before he gets there.', fr],
+  ]);
+  await say(g, '', 'He had been nobody, and then for a week he had been somebody, and now he was nobody again, with a job to do that nobody had given him.', 4.4);
+  dismiss(g, fr, ...crowd);
+  await fade(g, 1, 1);
+  asK(g);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'A girl');
+}
+
+// ---------- 10. The Wall ----------
+// Luv's spinner, with Deckard in it, runs for the sea wall and the ship beyond it. K brings it down in the spray.
+async function theWall(g) {
+  const { wall, home } = g.places, p = g.player;
+  await say(g, '', 'The transport would cross the wall at the north end, low, with an escort. He had one spinner and no more time.', 3.8);
+  const chase = g.spawnCar(home.car.x + 30, home.car.z - 60, NORTH, 0xf4f4f6, 'spinner'); chase.driverless = true; chase.mission = true; chase.alt = 30;
+  const aim = { x: wall.foot.x - 24, z: wall.top.z - 160 };
+  g.updaters.push(() => { if (chase.wreck) return false; const dx = aim.x - chase.pos.x, dz = aim.z - chase.pos.z, d = Math.hypot(dx, dz); if (d > 2) { chase.pos.x += dx / d * 0.9; chase.pos.z += dz / d * 0.9; chase.heading = Math.atan2(dx, dz); chase.alt = Math.max(0.5, Math.min(30, d * 0.3)); } else chase.alt = 0; chase.sync(); return !chase.wreck && d > 2; });
+  const track = quarry(g, { pos: chase.pos, human: { group: chase.mesh } });
+  p.locked = false;
+  await wantCar(g, g.tonyCar, 'Get in the <b>spinner</b>: the white one is already in the air.');
+  await reach(g, aim, '<b>Fly</b> after it. It is making for the sea wall, north.', { how: 'car', r: 14 });
+  track.stop?.();
+  p.locked = true; land(g, { x: aim.x + 8, z: aim.z + 6, h: WEST });
+  await say(g, '', 'He put his own spinner into hers at the foot of the wall, and the two of them came down together in the surf that came over the top of it.', 4.4);
+  const luv = actor(g, 'luv', { x: aim.x - 4, z: aim.z - 2 }, toward({ x: aim.x - 4, z: aim.z - 2 }, p.pos)), deck = actor(g, 'deckard', { x: aim.x - 1, z: aim.z + 4 }, EAST, 'kneel');
+  await cut(g, () => { p.pos.set(aim.x + 2, 0, aim.z + 1); p.heading = toward(p.pos, luv.group.position); frame(g, p.pos, luv.group.position, { dist: 5 }); }, 0.5);
+  await talk(g, [[LUV, 'You should have stayed in the dust. I would have told him you died well.', luv], [K, 'Get away from him.', p], [LUV, 'I am the best one he ever made. You are the one that stopped working.', luv]]);
+  g.cam.fixed = null;
+  const foe = g.makeEnemy(luv, { health: 260, stays: true, cash: 0 });
+  fistsOnly(g);
+  p.locked = false;
+  g.hud.objective('<b>Deal with her.</b> The sea is coming over the wall; keep your feet.');
+  await g.until(() => foe.dead);
+  g.hud.objective(); fistsOnly(g, false);
+  p.locked = true;
+  await cut(g, () => { frame(g, p.pos, deck.group.position, { dist: 4.4 }); deck.set('idle'); }, 0.5);
+  await say(g, '', 'He held her under until the water did it for him, and he did not feel like the best of anything. Then he pulled the old man out of the wreck and up onto the stones.', 4.6);
+  await talk(g, [[DECKARD, 'You should have let them take me. Then she stays hidden.', deck], [K, 'They think you drowned. So does everybody. ...There is somebody you should meet.', p]]);
+  dismiss(g, luv, deck);
+  await fade(g, 1, 1);
+  asK(g);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'The best one he ever made');
+}
+
+// ---------- 11. Snow ----------
+// A father brought to a daughter he cannot touch, and a blade runner on the steps outside, where the snow is real.
+async function snow(g) {
+  const { stelline } = g.places, p = g.player, LAB = g.places.rooms.STELLINE;
+  const deck = actor(g, 'deckard', spot(g.places.home.spawn, 2, 2), SOUTH);
+  const tail = follower(g, deck, { gap: 2, runs: false, pace: 2.6 });
+  await reach(g, stelline.kerb, '<b>Drive</b> Deckard to Stelline Laboratories.', { how: 'car', r: 9 });
+  p.locked = true; land(g, stelline.kerb); p.locked = false;
+  await reach(g, stelline.door, 'Walk him to the <b>door</b>.', { r: 1.8, how: 'foot' });
+  tail.on = false;
+  p.locked = true;
+  await cut(g, () => { deck.group.position.set(stelline.door.x - 1.2, 0, stelline.door.z + 1); deck.group.rotation.y = toward(deck.group.position, p.pos); p.pos.set(stelline.door.x + 1, 0, stelline.door.z + 1.4); p.heading = toward(p.pos, deck.group.position); frame(g, p.pos, deck.group.position, { dist: 4 }); }, 0.5);
+  await talk(g, [
+    [DECKARD, 'Why. You do not owe me this. You do not owe her anything.', deck],
+    [K, 'Somebody gave me her memory. It was the best thing I had. I would like her to have it back.', p],
+    [DECKARD, '...What do I say to her.', deck],
+    [K, 'Nothing, to begin with. She will know you.', p],
+  ]);
+  await say(g, '', 'He watched the old man go in through the white door, and through the glass he watched him put his hand up to the glass, and the woman on the other side put up hers.', 4.8);
+  await cut(g, () => { dismiss(g, deck); p.pos.set(stelline.door.x + 3, 0, stelline.door.z + 3); p.heading = NORTH; p.pose = 'sit'; g.cam.fixed = { pos: new THREE.Vector3(stelline.door.x + 8, 2.6, stelline.door.z + 9), look: new THREE.Vector3(stelline.door.x + 3, 0.8, stelline.door.z + 3) }; }, 0.8);
+  { const snowflakes = Array.from({ length: 120 }, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 3), new THREE.MeshBasicMaterial({ color: 0xffffff })); m.position.set(stelline.door.x + (Math.random() - 0.5) * 24, 1 + Math.random() * 10, stelline.door.z + (Math.random() - 0.5) * 24); g.track(m); return m; });
+    g.updaters.push(dt => { for (const m of snowflakes) { m.position.y -= dt * 0.9; m.position.x += Math.sin(g.time + m.position.z) * dt * 0.3; if (m.position.y < 0.05) m.position.y = 11; } return p.pose === 'sit'; }); }
+  await say(g, '', 'He sat down on the steps. The rain had turned, for once, into something that stayed on his hand for a moment before it went. He looked at it for as long as he could.', 5.2);
+  await g.wait(2.5);
+  await fade(g, 1, 2.4);
+  p.pose = null;
+  asK(g);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Blade Runner 2049', 5000);
+}
+
 export const NEXUS_STORY = [
   { name: 'Chapter One', title: 'Blade Runner', missions: [proteinFarm, baseline, joi, theArchive, orphanage, memory],
     titles: ['Protein Farm', 'Baseline', 'Joi', 'The Archive', 'Orphanage', 'Memory'] },
+  { name: 'Chapter Two', title: 'Off Baseline', missions: [offBaseline, theWasteland, freysa, theWall, snow],
+    titles: ['Off Baseline', 'The Wasteland', 'Freysa', 'The Wall', 'Snow'] },
 ];
