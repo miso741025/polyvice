@@ -3367,6 +3367,7 @@ async function offer(g, mission, title, straight) {
     try {
       await g.until(() => {
         const d = dist();
+        if (m) m.mesh.visible = !here || d > 7;             // standing on it, it is not drawn: from inside, its wall filled the bottom of the screen with a yellow wedge (the "blob" at K's spawn)
         if (d > 7) armed = true;
         if (here && !anywhere && d > 55) { here = false; g.hud.objective(far); }
         if (g.sideBusy) { away = true; return false; }     // out with Irina, or collecting: the story waits
