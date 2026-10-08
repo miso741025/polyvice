@@ -2,7 +2,9 @@
 // The city is a grid of NX x NZ blocks separated by roads; +x is east (the ocean), +z is south.
 
 // Two cities share the engine: Vice City (The Sopranos) and Los Angeles (Heat). The page's ?city= picks one.
-export const CITY = new URLSearchParams(location.search).get('city') === 'la' ? 'la' : 'vice';
+// Three worlds share the engine: Vice City (The Sopranos), Los Angeles (Heat) and Nexus, a planet seen from Vice City's sky (Blade Runner 2049).
+const want = new URLSearchParams(location.search).get('city');
+export const CITY = want === 'la' ? 'la' : want === 'nexus' ? 'nexus' : 'vice';
 export const NX = 16, NZ = 13, BLOCK = 60, ROAD = 16, CELL = BLOCK + ROAD, LANE = 3.6;
 export const OX = -NX * CELL / 2, OZ = -NZ * CELL / 2;
 
@@ -80,6 +82,21 @@ export function mulberry32(a) {
   };
 }
 
+// For something in the air: only the colliders that reach up to it count (a spinner clears a house and hits a tower).
+export function pushOutAbove(pos, r, alt) {
+  let hit = false;
+  for (const c of colliders) {
+    if (c.h <= alt) continue;
+    const cx = clamp(pos.x, c.minX, c.maxX), cz = clamp(pos.z, c.minZ, c.maxZ), dx = pos.x - cx, dz = pos.z - cz, d2 = dx * dx + dz * dz;
+    if (d2 >= r * r) continue;
+    hit = true;
+    if (d2 > 1e-8) { const d = Math.sqrt(d2); pos.x = cx + dx / d * r; pos.z = cz + dz / d * r; }
+    else { const l = pos.x - c.minX, ri = c.maxX - pos.x, t = pos.z - c.minZ, b = c.maxZ - pos.z, m = Math.min(l, ri, t, b); if (m === l) pos.x = c.minX - r; else if (m === ri) pos.x = c.maxX + r; else if (m === t) pos.z = c.minZ - r; else pos.z = c.maxZ + r; }
+  }
+  const x = clamp(pos.x, bounds.minX + r, bounds.maxX + 400), z = clamp(pos.z, bounds.minZ - 200, bounds.maxZ + 200);
+  if (x !== pos.x || z !== pos.z) { pos.x = x; pos.z = z; hit = true; }
+  return hit;
+}
 // Push a circle (pos.x, pos.z, radius r) out of every collider and back inside the island.
 // Returns true if anything was touched.
 export function pushOut(pos, r) {

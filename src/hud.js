@@ -134,7 +134,7 @@ export class Hud {
     c.beginPath(); c.moveTo(0, -11); c.lineTo(8, 9); c.lineTo(0, 4); c.lineTo(-8, 9); c.closePath(); c.fill(); c.stroke();
     c.restore();
     c.fillStyle = '#f4f1e6'; c.font = '20px "Bebas Neue", sans-serif'; c.textAlign = 'left';
-    c.fillText(CITY === 'la' ? 'LOS ANGELES' : 'VICE CITY', 24, 30); c.font = '13px sans-serif'; c.fillText('M to close', 24, 52);
+    c.fillText(CITY === 'la' ? 'LOS ANGELES' : CITY === 'nexus' ? 'NEXUS' : 'VICE CITY', 24, 30); c.font = '13px sans-serif'; c.fillText('M to close', 24, 52);
   }
   // 0..1: the blurred, tunnel-vision look of a panic attack.
   panic(k) {

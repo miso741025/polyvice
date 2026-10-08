@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CITY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, groundAt, surfaceAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
+import { CITY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, pushOutAbove, groundAt, surfaceAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
 import { makeLook, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
@@ -22,6 +22,8 @@ const hemi = new THREE.HemisphereLight(0xffd9ea, 0x5d4c7c, 1.5);
 scene.add(hemi);
 const SUN_DIR = new THREE.Vector3(0.75, 0.6, 0.3).normalize();
 const sun = new THREE.DirectionalLight(0xffcf9e, 2.3);
+// The player's own headlamps: a spot that rides on whatever he is driving, lit after dark.
+const headLight = new THREE.SpotLight(0xfff2c0, 0, 70, 0.55, 0.5, 1.2); headLight.position.set(0, 1.0, 1.6); headLight.target.position.set(0, -0.6, 30); headLight.add(headLight.target);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.bias = -0.0006;
@@ -61,10 +63,10 @@ async function boot() {
 
   // ----- Cars: Tony's SUV, parked cars at the kerb, traffic -----
   const g_scenery = [];
-  const LA = CITY === 'la';
-  const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, LA ? 0x1d1d24 : 0x7a1626, LA ? 'sedan' : 'suv'); // the player's own car
+  const NEXUS = CITY === 'nexus', LA = CITY === 'la';
+  const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, NEXUS ? 0x1c1c22 : LA ? 0x1d1d24 : 0x7a1626, NEXUS ? 'spinner' : LA ? 'sedan' : 'suv'); // the player's own car: Tony's SUV, Neil's sedan, K's spinner
   const cars = [tonyCar, ...spawnTraffic(scene, 46, rand)];
-  const parkedColors = [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0xd9342b, 0x8ecbff, 0xf08a3c, 0x7d5cff, 0x1d1d24];
+  const parkedColors = NEXUS ? [0x1c1c22, 0x2a2a30, 0x3a3a44, 0x16161c, 0x4a4446, 0x23232b, 0x2f2a38, 0x1a2028, 0x5a2a2a] : [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0xd9342b, 0x8ecbff, 0xf08a3c, 0x7d5cff, 0x1d1d24];
   const parkedKinds = ['sedan', 'coupe', 'sedan', 'suv', 'coupe', 'van', 'pickup'];
   for (let n = 0; n < 44; n++) {
     const off = (rand() - 0.5) * 36, far = ROAD / 2 - 1.2, color = parkedColors[n % parkedColors.length];
@@ -108,7 +110,7 @@ async function boot() {
   try { carry = arrived ? JSON.parse(sessionStorage.getItem('crossing')) : null; } catch { /* nothing carried */ }
   sessionStorage.removeItem('crossing');
   const heatOver = LA && savedMission() >= storyList().reduce((n, e) => n + e.titles.length, 0); // after the runway, Los Angeles is Hanna's
-  const local = LA ? (heatOver ? 'hanna' : 'neil') : 'tony', who = carry?.who || local;
+  const local = NEXUS ? 'k' : LA ? (heatOver ? 'hanna' : 'neil') : 'tony', who = carry?.who || local;
   const tony = makeLook(who); // the player: Tony Soprano in Vice City, Neil McCauley in Los Angeles, or a visitor from across the water
   scene.add(tony.group);
 
@@ -214,6 +216,11 @@ async function boot() {
       sun.intensity = 2.3 - k * 1.75; sun.color.set(0xffcf9e).lerp(tmpColor.set(0x9db4ff), k);
       scene.fog.color.set(LA ? 0xa8b4d6 : 0xf2a0b4).lerp(tmpColor.set(0x120f26), k);
       if (LA) { hemi.color.lerp(tmpColor.set(0xc8d6ff), 0.5); sun.color.lerp(tmpColor.set(0xffe6c8), 0.4); }
+      if (NEXUS) { // no day on Nexus: a city that lights itself, under rain, in a haze the colour of rust
+        hemi.intensity = 0.55; hemi.color.set(0x5a6a88); hemi.groundColor.set(0x2a1c14);
+        sun.intensity = 0.5; sun.color.set(0x9fb0d0);
+        scene.fog.color.set(0x1a1618); scene.fog.near = 60; scene.fog.far = 520;
+      }
       places.setNight(k);
     },
     // The player is dead: every mission wait fails, and the mission (or free roam) respawns them.
@@ -285,7 +292,11 @@ async function boot() {
   const p = g.player, tmpColor = new THREE.Color();
   let streamIndex = 0;
   // The radar's landmarks: home, the family's places, and whatever is useful.
-  const landmarks = (LA ? [
+  const landmarks = (NEXUS ? [
+    { ...places.home.spawn, label: 'H', name: "K's flat", color: '#2f9c5a' }, { ...places.wallace.door, label: 'W', name: 'Wallace', color: '#ffb347' }, { ...places.precinct.door, label: 'P', name: 'Police HQ', color: '#2f56c8' },
+    { ...places.hospital.door, label: '+', name: 'Morgue', color: '#8d8a8e' }, { ...places.stelline.door, label: 'S', name: 'Stelline Labs', color: '#dfeeff' }, { ...places.orphanage.door, label: 'O', name: 'Sector 6 salvage', color: '#8a4a2a' },
+    { ...places.farm.gate, label: 'F', name: 'Protein farm', color: '#7a8a4a' }, { ...places.market.centre, label: 'N', name: 'Night market', color: '#ff3fa8' }, { ...places.bar.door, label: 'B', name: 'The bar', color: '#e0a12c' }, { ...places.airport.door, label: 'A', name: 'Spaceport', color: '#f4f2ee' },
+  ] : LA ? [
     { ...places.home.spawn, label: 'H', name: who === 'hanna' ? "McCauley's house (empty)" : "Neil's house", color: '#2f9c5a' }, { ...places.bank.door, label: '$', name: 'Far East Pacific Bank', color: '#d9a520' }, { ...places.kates.door, label: 'K', name: "Kate's diner", color: '#ff5fd2' },
     { ...places.truckstop.door, label: 'T', name: 'Truck stop', color: '#1f6b4a' }, { ...places.precinct.door, label: 'P', name: 'Major Crimes', color: '#2f56c8' }, { ...places.hospital.door, label: '+', name: 'Hospital', color: '#d8342c' },
     { ...places.drivein.lot, label: 'D', name: 'Drive-in', color: '#49a0d0' }, { ...places.depository.gate, label: 'M', name: 'Metals depository', color: '#8d8a8e' }, { ...places.bookstore.door, label: 'B', name: 'Bookstore', color: '#8a6f8f' },
@@ -318,6 +329,7 @@ async function boot() {
     try {
       sessionStorage.setItem('crossing', JSON.stringify({ who: g.who, cash: g.cash, weapons: p.weapons, mag: p.mag, ammo: p.ammo, armour: p.armour, health: Math.max(20, p.health), car: p.car ? { kind: p.car.kind, color: p.car.color } : null }));
     } catch { /* cross with empty hands */ }
+    if (!places.bridge) return;
     hud.card(places.bridge.there, 'Across the bridge');
     hud.fade(1, 1.4);
     setTimeout(() => { location.search = LA ? '?from=bridge' : '?city=la&from=bridge'; }, 1700);
@@ -362,10 +374,13 @@ async function boot() {
   hud.fade(0, 1.2);
   // Each city has its own title, and a way across to the other.
   if (LA) { document.body.classList.add('la'); document.querySelector('.logo .sop').textContent = 'Heat'; document.querySelector('.logo .vc').textContent = 'Los Angeles'; document.title = 'Heat: Los Angeles'; g.setNight(0); }
+  if (NEXUS) { document.body.classList.add('nexus'); document.querySelector('.logo .sop').textContent = 'Blade Runner'; document.querySelector('.logo .vc').textContent = 'Nexus'; document.title = 'Blade Runner: Nexus'; g.setNight(1); }
   const otherBtn = document.getElementById('other');
   if (otherBtn) { // (an old cached page may not have the button)
     otherBtn.textContent = LA ? 'Vice City · The Sopranos' : 'Los Angeles · Heat';
     otherBtn.addEventListener('click', () => { location.search = LA ? '' : '?city=la'; });
+    const thirdBtn = document.getElementById('third');
+    if (thirdBtn) { thirdBtn.textContent = NEXUS ? 'Vice City · The Sopranos' : 'Nexus · Blade Runner'; thirdBtn.addEventListener('click', () => { location.search = NEXUS ? '' : '?city=nexus'; }); }
   }
   const startBtn = document.getElementById('start');
   startBtn.disabled = false;
@@ -389,7 +404,7 @@ async function boot() {
     p.pos.set(at.x, 0, at.z); p.heading = g.cam.yaw = at.h; p.locked = false;
     if (ride) { ride.mission = false; g.enterCar(ride); ride.speed = 12; }
     hud.fade(1, 0); hud.fade(0, 1.6);
-    hud.card(LA ? 'Los Angeles' : 'Vice City', g.visitor ? 'You are a long way from home' : 'Home');
+    hud.card(NEXUS ? 'Nexus' : LA ? 'Los Angeles' : 'Vice City', g.visitor ? 'You are a long way from home' : 'Home');
     g.wait(3.5).then(() => { hud.card(); return g.visitor ? null : runStory(g); }).then(() => { g.storyDone = true; }).catch(err => console.error(err));
     addEventListener('pointerdown', () => sfx.unlock(), { once: true }); addEventListener('keydown', () => sfx.unlock(), { once: true });
   }
@@ -413,10 +428,16 @@ async function boot() {
   function updatePlayer(dt) {
     const car = p.car;
     if (car) {
-      if (p.locked || car.wreck) car.drive(dt, 0, 0, true);
-      else car.drive(dt, (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), keys.Space);
+      const flying = car.kind === 'spinner' && (car.alt > 0.5 || (!p.locked && keys.Space));
+      if (flying) { // a spinner: Space climbs, Shift sinks; it stays up until it is brought down
+        car.lift = p.locked ? -1 : (keys.Space ? 1 : 0) - (keys.ShiftLeft || keys.ShiftRight ? 1 : 0);
+        car.fly(dt, p.locked ? 0 : (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), p.locked ? 0 : (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), car.lift);
+        if (car.alt > 0.5) { const before = car.pos.clone(); if (pushOutAbove(car.pos, car.reach, car.alt + groundAt(car.pos.x, car.pos.z) + 0.5)) { const jolt = before.distanceTo(car.pos) * 8; if (jolt > 1) { sfx.crash(Math.min(1, jolt / 10)); g.hurtCar(car, jolt * 2); car.speed *= 0.3; } } }
+      }
+      if (p.locked || car.wreck) { if (!flying) car.drive(dt, 0, 0, true); }
+      else if (!flying) car.drive(dt, (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), keys.Space);
       const wasGoing = car.speed;
-      car.collide();
+      if (!flying) car.collide();
       const jolt = Math.abs(wasGoing - car.speed);
       if (jolt > 2.5) { sfx.crash(jolt / 12); g.hurtCar(car, (jolt - 2.5) * 2.6); }
       if (!p.locked && g.consume('KeyH')) sfx.horn();
@@ -709,7 +730,7 @@ async function boot() {
       if (g.consume('KeyB')) sfx.radio.next(-1);
       if (g.consume('KeyV')) hud.radio(sfx.radio.toggle() ? sfx.radio.title || 'Radio on' : 'Radio off');
     }
-    if (g.started && !p.locked && !p.inside && (p.pos.x - places.bridge.far.x) * places.bridge.dir > 0 && Math.abs(p.pos.z - places.bridge.far.z) < 12) crossBridge();
+    if (places.bridge && g.started && !p.locked && !p.inside && (p.pos.x - places.bridge.far.x) * places.bridge.dir > 0 && Math.abs(p.pos.z - places.bridge.far.z) < 12) crossBridge();
     g.time += dt;
 
     updatePlayer(dt);
@@ -768,6 +789,11 @@ async function boot() {
     sun.position.copy(focus).addScaledVector(SUN_DIR, 200);
     places.sky.position.copy(camera.position);
     places.update(g.time);
+    { // Lights on the cars after dark: beams on the road from everything near, and the spot on his own.
+      const dark = Math.max(0, Math.min(1, (g.night - 0.35) / 0.4));
+      for (const car of cars) { const b = car.mesh.userData.beam; if (!b) continue; const d = Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z); b.material.opacity = d < 160 && !car.wreck && (car.nav || car.ai || car === p.car || car.mission) ? dark * 0.55 : 0; }
+      if (p.car) { if (headLight.parent !== p.car.mesh) p.car.mesh.add(headLight); headLight.intensity = dark * 90 * (p.car.wreck ? 0 : 1); } else headLight.intensity = 0;
+    }
 
     // Once the story is told, the days turn on their own: dark from a quarter past eight until a quarter to six.
     if (g.storyDone && !g.missionActive) {
@@ -793,7 +819,7 @@ async function boot() {
       sfx.ambience({
         inCar: !!p.car, speed: p.car ? p.car.speed : 0, throttle: p.car && !p.locked ? (keys.KeyW ? 1 : keys.KeyS ? 0.5 : 0) : 0,
         sliding: p.car && !p.locked ? (keys.Space && Math.abs(p.car.speed) > 5 ? 1 : (keys.KeyA || keys.KeyD) && Math.abs(p.car.speed) > 17 ? 0.5 : 0) : 0,
-        police: g.sirenLevel || 0, night: g.night, la: LA,
+        police: g.sirenLevel || 0, night: g.night, la: LA || NEXUS, rain: NEXUS ? 1 : 0,
         ear, right: { x: -look.z / ll, z: look.x / ll }, room: room ? roomKind(room) : null,
         surface, foot: !p.car && !p.hidden && !p.locked && p.motion && p.motion !== 'idle' ? (p.motion === 'sprint' ? 7.6 : 3.7) : 0,
         shore: clamp(1 - edges[0] / 140, 0, 1) * edges[3], seaward: { x: edges[1], z: edges[2] }, exposed: deck ? 1 : 0,

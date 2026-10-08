@@ -4,25 +4,28 @@ import { CITY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHO
 import { makeHuman } from './people.js';
 import { box, makeLook, makeTony, makeDuck, Car } from './entities.js';
 
-const LA = CITY === 'la';
+const NEXUS = CITY === 'nexus', LA = CITY !== 'vice'; // Nexus is laid out like Los Angeles (its story's city), and dressed in the dark
 // Vice City is pastel deco under a pink sky. Los Angeles is concrete, stucco and glass: beige, bone, grey, terracotta.
-const PASTELS = LA ? [0xe9e2d2, 0xd9c7a0, 0xf4f2ee, 0xc9b79c, 0xb9b3ba, 0xd08a6c, 0xdfe5ea, 0xa9b4c0] : [0xf7a8c4, 0x8fe0d4, 0xffd3a1, 0xc9b6f2, 0xfff1c9, 0x9fd0f5, 0xf5f5f0, 0xff9e8a];
-const GLASS_TINTS = LA ? [0x9fb8d0, 0xb8c8d8, 0x8fa6c4, 0xcfe0ee] : [0xffffff, 0xcfe8ff, 0xffd9e8, 0xd6fff4];
-const NEONS = LA ? ['#ff5a4a', '#ffe066', '#6fb0ff', '#ffffff', '#ff8a5c', '#7dffb0'] : ['#ff5fd2', '#49e0d0', '#ffe066', '#ff8a5c', '#8f7bff', '#7dffb0'];
-const SHOPS = LA ? ['TACOS', 'DONUTS', 'LIQUOR', 'PAWN', 'DINER', 'BAR', 'GUNS', 'AUTO PARTS', 'LAUNDRY', 'CHECKS CASHED', 'BURGERS', 'VIDEO', 'RECORDS']
+const PASTELS = NEXUS ? [0x3a3a40, 0x2e2e34, 0x44444c, 0x383a3e, 0x4a4446, 0x2a2c30, 0x3e3a44, 0x34383c] : LA ? [0xe9e2d2, 0xd9c7a0, 0xf4f2ee, 0xc9b79c, 0xb9b3ba, 0xd08a6c, 0xdfe5ea, 0xa9b4c0] : [0xf7a8c4, 0x8fe0d4, 0xffd3a1, 0xc9b6f2, 0xfff1c9, 0x9fd0f5, 0xf5f5f0, 0xff9e8a];
+const GLASS_TINTS = NEXUS ? [0x1a2028, 0x202a36, 0x161a22, 0x2a2430] : LA ? [0x9fb8d0, 0xb8c8d8, 0x8fa6c4, 0xcfe0ee] : [0xffffff, 0xcfe8ff, 0xffd9e8, 0xd6fff4];
+const NEONS = NEXUS ? ['#49e0ff', '#ff3fa8', '#ff8a2c', '#f4f4f0', '#8f7bff', '#ffe066'] : LA ? ['#ff5a4a', '#ffe066', '#6fb0ff', '#ffffff', '#ff8a5c', '#7dffb0'] : ['#ff5fd2', '#49e0d0', '#ffe066', '#ff8a5c', '#8f7bff', '#7dffb0'];
+const SHOPS = NEXUS ? ['NOODLES', 'PHARMA', 'LIQUOR', 'PAWN', 'DINER', 'BAR', 'GUNS', 'AUTO PARTS', 'LAUNDRY', 'PACHINKO', 'RAMEN', 'VIDEO', 'RECORDS'] : LA ? ['TACOS', 'DONUTS', 'LIQUOR', 'PAWN', 'DINER', 'BAR', 'GUNS', 'AUTO PARTS', 'LAUNDRY', 'CHECKS CASHED', 'BURGERS', 'VIDEO', 'RECORDS']
   : ['CAFE', 'PAWN', 'LIQUOR', 'DELI', 'VIDEO', 'SURF', 'PIZZA', 'RECORDS', 'BAR', 'TAILOR', 'CIGARS', 'DINER', 'GUNS'];
-const HOTELS = LA ? ['HOTEL', 'PALMS', 'SUNSET', 'PACIFIC', 'WILSHIRE', 'ROOSEVELT'] : ['HOTEL', 'OCEAN', 'PALMS', 'DECO', 'VICE', 'CORAL', 'MIAMI'];
+const HOTELS = NEXUS ? ['HOTEL', 'CAPSULE', 'SECTOR 9', 'OFFWORLD', 'TANNHAUSER', 'VOIGHT'] : LA ? ['HOTEL', 'PALMS', 'SUNSET', 'PACIFIC', 'WILSHIRE', 'ROOSEVELT'] : ['HOTEL', 'OCEAN', 'PALMS', 'DECO', 'VICE', 'CORAL', 'MIAMI'];
 const CURB = 0.14;                       // sidewalk height
 const FLOOR = 3.4, GROUND = 4.2, BAY = 4; // storey height, shopfront height, width of one window bay
 const SPECIAL_LA = { '15,1': 'neil', '8,6': 'bank', '2,9': 'drivein', '6,9': 'kates', '3,5': 'truckstop', '10,3': 'hospital', '8,3': 'precinct', '6,2': 'depository', '10,8': 'bookstore',
   '12,4': 'park', '4,11': 'park', '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '2,7': 'yard', '13,8': 'church', '1,10': 'containers',
   '15,12': 'hotel' };                  // chapter four: the hotel at the end of the runway
+// Nexus: the same bones as Los Angeles, with the story's own places on them. The ocean side is a wall now.
+const SPECIAL_NX = { '15,1': 'kblock', '8,6': 'wallace', '8,3': 'precinct', '10,3': 'hospital', '10,8': 'stelline', '1,10': 'orphanage', '0,2': 'farm', '2,7': 'yard', '1,8': 'yard', '13,8': 'market',
+  '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '15,12': 'hotel' };
 const SPECIAL_VICE = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
   '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel',
   '13,0': 'college', '12,2': 'travel', // episode five: up the coast
   '15,12': 'manor' };                  // episode six: the banquet hall at the south end of Ocean Drive
 const SUN = new THREE.Vector3(1250, 190, 420).normalize();
-const HOUSE_WALLS = LA ? [0xe9e2d2, 0xf4f2ee, 0xd9c7a0, 0xc9b79c, 0xe6d2b4, 0xdfe5ea] : [0xcfe8ff, 0xfff1c9, 0xffd9e8, 0xe9e2d2, 0xd6fff4, 0xf7a8c4, 0xf4f2ee, 0xc9b6f2];
+const HOUSE_WALLS = NEXUS ? [0x3a3a40, 0x44444c, 0x2e2e34, 0x4a4446] : LA ? [0xe9e2d2, 0xf4f2ee, 0xd9c7a0, 0xc9b79c, 0xe6d2b4, 0xdfe5ea] : [0xcfe8ff, 0xfff1c9, 0xffd9e8, 0xe9e2d2, 0xd6fff4, 0xf7a8c4, 0xf4f2ee, 0xc9b6f2];
 const FIRMS = [['VICE FREIGHT', 'INTERSTATE HAULAGE'], ['ATLANTIC SALVAGE', 'SCRAP · PARTS · TOWING'], ['GULF SEAFOOD', 'WHOLESALE'], ['SUNSHINE CEMENT', 'READY MIX'], ['BAYSIDE PLUMBING', 'SUPPLY CO.'], ['MARINA ICE', 'BLOCK & CRUSHED']];
 
 // ---------- Textures, all drawn in code ----------
@@ -228,7 +231,7 @@ function shopfronts(rand) {
 // ---------- The city ----------
 
 export function buildWorld(scene) {
-  const rand = mulberry32(LA ? 4127 : 1999); // each city is dealt its own hand
+  const rand = mulberry32(NEXUS ? 2049 : LA ? 4127 : 1999); // each city is dealt its own hand
   const pick = list => list[Math.floor(rand() * list.length)];
   const places = {}, updaters = [];
   const W = NX * CELL + ROAD, D = NZ * CELL + ROAD;
@@ -259,19 +262,21 @@ export function buildWorld(scene) {
   const under = opts => lam({ polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, ...opts });
   const M = {
     plain: lam(), glow: new THREE.MeshBasicMaterial({ vertexColors: true }),
-    paver: lam({ map: T.paver }), asphalt: lam({ map: T.asphalt }), tarmac: under({ map: T.asphalt }), grass: decal({ map: T.grass }), paint: decal(),
+    paver: lam({ map: T.paver }), asphalt: NEXUS ? new THREE.MeshPhongMaterial({ vertexColors: true, map: T.asphalt, shininess: 80, specular: 0x5a6a80 }) : lam({ map: T.asphalt }), /* wet, on Nexus: the neon lies on it */ tarmac: under({ map: T.asphalt }), grass: decal({ map: T.grass }), paint: decal(),
     brick: lam({ map: T.brick }), siding: lam({ map: T.siding }), shingle: lam({ map: T.shingle }), gravel: lam({ map: T.gravel }),
     wood: lam({ map: T.wood }), sand: lam({ map: T.sand }),
     shop: lit(shopfronts(rand)),
     deco: lit(facade('deco', rand)), balcony: lit(facade('balcony', rand)), stucco: lit(facade('stucco', rand)), office: lit(facade('office', rand)),
     pool: new THREE.MeshBasicMaterial({ map: T.halo, vertexColors: true, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }),
   };
-  M.office.emissiveIntensity = 0.6;
+  M.office.emissiveIntensity = NEXUS ? 1.05 : 0.6;
+  if (NEXUS) for (const m of [M.shop, M.deco, M.balcony, M.stucco]) m.emissiveIntensity = 1.1;
 
   // Everything static is collected per material and merged into one mesh each at the end.
   let buckets = new Map();
   const tintOf = new THREE.Color();
   const put = (mat, geo, hex = 0xffffff) => {
+    if (!mat) throw new Error('put: no material (a texture that only one city makes?)');
     const n = geo.attributes.position.count, a = new Float32Array(n * 3);
     tintOf.set(hex);
     for (let i = 0; i < n; i++) tintOf.toArray(a, i * 3);
@@ -629,6 +634,7 @@ export function buildWorld(scene) {
   // Districts: industry in the north-west corner, houses along the west and south, hotels on the beach,
   // and the towers in the middle. The named places keep the blocks the story was written around.
   const district = (i, j) => {
+    if (NEXUS) return (i <= 3 && j >= 7) || j >= 11 || (i <= 2 && j <= 3) ? 'industry' : 'city'; // no suburbs on Nexus: nobody has a lawn
     if (i === NX - 1) return 'beach';
     if (LA) { // houses in the hills to the north and on the east side, yards in the south-west and by the airport, towers between
       if (j <= 1 || (i >= 11 && j <= 4)) return 'suburb';
@@ -642,21 +648,27 @@ export function buildWorld(scene) {
   };
   for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
     const c = blockCenter(i, j), core = LA && Math.abs(i - 8) <= 2 && Math.abs(j - 6) <= 1; // the downtown core: nothing but towers
-    const kind = (LA ? SPECIAL_LA : SPECIAL_VICE)[`${i},${j}`] ?? (LA && i === 11 ? 'river' : core ? 'tower' : pickBlock(district(i, j), i, j));
+    const kind = (NEXUS ? SPECIAL_NX : LA ? SPECIAL_LA : SPECIAL_VICE)[`${i},${j}`] ?? (LA && i === 11 ? 'river' : core ? 'tower' : pickBlock(district(i, j), i, j));
     if (kind === 'bing') { // a ring of sidewalk around a car park at road level
       for (const s of [-1, 1]) {
         slab(0xffffff, BLOCK, CURB, 5, c.x, 0, c.z + s * (BLOCK / 2 - 2.5), M.paver, 6);
         slab(0xffffff, 5, CURB, BLOCK - 10, c.x + s * (BLOCK / 2 - 2.5), 0, c.z, M.paver, 6);
       }
-    } else if (kind !== 'river' && kind !== 'home') slab(LA ? 0xcfcfd2 : 0xffffff, BLOCK, CURB, BLOCK, c.x, 0, c.z, M.paver, 6); // the house lays its own, around the pool
+    } else if (kind !== 'river' && kind !== 'home') slab(NEXUS ? 0x5a5a62 : LA ? 0xcfcfd2 : 0xffffff, BLOCK, CURB, BLOCK, c.x, 0, c.z, M.paver, 6); // the house lays its own, around the pool
     (places.kinds ??= {})[i + ',' + j] = kind; // what each block is, for whoever needs to know (the sound of the place, for one)
     if (kind !== 'river') {
-      for (const sx of [-1, 1]) for (const sz of LA ? [0] : [-14, 14]) palms.push({ x: c.x + sx * 28.8, z: c.z + sz }); // one tall palm a side in Los Angeles, two in Vice City
+      for (const sx of [-1, 1]) for (const sz of NEXUS ? [] : LA ? [0] : [-14, 14]) palms.push({ x: c.x + sx * 28.8, z: c.z + sz }); // one tall palm a side in Los Angeles, two in Vice City
       furniture(c, i, j);
     }
     if (kind === 'river') { buildRiver(c, j); continue; }
 
     if (kind === 'neil') buildNeil(c);
+    else if (kind === 'kblock') buildKBlock(c);
+    else if (kind === 'wallace') buildWallace(c);
+    else if (kind === 'stelline') buildStelline(c);
+    else if (kind === 'orphanage') buildOrphanage(c);
+    else if (kind === 'farm') buildFarm(c);
+    else if (kind === 'market') buildMarket(c);
     else if (kind === 'bank') buildBank(c);
     else if (kind === 'drivein') buildDriveIn(c);
     else if (kind === 'kates') { buildRoadDiner(c, "KATE'S", 'kates'); lots(c, i, [-1, 1]); }
@@ -688,7 +700,7 @@ export function buildWorld(scene) {
     else if (kind === 'cafe') { buildCafe(c); lots(c, i, [-1, 1]); }
     else if (kind === 'tower') {
       const downtown = 1 - Math.hypot(c.x, c.z) / maxDist;
-      building(c.x, c.z, 36 + Math.floor(rand() * 3) * 4, 36 + Math.floor(rand() * 3) * 4, core ? 64 + Math.floor(rand() * 8) * 8 : i === NX - 1 ? 12 : 16 + Math.floor(rand() * 4 + downtown * (LA ? 12 : 9)) * 4, { fx: rand() < 0.5 ? 1 : -1, fz: rand() < 0.5 ? 1 : -1 });
+      building(c.x, c.z, 36 + Math.floor(rand() * 3) * 4, 36 + Math.floor(rand() * 3) * 4, core ? (NEXUS ? 120 : 64) + Math.floor(rand() * 8) * (NEXUS ? 12 : 8) : i === NX - 1 ? 12 : 16 + Math.floor(rand() * 4 + downtown * (LA ? 12 : 9)) * 4, { fx: rand() < 0.5 ? 1 : -1, fz: rand() < 0.5 ? 1 : -1 });
     }
     else if (kind === 'houses') buildHouses(c);
     else if (kind === 'yard') buildYard(c);
@@ -700,6 +712,7 @@ export function buildWorld(scene) {
   }
   function pickBlock(where, i, j) {
     const r = rand();
+    if (NEXUS) return where === 'industry' ? (r < 0.6 ? 'yard' : 'lowrise') : r < 0.45 ? 'tower' : r < 0.5 ? 'gas' : 'lots';
     if (where === 'industry') return r < 0.5 ? 'yard' : r < 0.6 ? 'gas' : 'lowrise';
     if (where === 'suburb') return r < 0.62 ? 'houses' : r < 0.7 ? 'church' : r < 0.78 ? 'park' : r < 0.86 ? 'gas' : 'lots';
     if (where === 'beach') return r < 0.08 ? 'park' : 'lots';
@@ -1671,6 +1684,115 @@ export function buildWorld(scene) {
       spawn: { x: hx - 14, z: hz + 3 }, door: { x: hx - 12.6, z: hz + 3 }, wake: { x: c.x - 15.2, z: c.z + 12 }, car: { x: c.x - 18, z: c.z + 14, h: 0 },
       drive: { x: c.x - 18, z: c.z + 20 }, road: { x: c.x - 18, z: c.z + 34 }, deck: { x: hx + 14, z: hz }, ducks: [],
     };
+  }
+
+  // ----- Nexus: K's block, a residential slab on the sea road. Four hundred flats stacked on a lobby, a lift core, antennae -----
+  function buildKBlock(c) {
+    const y = CURB, bx = c.x + 4, bz = c.z - 2, W = 34, D = 30, H = 62, CONC = 0x3a3a40;
+    flat(M.paint, 0x2e2e34, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z);
+    slab(CONC, W, H, D, bx, y, bz, M.gravel, 6); collide(bx, bz, W, D, y + H);
+    for (let f = 0; f < 15; f++) for (let k = 0; k < 9; k++) { // a grid of small windows, most lit by somebody's television
+      const lit = ((f * 7 + k * 3) % 5) < 3, hex = lit ? [0x6fb0ff, 0xffd9a8, 0x9fd0f5, 0xff8a5c][(f + k) % 4] : 0x14161c;
+      slab(hex, 1.6, 1.1, 0.08, bx - W / 2 + 2.5 + k * 3.6, y + 1.6 + f * 4, bz - D / 2 - 0.02, lit ? M.glow : M.plain); slab(0x2a2a30, 2, 0.2, 0.4, bx - W / 2 + 2.5 + k * 3.6, y + 1.3 + f * 4, bz - D / 2 - 0.18);
+      if (k < 7) slab(hex, 1.6, 1.1, 0.08, bx - W / 2 - 0.02, y + 1.6 + f * 4, bz - D / 2 + 2.5 + k * 3.6, lit ? M.glow : M.plain);
+    }
+    for (const s2 of [-1, 1]) slab(0x2e2e34, 3, H + 2, 3, bx + s2 * (W / 2 - 1), y, bz + D / 2 - 1.5);                               // the lift and stair cores, proud of the face
+    slab(0x2a2a30, W + 0.6, 0.6, D + 0.6, bx, y + H, bz); for (let n = 0; n < 5; n++) post(0x8a8d96, 0.06, 6 + n * 2, bx - 10 + n * 5, y + H, bz - 6 + (n % 2) * 8, 4); ball(0xff3b3b, 0.22, bx - 10, y + H + 6.1, bz - 6, M.glow); halo(bx - 10, y + H + 6.1, bz - 6, 0xff3030, 4);
+    slab(0x2a2a30, 10, 4.2, 4, bx, y, bz + D / 2 + 1.5); collide(bx, bz + D / 2 + 1.5, 10, 4, y + 4.2); slab(0xffd9a8, 3.6, 2.9, 0.1, bx, y + 0.2, bz + D / 2 + 3.46, M.glow); slab(0x16161c, 1.4, 2.9, 0.12, bx, y, bz + D / 2 + 3.5);   // the lobby, lit, and its door
+    sign(['BLOCK 9', 'RESIDENTS ONLY'], bx, y + 3.6, bz + D / 2 + 3.52, 0, { w: 5, h: 1, color: '#49e0ff', bg: '#16161c', size: 0.6, glow: true });
+    for (let k = 0; k < 4; k++) { post(0x8a8d96, 0.07, 4, bx - 9 + k * 6, y, bz + D / 2 + 6, 5); slab(0xcfe0ff, 0.6, 0.08, 0.3, bx - 9 + k * 6, y + 4, bz + D / 2 + 6, M.glow); halo(bx - 9 + k * 6, y + 3.9, bz + D / 2 + 6, 0xcfe0ff, 4); }
+    for (const [px, pz] of [[-24, 20], [-24, 12], [-24, 4]]) { slab(0x3a3a44, 1.8, 1.6, 1.4, c.x + px, y, c.z + pz); slab(0x49e0ff, 1, 0.5, 0.04, c.x + px, y + 0.9, c.z + pz + 0.72, M.glow); } // vending machines along the west side
+    shopDoors.push({ shop: 'KFLAT', outside: { x: bx, z: bz + D / 2 + 5.2, h: Math.PI } });
+    places.home = {
+      spawn: { x: bx, z: bz + D / 2 + 6.5 }, door: { x: bx, z: bz + D / 2 + 5.2 }, wake: { x: bx - 2, z: bz + D / 2 + 7 }, car: { x: c.x - 18, z: c.z + 14, h: 0 },
+      drive: { x: c.x - 18, z: c.z + 20 }, road: { x: c.x - 18, z: c.z + 34 }, ducks: [],
+    };
+    places.kblock = { door: places.home.door, kerb: { x: c.x - 18, z: c.z + 34, h: Math.PI / 2 } };
+  }
+  // ----- Wallace: a black ziggurat the height of the sky, slit with amber, standing in its own water -----
+  function buildWallace(c) {
+    const y = CURB, BLK = 0x16161a, AMBER = 0xffb347;
+    flat(M.paint, 0x2a2a30, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z);
+    put(M.pool, new THREE.PlaneGeometry(BLOCK - 8, BLOCK - 8).rotateX(-Math.PI / 2).translate(c.x, y + 0.12, c.z), 0x1a2a3a);                         // the moat
+    const tiers = [[52, 0, 26], [44, 26, 30], [34, 56, 34], [24, 90, 40], [12, 130, 30]];
+    for (const [w, y0, h] of tiers) { slab(BLK, w, h, w, c.x, y + y0, c.z, M.gravel, 8); collide(c.x, c.z, w, w, y + y0 + h); for (let k = 0; k < h / 5; k++) for (const s2 of [-1, 1]) { slab(AMBER, w - 4, 0.22, 0.06, c.x, y + y0 + 2.5 + k * 5, c.z + s2 * (w / 2 + 0.02), M.glow); slab(AMBER, 0.06, 0.22, w - 4, c.x + s2 * (w / 2 + 0.02), y + y0 + 2.5 + k * 5, c.z, M.glow); } }
+    ball(0xff3b3b, 0.5, c.x, y + 161, c.z, M.glow); halo(c.x, y + 161, c.z, 0xff3030, 10);
+    slab(0x2a2a30, 8, 0.3, 32, c.x, y + 0.1, c.z + 14); for (let k = 0; k < 6; k++) for (const s2 of [-1, 1]) { post(BLK, 0.5, 6, c.x + s2 * 3.6, y, c.z + 4 + k * 4.6, 4); slab(AMBER, 0.2, 0.2, 0.2, c.x + s2 * 3.6, y + 6, c.z + 4 + k * 4.6, M.glow); } // the causeway across the water, lit
+    slab(0x16161c, 3.2, 5, 0.3, c.x, y, c.z + 26.1); slab(AMBER, 0.14, 4.6, 0.1, c.x, y + 0.2, c.z + 26.3, M.glow);                                      // the door: a slit of light
+    sign(['WALLACE'], c.x, y + 7.5, c.z + 26.3, 0, { w: 7, h: 1.2, color: '#ffb347', bg: '#101012', size: 0.8, glow: true });
+    shopDoors.push({ shop: 'ARCHIVE', outside: { x: c.x, z: c.z + 28.4, h: Math.PI } });
+    places.wallace = { door: { x: c.x, z: c.z + 28.4 }, kerb: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 }, plaza: { x: c.x, z: c.z + 31 } };
+  }
+  // ----- Stelline: a white compound under a dome, the one clean building in the city -----
+  function buildStelline(c) {
+    const y = CURB, WHITE = 0xe9e9ee, hx = c.x, hz = c.z - 4;
+    flat(M.paint, 0x3a3a40, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z);
+    slab(WHITE, 30, 7, 24, hx, y, hz, M.gravel, 4); collide(hx, hz, 30, 24, y + 7);
+    put(M.plain, new THREE.SphereGeometry(10, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2).translate(hx, y + 7, hz), 0xf4f4f6);
+    put(M.glow, new THREE.SphereGeometry(10.1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2).translate(hx, y + 7, hz), 0x5a6a80); put(M.plain, new THREE.SphereGeometry(10.2, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2).translate(hx, y + 7, hz), 0xf4f4f6); // (two shells: the inner one reads as frost through the gaps)
+    for (let n = 0; n < 12; n++) put(M.plain, new THREE.BoxGeometry(0.2, 10, 0.2).translate(0, 5, 10).rotateX(-Math.PI / 2 + 0.4).rotateY(n * Math.PI / 6).translate(hx, y + 7, hz), 0xc9cbd2); // the dome's ribs
+    for (const s2 of [-1, 1]) windowAt(hx + s2 * 8, y + 2.2, hz + 12, 6, 2.4, 0, 1, true);
+    slab(0x2a2a30, 5, 3.6, 3, hx, y, hz + 13); slab(0xcfe0ff, 1.6, 2.9, 0.12, hx, y, hz + 14.5, M.glow);                                                  // the entrance: a lit door in a dark porch
+    sign(['STELLINE LABORATORIES', 'MEMORY DESIGN'], hx, y + 5.4, hz + 12.15, 0, { w: 9, h: 1.4, color: '#2a2a30', bg: '#e9e9ee', size: 0.52, glow: false });
+    for (const [px, pz] of [[-22, 18], [22, 18], [-22, -22], [22, -22]]) { post(0xc9cbd2, 0.06, 4.2, c.x + px, y, c.z + pz, 5); ball(0xdfeeff, 0.22, c.x + px, y + 4.3, c.z + pz, M.glow); halo(c.x + px, y + 4.3, c.z + pz, 0xcfe0ff, 4); }
+    for (let k = 0; k < 7; k++) slab(0xcfd8dc, 2.2, 0.5, 0.5, c.x - 22 + k * 7, y, c.z + 24);                                                                  // a low white kerb round the front court
+    shopDoors.push({ shop: 'STELLINE', outside: { x: hx, z: hz + 16.4, h: Math.PI } });
+    places.stelline = { door: { x: hx, z: hz + 16.4 }, kerb: { x: hx + 8, z: c.z + 34, h: Math.PI / 2 } };
+  }
+  // ----- The orphanage: a scrapyard the size of a block, with a long rusted shed where the children work -----
+  function buildOrphanage(c) {
+    const y = 0.03, RUST = 0x6a3a2a, COLS = [0x5a3a2a, 0x3a3a44, 0x6a6a5a, 0x2a2a30, 0x8a4a2a, 0x4a4a52];
+    flat(M.asphalt, 0x6a5a50, BLOCK - 2, BLOCK - 2, c.x, y, c.z, 5); lowGround.push({ x: c.x, z: c.z, half: BLOCK / 2 - 1 });
+    const heap = (x, z, n) => { for (let k = 0; k < n; k++) { const r = rand() * 2.2, a = rand() * 6.3; slab(COLS[k % COLS.length], 0.6 + rand() * 1.4, 0.4 + rand() * 0.8, 0.6 + rand() * 1.2, x + Math.cos(a) * r, y + rand() * 1.4, z + Math.sin(a) * r); } collide(x, z, 4, 4, 2); };
+    for (const [hx, hz] of [[-22, -20], [-12, -24], [-24, -8], [20, -22], [24, -6], [24, 8], [-22, 8], [20, 22]]) heap(c.x + hx, c.z + hz, 9 + Math.floor(rand() * 6));
+    slab(RUST, 36, 7, 18, c.x, y, c.z - 4, M.siding, 1.2); collide(c.x, c.z - 4, 36, 18, 7); gable(0x4a3a30, 18, 3, 37, c.x, y + 7, c.z - 4, Math.PI / 2, M.plain);
+    for (let k = 0; k < 6; k++) slab(0xffb347, 1.4, 1.6, 0.08, c.x - 15 + k * 6, y + 3.6, c.z + 5.02, M.glow);                                             // its windows, lit by the furnace
+    slab(0x16161c, 3, 4, 0.2, c.x, y, c.z + 5.1); post(0x3a3a44, 0.6, 14, c.x + 14, y + 7, c.z - 8, 10); ball(0xff5a30, 0.4, c.x + 14, y + 21.2, c.z - 8, M.glow);  // the door; the chimney
+    for (const [bx, bz] of [[-8, 12], [10, 14]]) { post(0x3a3a44, 0.45, 0.9, c.x + bx, y, c.z + bz, 10); ball(0xff7a20, 0.4, c.x + bx, y + 1.1, c.z + bz, M.glow); halo(c.x + bx, y + 1.3, c.z + bz, 0xff8a30, 4); } // fires in barrels
+    for (let k = 0; k < 7; k++) { post(0x3a3a44, 0.1, 3.2, c.x - 29 + k * 10, y, c.z + 29, 5); slab(0x55525a, 10, 2.2, 0.06, c.x - 24 + k * 10, y + 0.5, c.z + 29); } // the fence along the road
+    sign(['SECTOR 6 SALVAGE', 'JUVENILE LABOR · NO ADMITTANCE'], c.x, y + 8.6, c.z + 5.1, 0, { w: 11, h: 1.6, color: '#f4f4f0', bg: '#3a1c14', size: 0.6, glow: false });
+    shopDoors.push({ shop: 'ORPHANAGE', outside: { x: c.x, z: c.z + 7.2, h: Math.PI } });
+    places.orphanage = { door: { x: c.x, z: c.z + 7.2 }, gate: { x: c.x + 24, z: c.z + 34, h: Math.PI / 2 }, yard: { x: c.x, z: c.z + 18 } };
+  }
+  // ----- The protein farm: a block of mud at the city's edge, greenhouses glowing in rows, a farmhouse, one dead tree -----
+  function buildFarm(c) {
+    const y = 0.03;
+    flat(M.gravel, 0x5a4a3a, BLOCK - 2, BLOCK - 2, c.x, y, c.z, 6); lowGround.push({ x: c.x, z: c.z, half: BLOCK / 2 - 1 });
+    for (let k = 0; k < 5; k++) { const gx = c.x - 20 + k * 8, gz = c.z - 8;                                                                                    // greenhouses: long tunnels of dirty glass, lit from within
+      put(M.glow, new THREE.CylinderGeometry(3, 3, 34, 12, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateY(Math.PI / 2).translate(gx, y, gz), 0x7a8a6a); collide(gx, gz, 6, 34, 3);
+      for (let n = 0; n < 8; n++) slab(0x3a3a44, 0.06, 3, 0.06, gx - 2.9, y, gz - 15 + n * 4.3); slab(0xdfe8d0, 0.5, 0.5, 0.5, gx, y + 3, gz - 16);
+    }
+    const hx = c.x + 18, hz = c.z + 12;
+    slab(0x6a6a5a, 10, 6.4, 9, hx, y, hz, M.siding, 1.2); collide(hx, hz, 10, 9, 6.4); gable(0x3a3a3a, 9.6, 2.4, 11, hx, y + 6.4, hz, Math.PI / 2, M.plain);
+    windowAt(hx - 2.5, y + 1.4, hz + 4.5, 1.6, 1.3, 0, 1, true); windowAt(hx + 3, y + 4.4, hz + 4.5, 1.4, 1.1, 0, 1, false); slab(0x2a2a30, 1.3, 2.6, 0.14, hx + 1, y, hz + 4.55);
+    slab(0x4a4a52, 3, 1.8, 3, hx - 7, y, hz + 2); post(0x3a3a44, 0.08, 4, hx - 7, y + 1.8, hz + 2, 5); put(M.plain, new THREE.BoxGeometry(1.6, 0.2, 0.2).translate(hx - 7, y + 5.8, hz + 2), 0x8a8d96); // the pump and its wind vane
+    { const tx = c.x - 20, tz = c.z + 20;                                                                                                                                 // the tree: dead, and a stone at its foot
+      post(0x3a3028, 0.32, 5, tx, y, tz, 8); for (const [a, l, t] of [[0.4, 3, 0.9], [-0.6, 2.4, 1.3], [2.2, 2.6, 1.1], [3.6, 2, 1.5]]) put(M.plain, new THREE.CylinderGeometry(0.05, 0.12, l, 5).translate(0, l / 2, 0).rotateZ(t).rotateY(a).translate(tx, y + 4.2, tz), 0x3a3028);
+      slab(0x5a5a52, 0.5, 0.3, 0.3, tx + 0.9, y, tz + 0.2); for (let k = 0; k < 5; k++) post(0x6a5a3a, 0.025, 0.4, tx - 0.6 + k * 0.3, y, tz + 1.1, 4);
+      places.farm = { tree: { x: tx, z: tz }, stone: { x: tx + 0.9, z: tz + 0.2 }, root: { x: tx, z: tz + 1.4 }, house: { door: { x: hx + 1, z: hz + 6.4 }, inside: null }, gate: { x: c.x + 20, z: c.z + 34, h: Math.PI / 2 }, yard: { x: hx - 6, z: hz + 8 } };
+    }
+    for (let k = 0; k < 8; k++) post(0x3a3a44, 0.08, 1.4, c.x - 29 + k * 8.2, y, c.z + 29, 5); for (let k = 0; k < 8; k++) slab(0x6a6a5a, 8, 0.05, 0.05, c.x - 25 + k * 8.2, y + 1.2, c.z + 29);
+    shopDoors.push({ shop: 'FARMHOUSE', outside: { x: hx + 1, z: hz + 6.4, h: Math.PI } });
+  }
+  // ----- A street market: stalls under tarpaulins, hanging lanterns, steam, a crowd that eats standing up -----
+  function buildMarket(c) {
+    const y = CURB, LANT = [0xff3fa8, 0x49e0ff, 0xffe066, 0xff8a2c];
+    flat(M.paint, 0x33333a, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z);
+    for (let k = 0; k < 8; k++) {
+      const sx = c.x - 21 + (k % 4) * 14, sz = c.z - 12 + Math.floor(k / 4) * 24, turn = k < 4 ? 0 : Math.PI;
+      slab(0x5a3320, 5, 1, 1.2, sx, y, sz, M.wood, 1); collide(sx, sz, 5, 1.2, 1); slab(0x2a2a30, 5.4, 0.08, 1.4, sx, y + 1, sz);
+      for (const s2 of [-1, 1]) post(0x3a3a44, 0.05, 2.8, sx + s2 * 2.5, y, sz + (turn ? 1.2 : -1.2), 5); slab(LANT[k % 4], 6, 0.1, 3.4, sx, y + 2.8, sz, M.plain);
+      for (let n = 0; n < 3; n++) { ball(LANT[(k + n) % 4], 0.18, sx - 1.6 + n * 1.6, y + 2.3, sz + (turn ? 1.5 : -1.5), M.glow); halo(sx - 1.6 + n * 1.6, y + 2.3, sz + (turn ? 1.5 : -1.5), LANT[(k + n) % 4], 4); }
+      for (let n = 0; n < 4; n++) slab([0xd8342c, 0x2f7d46, 0xffe066, 0xf4f4f0][n], 0.5, 0.2, 0.4, sx - 1.5 + n * 1, y + 1.08, sz);
+      slab(0xffe2a6, 0.8, 0.5, 0.5, sx + 1.8, y + 1.08, sz, M.glow);
+      const steam = new THREE.Mesh(new THREE.SphereGeometry(0.5, 7, 5), new THREE.MeshBasicMaterial({ color: 0xdfe8f0, transparent: true, opacity: 0.2, depthWrite: false })); steam.position.set(sx + 1.8, y + 1.9, sz); scene.add(steam);
+      updaters.push(t => { const u = (t * 0.5 + k * 0.4) % 1; steam.position.y = y + 1.6 + u * 1.6; steam.scale.setScalar(0.5 + u); steam.material.opacity = 0.22 * (1 - u); });
+      q_stall(sx, sz, turn);
+    }
+    function q_stall(sx, sz, turn) { const who = makeHuman({ shirt: 0xf4f4f0, sleeves: 'long', pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', dark: rand() < 0.5, hat: 'cap', hatColor: 0x16161c }); who.group.position.set(sx, y, sz + (turn ? -1.1 : 1.1)); who.group.rotation.y = turn; who.set('idle'); scene.add(who.group); (places.marketFolk ??= []).push(who); }
+    sign(['NIGHT MARKET', 'SECTOR 13'], c.x, y + 6, c.z + 22, 0, { w: 8, h: 1.6, color: '#ff3fa8', bg: '#16161c', size: 0.7, glow: true });
+    for (const s2 of [-1, 1]) post(0x3a3a44, 0.12, 6, c.x + s2 * 4, y, c.z + 22, 6);
+    places.market = { centre: { x: c.x, z: c.z }, kerb: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 } };
   }
 
   // ----- Far East Pacific Bank: a tower over a colonnade, downtown -----
@@ -3627,15 +3749,70 @@ export function buildWorld(scene) {
     q.vault = q.at(9, -6); q.floor = q.at(0, 2);
   }
 
-  const SHOP_ROOM = { BAR: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'FASTFOOD', DONUTS: 'FASTFOOD', BURGERS: 'FASTFOOD', 'AUTO PARTS': 'PARTS', LAUNDRY: 'LAUNDRY', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
-  const SHOP_NAME = { CHRIS: "Christopher's place", HOTEL: 'the hotel', CARDROOM: 'room six', BANQUET: 'the Manor', BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
+  if (NEXUS) { // ----- Rooms the Blade Runner story needs -----
+    const INK = 0x16161c, STEELC = 0xc9cbd2, WHITE = 0xf4f4f0;
+    { // K's flat: one room over the sea road. A bed, a chair, a wall that is a screen, and the projector on the ceiling that is Joi's whole world.
+      const q = rooms.KFLAT = room(9, 7, 3, { floor: M.gravel, floorTint: 0x3a3a40, floorScale: 3, wall: M.plain, wallTint: 0x4a4a52, ceil: 0x2a2a30, door: INK, doorX: 2.5 });
+      q.block(0x2a2a30, 2.1, 0.4, 1.9, -3, -2.2); slab(0x55525a, 2, 0.14, 1.8, q.X - 3, q.Y + 0.4, q.Z - 2.2); slab(0x8a8d96, 0.5, 0.1, 0.4, q.X - 3.6, q.Y + 0.54, q.Z - 2.9);                   // the bed
+      q.glowPanel(0x1a2a3a, 5, 1.6, 1.5, -3.47, 1.6, 0); for (let k = 0; k < 6; k++) slab(0x49e0ff, 0.06, 0.4 + (k % 3) * 0.3, 0.02, q.X + 0.2 + k * 0.7, q.Y + 1.2, q.Z - 3.45, M.glow);         // the wall screen: a feed nobody watches
+      q.block(0x2a2a30, 0.9, 0.44, 0.9, 1.2, 1.5); put(M.plain, new THREE.BoxGeometry(0.9, 0.5, 0.08).translate(0, 0.7, -0.4).translate(q.X + 1.2, q.Y, q.Z + 1.5), 0x2a2a30);                  // a chair
+      q.block(0x3a3a44, 1.6, 0.9, 0.5, -3.4, 2.9); slab(STEELC, 0.5, 0.3, 0.3, q.X - 3.8, q.Y + 0.9, q.Z + 2.9); for (let k = 0; k < 3; k++) post(0x2f7d46, 0.03, 0.22, q.X - 2.9 + k * 0.15, q.Y + 0.9, q.Z + 2.9, 6);   // a counter, a kettle, bottles
+      slab(0xd8d2c0, 0.3, 0.25, 0.04, q.X + 3.8, q.Y + 1.4, q.Z - 3.47); slab(0x8a6a44, 0.18, 0.22, 0.03, q.X + 3.8, q.Y + 1.41, q.Z - 3.45);                                                   // a wooden horse would go here; a photograph does
+      q.window(-3.9, 0, 2, 1.2, 1.7, Math.PI / 2, 0x2a3a4a); for (let k = 0; k < 9; k++) slab(0x55525a, 0.03, 1.3, 0.04, q.X - 4.17, q.Y + 1.1, q.Z - 1 + k * 0.25);                               // the window and its blind, the rain outside
+      put(M.plain, new THREE.CylinderGeometry(0.2, 0.3, 0.2, 10).translate(q.X, q.Y + 2.85, q.Z), 0x8a8d96); ball(0x9fd0f5, 0.08, q.X, q.Y + 2.74, q.Z, M.glow);                                 // the projector
+      q.light(0, 2.6, 0, 0x9fd0f5, 20, 7); q.light(-3, 2.2, -2, 0xffd9a8, 10, 4);
+      Object.assign(q, { bed: { x: q.X - 3, y: q.Y, z: q.Z - 2.2 }, chair: { x: q.X + 1.2, y: q.Y, z: q.Z + 1.3, h: Math.PI }, joi: { x: q.X - 0.6, z: q.Z - 0.4 }, screen: { x: q.X + 1.5, z: q.Z - 3 } });
+    }
+    { // Baseline: a white room with one chair and a lens in the wall. Nothing else, so that nothing else is in your head.
+      const q = rooms.BASELINE = room(7, 7, 3.2, { floor: M.plain, floorTint: 0xe9e9ee, wall: M.plain, wallTint: 0xf4f4f6, ceil: 0xffffff, door: 0xcfd8dc, doorX: 0 });
+      q.block(0x2a2a30, 0.6, 0.5, 0.6, 0, -1.4); put(M.plain, new THREE.BoxGeometry(0.6, 0.6, 0.06).translate(0, 0.8, -0.3).translate(q.X, q.Y, q.Z - 1.4), 0x2a2a30);
+      put(M.plain, new THREE.CylinderGeometry(0.4, 0.4, 0.16, 20).rotateX(Math.PI / 2).translate(q.X, q.Y + 1.5, q.Z - 3.4), 0x2a2a30); put(M.glow, new THREE.CylinderGeometry(0.22, 0.22, 0.2, 20).rotateX(Math.PI / 2).translate(q.X, q.Y + 1.5, q.Z - 3.4), 0x8f7bff);
+      slab(0xcfd8dc, 2.4, 0.6, 0.02, q.X, q.Y + 2.4, q.Z - 3.47); q.light(0, 3, 0, 0xffffff, 40, 9);
+      Object.assign(q, { chair: { x: q.X, y: q.Y, z: q.Z - 1.4, h: Math.PI }, lens: { x: q.X, z: q.Z - 3.4 } });
+    }
+    { // The Wallace archive: a hall of black stone under a skin of water, and amber light that moves on everything
+      const q = rooms.ARCHIVE = room(22, 14, 7, { floor: M.gravel, floorTint: 0x1a1a1e, floorScale: 6, wall: M.plain, wallTint: 0x1e1a18, ceil: 0x0c0c0e, door: INK, doorX: 0 });
+      put(M.pool, new THREE.PlaneGeometry(21, 13).rotateX(-Math.PI / 2).translate(q.X, q.Y + 0.02, q.Z), 0x3a2a10);
+      for (const s2 of [-1, 1]) for (let k = 0; k < 5; k++) { post(0x16161a, 0.6, 7, q.X - 8 + k * 4, q.Y, q.Z + s2 * 4.5, 4); slab(0xffb347, 0.14, 5, 0.06, q.X - 8 + k * 4, q.Y + 1, q.Z + s2 * 4.5 - s2 * 0.32, M.glow); }
+      q.block(0x16161a, 6, 1.1, 1.4, 0, -4.6); slab(0xffb347, 5.6, 0.04, 1.2, q.X, q.Y + 1.1, q.Z - 4.6, M.glow); for (let k = 0; k < 4; k++) slab(0x3a2a10, 0.6, 0.3, 0.4, q.X - 2 + k * 1.3, q.Y + 1.14, q.Z - 4.6); // the reading table, lit from within, and the drawers of what is kept
+      for (let k = 0; k < 14; k++) slab(0x2a2420, 0.9, 0.5, 0.4, q.X - 9.6, q.Y + 0.4 + k * 0.42, q.Z - 5.5 + (k % 7) * 1.6);
+      q.light(0, 5, 0, 0xffb347, 60, 16); q.light(-6, 3, -3, 0xffb347, 30, 9); q.light(6, 3, 3, 0xffb347, 30, 9);
+      const caustic = new THREE.Mesh(new THREE.PlaneGeometry(21, 13).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: T.halo, color: 0xffb347, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false })); caustic.position.set(q.X, q.Y + 0.05, q.Z); scene.add(caustic);
+      updaters.push(t => { caustic.material.map.offset.set(Math.sin(t * 0.3) * 0.2, t * 0.03); caustic.material.opacity = 0.09 + Math.sin(t * 1.7) * 0.04; });
+      Object.assign(q, { table: { x: q.X, z: q.Z - 3.4 }, luv: { x: q.X + 1.2, y: q.Y, z: q.Z - 3.6, h: 0 } });
+    }
+    { // The orphanage shed: long tables, the children at them taking old boards apart, the furnace at the end
+      const q = rooms.ORPHANAGE = room(24, 12, 5, { floor: M.asphalt, floorTint: 0x5a4a40, floorScale: 5, wall: M.siding, wallTint: 0x6a4a3a, wallScale: 1.4, ceil: 0x2a2420, door: INK, doorX: 0 });
+      for (let r = 0; r < 3; r++) { q.block(0x4a3a2a, 16, 0.8, 1, -2, -4 + r * 3.4, M.wood, 1); for (let k = 0; k < 10; k++) slab([0x2f7d46, 0x3a3a44, 0x8a8d96, 0xd8342c][(k + r) % 4], 0.3, 0.06, 0.4, q.X - 9 + k * 1.6, q.Y + 0.8, q.Z - 4 + r * 3.4);
+        for (let k = 0; k < 6; k++) q.person(KID_LOOKS[(k + r) % 3], -8.5 + k * 3, -4 + r * 3.4 + (r % 2 ? 0.9 : -0.9), r % 2 ? Math.PI : 0, 'interact'); }
+      q.block(0x3a3a44, 3, 3.6, 2, 9.5, -3.5); put(M.glow, new THREE.PlaneGeometry(1.6, 1.4).translate(q.X + 7.98, q.Y + 1.4, q.Z - 3.5).rotateY(0), 0xff7a20); // (the furnace door faces west: the plane is on its west side)
+      slab(0xff5a30, 0.02, 1.2, 1.4, q.X + 7.97, q.Y + 0.8, q.Z - 3.5, M.glow); post(0x2a2a30, 0.3, 1.4, q.X + 9.5, q.Y + 3.6, q.Z - 3.5, 8);
+      q.block(0x2a2a30, 2, 1.2, 1, 9, 3.5, M.plain, 0); slab(0x55525a, 0.6, 0.5, 0.4, q.X + 9, q.Y + 1.2, q.Z + 3.5); slab(0xd8d2c0, 0.4, 0.3, 0.05, q.X + 8.6, q.Y + 1.2, q.Z + 3.3);  // the desk at which the books are kept
+      q.light(-2, 4.4, -1, 0xffd9a8, 40, 14); q.light(8, 2.4, -3.5, 0xff7a20, 30, 8);
+      const flicker = q.lights[1]; updaters.push(t => { flicker.power = 24 + Math.sin(t * 9) * 6 + Math.sin(t * 23) * 3; });
+      Object.assign(q, { furnace: { x: q.X + 7.2, z: q.Z - 3.5 }, desk: { x: q.X + 7.8, y: q.Y, z: q.Z + 3.5, h: -Math.PI / 2 }, floorMid: { x: q.X - 2, z: q.Z + 0.6 } });
+    }
+    { // Stelline's laboratory: a white room, and behind glass the maker of memories at her table, with a forest that is not there
+      const q = rooms.STELLINE = room(14, 10, 4, { floor: M.plain, floorTint: 0xe9e9ee, wall: M.plain, wallTint: 0xf4f4f6, ceil: 0xffffff, door: 0xcfd8dc, doorX: 0 });
+      slab(0xcfe0ff, 13, 3.6, 0.06, q.X, q.Y + 0.2, q.Z - 1, M.glow); collide(q.X, q.Z - 1, 13, 0.1, 3.8);                                                            // the glass wall, faintly lit
+      for (let k = 0; k < 5; k++) slab(STEELC, 0.08, 3.8, 0.1, q.X - 6 + k * 3, q.Y, q.Z - 1);
+      q.block(WHITE, 2, 0.76, 1, 0, -3.2, M.plain, 0); slab(0x8a8d96, 0.5, 0.3, 0.4, q.X - 0.6, q.Y + 0.76, q.Z - 3.2); put(M.glow, new THREE.SphereGeometry(0.16, 10, 8).translate(q.X + 0.6, q.Y + 1.05, q.Z - 3.2), 0x9fd0f5);  // her table and the device she draws with
+      for (let k = 0; k < 7; k++) { post(0x2a3a2a, 0.08, 3.4, q.X - 6 + k * 2, q.Y, q.Z - 4.6, 5); ball(0x4a7a4a, 0.7, q.X - 6 + k * 2, q.Y + 3.2, q.Z - 4.6); }                          // trees, projected: what she is making
+      const snow = Array.from({ length: 24 }, (_, k) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 4), new THREE.MeshBasicMaterial({ color: 0xffffff })); m.position.set(q.X - 6 + (k % 12), q.Y + 1 + (k % 5) * 0.6, q.Z - 2 - (k % 3)); scene.add(m); return m; });
+      updaters.push(t => snow.forEach((m, k) => { m.position.y = q.Y + 3.6 - ((t * 0.25 + k * 0.17) % 1) * 3.4; m.position.x += Math.sin(t + k) * 0.003; }));
+      q.block(0x2a2a30, 0.9, 0.44, 0.9, 0, 2.6); q.light(0, 3.6, 2, 0xffffff, 40, 10); q.light(0, 3.2, -3, 0xdfeeff, 30, 8);
+      Object.assign(q, { glass: { x: q.X, z: q.Z + 0.2 }, her: { x: q.X + 0.3, y: q.Y, z: q.Z - 2.6, h: 0 } });
+    }
+  }
+  const SHOP_ROOM = { BAR: 'BAR', NOODLES: 'DINER', RAMEN: 'DINER', PHARMA: 'STORE', PACHINKO: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'FASTFOOD', DONUTS: 'FASTFOOD', BURGERS: 'FASTFOOD', 'AUTO PARTS': 'PARTS', LAUNDRY: 'LAUNDRY', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
+  const SHOP_NAME = { NOODLES: 'the noodle bar', RAMEN: 'the ramen bar', PHARMA: 'the pharmacy', PACHINKO: 'the pachinko parlour', CHRIS: "Christopher's place", KFLAT: "K's flat", ARCHIVE: 'the Wallace archive', STELLINE: 'the laboratory', ORPHANAGE: 'the orphanage', FARMHOUSE: 'the farmhouse', HOTEL: 'the hotel', CARDROOM: 'room six', BANQUET: 'the Manor', BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
     HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the store', BOOKS: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office', SCHOOL: 'the hall' };
   places.rooms = rooms;
   places.parkedSpots = parkedSpots;
   // The story's diner is the one a short drive from Dr. Melfi's office; its bar is the one nearest the park.
   const nearestShop = (kind, to, lo = 120, hi = 260) => shopDoors.filter(d => (SHOP_ROOM[d.shop] ?? d.shop) === kind && d.kerb)
     .map(d => [Math.hypot(d.kerb.x - to.x, d.kerb.z - to.z), d]).sort((a, b) => Math.abs(a[0] - (lo + hi) / 2) - Math.abs(b[0] - (lo + hi) / 2))[0][1];
-  const dinerDoor = LA ? null : nearestShop('DINER', places.melfi.kerb), barDoor = nearestShop('BAR', places.park.kerb, 80, 200);
+  const dinerDoor = LA ? null : nearestShop('DINER', places.melfi.kerb), barDoor = nearestShop('BAR', places.park?.kerb ?? places.home.spawn, 80, 200);
   if (dinerDoor) places.diner = { door: dinerDoor.outside, kerb: dinerDoor.kerb };
   places.bar = { door: barDoor.outside, kerb: barDoor.kerb, room: rooms.BAR };
   const gunDoor = nearestShop('GUNS', places.home.spawn, 60, 400);
@@ -3686,8 +3863,22 @@ export function buildWorld(scene) {
     for (let k = 0; k < 5; k++) { post(0x8a8d96, 0.04, 2.2, cx - 6 + k * 3.4, on(-6 + k * 3.4, -13), cz - 13, 5); if (k < 4) { slab(0x9aa0a8, 3.4, 0.04, 0.04, cx - 4.3 + k * 3.4, on(-4.3 + k * 3.4, -13) + 2.15, cz - 13); slab(0x9aa0a8, 3.4, 0.04, 0.04, cx - 4.3 + k * 3.4, on(-4.3 + k * 3.4, -13) + 1.1, cz - 13); } } // what is left of a fence
   }
 
-  // ----- Beach: boardwalk, palms along Ocean Drive, umbrellas and lifeguard huts on the sand -----
   const beachLen = bounds.maxZ - bounds.minZ;
+  if (NEXUS) { // ----- The sea wall: thirty metres of concrete between the city and what the ocean has become -----
+    const WX = SHORE + 14, mid = (bounds.minZ + bounds.maxZ) / 2, CONC = 0x4a4a52, H = 30;
+    slab(CONC, 12, H + 1, beachLen + 40, WX, -1, mid, M.gravel, 8); collide(WX, mid, 12, beachLen + 40, H);
+    slab(0x55555e, 13, 0.8, beachLen + 40, WX, H - 0.4, mid); slab(0x3a3a42, 0.6, 1.4, beachLen + 40, WX - 6.2, H, mid); slab(0x3a3a42, 0.6, 1.4, beachLen + 40, WX + 6.2, H, mid); // the walkway along the top and its parapets
+    for (let z = bounds.minZ - 10; z < bounds.maxZ + 10; z += 48) {
+      slab(0x44444c, 5, H - 2, 7, SHORE + 5.5, -1, z, M.gravel, 6); collide(SHORE + 5.5, z, 5, 7, H - 2);                                                    // buttresses on the city side
+      ball(0xff3b3b, 0.3, WX, H + 1.6, z, M.glow); halo(WX, H + 1.6, z, 0xff3030, 4); post(0x8a8d96, 0.06, 1.6, WX, H, z, 5);
+      for (let k = 0; k < 3; k++) slab(0x2a2a30, 0.08, 1.5, 0.4, SHORE + 8.04, 6 + k * 7, z + 2.2); slab(0xf2c230, 1.6, 0.5, 0.04, SHORE + 8.04, 3.4, z - 2.4);   // rungs up the face, a stencil
+    }
+    for (let z = bounds.minZ + 20; z < bounds.maxZ; z += 96) { put(M.plain, new THREE.CylinderGeometry(1.1, 1.1, 2, 12).rotateZ(Math.PI / 2).translate(WX + 6.5, 4, z), 0x2a2a30); put(M.paint, new THREE.PlaneGeometry(2.2, 9).rotateX(-Math.PI / 2).translate(WX + 11, -0.05, z), 0x1a2a30); } // outfalls, and the stain below each
+    const spray = Array.from({ length: 14 }, (_, k) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(7, 5), new THREE.MeshBasicMaterial({ color: 0xbfd0dc, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide })); m.rotation.y = Math.PI / 2; m.position.set(WX + 7.5, H + 2, bounds.minZ + 30 + k * (beachLen / 14)); scene.add(m); return m; });
+    updaters.push(t => spray.forEach((m, k) => { const u = (t * 0.22 + k * 0.37) % 1; m.material.opacity = Math.sin(u * Math.PI) * 0.35; m.position.y = H - 4 + u * 11; m.scale.setScalar(0.6 + u * 1.4); })); // the sea coming over, now and then
+    places.wall = { top: { x: WX, y: H, z: mid }, foot: { x: SHORE + 3, z: mid } };
+  } else {
+  // ----- Beach: boardwalk, palms along Ocean Drive, umbrellas and lifeguard huts on the sand -----
   slab(0xd9b48a, 4.6, 0.12, beachLen - 16, SHORE + 2.3, -0.08, (bounds.minZ + bounds.maxZ) / 2, M.wood, 2.5);
   for (let z = bounds.minZ + 14; z < bounds.maxZ - 10; z += 13) palms.push({ x: SHORE + 5.6 + rand() * 1.5, z: z + rand() * 4 });
   const pierZ = blockCenter(NX - 1, 2).z, offPier = z => Math.abs(z - pierZ) > 7 && !(z > pierZ + 8 && z < pierZ + 48); // nothing grows through the pier, or through Rideland beside it
@@ -3813,6 +4004,8 @@ export function buildWorld(scene) {
     places.rideland = { gate: { x: x - 13, z }, carousel: { x: cx, z: cz }, horses, wheel: { x: wx, z: wz }, booth: { x: x - 9, z: z + 6 }, hide: { x: x - 7.4, z: z + 7.6 }, stop: { x: SHORE - 5, z }, kerb: { x: nodeX(NX) + 3.6, z, h: 0 } };
   }
 
+  }
+  if (!NEXUS) {
   // ----- The marsh on the west shore: reeds and dark water -----
   const marsh = { x: OX - ROAD / 2 - 11, z: blockCenter(0, 4).z };
   for (let n = 0; n < 60; n++) {
@@ -3838,6 +4031,8 @@ export function buildWorld(scene) {
     });
   }
 
+  }
+  if (!NEXUS) {
   // ----- The bridge to the other island: a long deck out over the water, two towers, cables, lamps -----
   // Vice City's leaves from the west shore; Los Angeles's arrives on the east. Driving off the far end crosses over.
   {
@@ -3927,7 +4122,8 @@ export function buildWorld(scene) {
     for (let n = palms.length - 1; n >= 0; n--) if (Math.abs(palms[n].z - z) < W / 2 + 3 && (palms[n].x - x0) * dir > -4) palms.splice(n, 1); // no palms growing through the deck
   }
 
-  buildPalms(scene, palms, rand, LA);
+  }
+  buildPalms(scene, NEXUS ? [] : palms, rand, LA); // nothing grows on Nexus
 
   const oz = blockCenter(NX - 1, 5).z;
   places.ocean = {
@@ -3965,8 +4161,12 @@ export function buildWorld(scene) {
     const f = places.flats.filter(f => f.door !== places.flat.door).sort((a, b) => off(a) - off(b))[0], d = f && shopDoors.find(d => d.outside === f.door);
     if (d) { d.shop = 'CHRIS'; places.chris = { door: f.door, kerb: f.kerb }; }
   }
-  const shopList = shopDoors.map(d => ({ name: SHOP_NAME[d.shop], outside: d.outside, inside: rooms[SHOP_ROOM[d.shop] ?? d.shop].inside }));
-  places.doors = LA ? [
+  if (NEXUS) rooms.FARMHOUSE = rooms.HOUSE; // the farmhouse is a house inside
+  const shopList = shopDoors.map(d => { const q = rooms[SHOP_ROOM[d.shop] ?? d.shop]; return q && { name: SHOP_NAME[d.shop], outside: d.outside, inside: q.inside }; }).filter(Boolean);
+  places.doors = NEXUS ? [
+    { name: 'the morgue', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: rooms.HOSPITAL.inside },
+    ...shopList.filter(d => d.name && d.inside),
+  ] : LA ? [
     { name: 'the hospital', outside: { x: places.hospital.door.x, z: places.hospital.door.z - 3.6, h: 0 }, inside: rooms.HOSPITAL.inside },
     ...shopList,
   ] : [
@@ -3999,6 +4199,48 @@ export function buildWorld(scene) {
     });
   };
   places.sky = buildSky(scene, updaters);
+  if (NEXUS) { // ----- What moves in Nexus: the rain, the sky's traffic, the adverts, and one woman eight storeys tall -----
+    { // Rain: lines in a box round the camera, falling; the box rides with the sky dome, which rides with the camera.
+      const N = 1400, pos = new Float32Array(N * 6), seed = Array.from({ length: N }, (_, k) => [(mulberry32(k + 7)() - 0.5) * 60, mulberry32(k + 99)() * 40, (mulberry32(k + 3)() - 0.5) * 60]);
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const rain = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x9fb0c8, transparent: true, opacity: 0.28, fog: false, depthWrite: false })); rain.frustumCulled = false; places.sky.add(rain);
+      updaters.push(t => { for (let k = 0; k < N; k++) { const [x, y0, z] = seed[k], y = 40 - ((y0 + t * 26) % 40); pos[k * 6] = x; pos[k * 6 + 1] = y; pos[k * 6 + 2] = z; pos[k * 6 + 3] = x + 0.08; pos[k * 6 + 4] = y + 0.9; pos[k * 6 + 5] = z; } geo.attributes.position.needsUpdate = true; });
+    }
+    { // Spinners: the traffic that goes over the top of everything, in lanes of its own, with their lights
+      const kinds = [];
+      for (let k = 0; k < 10; k++) {
+        const grp = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.1, 2), new THREE.MeshLambertMaterial({ color: k % 3 ? 0x1c1c22 : 0x3a3a44 })), cab = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 1.7).translate(-0.2, 0.9, 0), new THREE.MeshLambertMaterial({ color: 0x141c2b }));
+        const under = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.8).rotateX(Math.PI / 2).translate(0, -0.56, 0), new THREE.MeshBasicMaterial({ color: 0x49e0ff, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+        for (const [x, hex] of [[2.1, 0xfff2c0], [-2.1, 0xff2a3c]]) for (const s2 of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.4), new THREE.MeshBasicMaterial({ color: hex })); l.position.set(x, 0.1, s2 * 0.7); grp.add(l); }
+        if (k % 4 === 0) { const bar = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.14, 1.4), new THREE.MeshBasicMaterial({ color: 0x4a7dff })); bar.position.set(0.4, 1.4, 0); grp.add(bar); }
+        grp.add(body, cab, under); scene.add(grp);
+        kinds.push({ grp, r: 180 + k * 55, y: 70 + (k % 5) * 18, w: (k % 2 ? 1 : -1) * (0.05 + (k % 3) * 0.012), ph: k * 1.7, cx: (k % 3 - 1) * 200, cz: (k % 2) * 160 - 80 });
+      }
+      updaters.push(t => { for (const s2 of kinds) { const a = t * s2.w + s2.ph, x = s2.cx + Math.cos(a) * s2.r, z = s2.cz + Math.sin(a) * s2.r * 0.7; s2.grp.position.set(x, s2.y + Math.sin(t * 0.7 + s2.ph) * 2, z); s2.grp.rotation.y = -a + (s2.w > 0 ? Math.PI : 0); s2.grp.rotation.z = -0.12 * Math.sign(s2.w); } });
+    }
+    { // Adverts: tall sheets of light on the faces of the towers, and they flicker. The words are the game's own.
+      const ADS = [['NEW LIVES', 'OFF-WORLD'], ['EVERYTHING', 'YOU WANT', 'TO HEAR'], ['SOY · PROTEIN', 'FARMED FRESH'], ['REAL EYES', 'WALLACE OPTICS'], ['PACHINKO', 'SECTOR 9'], ['SLEEP', 'WITHOUT', 'DREAMS']];
+      const holos = [], HEX = [0xff3fa8, 0x49e0ff, 0xffb347, 0x8f7bff, 0x7dffb0];
+      let n = 0;
+      for (const [key, kind] of Object.entries(places.kinds)) {
+        if (kind !== 'tower' && kind !== 'wallace') continue;
+        const [i, j] = key.split(',').map(Number), c = blockCenter(i, j); if ((i * 3 + j) % 2) continue;
+        const w = 14, h = 36, hex = HEX[n % HEX.length], face = (n % 4), tx = c.x + (face === 1 ? 19.5 : face === 3 ? -19.5 : 0), tz = c.z + (face === 0 ? 19.5 : face === 2 ? -19.5 : 0), turn = face === 0 ? 0 : face === 1 ? Math.PI / 2 : face === 2 ? Math.PI : -Math.PI / 2;
+        const tex = texture(256, 640, (cv, W, H) => { cv.fillStyle = '#000'; cv.fillRect(0, 0, W, H); cv.fillStyle = '#' + hex.toString(16).padStart(6, '0'); cv.font = 'bold 54px "Bebas Neue", sans-serif'; cv.textAlign = 'center'; const rows = ADS[n % ADS.length]; rows.forEach((r, k) => cv.fillText(r, W / 2, H * 0.35 + k * 70)); cv.globalAlpha = 0.35; for (let y = 0; y < H; y += 4) cv.fillRect(0, y, W, 1); });
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+        m.position.set(tx, 42 + (n % 3) * 10, tz); m.rotation.y = turn; scene.add(m); holos.push({ m, k: n });
+        n++;
+      }
+      updaters.push(t => { for (const { m, k } of holos) m.material.opacity = 0.55 + 0.25 * Math.sin(t * 1.3 + k) + (Math.sin(t * 17 + k * 5) > 0.93 ? 0.3 : 0); });
+    }
+    if (places.wallace) { // the one that dances on the plaza by the water, eight storeys tall, lit from inside
+      const her = makeHuman({ body: 'female', shirt: 0x9fd0f5, tee: true, pants: 0x49e0ff, hair: 0x1c1c3a, hairMesh: 'long', hairScale: [1.05, 1.1, 1.05] });
+      her.group.scale.setScalar(9); her.group.position.set(places.wallace.plaza.x - 22, CURB, places.wallace.plaza.z + 1); her.group.rotation.y = Math.PI;
+      her.group.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.42; o.material.depthWrite = false; o.material.emissive?.set(0x3060a0); if (o.material.emissiveIntensity !== undefined) o.material.emissiveIntensity = 0.9; o.castShadow = false; } });
+      her.set('dance'); scene.add(her.group); places.giant = her;
+      updaters.push(t => { her.group.visible = Math.sin(t * 11) > -0.97; });
+    }
+  }
   places.update = time => { for (const fn of updaters) fn(time); };
   // k: 0 = the usual sunset, 1 = night.
   places.setNight = k => {
@@ -4151,9 +4393,9 @@ function buildSky(scene, updaters) {
   const group = new THREE.Group();
   const dome = new THREE.Mesh(new THREE.SphereGeometry(1500, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { time: { value: 0 }, sun: { value: SUN }, night: { value: 0 }, tint: { value: LA ? new THREE.Vector3(0.62, 0.8, 1.22) : new THREE.Vector3(1, 1, 1) } },
+    uniforms: { time: { value: 0 }, sun: { value: SUN }, night: { value: 0 }, smog: { value: NEXUS ? 1 : 0 }, tint: { value: LA && !NEXUS ? new THREE.Vector3(0.62, 0.8, 1.22) : new THREE.Vector3(1, 1, 1) } },
     vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `varying vec3 vP; uniform float time; uniform float night; uniform vec3 sun; uniform vec3 tint;
+    fragmentShader: `varying vec3 vP; uniform float time; uniform float night; uniform vec3 sun; uniform vec3 tint; uniform float smog;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y); }
@@ -4173,6 +4415,11 @@ function buildSky(scene, updaters) {
         dark += step(0.9972, hash(floor(d.xz / (abs(h) + 0.35) * 190.0))) * smoothstep(0.04, 0.3, h) * (1.0 - cloud);
         dark += cloud * vec3(0.05, 0.05, 0.1) + vec3(0.25, 0.3, 0.5) * pow(s, 40.0);
         c = mix(c * tint, dark, night); // Los Angeles: the same dusk, gone to blue
+        if (smog > 0.5) { // Nexus: no sky to speak of. Rust at the horizon where the city burns its light, soot above, the cloud lit from below.
+          vec3 s2 = mix(vec3(0.46, 0.22, 0.07), vec3(0.04, 0.035, 0.06), smoothstep(-0.04, 0.3, h));
+          s2 += cloud * vec3(0.16, 0.08, 0.03) * (1.0 - smoothstep(0.0, 0.5, h)) + vec3(0.03, 0.02, 0.05) * fbm(d.xz / (h + 0.3) * 0.6 + time * 0.01);
+          c = s2;
+        }
         gl_FragColor = vec4(c, 1.0);
       }`,
   }));
@@ -4182,6 +4429,28 @@ function buildSky(scene, updaters) {
   sun.position.copy(SUN).multiplyScalar(1338);
   sun.lookAt(0, 0, 0);
   group.add(dome, sun);
+  if (NEXUS) sun.visible = false;
+  // Other worlds in the sky. From Vice City and Los Angeles: a grey planet with a dish in it, like a station somebody built and left. From Nexus: the pink one they came from.
+  const planet = (r, dir, draw, lit = 1) => {
+    const tex = texture(512, 256, draw), m = new THREE.Mesh(new THREE.SphereGeometry(r, 36, 24), new THREE.MeshLambertMaterial({ map: tex, fog: false, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.18 * lit }));
+    m.position.copy(dir).normalize().multiplyScalar(1320); m.rotation.y = 2.2; group.add(m); return m;
+  };
+  const station = (c, w, h) => { // grey, cratered, a great dish on one face and a trench round its middle
+    c.fillStyle = '#8c8c92'; c.fillRect(0, 0, w, h);
+    for (let n = 0; n < 420; n++) { const x = (n * 97) % w, y = (n * 61) % h, r = 2 + (n * 13) % 9; c.fillStyle = n % 3 ? '#777780' : '#9a9aa2'; c.beginPath(); c.arc(x, y, r, 0, 6.3); c.fill(); c.fillStyle = '#5e5e66'; c.beginPath(); c.arc(x + r * 0.3, y + r * 0.3, r * 0.6, 0, 6.3); c.fill(); }
+    for (let y = 0; y < h; y += 8) for (let x = 0; x < w; x += 10) if ((x * 7 + y * 3) % 11 < 2) { c.fillStyle = '#6a6a72'; c.fillRect(x, y, 6, 3); }
+    c.fillStyle = '#55555e'; c.fillRect(0, h * 0.47, w, h * 0.06); c.fillStyle = '#3a3a44'; c.fillRect(0, h * 0.49, w, h * 0.02);
+    const g = c.createRadialGradient(w * 0.3, h * 0.36, 6, w * 0.3, h * 0.36, 52); g.addColorStop(0, '#2c2c34'); g.addColorStop(0.7, '#4a4a54'); g.addColorStop(1, '#8c8c92'); c.fillStyle = g; c.beginPath(); c.arc(w * 0.3, h * 0.36, 52, 0, 6.3); c.fill();
+    c.fillStyle = '#9fe8ff'; c.beginPath(); c.arc(w * 0.3, h * 0.36, 5, 0, 6.3); c.fill();
+  };
+  const home = (c, w, h) => { // pink seas, pale land, swirls of white
+    c.fillStyle = '#d87aa8'; c.fillRect(0, 0, w, h);
+    for (let n = 0; n < 60; n++) { c.fillStyle = n % 2 ? '#f0d4a0' : '#8fd0c8'; c.beginPath(); c.ellipse((n * 131) % w, (n * 71) % h, 18 + (n * 7) % 40, 10 + (n * 5) % 24, n, 0, 6.3); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.75)'; for (let n = 0; n < 90; n++) { c.beginPath(); c.ellipse((n * 173) % w, (n * 53) % h, 30 + (n * 11) % 40, 4 + (n * 3) % 6, 0.3, 0, 6.3); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(0, 0, w, 14); c.fillRect(0, h - 14, w, 14);
+  };
+  if (NEXUS) { planet(95, new THREE.Vector3(0.35, 0.22, -0.9), home, 1.4); planet(26, new THREE.Vector3(-0.8, 0.5, 0.3), station, 0.6); }
+  else planet(130, new THREE.Vector3(-0.55, 0.3, -0.78), station, LA ? 0.5 : 0.8);
   scene.add(group);
   const dusk = new THREE.Color(0xfff3c4), moon = new THREE.Color(0xe6ecff);
   group.userData.setNight = k => {

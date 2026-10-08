@@ -473,7 +473,8 @@ function paint(B, o) {
   const print = o.pattern ? printData(o.pattern) : null, printOuter = print && !jacket, printInner = print && jacket;
   const jprint = jacket && o.jacketPattern ? printData(o.jacketPattern) : null;
   const sleeve = bikini ? 0 : o.sleeves === 'long' || jacket ? 0.96 : o.tee ? 0.3 : 0.45;
-  const waistY = J.waistY, hemY = o.tucked && !jacket ? waistY : jacket ? waistY - 0.17 : waistY - 0.1, neck = J.neck;
+  const waistY = J.waistY, hemY = o.tucked && !jacket ? waistY : jacket ? waistY - (o.coat !== undefined ? (o.coatLen ?? 0.5) : 0.17) : waistY - 0.1, neck = J.neck;
+  const collar = o.collar !== undefined ? rgb(o.collar) : null, turtle = o.turtle !== undefined ? rgb(o.turtle) : null;
   const cuffY = J.ankle.y - 0.03;
   const armLen = J.wrist.x - J.shoulder.x, legLen = J.hip.y - J.ankle.y;
   const prof = B.prof, fill = B.female ? 0.76 : 0.94;
@@ -511,7 +512,9 @@ function paint(B, o) {
     // Returns false where nothing is drawn (bare skin, or trousers when low).
     const top = low => {
       const dn = Math.hypot(x, y - neck.y, z - neck.z);
+      if (turtle && dn < 0.1 && y > neck.y - 0.09) { set(turtle, 0.9 + 0.18 * ((((i * 2654435761) >>> 20) & 3) / 3)); shade = 0; return true; } // a roll-neck, ribbed
       if (dn < 0.062) return false;
+      if (collar && dn < 0.125 && y > neck.y - 0.115 && !(front && Math.abs(x) < 0.03 && y < neck.y - 0.06)) { set(collar, 0.82 + 0.36 * ((((i * 2246822519) >>> 22) & 7) / 7)); shade = 0; return true; } // fleece: a collar that stands up, mottled
       // The body is widened into its clothes after painting (see shaped), unevenly by height;
       // measure across the finished cloth so edges and prints come out straight.
       const w0 = Math.max(0.03, prof.w(y)), wide = lerp(Math.max(w0, prof.chestW * fill) / w0, 1, smooth((y - prof.chestY) / 0.1));
@@ -868,6 +871,8 @@ const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true
 //   hat        'fedora' | 'cap', in hatColor, with hatBand for the band or button
 //   pattern    'blocks' | 'plaid' | 'paisley' | 'palms' | 'stripes' | 'pinstripe' | 'check' printed shirt
 //   jacket     colour of an open jacket worn over the shirt; jacketPattern prints the jacket; tie adds a tie in that colour
+//   coat       colour of a long coat (a jacket that falls to the knee: coatLen metres below the waist, 0.5 by default)
+//   collar     colour of a thick fleece collar on the coat or jacket; turtle colour of a roll-neck under it
 //   open       colour of an undershirt showing through an unbuttoned shirt or track top
 //   tank       the undershirt is a low-cut tank
 //   sleeves    'short' | 'long'
@@ -875,6 +880,7 @@ const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true
 //   stripe     colour of side stripes down arms and legs (tracksuit)
 export function makeHuman(opts = {}) {
   const o = { body: 'male', shirt: 0xffffff, pants: 0x23232b, hair: 0x2b1b12, bulk: 1, height: 1, head: 1.06, hairStyle: 'short', sleeves: 'short', ...opts };
+  if (o.coat !== undefined && o.jacket === undefined) o.jacket = o.coat; // a coat is a jacket that goes on down
   const B = bodies[o.body];
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';
@@ -1042,6 +1048,19 @@ export function updatePeople(dt, eye) {
 // The crew's looks, taken from the reference image (left to right).
 // Hesh runs his record label in this world; Furio only arrives late in the storyline.
 export const LOOKS = {
+  // ----- Nexus (Blade Runner 2049). Generic figures in the film's wardrobe: build, hair and clothes, not anybody's face. -----
+  k: { coat: 0x2f3a2e, coatLen: 0.55, collar: 0xb9a58a, shirt: 0x2a2a30, turtle: 0x2a2a30, pants: 0x23232b, shoes: 0x1c1c22, hair: 0x3a2a1c, hairMesh: 'buzzed', hairScale: [1.02, 1.1, 1.04], bulk: 1.02, stubble: 0.25, face: { jaw: 0.08, brow: 0.3, cheeks: -0.3 } },
+  joi: { body: 'female', coat: 0xdfe8f0, coatLen: 0.5, shirt: 0xffd9a8, pants: 0xcfd8e6, shoes: 0xdfe8f0, hair: 0x1c1410, hairMesh: 'long', hairScale: [1.06, 0.82, 1.06], skin: [1.02, 0.98, 0.98] },
+  joshi: { body: 'female', coat: 0x1c1c22, coatLen: 0.4, shirt: 0x2a2a30, turtle: 0x2a2a30, pants: 0x1c1c22, hair: 0x2b1b12, hairMesh: 'parted', hairScale: [1.04, 0.96, 1.08], age: 0.4, face: { cheeks: -0.3, jaw: -0.1 } },
+  luv: { body: 'female', coat: 0xf4f4f6, coatLen: 0.55, shirt: 0xf4f4f6, turtle: 0xf4f4f6, pants: 0xf4f4f6, shoes: 0xf4f4f6, hair: 0x111111, hairMesh: 'long', hairScale: [1.04, 0.78, 1.04], skin: [1, 0.97, 0.96], face: { cheeks: -0.5, jaw: -0.15 } },
+  wallace: { coat: 0x1a1a1e, coatLen: 0.7, shirt: 0x1a1a1e, turtle: 0x1a1a1e, pants: 0x1a1a1e, hair: 0x8a8278, hairMesh: 'parted', hairScale: [1.02, 1.0, 1.06], bulk: 0.92, age: 0.5, skin: [1.02, 1, 0.96], face: { cheeks: -0.5, chin: 0.2 } },
+  sapper: { jacket: 0x3a3a34, shirt: 0x6a6a5a, sleeves: 'long', pants: 0x3a3a34, shoes: 0x2a2420, hair: 0x2b1b12, hairStyle: 'balding', beard: 0x3a2a1c, beardMesh: true, bulk: 1.38, belly: 0.03, height: 1.08, age: 0.5, face: { jaw: 0.22, brow: 0.5, neck: 0.4 } },
+  coco: { jacket: 0xf4f4f0, shirt: 0x5fb0a8, tee: true, pants: 0x3a3a44, hair: 0x111111, hairMesh: 'buzzed', dark: true, glasses: 'clear', bulk: 0.95 },
+  cotton: { jacket: 0x5a4a3a, shirt: 0xd9c7a0, sleeves: 'long', tucked: true, pants: 0x3a3028, hair: 0x9a9690, hairStyle: 'receding', glasses: 'clear', glassesScale: 1.2, bulk: 1.1, age: 0.8, stubble: 0.4, face: { cheeks: 0.4, jowls: 0.4 } },
+  stelline: { body: 'female', jacket: 0xf4f4f6, shirt: 0xe9e9ee, pants: 0xf4f4f6, shoes: 0xf4f4f6, hair: 0x7a3b1a, hairMesh: 'long', hairScale: [1.04, 1.02, 1.04], skin: [1.04, 1.0, 0.98], bulk: 0.9 },
+  mariette: { body: 'female', coat: 0x3a2a3a, coatLen: 0.4, shirt: 0xff3fa8, pants: 0x1c1c22, hair: 0xff3fa8, hairMesh: 'long', hairScale: [1.02, 0.8, 1.02] },
+  freysa: { body: 'female', coat: 0x4a4a52, coatLen: 0.55, shirt: 0x3a3a44, turtle: 0x3a3a44, pants: 0x2a2a30, hair: 0xdcdad4, hairMesh: 'parted', age: 0.6, glasses: 'clear' },
+  replicant: { coat: 0x2a2a30, coatLen: 0.5, shirt: 0x3a3a44, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', bulk: 1.1 },
   pussy: { // the biggest man in the room: a round face on no neck, slicked hair, a loose two-piece in powder blue
     jacket: 0xa9bcd8, pants: 0xa9bcd8, shirt: 0xece6dc, pattern: 'stripes', tucked: true, shoes: 0xe9e4da, chain: true,
     hair: 0x14110f, hairMesh: 'parted', hairScale: [1.06, 0.92, 1.06], bulk: 1.5, belly: 0.015, height: 1.02, head: 1.12,

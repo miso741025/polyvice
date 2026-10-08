@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { NX, NZ, ROAD, LANE, CELL, nodeX, nodeZ, clamp, wrapAngle, pushOut, groundAt } from './grid.js';
+import { CITY, NX, NZ, ROAD, LANE, CELL, nodeX, nodeZ, clamp, wrapAngle, pushOut, pushOutAbove, groundAt } from './grid.js';
 import { makeHuman, makeLook, makeTony, LOOKS, loadPeople, updatePeople } from './people.js';
 
 // Headings: an angle h means "facing (sin h, cos h)" in (x, z); local +z of a mesh is its front.
@@ -60,7 +60,23 @@ const PED_LOOKS = [
   { shirt: 0xf4f4f4, sleeves: 'long', tucked: true, pants: 0x23232b, tie: 0x8a1c1c, hair: 0x111111, hairMesh: 'buzzed', dark: true, age: 0.3 },
 ];
 const pick = (arr, rand) => arr[Math.floor(rand() * arr.length)];
-export const randomPedLook = (rand = Math.random) => ({ ...pick(PED_LOOKS, rand), bulk: 0.9 + Math.floor(rand() * 4) * 0.1 });
+// Nexus dresses for the rain: long coats, hoods and caps, collars up, and the hair in colours that glow under the adverts.
+const NEXUS_LOOKS = [
+  { coat: 0x1c1c22, shirt: 0x3a3a44, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', dark: true, collar: 0x2a2a30 },
+  { coat: 0x2a2420, shirt: 0x8a8d96, pants: 0x1c1c22, hair: 0x2b1b12, hairMesh: 'parted', hat: 'cap', hatColor: 0x16161c, stubble: 0.5 },
+  { coat: 0x16161c, shirt: 0xf4f4f0, turtle: 0x16161c, pants: 0x16161c, hair: 0x9a9690, hairMesh: 'parted', glasses: 'shades', age: 0.5 },
+  { body: 'female', coat: 0xcfd8e6, shirt: 0xffffff, pants: 0x23232b, hair: 0xff3fa8, hairMesh: 'long', hairScale: [1, 0.8, 1] },
+  { body: 'female', coat: 0x1c1c22, shirt: 0x49e0ff, turtle: 0x49e0ff, pants: 0x1c1c22, hair: 0x111111, hairMesh: 'long', dark: true },
+  { body: 'female', coat: 0x3a2a3a, shirt: 0xe9e2d2, pants: 0x2a2a30, hair: 0x49e0ff, hairMesh: 'long', hairScale: [1, 0.7, 1], glasses: 'clear' },
+  { jacket: 0x2f3a2a, shirt: 0xd9c7a0, sleeves: 'long', pants: 0x2a2a30, hair: 0x7a3b1a, hairMesh: 'parted', beard: 0x6a3a2a, beardMesh: true, bulk: 1.15, hat: 'cap', hatColor: 0x2a2a30 },
+  { coat: 0x5a4a3a, shirt: 0x3a3a44, pants: 0x3a3a44, hair: 0x111111, hairStyle: 'balding', dark: true, age: 0.8, collar: 0x8a7a66 },
+  { shirt: 0xff8a2c, tee: true, pants: 0x16161c, hair: 0x111111, hairMesh: 'buzzed', dark: true, glasses: 'shades', bulk: 1.2 },
+  { body: 'female', jacket: 0xf4f4f0, shirt: 0x16161c, pants: 0xf4f4f0, hair: 0x1c1c3a, hairMesh: 'long', hairScale: [1, 0.85, 1] },
+  { coat: 0x23232b, shirt: 0x8f7bff, pants: 0x23232b, hair: 0xd9b25a, hairMesh: 'parted', stubble: 0.3, collar: 0x16161c },
+  { body: 'female', coat: 0x2a2a30, shirt: 0xffe066, pants: 0x2a2a30, hair: 0x111111, hairMesh: 'long', hat: 'cap', hatColor: 0x16161c },
+];
+const CROWD = CITY === 'nexus' ? NEXUS_LOOKS : PED_LOOKS;
+export const randomPedLook = (rand = Math.random) => ({ ...pick(CROWD, rand), bulk: 0.9 + Math.floor(rand() * 4) * 0.1 });
 
 // A pedestrian who walks laps around the sidewalk of one block, runs from trouble, and can be hurt.
 export class Ped {
@@ -70,7 +86,7 @@ export class Ped {
     this.dir = rand() < 0.5 ? 1 : -1;
     this.speed = 1.2 + rand() * 0.6;
     this.loiter = rand() < 0.2 ? 20 + rand() * 60 : 0; // some stand about talking for a while before moving on
-    this.human = makeHuman({ ...pick(PED_LOOKS, rand), bulk: 0.9 + Math.floor(rand() * 4) * 0.1 });
+    this.human = makeHuman({ ...pick(CROWD, rand), bulk: 0.9 + Math.floor(rand() * 4) * 0.1 });
     this.pos = new THREE.Vector3();
     this.down = 0; this.health = 100; this.dead = false; this.flight = 0; this.threat = new THREE.Vector3(); this.returning = false;
     this.pathPoint(this.pos);
@@ -207,6 +223,8 @@ const CAR_KINDS = {
   suv: { L: 5.1, W: 2.02, clear: 0.36, R: 0.4, axle: 1.62, nose: 1.0, cowl: [1.08, 1.12], roofF: 0.72, roofR: -2.32, roof: 1.84, deck: [-2.46, 1.12], tail: 1.1, pillars: [-0.2, -1.32], rack: true },
   taxi: { base: 'sedan', sign: true },
   police: { base: 'sedan', lightbar: true },
+  // A spinner: a long low wedge of a car that lifts off. Its wheels fold away when it does.
+  spinner: { base: 'coupe', L: 4.9, W: 2.1, clear: 0.3, nose: 0.62, cowl: [0.7, 0.86], roofF: -0.1, roofR: -1.1, roof: 1.2, deck: [-1.9, 0.9], tail: 0.88, fins: true },
   // A panel van: a short nose and a tall box of a body, windowless behind the cab.
   van: { L: 5.0, W: 2.0, clear: 0.34, R: 0.36, axle: 1.55, nose: 0.95, cowl: [1.3, 1.05], roofF: 0.9, roofR: -2.25, roof: 2.05, deck: [-2.4, 1.05], tail: 1.05, pillars: [0.1], blind: true },
   ambulance: { base: 'van', lightbar: true, medic: true },
@@ -314,6 +332,7 @@ function buildCar(kind) {
       slab(0.2, 0.05, k.axle * 2 - R * 2 - 0.36, s * (W / 2 + 0.06), yb + 0.02, 0, BLACK));  // roof rail, running board
   }
   if (k.rack) for (const z of [k.roofF - 0.5, (k.roofF + k.roofR) / 2, k.roofR + 0.5]) trim.push(slab(gw - 0.2, 0.04, 0.05, 0, ry + 0.1, z, BLACK));
+  if (k.fins) for (const s of [-1, 1]) { paint.push(new THREE.BoxGeometry(0.5, 0.28, 1.6).translate(s * (W / 2 - 0.2), k.tail + 0.1, -hl + 0.9)); lights.push(slab(0.3, 0.06, 0.5, s * (W / 2 - 0.2), k.clear + 0.05, -0.3, 0x49e0ff)); lights.push(slab(0.5, 0.05, 0.5, s * (W / 2 - 0.2), k.clear + 0.02, 0.9, 0x49e0ff)); }
   if (k.wing) {
     paint.push(new THREE.BoxGeometry(W - 0.1, 0.045, 0.34).translate(0, k.tail + 0.24, -hl + 0.24));
     for (const s of [-1, 1]) paint.push(new THREE.BoxGeometry(0.06, 0.24, 0.2).translate(s * (W / 2 - 0.2), k.tail + 0.1, -hl + 0.24));
@@ -358,6 +377,8 @@ function buildCar(kind) {
 
 const trimMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 40, specular: 0x262626, side: THREE.DoubleSide });
 const lightMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+let beamTex = null;
+const beamMap = () => beamTex ??= (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d'); const gr = x.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 128); const side = x.createLinearGradient(0, 0, 64, 0); side.addColorStop(0, 'rgba(0,0,0,1)'); side.addColorStop(0.3, 'rgba(0,0,0,0)'); side.addColorStop(0.7, 'rgba(0,0,0,0)'); side.addColorStop(1, 'rgba(0,0,0,1)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = side; x.fillRect(0, 0, 64, 128); const t = new THREE.CanvasTexture(c); return t; })();
 const wheelMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 const paints = new Map();
 const paintMat = color => paints.get(color) ?? paints.set(color, new THREE.MeshPhongMaterial({ color, shininess: 90, specular: 0x777777 })).get(color);
@@ -371,6 +392,14 @@ function makeCarMesh(color, kind) {
   }
   g.userData.radius = k.R;
   g.userData.reach = k.L / 2 - 1; // how far the collision circles sit from the centre
+  { // Headlamp beams: a pale wedge laid on the road ahead, shown after dark (owner: cars had no lights at night).
+    const L = k.L, geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-k.W * 0.42, 0.05, L / 2, k.W * 0.42, 0.05, L / 2, k.W * 1.1, 0.05, L / 2 + 16, -k.W * 1.1, 0.05, L / 2 + 16]), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
+    geo.setIndex([0, 1, 2, 0, 2, 3]);
+    const beam = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: beamMap(), color: 0xfff2c0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    beam.renderOrder = 2; g.add(beam); g.userData.beam = beam;
+  }
   return g;
 }
 
@@ -400,8 +429,20 @@ export class Car {
     this.pool = wheelPool(scene, kind);
     this.wheel = this.pool.free.length ? this.pool.free.pop() : (this.pool.mesh.count += 4) - 4;
     this.spin = 0; this.wheelsShown = true;
+    this.alt = 0; this.lift = 0; // a spinner: height above the ground, and the rate it is climbing
     scene.add(this.mesh);
     this.sync();
+  }
+
+  // In the air a spinner steers at any speed, climbs and sinks on `lift` (-1..1), and does not roll.
+  fly(dt, throttle, steer, lift) {
+    const top = 42;
+    if (throttle > 0) this.speed += 12 * (1 - this.speed / top) * dt; else if (throttle < 0) this.speed -= 12 * dt; else this.speed -= Math.sign(this.speed) * Math.min(Math.abs(this.speed), 4 * dt);
+    this.speed = clamp(this.speed, -8, top);
+    this.heading += steer * 1.5 * dt;
+    this.alt = clamp(this.alt + lift * 9 * dt, 0, 170);
+    this.bank = ((this.bank ?? 0) + (steer * 0.35 - (this.bank ?? 0)) * Math.min(1, dt * 3));
+    this.move(dt);
   }
 
   drive(dt, throttle, steer, handbrake) {
@@ -437,8 +478,9 @@ export class Car {
   }
 
   sync() {
-    this.mesh.position.set(this.pos.x, groundAt(this.pos.x, this.pos.z), this.pos.z);
+    this.mesh.position.set(this.pos.x, groundAt(this.pos.x, this.pos.z) + (this.alt || 0), this.pos.z);
     this.mesh.rotation.y = this.heading;
+    if (this.kind === 'spinner') { this.mesh.rotation.z = -(this.bank ?? 0); this.mesh.rotation.x = this.alt > 0.5 ? -(this.lift || 0) * 0.12 : 0; const show = this.alt < 0.5; if (show !== this.wheelsShown) { this.wheelsShown = show; } }
     this.placeWheels();
   }
 

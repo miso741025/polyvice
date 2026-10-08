@@ -150,6 +150,12 @@ const crickets = (() => {
   }
   return { out };
 })();
+// Rain: a wash of brown noise with a little hiss on top, and drips off whatever is overhead.
+const rainBed = (() => {
+  const out = gainAt(0, world), lp = filter('lowpass', 900, 0.5, out), s = noise(BROWN), g = gainAt(1.8, lp); s.connect(g); s.start();
+  const hi = filter('bandpass', 2600, 0.8, out), w = noise(), hg = gainAt(0.08, hi); w.connect(hg); w.start(); lfo(0.17, 0.03, hg.gain);
+  return { out };
+})();
 // Sirens: a two-tone wail that comes and goes with the police.
 const siren = (() => {
   const out = gainAt(0, world), o = ctx.createOscillator();
@@ -331,6 +337,7 @@ const radio = (() => {
   return r;
 })();
 
+let cueEl = null, cueGain = null, cueWired = false;
 let unlocked = false;
 // Browsers keep a page silent until it is clicked or a key is pressed, and a game that starts itself (a mission picked
 // from the menu reloads straight into play) has had neither. So every click and every key tries again, for as long as
@@ -383,6 +390,19 @@ export const sfx = {
     load: () => radio.load(), next: d => { if (radio.tracks.length) { radio.cue(d); if (!radio.playing) radio.onChange?.(radio.title); } }, toggle: () => { radio.on = !radio.on; return radio.on; },
     volume: v => { radio.vol = v; }, set onChange(fn) { radio.onChange = fn; }, get count() { return radio.tracks.length; }, get title() { return radio.title; }, get on() { return radio.on; }, get playing() { return radio.playing; },
   },
+  // A song for a scene, from the owner's own music/ folder: the first file whose name contains `name` (case does not
+  // matter). Nothing is bundled with the game and nothing is fetched from anywhere: no file, no song, and the scene plays
+  // without it. Resolves to the title, or null. `cue(null)` fades it out.
+  cue(name, vol = 0.55) {
+    if (!cueEl) { cueEl = new Audio(); cueEl.preload = 'auto'; cueGain = gainAt(0, master); }
+    if (!name) { if (cueGain) { smooth(cueGain.gain, 0, 0.6); setTimeout(() => { if (cueGain.gain.value < 0.01) cueEl.pause(); }, 2500); } return null; }
+    const file = radio.tracks.find(t => t.toLowerCase().includes(String(name).toLowerCase()));
+    if (!file) return null;
+    cueEl.src = 'music/' + encodeURIComponent(file); cueEl.currentTime = 0;
+    if (!cueWired) { try { ctx.createMediaElementSource(cueEl).connect(cueGain); cueWired = true; } catch { /* already wired */ } }
+    cueEl.play().catch(() => {}); smooth(cueGain.gain, vol, 0.4);
+    return file.replace(/\.[^.]+$/, '');
+  },
   // Recordings of real places, from the sounds/ folder. Resolves to the names found.
   loadRecordings: () => loadBeds(),
   get recordings() { return Object.keys(beds); },
@@ -407,7 +427,7 @@ export const sfx = {
   // The place: `shore` 0..1 and `seaward` {x, z} toward the nearest water, `green` and `dense` 0..1 for trees and
   // towers, `exposed` 0..1 for open decks, `night` 0..1, `hour` of the clock, `cars` [{ dx, dz, speed, heavy }] nearby.
   ambience({ speed = 0, throttle = 0, inCar = false, shore = 0, police = 0, sliding = 0, night = 0, ear = { x: 0, z: 0 }, right = { x: 1, z: 0 }, room = null,
-    surface = 'pave', foot = 0, seaward = { x: 1, z: 0 }, green = 0.2, dense = 0.5, exposed = 0, hour = -1, cars = [], la = false }) {
+    surface = 'pave', foot = 0, seaward = { x: 1, z: 0 }, green = 0.2, dense = 0.5, exposed = 0, hour = -1, cars = [], la = false, rain = 0 }) {
     if (!live()) return;
     const now = ctx.currentTime, dt = Math.min(0.1, Math.max(0, now - st.last)), inside = !!room, out = inside ? 0 : 1, day = 1 - night;
     st.last = now;
@@ -445,6 +465,8 @@ export const sfx = {
     smooth(wind.out.gain, 0.003 + shore * 0.008 + exposed * 0.03 + (1 - dense) * 0.003, 0.5);
     smooth(crickets.out.gain, night * green * 0.016 * (1 - shore * 0.5) * synth, 0.8);
     smooth(siren.out.gain, police * 0.12, 0.2);
+    smooth(rainBed.out.gain, rain * (inside ? 0.02 : 0.045), 0.6);
+    if (rain > 0 && out && now > (st.drip || 0)) { st.drip = now + rnd(0.3, 1.4); tone('sine', rnd(1800, 3200), now, 0.012, 0.002, 0.05, { to: spotAt(1, rnd(-0.9, 0.9)), slide: 900 }); }
     for (const [k, voice] of passers.entries()) {
       const c = cars[k];
       if (!c) { smooth(voice.out.gain, 0, 0.12); continue; }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CITY, near, clamp, bounds, SHORE, groundAt, pushOut, colliders, nodeX, nodeZ, NX, NZ } from './grid.js';
 import { HEAT } from './heat.js';
+import { NEXUS_STORY } from './nexus.js';
 import { makeLook, makeHuman, randomPedLook, Car, roam, nearestNode } from './entities.js';
 
 // The story is written as plain async functions: each `await` waits on the game loop
@@ -17,12 +18,12 @@ export const NORTH = Math.PI, SOUTH = 0, EAST = Math.PI / 2, WEST = -Math.PI / 2
 
 // ---------- Saving: the number of the next mission, and the money ----------
 
-const SAVE = CITY === 'la' ? 'heat-la.save' : 'sopranos-vice.save';
+const SAVE = CITY === 'la' ? 'heat-la.save' : CITY === 'nexus' ? 'br-nexus.save' : 'sopranos-vice.save';
 const readSave = () => { try { return JSON.parse(localStorage.getItem(SAVE)) || {}; } catch { return {}; } };
 export const savedMission = () => readSave().mission || 0;
 export function clearSave() { try { localStorage.removeItem(SAVE); } catch { /* storage unavailable: nothing to clear */ } }
 // For the settings menu: every chapter with its mission titles, and a way to put the save at any one of them.
-export const storyList = () => (CITY === 'la' ? HEAT : EPISODES).map(e => ({ name: e.name, title: e.title, titles: e.titles }));
+export const storyList = () => (CITY === 'la' ? HEAT : CITY === 'nexus' ? NEXUS_STORY : EPISODES).map(e => ({ name: e.name, title: e.title, titles: e.titles }));
 export function jumpTo(n, cash) { save(n, cash); }
 function save(mission, cash, more = {}) { try { localStorage.setItem(SAVE, JSON.stringify({ ...readSave(), mission, cash, ...more })); } catch { /* play on without saving */ } }
 // Everything beside the mission number: each character's pockets, what each mission paid, who has been introduced.
@@ -1254,25 +1255,48 @@ async function paxSoprana(g) {
   nerves.stop();
   await reach(g, fdoor, 'Take him <b>in</b>.', { r: 1.8, how: 'foot' });
   ride.on = false; junior.group.visible = false;
-  await roomScene(g, inRoom(FNOTE, [-0.8, 3.5], [-4.6, 3.1], 1.55, 1.05), q => ({
-    hesh: actor(g, 'hesh', roomSpot(q, -5.05, 2.6), SOUTH, 'sit'),
-    junior: actor(g, 'junior', roomSpot(q, -3.95, 2.6), SOUTH, 'sit'),
-    tony: actor(g, 'tony', roomSpot(q, -4.5, 4.2), NORTH),
-  }), async cast => {
-    await talk(g, [
-      [JUNIOR, "Twenty years you earned under this family's roof, and the roof never saw a dollar.", cast.junior],
-      [HESH, 'I paid your brother in friendship, Corrado. He never sent it back.', cast.hesh],
-      [JUNIOR, 'My brother is dead. I am not sentimental. Five hundred, and two points.', cast.junior],
-      [TONY, 'There was a Roman. Augustus. He ran that thing longer than anybody before him or after. You know how? He did not squeeze. Everybody under him ate, so nobody under him wanted him gone. They called it a peace.', cast.tony],
-      [JUNIOR, 'A year and a half of college, and this is what I get for it.', cast.junior],
-      [TONY, 'Johnny Sack says the same thing, with no Romans in it.', cast.tony],
-      [JUNIOR, '...Three hundred. A point and a half.', cast.junior],
-      [HESH, 'Three hundred I can live with. The point and a half I will complain about every week, as is my right.', cast.hesh],
-      [JUNIOR, 'And the three hundred I cut five ways, with my captains. Let them see who feeds them.', cast.junior],
-      [TONY, 'That is a boss talking.', cast.tony],
-    ]);
-    await say(g, '', 'Tony had put every word of it in his mouth, and his uncle would remember all of it as his own. That was the peace.');
-  });
+  // Through reception and into Hesh's office (owner: the three of them on the reception couch made no sense). Hesh is behind
+  // his desk; Junior takes the guest chair nearest him; Tony sits in the other, a little back, and does the talking.
+  const OFFICE = g.places.rooms.HESH;
+  await enter(g, FNOTE);
+  junior.group.visible = true; junior.group.position.set(FNOTE.inside.x - 1.1, FNOTE.Y, FNOTE.inside.z + 0.3); junior.set('idle');
+  ride = follower(g, junior, { gap: 1.6, runs: false, pace: 2.2 }); ride.pos.copy(junior.group.position);
+  p.locked = true; p.heading = NORTH;
+  g.cam.fixed = inRoom(FNOTE, [2.7, 0.6], [0, -3], 1.6, 1.3).cam;
+  await talk(g, [['Receptionist', 'Mr. Soprano. Mr. Rabkin said to bring your uncle straight through.', FNOTE.clerk], [JUNIOR, 'He said my name? He said "the uncle"?', junior], [TONY, 'Uncle Jun. The door.', p]]);
+  g.cam.fixed = null; p.locked = false;
+  { const at = roomSpot(FNOTE, -5.4, -3.7), inOffice = () => p.pos.z < FNOTE.Z - 6;
+    g.hud.objective('Take him through the door marked <b>H. RABKIN</b>.');
+    const m = g.addMarker(at.x, at.z, 1.2);
+    await g.until(() => near(p.pos, at, 1.3) || inOffice());
+    g.removeMarker(m); g.hud.objective();
+    if (!inOffice()) { p.locked = true; await fade(g, 1, 0.35); g.sfx?.door(); p.pos.set(OFFICE.inside.x, 0, OFFICE.inside.z + 1); p.heading = g.cam.yaw = NORTH; await fade(g, 0, 0.35); p.locked = false; } }
+  ride.on = false;
+  await reach(g, roomSpot(OFFICE, 0.5, 0.6), 'Hesh is at his <b>desk</b>. Sit your uncle down.', { r: 1.3, how: 'foot' });
+  p.locked = true;
+  await cut(g, () => {
+    junior.group.position.set(OFFICE.guests[0].x, OFFICE.guests[0].y, OFFICE.guests[0].z); junior.group.rotation.y = OFFICE.guests[0].h; junior.set('sit');
+    p.pos.set(OFFICE.guests[1].x, 0, OFFICE.guests[1].z + 0.25); p.heading = OFFICE.guests[1].h; p.pose = 'sit';
+    g.cam.fixed = inRoom(OFFICE, [-3.6, 1.6], [0.8, -2.2], 1.55, 1.05).cam; // from the couch side: Hesh at his desk, the two chairs before it
+  }, 0.5);
+  const heshA = actor(g, 'hesh', OFFICE.chair, OFFICE.chair.h, 'sit');
+  await talk(g, [
+    [JUNIOR, "Twenty years you earned under this family's roof, and the roof never saw a dollar.", junior],
+    [HESH, 'I paid your brother in friendship, Corrado. He never sent it back.', heshA],
+    [JUNIOR, 'My brother is dead. I am not sentimental. Five hundred, and two points.', junior],
+    [TONY, 'There was a Roman. Augustus. He ran that thing longer than anybody before him or after. You know how? He did not squeeze. Everybody under him ate, so nobody under him wanted him gone. They called it a peace.', p],
+    [JUNIOR, 'A year and a half of college, and this is what I get for it.', junior],
+    [TONY, 'Johnny Sack says the same thing, with no Romans in it.', p],
+    [JUNIOR, '...Three hundred. A point and a half.', junior],
+    [HESH, 'Three hundred I can live with. The point and a half I will complain about every week, as is my right.', heshA],
+    [JUNIOR, 'And the three hundred I cut five ways, with my captains. Let them see who feeds them.', junior],
+    [TONY, 'That is a boss talking.', p],
+  ]);
+  await cut(g, () => { g.cam.fixed = { pos: new THREE.Vector3(OFFICE.X + 3.2, OFFICE.Y + 1.5, OFFICE.Z - 3.4), look: new THREE.Vector3(OFFICE.X + 0.2, OFFICE.Y + 1.05, OFFICE.Z - 0.6) }; }, 0.4);   // over Hesh's shoulder: the two of them in his chairs
+  await say(g, '', 'Tony had put every word of it in his mouth, and his uncle would remember all of it as his own. That was the peace.');
+  await fade(g, 1, 1);
+  dismiss(g, heshA);
+  p.pose = null; outdoors(g);
   place(g, fdoor, toward(fdoor, hesh.kerb));
   junior.group.position.set(fdoor.x + 1.3, groundAt(fdoor.x + 1.3, fdoor.z), fdoor.z); junior.group.visible = true; junior.set('idle');
   ride = follower(g, junior, { pace: 2.4, runs: false });
@@ -1438,6 +1462,12 @@ async function theBoard(g) {
   const [mk, la, ju, to, ji, ra] = seated;
   const guests = HALL.rounds.flatMap((t, n) => [n % 4, (n + 2) % 4].map(k => extraAt(g, t.seats[k], t.seats[k].h, 'sit')));
   await playing(g, 'Special Agent Grasso', 'F.B.I., dressed as a waiter. You play him in this one');
+  // The owner's own song for this scene, if a file with "paparazzi" in its name is in the music/ folder (nothing is downloaded
+  // for him); and while it plays, other people's cameras go off round the hall. (Owner, 2026-10-08.)
+  const song = g.sfx?.cue?.('paparazzi', 0.5);
+  if (song) g.hud.radio?.(song);
+  let flashing = true;
+  g.updaters.push(() => { if (!flashing) return false; if (Math.random() < 0.012) { g.hud.flash('#ffffff', 0.07); g.sfx?.click?.(); } return true; });
   g.cam.fixed = inRoom(HALL, [0, 1.6], [0, -6.8], 1.8, 1.2).cam;
   await fade(g, 0, 1);
   await talk(g, [
@@ -1458,6 +1488,7 @@ async function theBoard(g) {
     p.hidden = false; p.locked = false;
   }
   p.locked = true;
+  flashing = false; g.sfx?.cue?.(null);
   await fade(g, 1, 1.2);
   await say(g, '', 'By midnight the film was in Newark.');
   await say(g, '', "A man with his sleeves rolled took one photograph off the cork board, pinned it at the top, and wrote BOSS under it with a marker. It was Corrado Soprano's.");
@@ -3354,7 +3385,7 @@ async function offer(g, mission, title, straight) {
   }
 }
 export async function runStory(g) {
-  const STORY = CITY === 'la' ? HEAT : EPISODES; // each city tells its own
+  const STORY = CITY === 'la' ? HEAT : CITY === 'nexus' ? NEXUS_STORY : EPISODES; // each city tells its own
   const total = STORY.reduce((n, e) => n + e.missions.length, 0);
   const saved = readSave(), from = clamp(saved.mission || 0, 0, total);
   if (from > 0) { // pick up a saved game at home
@@ -3391,7 +3422,7 @@ export async function runStory(g) {
       save(n, g.cash, keep(g));
       await g.wait(1.5);
       if (k === episode.missions.length - 1) {
-        g.hud.card(`End of ${episode.name}`, e === STORY.length - 1 ? (CITY === 'la' ? 'Los Angeles is yours until the next one.' : 'Vice City is yours until the next one.') : '');
+        g.hud.card(`End of ${episode.name}`, e === STORY.length - 1 ? (CITY === 'la' ? 'Los Angeles is yours until the next one.' : CITY === 'nexus' ? 'Nexus is yours until the next one.' : 'Vice City is yours until the next one.') : '');
         await g.wait(6);
         g.hud.card();
       }
