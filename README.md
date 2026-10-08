@@ -1,6 +1,6 @@
 # polyvice
 
-A GTA-style open-world game that runs in the browser (Three.js, no build step). One engine, three worlds, each with its own story written as mission scripts:
+A PS2-era open-world game that runs in the browser (Three.js, no build step): the look and feel of the open-world games of the early 2000s, flat-shaded and chunky, with a city you can drive, walk and fly through. One engine, three worlds, each with its own story written as mission scripts:
 
 - **Vice City** – an 80s Miami-style city; the story follows *The Sopranos*, played as Tony.
 - **Los Angeles** (`?city=la`) – the story of *Heat*, played as Neil McCauley.
