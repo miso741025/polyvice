@@ -850,6 +850,7 @@ const hatMat = color => hatMats.get(color) ?? hatMats.set(color, new THREE.MeshL
 const frameMat = new THREE.MeshLambertMaterial({ color: 0x1a1512 });
 const pistolMat = new THREE.MeshPhongMaterial({ color: 0x1c1c22, shininess: 60, specular: 0x666666 });
 const woodMat = new THREE.MeshLambertMaterial({ color: 0x6a4a34 });
+const blasterMat = new THREE.MeshPhongMaterial({ color: 0x3a3a44, shininess: 90, specular: 0x8a8a96 }), ledOrange = new THREE.MeshBasicMaterial({ color: 0xff8a2c }), ledRed = new THREE.MeshBasicMaterial({ color: 0xff2a3c });
 const shadeMat = new THREE.MeshBasicMaterial({ color: 0x0b0b10 });
 const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true, opacity: 0.22, depthWrite: false });
 
@@ -873,6 +874,7 @@ const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true
 //   jacket     colour of an open jacket worn over the shirt; jacketPattern prints the jacket; tie adds a tie in that colour
 //   coat       colour of a long coat (a jacket that falls to the knee: coatLen metres below the waist, 0.5 by default)
 //   collar     colour of a thick fleece collar on the coat or jacket (collarSize scales it; 1 = a band at the neck, 1.6 spreads over the shoulders); turtle colour of a roll-neck under it
+//   blaster    carries the heavy two-barrelled pistol with the lit lamps instead of the plain one
 //   sheen      0..1: the cloth catches the light (leather, a waxed coat); the body gets a Phong material
 //   coatAlpha  0..1 makes the coat's skirt see-through (a clear plastic raincoat); hairStyle 'fringe' paints bangs
 //   open       colour of an undershirt showing through an unbuttoned shirt or track top
@@ -973,7 +975,12 @@ export function makeHuman(opts = {}) {
     handBone?.add(grp);
     guns[kind] = grp;
   };
-  gun('pistol', [[0.024, 0.034, 0.17, 0, 0.02, 0.05, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3]]);
+  // Deckard's blaster: a heavy two-barrelled thing with a bolt on top, a second trigger in front of the first, and two small
+  // lamps on the receiver that stay lit. Anyone with `blaster` in their look carries this as their pistol.
+  if (o.blaster) gun('pistol', [[0.03, 0.03, 0.2, 0, 0.03, 0.06, 0, blasterMat], [0.026, 0.024, 0.19, 0, 0.004, 0.07, 0, pistolMat], [0.034, 0.02, 0.09, 0, 0.052, -0.01, 0, blasterMat], [0.016, 0.016, 0.07, 0.012, 0.062, 0.02, 0, pistolMat],
+    [0.028, 0.1, 0.036, 0, -0.04, -0.03, 0.35, woodMat], [0.006, 0.028, 0.02, 0, -0.016, 0.03, 0, pistolMat], [0.006, 0.024, 0.016, 0, -0.012, 0.06, 0, pistolMat], [0.03, 0.004, 0.06, 0, -0.03, 0.045, 0, pistolMat],
+    [0.006, 0.006, 0.006, 0.017, 0.034, 0.0, 0, ledOrange], [0.006, 0.006, 0.006, 0.017, 0.034, 0.03, 0, ledRed], [0.006, 0.006, 0.006, -0.017, 0.034, 0.015, 0, ledOrange]]);
+  else gun('pistol', [[0.024, 0.034, 0.17, 0, 0.02, 0.05, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3]]);
   gun('smg', [[0.03, 0.05, 0.3, 0, 0.02, 0.1, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3], [0.024, 0.13, 0.03, 0, -0.05, 0.1, 0], [0.018, 0.018, 0.1, 0, 0.03, 0.3, 0], [0.03, 0.03, 0.12, 0, 0.02, -0.1, 0, woodMat]]);
   gun('shotgun', [[0.028, 0.028, 0.5, 0, 0.03, 0.22, 0], [0.034, 0.034, 0.22, 0, 0.0, 0.2, 0, woodMat], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3, woodMat], [0.03, 0.07, 0.18, 0, -0.01, -0.12, 0.15, woodMat]]);
   gun('rifle', [[0.03, 0.05, 0.36, 0, 0.02, 0.12, 0], [0.018, 0.018, 0.26, 0, 0.03, 0.42, 0], [0.022, 0.09, 0.032, 0, -0.035, -0.02, 0.3], [0.026, 0.15, 0.04, 0, -0.06, 0.14, 0.25], [0.028, 0.06, 0.24, 0, 0.0, -0.2, 0], [0.012, 0.03, 0.03, 0, 0.06, 0.3, 0]]);
@@ -1090,7 +1097,7 @@ export const LOOKS = {
   mariette: { body: 'female', coat: 0x3a2a3a, coatLen: 0.4, shirt: 0xff3fa8, pants: 0x1c1c22, hair: 0xff3fa8, hairMesh: 'long', hairScale: [1.02, 0.8, 1.02] },
   freysa: { body: 'female', coat: 0x4a4a52, coatLen: 0.55, shirt: 0x3a3a44, turtle: 0x3a3a44, pants: 0x2a2a30, hair: 0xdcdad4, hairMesh: 'parted', age: 0.6, glasses: 'clear' },
   // ----- Blade Runner (2019). Deckard's crumpled trench coat and loosened tie; Gaff's dandy hat and cane; Bryant's shirtsleeves; Rachael's shoulders and the rolled hair; the four Nexus-6.
-  deckard: { coat: 0x5a5046, coatLen: 0.5, collar: 0x5a5046, collarSize: 1.0, shirt: 0xe9e2d2, tie: 0x3a2a2a, tucked: true, pants: 0x3a3a3a, shoes: 0x2a2420, hair: 0x2b1b12, hairMesh: 'parted', hairScale: [1.02, 1.0, 1.04], stubble: 0.45, age: 0.35, bulk: 1.02, face: { jaw: 0.1, cheeks: -0.2 } },
+  deckard: { blaster: true, coat: 0x5a5046, coatLen: 0.5, collar: 0x5a5046, collarSize: 1.0, shirt: 0xe9e2d2, tie: 0x3a2a2a, tucked: true, pants: 0x3a3a3a, shoes: 0x2a2420, hair: 0x2b1b12, hairMesh: 'parted', hairScale: [1.02, 1.0, 1.04], stubble: 0.45, age: 0.35, bulk: 1.02, face: { jaw: 0.1, cheeks: -0.2 } },
   gaff: { coat: 0x2a2a34, coatLen: 0.5, shirt: 0xf4f4f0, tie: 0x8a1c2a, tucked: true, pants: 0x2a2a34, hair: 0x111111, hairMesh: 'parted', hat: 'fedora', hatColor: 0x2a2a34, hatBand: 0x8a1c2a, glasses: 'clear', age: 0.5, bulk: 0.92 },
   bryant: { shirt: 0xf4f4f0, sleeves: 'long', tie: 0x4a3a2a, tucked: true, pants: 0x4a4a52, hair: 0x9a9690, hairStyle: 'receding', age: 0.8, bulk: 1.28, belly: 0.03, stubble: 0.3, face: { jowls: 0.5, cheeks: 0.4 } },
   rachael: { body: 'female', jacket: 0x16161c, shirt: 0xf4f4f0, pants: 0x16161c, tucked: true, hair: 0x1c1410, hairMesh: 'long', hairScale: [1.16, 0.86, 1.1], hairShift: [0, 0.01, 0], skin: [1.03, 0.98, 0.97], face: { cheeks: -0.3, chin: -0.1 } },

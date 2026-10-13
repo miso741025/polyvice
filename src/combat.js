@@ -24,9 +24,10 @@ const LOADOUTS = {
   christopher: { pistol: [12, 36] }, pussy: { pistol: [12, 24] }, mikey: { pistol: [12, 24] },
   paulie: { pistol: [12, 36] }, silvio: { pistol: [12, 24] }, agent: { pistol: [12, 24] },
   shiherlis: { pistol: [12, 36] }, cheritto: { pistol: [12, 24] }, trejo: { pistol: [12, 12] },
+  k: { pistol: [12, 36] }, deckard: { pistol: [6, 30] }, // the blaster holds six
 };
 // And what is in their pockets.
-const POCKET = { tony: 0, neil: 0, hanna: 340, christopher: 800, pussy: 450, mikey: 600, carmela: 220, aj: 6, tonyboy: 0, shiherlis: 300, cheritto: 900, trejo: 120, waiter: 40 };
+const POCKET = { deckard: 240, k: 180, tony: 0, neil: 0, hanna: 340, christopher: 800, pussy: 450, mikey: 600, carmela: 220, aj: 6, tonyboy: 0, shiherlis: 300, cheritto: 900, trejo: 120, waiter: 40 };
 const fresh = who => {
   const L = LOADOUTS[who] || {}, s = { weapon: 'fist', weapons: { fist: true }, mag: {}, ammo: {}, health: 100, armour: 0, cash: POCKET[who] ?? 50, wanted: 0 };
   for (const w of GUNS) { s.weapons[w] = !!L[w]; s.mag[w] = L[w]?.[0] || 0; s.ammo[w] = L[w]?.[1] || 0; }

@@ -9,7 +9,7 @@ import {
 // the game. The player is Deckard, retired, until he is not. The same city, the same buildings, under their older names:
 // the ziggurat is Tyrell's, the police block is Bryant's.
 
-const DECKARD = 'Deckard', GAFF = 'Gaff', BRYANT = 'Bryant', RACHAEL = 'Rachael', TYRELL = 'Tyrell', LEON = 'Leon', SEBASTIAN = 'Sebastian', ROY = 'Roy Batty';
+const DECKARD = 'Deckard', GAFF = 'Gaff', BRYANT = 'Bryant', RACHAEL = 'Rachael', TYRELL = 'Tyrell', LEON = 'Leon', SEBASTIAN = 'Sebastian', ROY = 'Roy Batty', HOLDEN = 'Holden';
 
 const land = (g, at) => { const c = g.tonyCar; if (g.player.car === c) g.leaveCar(); c.pos.set(at.x, 0, at.z); c.heading = at.h ?? 0; c.speed = 0; c.alt = 0; c.sync?.(); return c; };
 function asDeckard(g) {
@@ -327,7 +327,86 @@ async function theRoof(g) {
   await passed(g, 'Blade Runner', 5000);
 }
 
+// ---------- 1b. Holden ----------
+// The last blade runner to try. He is alive, on a machine, and the recording of what happened to him is on the file.
+async function holden(g) {
+  const { hospital, precinct } = g.places, p = g.player, MORGUE = g.places.rooms.HOSPITAL, WARD = g.places.wardRoom, OFFICE = g.places.rooms.OFFICE;
+  await say(g, '', 'Bryant had said Holden was breathing through a machine. Deckard wanted to see the machine before he believed the rest of it.', 3.8);
+  await reach(g, hospital.kerb, '<b>Fly</b> to the hospital. Holden is on the top floor, if he is anywhere.', { how: 'car', r: 9 });
+  p.locked = true; land(g, hospital.kerb); p.locked = false;
+  await reach(g, g.places.doors.find(d => d.name === 'the morgue').outside, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
+  await enter(g, MORGUE);
+  await reach(g, MORGUE.lifts || roomSpot(MORGUE, 7, -5), 'The <b>lift</b>, at the back. Intensive care is up.', { r: 1.6, how: 'foot' });
+  // The ward: Holden in the bed, a nurse who will not stay, and the tape.
+  const hol = actor(g, 'coco', WARD.bed, EAST, 'down'); hol.mixer.update(4); hol.group.position.y = WARD.bed.y;
+  const nurse = actor(g, 'stelline', { x: WARD.chair.x + 1.2, y: WARD.chair.y, z: WARD.chair.z + 1.2 }, WEST);
+  await cut(g, () => { p.inside = { name: 'the ward', inside: WARD.inside, outside: g.places.doors.find(d => d.name === 'the morgue').outside }; p.pos.set(WARD.inside.x, 0, WARD.inside.z); p.heading = WARD.inside.h; g.cam.fixed = { pos: new THREE.Vector3(WARD.inside.x + 1.5, WARD.bed.y + 1.4, WARD.inside.z + 1), look: new THREE.Vector3(WARD.bed.x, WARD.bed.y + 0.6, WARD.bed.z) }; }, 0.6);
+  await say(g, '', 'A room with one bed and a lot of tubes. Holden had been a big man; the machine had made him small. His eyes were open and did not move when the door did.', 4.6);
+  await talk(g, [['Nurse', 'He hears you. He cannot answer. The lieutenant left the tape on the chair, he said you would want it.', nurse], [DECKARD, 'Thank you. ...I will not be long.', p]]);
+  dismiss(g, nurse);
+  await cut(g, () => { p.pos.set(WARD.chair.x, 0, WARD.chair.z); p.heading = toward(p.pos, WARD.bed); p.pose = 'sit'; g.cam.fixed = { pos: new THREE.Vector3(WARD.bed.x - 2.2, WARD.bed.y + 1.5, WARD.bed.z + 2.6), look: new THREE.Vector3(WARD.chair.x, WARD.bed.y + 0.9, WARD.chair.z - 0.4) }; }, 0.5);
+  await say(g, '', 'The tape: a room, a desk, the machine. Holden asking a question about a tortoise, and a man who could not understand why it mattered, and did not like being told it did.', 4.6);
+  await talk(g, [[LEON + ' (tape)', 'What is a tortoise? ...Why would I turn it over? I do not know about any tortoise.', null], [HOLDEN + ' (tape)', "Tell me about your mother, Leon.", null], [LEON + ' (tape)', 'My mother? Let me tell you about my mother.', null]]);
+  await say(g, '', 'And then the sound of the desk coming apart. Deckard turned it off there. He had heard the rest in his own career, more than once.', 4);
+  await say(g, DECKARD, 'A tortoise, Dave. You asked a combat model about a tortoise. ...Rest. I will find him.', 3.8);
+  p.pose = null; dismiss(g, hol);
+  // Back at headquarters: the photograph from Holden's file, into the machine.
+  await fade(g, 1, 1); outdoors(g);
+  await say(g, '', "Holden's file held one photograph of Leon, taken for the hotel's register, and in the corner of it a mirror, and in the mirror a room.", 4);
+  land(g, precinct.kerb); p.pos.set(precinct.door.x, 0, precinct.door.z + 3); p.heading = NORTH; g.cam.fixed = null;
+  await fade(g, 0, 1);
+  p.locked = false;
+  await reach(g, precinct.door, 'Go <b>in</b>. The machine that reads photographs is on the lieutenant\'s floor.', { r: 1.8, how: 'foot' });
+  await enter(g, OFFICE);
+  await reach(g, roomSpot(OFFICE, 2, -1.4), 'The <b>machine</b> on the desk. Put the photograph in.', { r: 1.3, how: 'foot' });
+  p.locked = true; p.pos.set(OFFICE.X + 2, 0, OFFICE.Z - 0.6); p.heading = NORTH; p.pose = 'sit';
+  g.cam.fixed = { pos: new THREE.Vector3(OFFICE.X + 0.4, OFFICE.Y + 1.5, OFFICE.Z + 0.6), look: new THREE.Vector3(OFFICE.X + 2.2, OFFICE.Y + 1.0, OFFICE.Z - 1.6) };
+  const STEPS = [['Enhance 34 to 46.', 'The mirror. Something on the dressing table under it.'], ['Pull back. Track 45 left.', 'A bed, made. A dress across it that is not a man\'s.'], ['Enhance 15 to 23. Give me a hard copy.', 'A woman, asleep, or pretending to be. And on her shoulder, where the dress had slipped, a tattoo of a snake.'], ['Stop. Enhance 57 by 19. Centre and pull back.', 'The dressing table again: a scale, the same as the one in the bath. The woman is Zhora.']];
+  for (const [cmd, seen] of STEPS) { g.hud.objective(`Say it to the machine: press <b>Enter</b>.`); await g.until(() => g.consume('Enter')); g.hud.objective(); g.sfx?.click?.(); await say(g, DECKARD, cmd, 2.2); g.hud.flash('#8fb0ff', 0.08); await say(g, '', seen, 3.6); }
+  p.pose = null;
+  await fade(g, 1, 1);
+  asDeckard(g);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'A hard copy');
+}
+
+// ---------- 8. Unicorn ----------
+// After the roof. His flat, a woman asleep in it, and at the door a thing of folded foil that says Gaff was here and let it be.
+async function unicorn(g) {
+  const { home } = g.places, p = g.player, FLAT = g.places.rooms.KFLAT;
+  await say(g, '', 'He came down off the roof in the morning, which was only a lighter kind of rain, and went home, because she was there.', 3.8);
+  await reach(g, home.door, 'Go <b>home</b>. Quietly.', { r: 1.8, how: 'foot' });
+  await enter(g, FLAT);
+  const ra = actor(g, 'rachael', { x: FLAT.bed.x, y: FLAT.Y, z: FLAT.bed.z }, EAST, 'down'); ra.mixer.update(4); ra.group.position.y = FLAT.Y + 0.4;
+  p.locked = true;
+  p.pos.set(FLAT.inside.x, 0, FLAT.inside.z - 1); p.heading = toward(p.pos, ra.group.position);
+  g.cam.fixed = inRoom(FLAT, [3, 2.5], [-2.5, -1.8], 1.4, 0.8).cam;
+  await say(g, '', 'She was asleep on his bed with her shoes on, as if she had meant to leave and had not managed it.', 3.6);
+  await talk(g, [[DECKARD, 'Rachael. ...Do you love me? Do you trust me?', p], [RACHAEL, 'I trust you.', ra], [DECKARD, 'Then get up. We are going somewhere nobody has a file on either of us.', p]]);
+  ra.after = null; ra.set('idle'); ra.group.position.set(FLAT.bed.x + 1.2, FLAT.Y, FLAT.bed.z + 1);
+  g.cam.fixed = null; p.locked = false;
+  const tail = follower(g, ra, { gap: 1.6, runs: false, pace: 2.4 });
+  await walkOut(g, FLAT, 'Take her <b>out</b>. Watch the floor by the door.');
+  p.locked = true;
+  await cut(g, () => { p.heading = toward(p.pos, home.door); g.cam.fixed = { pos: new THREE.Vector3(p.pos.x + 1.6, 1.0, p.pos.z + 1.2), look: new THREE.Vector3(home.door.x, 0.15, home.door.z + 0.6) }; }, 0.5);
+  await say(g, '', 'On the floor by the door, a unicorn, folded out of silver foil, the way Gaff folded things when he had something to say and chose not to say it.', 4.2);
+  await say(g, DECKARD, 'He was here. He saw her. ...And he let her sleep.', 3.2);
+  await say(g, '', "Gaff had told him, on the roof: it is a shame she will not live, but then, who does. Deckard picked the unicorn up and put it in his pocket, and nodded to nobody, and they went down to the car.", 5);
+  g.cam.fixed = null; p.locked = false;
+  await wantCar(g, g.tonyCar, 'Get in the <b>spinner</b>.');
+  tail.on = false; dismiss(g, ra);
+  await reach(g, g.places.farm.gate, '<b>Fly</b> north, out past the farms, and keep going.', { how: 'car', r: 12 });
+  p.locked = true;
+  await fade(g, 1, 2);
+  await say(g, '', 'Past the last greenhouse the ground went on under the rain, and then the rain stopped, and there was a sky. Neither of them had seen one.', 4.4);
+  asDeckard(g);
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Who does', 5000);
+}
+
 export const BLADE_STORY = [
-  { name: 'Chapter One', title: 'Blade Runner', missions: [noodles, tyrell, leonsRoom, zhora], titles: ['Noodles', 'Tyrell', "Leon's Room", 'Zhora'] },
-  { name: 'Chapter Two', title: 'Time to Die', missions: [rachael, sebastian, theRoof], titles: ['Rachael', 'Sebastian', 'The Roof'] },
+  { name: 'Chapter One', title: 'Blade Runner', missions: [noodles, holden, tyrell, leonsRoom, zhora], titles: ['Noodles', 'Holden', 'Tyrell', "Leon's Room", 'Zhora'] },
+  { name: 'Chapter Two', title: 'Time to Die', missions: [rachael, sebastian, theRoof, unicorn], titles: ['Rachael', 'Sebastian', 'The Roof', 'Unicorn'] },
 ];
