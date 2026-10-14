@@ -6,8 +6,15 @@
 
 const ctx = new (window.AudioContext || window.webkitAudioContext)();
 const master = ctx.createGain();
-// Silent for testing: ?mute=1 in the address, or localStorage 'dev.mute' = '1'. Nothing then makes a sound.
-const MUTED = /[?&]mute=1\b/.test(location.search) || (() => { try { return localStorage.getItem('dev.mute') === '1'; } catch { return false; } })();
+// THE SOUND SWITCH. The game is silent unless sound is asked for (owner, 2026-10-15: "take the sound out for now").
+// To hear it: add ?sound=1 to the address, or run localStorage.setItem('sound', '1') in the console once (setItem('sound', '0') to stop).
+// ?mute=1 (or localStorage 'dev.mute' = '1') silences it again even then. Silent means the audio clock never runs: nothing reaches the speakers.
+const MUTED = (() => {
+  const q = location.search, ls = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  if (/[?&]mute=1\b/.test(q) || ls('dev.mute') === '1') return true;
+  return !(/[?&]sound=1\b/.test(q) || ls('sound') === '1');
+})();
+if (MUTED) ctx.suspend().catch(() => {});
 master.gain.value = MUTED ? 0 : 0.7;
 // Everything goes through a limiter, so a gunfight on top of traffic on top of the sea does not clip. It is only for
 // peaks. (Owner: "a lot of noise". It used to be a compressor from -16 dB: that puts some six decibels of make-up gain on
@@ -303,7 +310,7 @@ const radio = (() => {
     r.i = (r.i + d + r.tracks.length) % r.tracks.length;
     el.src = 'music/' + encodeURIComponent(r.tracks[r.i]);
     r.title = pretty(r.tracks[r.i]);
-    if (r.playing) { el.play().catch(() => {}); r.onChange?.(r.title); }
+    if (r.playing && !MUTED) { el.play().catch(() => {}); r.onChange?.(r.title); }
   };
   el.addEventListener('ended', () => r.cue(1));
   el.addEventListener('error', () => { if (r.tracks.length > 1 && r.playing) r.cue(1); }); // a file the browser cannot play: the next one
@@ -317,7 +324,7 @@ const radio = (() => {
     const listen = want && r.on && r.tracks.length > 0 && r.vol > 0;
     if (listen && !r.playing) {
       if (!r.wired) { ctx.createMediaElementSource(el).connect(tone0); r.wired = true; }
-      r.playing = true; el.play().catch(() => { r.playing = false; });
+      if (MUTED) return; r.playing = true; el.play().catch(() => { r.playing = false; });
       r.onChange?.(r.title);
     }
     if (!listen && r.playing) { r.playing = false; r.idle = ctx.currentTime + 0.7; }
@@ -333,7 +340,7 @@ let unlocked = false;
 // Browsers keep a page silent until it is clicked or a key is pressed, and a game that starts itself (a mission picked
 // from the menu reloads straight into play) has had neither. So every click and every key tries again, for as long as
 // it takes; and nothing is scheduled while the clock is stopped, or it would all sound at once when it starts.
-const wake = () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); };
+const wake = () => { if (!MUTED && ctx.state !== 'running') ctx.resume().catch(() => {}); };
 for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchstart']) addEventListener(ev, wake, true);
 const live = () => unlocked && ctx.state === 'running';
 // What the world is doing, as of the last frame.
@@ -385,6 +392,7 @@ export const sfx = {
   // matter). Nothing is bundled with the game and nothing is fetched from anywhere: no file, no song, and the scene plays
   // without it. Resolves to the title, or null. `cue(null)` fades it out.
   cue(name, vol = 0.55) {
+    if (MUTED) return null;
     if (!cueEl) { cueEl = new Audio(); cueEl.preload = 'auto'; cueGain = gainAt(0, master); }
     if (!name) { if (cueGain) { smooth(cueGain.gain, 0, 0.6); setTimeout(() => { if (cueGain.gain.value < 0.01) cueEl.pause(); }, 2500); } return null; }
     const file = radio.tracks.find(t => t.toLowerCase().includes(String(name).toLowerCase()));
