@@ -182,8 +182,10 @@ async function zhora(g) {
   await say(g, '', 'She did not wait. She went out through the back, and he went after her into the market, where everything was wet and everyone was in the way.', 4.2);
   g.cam.fixed = null;
   // The chase: she runs through the stalls for the street; he has to put her down before she is out of sight.
-  const npc = g.addNpc(zh, { health: 60, ai: 'flee', stays: true, cash: 0 }); npc.threat = p.pos.clone();
-  await cut(g, () => { outdoors(g); p.pos.set(bar.door.x, 0, bar.door.z + 2); p.heading = toward(p.pos, market.centre); npc.pos.set(bar.door.x + 4, 0, bar.door.z + 6); }, 0.4);
+  const npc = g.addNpc(zh, { health: 60, ai: 'flee', stays: true, cash: 0 });
+  // Out on the street side of the club's door (this club's door faces north): toward the kerb, never back into the building.
+  const ox = bar.kerb.x - bar.door.x, oz = bar.kerb.z - bar.door.z, ol = Math.hypot(ox, oz) || 1, ux = ox / ol, uz = oz / ol;
+  await cut(g, () => { outdoors(g); p.pos.set(bar.door.x + ux * 2, 0, bar.door.z + uz * 2); npc.pos.set(bar.door.x + ux * 6 - uz * 4, 0, bar.door.z + uz * 6 + ux * 4); p.heading = toward(p.pos, npc.pos); npc.threat = p.pos.clone(); }, 0.4);
   const track = quarry(g, npc);
   g.setWeapon('pistol');
   p.locked = false;
