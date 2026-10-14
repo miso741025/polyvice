@@ -833,7 +833,7 @@ async function boot() {
         hour: Math.floor(((18 * 60 + 30 + g.time + (g.clockOffset || 0)) % 1440) / 60), cars: near4,
       });
     }
-    muteEl.classList.toggle('on', g.started && sfx.state !== 'running'); // say so, rather than leave him wondering
+    muteEl.classList.toggle('on', g.started && sfx.state !== 'running' && sfx.state !== 'off'); // say so, rather than leave him wondering
     hud.clock(g.time + (g.clockOffset || 0), g.day());
     hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips, ...(g.hostiles || [])], landmarks);
     hud.map(g.mapOpen, { focus: p.pos, heading: p.car ? p.car.heading : p.heading, blips: [...g.markers, ...g.blips], landmarks });
