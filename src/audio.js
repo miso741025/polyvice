@@ -6,7 +6,9 @@
 
 const ctx = new (window.AudioContext || window.webkitAudioContext)();
 const master = ctx.createGain();
-master.gain.value = 0.7;
+// Silent for testing: ?mute=1 in the address, or localStorage 'dev.mute' = '1'. Nothing then makes a sound.
+const MUTED = /[?&]mute=1\b/.test(location.search) || (() => { try { return localStorage.getItem('dev.mute') === '1'; } catch { return false; } })();
+master.gain.value = MUTED ? 0 : 0.7;
 // Everything goes through a limiter, so a gunfight on top of traffic on top of the sea does not clip. It is only for
 // peaks. (Owner: "a lot of noise". It used to be a compressor from -16 dB: that puts some six decibels of make-up gain on
 // everything quiet, which is the beds of filtered noise, and lets every kick drum and passing car duck them and swell back.)
@@ -137,19 +139,8 @@ const wind = (() => {
   lfo(0.07, 150, bp.frequency); lfo(0.23, 60, bp.frequency);
   return { out };
 })();
-// Crickets, after dark where there is grass: two of them, a little apart in pitch and to either side.
-const crickets = (() => {
-  const out = gainAt(0, world);
-  for (const [f, side, rate] of [[4300, -0.6, 0.62], [4720, 0.55, 0.47], [3980, 0.1, 0.83]]) {
-    const p = panTo(out), gate = ctx.createGain(), chirp = ctx.createGain(), o = ctx.createOscillator();
-    if (p.pan) p.pan.value = side;
-    o.type = 'sine'; o.frequency.value = f;
-    chirp.gain.value = 0.5; gate.gain.value = 0.5;
-    lfo(31 + side * 4, 0.5, chirp.gain, 'sine'); lfo(rate, 0.5, gate.gain, 'sine');   // (square gates made them a buzz)
-    o.connect(chirp); chirp.connect(gate); gate.connect(p); o.start();
-  }
-  return { out };
-})();
+// (Crickets were three high sine tones pulsing all night on every lawn: the owner heard them as a loud electronic beeping. Gone.)
+const crickets = { out: gainAt(0, world) };
 // Rain: a wash of brown noise with a little hiss on top, and drips off whatever is overhead.
 const rainBed = (() => {
   const out = gainAt(0, world), lp = filter('lowpass', 900, 0.5, out), s = noise(BROWN), g = gainAt(1.8, lp); s.connect(g); s.start();
@@ -383,7 +374,7 @@ export const sfx = {
   unlock() { unlocked = true; wake(); },
   get ready() { return live(); },
   get state() { return ctx.state; }, // 'running', or 'suspended' while the browser is still holding it back
-  setVolume(v) { master.gain.value = v; },
+  setVolume(v) { master.gain.value = MUTED ? 0 : v; },
   setAmbience(v) { ambient.gain.value = v; },
   // The radio: `radio.load()` reads the music folder; next(±1), toggle(), volume(v); `onChange` is told each new title.
   radio: {
@@ -562,7 +553,7 @@ export const sfx = {
   cash() {
     if (!live()) return;
     const t = ctx.currentTime;
-    tone('square', 1320, t, 0.12, 0.004, 0.07); tone('square', 1760, t + 0.07, 0.12, 0.004, 0.14);
+    tone('sine', 1320, t, 0.06, 0.004, 0.08); tone('sine', 1760, t + 0.07, 0.05, 0.004, 0.16); // (it was two square waves: a beep)
   },
   // A spray gun: a long hiss with a rasp in it. Also does for sausage on a grill, quieter.
   spray(v = 1) {
@@ -633,7 +624,7 @@ export const sfx = {
   phone() { // a ring, twice
     if (!live()) return;
     const t = ctx.currentTime;
-    for (const r of [0, 0.6]) for (let k = 0; k < 8; k++) tone('square', k % 2 ? 1180 : 1040, t + r + k * 0.05, 0.05, 0.005, 0.04);
+    for (const r of [0, 0.7]) for (let k = 0; k < 6; k++) tone('sine', k % 2 ? 820 : 700, t + r + k * 0.06, 0.022, 0.01, 0.06); // a soft warble (it was square waves at 1 kHz, and loud)
   },
   click() {
     if (!live()) return;

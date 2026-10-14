@@ -159,7 +159,7 @@ export async function talk(g, lines) {
 // cannot be seen), and puts it away a few seconds after the last thing said.
 export const phone = (g, who, text) => {
   const p = g.player;
-  if (!g.ringing) { g.ringing = true; g.sfx?.phone(); g.wait(1.5).then(() => { g.ringing = false; }).catch(() => {}); }
+  if (!(g.time < (g.hangUp ?? -1))) g.sfx?.phone(); // it rings once, when the call comes in: not again before every line of it
   if (!p.car && !p.hidden) {
     if (!p.onPhone) {
       const who0 = p.human;
