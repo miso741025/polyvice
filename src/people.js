@@ -1106,6 +1106,12 @@ export const LOOKS = {
   zhora: { body: 'female', coat: 0xdfe8f0, coatLen: 0.45, coatAlpha: 0.4, shirt: 0x8a1c2a, pants: 0x1c1c22, hair: 0x3a1a10, hairMesh: 'long', hairScale: [1.1, 1.0, 1.1], dark: true },
   leon: { jacket: 0x4a3a2a, shirt: 0x8a8d96, sleeves: 'long', pants: 0x3a3a3a, hair: 0x2b1b12, hairMesh: 'buzzed', bulk: 1.2, height: 1.04, face: { jaw: 0.25, brow: 0.4, neck: 0.4 } },
   tyrell: { jacket: 0x3a3a44, shirt: 0xf4f4f0, tie: 0x2a2a34, tucked: true, pants: 0x3a3a44, hair: 0x9a9690, hairStyle: 'receding', glasses: 'clear', glassesScale: 1.5, age: 0.7, bulk: 0.94 },
+  // 2019 only (the first film's people; nobody from the later story stands in for them)
+  holden: { coat: 0x4a4038, coatLen: 0.45, shirt: 0xd9c7a0, tie: 0x5a2a2a, tucked: true, pants: 0x3a3a3a, hair: 0x5a4328, hairMesh: 'buzzed', bulk: 1.22, age: 0.5, stubble: 0.3, face: { jaw: 0.2, jowls: 0.3 } },
+  chew: { coat: 0x8a6a4a, coatLen: 0.5, collar: 0xd8ccb0, collarSize: 1.5, shirt: 0x3a3a44, turtle: 0x3a3a44, pants: 0x3a3a44, hair: 0xd8d2c8, hairStyle: 'receding', glasses: 'clear', glassesScale: 1.4, age: 0.95, bulk: 0.9, height: 0.92, face: { cheeks: -0.2 } },
+  hassan: { jacket: 0xd9c7a0, shirt: 0x8a5a2a, tucked: true, pants: 0xd9c7a0, hair: 0x2b1b12, hairStyle: 'receding', hat: 'fedora', hatColor: 0xd9c7a0, hatBand: 0x5a3a2a, age: 0.6, bulk: 1.15, belly: 0.03, stubble: 0.5, face: { cheeks: 0.3, jowls: 0.2 } },
+  taffey: { jacket: 0xe9e2d2, shirt: 0x2a2a30, tucked: true, pants: 0xe9e2d2, hair: 0x2b1b12, hairMesh: 'parted', age: 0.55, bulk: 1.2, belly: 0.04, face: { jowls: 0.4, cheeks: 0.3 } },
+  scaler: { body: 'female', shirt: 0x5a3a5a, sleeves: 'long', pants: 0x2a2a30, hair: 0x111111, hairMesh: 'long', hairScale: [1.0, 0.8, 1.0], age: 0.6, glasses: 'clear', glassesScale: 1.3 },
   sebastian: { jacket: 0x6a5a4a, shirt: 0xd9c7a0, sleeves: 'long', pants: 0x4a4a52, hair: 0x7a3b1a, hairMesh: 'parted', age: 0.5, bulk: 0.9, face: { cheeks: -0.3 } },
   replicant: { coat: 0x2a2a30, coatLen: 0.5, shirt: 0x3a3a44, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', bulk: 1.1 },
   pussy: { // the biggest man in the room: a round face on no neck, slicked hair, a loose two-piece in powder blue

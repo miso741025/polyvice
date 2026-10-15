@@ -3341,7 +3341,7 @@ const STARTS = {
   farEastPacific: 'kates',
 };
 // These follow straight on from the one before: the story does not stop between them.
-const CHAIN = new Set(['fredPeters', 'homeSick', 'theStakeout', 'theInterview', 'oneFace', 'theStreet', 'theRunway', 'ridelandSunday', 'closingTime']);
+const CHAIN = new Set(['fredPeters', 'homeSick', 'theStakeout', 'theInterview', 'oneFace', 'theStreet', 'theRunway', 'ridelandSunday', 'closingTime', 'theBradbury']);
 // These open somewhere else, as somebody else (Christopher, Carmela, Mikey, the lieutenant, one of the crew): there is no
 // place for the player to go to begin them. They are offered wherever he is.
 const ANYWHERE = new Set(['garbage', 'hijack', 'studyAid', 'acceptance', 'messageJob', 'juniorsWeek', 'anniversary', 'sacramentalWine', 'badDreams', 'theBakery', 'theRaid', 'aGift',

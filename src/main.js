@@ -225,7 +225,10 @@ async function boot() {
         scene.fog.color.set(old ? 0x2a1e14 : 0x201c22); scene.fog.near = old ? 50 : 70; scene.fog.far = old ? 460 : 560;
       }
       places.setNight(k);
+      if (g.climate) applyClimate(g.climate); // a set with its own air keeps it
     },
+    // An open-air set out past the rooms brings its own air (the dust of the dead city, the wind on the sea wall).
+    climate: null,
     // The player is dead: every mission wait fails, and the mission (or free roam) respawns them.
     wasted() {
       if (p.dying) return;
@@ -295,7 +298,11 @@ async function boot() {
   const p = g.player, tmpColor = new THREE.Color();
   let streamIndex = 0;
   // The radar's landmarks: home, the family's places, and whatever is useful.
-  const landmarks = (NEXUS ? [
+  const landmarks = (NEXUS && STORY_KEY === '2019' ? [
+    { ...places.home.spawn, label: 'H', name: "Deckard's apartment", color: '#2f9c5a' }, { ...places.tyrell.door, label: 'T', name: 'Tyrell Corporation', color: '#ffb347' }, { ...places.precinct.door, label: 'P', name: 'Police HQ', color: '#2f56c8' },
+    { ...places.bradbury.door, label: 'B', name: 'The Bradbury', color: '#c88a5a' }, { ...places.chew.door, label: 'E', name: 'Eye Works', color: '#9fd0ff' }, { ...places.market.centre, label: 'N', name: 'Night market', color: '#ff3fa8' },
+    { ...places.bar.door, label: 'S', name: "Taffey's bar", color: '#e0a12c' }, { ...places.airport.door, label: 'A', name: 'Spaceport', color: '#f4f2ee' },
+  ] : NEXUS ? [
     { ...places.home.spawn, label: 'H', name: "K's flat", color: '#2f9c5a' }, { ...places.wallace.door, label: 'W', name: 'Wallace', color: '#ffb347' }, { ...places.precinct.door, label: 'P', name: 'Police HQ', color: '#2f56c8' },
     { ...places.hospital.door, label: '+', name: 'Morgue', color: '#8d8a8e' }, { ...places.stelline.door, label: 'S', name: 'Stelline Labs', color: '#dfeeff' }, { ...places.orphanage.door, label: 'O', name: 'Sector 6 salvage', color: '#8a4a2a' },
     { ...places.farm.gate, label: 'F', name: 'Protein farm', color: '#7a8a4a' }, { ...places.market.centre, label: 'N', name: 'Night market', color: '#ff3fa8' }, { ...places.bar.door, label: 'B', name: 'The bar', color: '#e0a12c' }, { ...places.airport.door, label: 'A', name: 'Spaceport', color: '#f4f2ee' },
@@ -377,14 +384,18 @@ async function boot() {
   hud.fade(0, 1.2);
   // Each city has its own title, and a way across to the other.
   if (LA) { document.body.classList.add('la'); document.querySelector('.logo .sop').textContent = 'Heat'; document.querySelector('.logo .vc').textContent = 'Los Angeles'; document.title = 'Heat: Los Angeles'; g.setNight(0); }
-  if (NEXUS) { document.body.classList.add('nexus'); document.querySelector('.logo .sop').textContent = 'Blade Runner'; document.querySelector('.logo .vc').textContent = STORY_KEY === '2019' ? 'Nexus 2019' : 'Nexus 2049'; document.title = STORY_KEY === '2019' ? 'Blade Runner: Nexus 2019' : 'Blade Runner: Nexus 2049'; g.setNight(1);
-    const yearBtn = document.getElementById('year'); if (yearBtn) { yearBtn.hidden = false; yearBtn.textContent = STORY_KEY === '2019' ? 'The other story · 2049 (K)' : 'The other story · 2019 (Deckard)'; yearBtn.addEventListener('click', () => { location.search = STORY_KEY === '2019' ? '?city=nexus' : '?city=nexus&story=2019'; }); } }
+  // The two Blade Runner stories are two separate games that happen to share a city: neither title offers the other, and
+  // each is reached from Vice City's or Los Angeles's title (owner, 2026-10-15: keep them apart).
+  const OLD = NEXUS && STORY_KEY === '2019';
+  if (NEXUS) { document.body.classList.add('nexus'); document.querySelector('.logo .sop').textContent = 'Blade Runner'; document.querySelector('.logo .vc').textContent = OLD ? 'Los Angeles 2019' : 'Nexus 2049'; document.title = OLD ? 'Blade Runner: 2019' : 'Blade Runner: Nexus 2049'; g.setNight(1); }
   const otherBtn = document.getElementById('other');
   if (otherBtn) { // (an old cached page may not have the button)
-    otherBtn.textContent = LA ? 'Vice City · The Sopranos' : 'Los Angeles · Heat';
-    otherBtn.addEventListener('click', () => { location.search = LA ? '' : '?city=la'; });
-    const thirdBtn = document.getElementById('third');
-    if (thirdBtn) { thirdBtn.textContent = NEXUS ? 'Vice City · The Sopranos' : 'Nexus · Blade Runner'; thirdBtn.addEventListener('click', () => { location.search = NEXUS ? '' : '?city=nexus'; }); }
+    const toVice = LA && !NEXUS;
+    otherBtn.textContent = toVice ? 'Vice City · The Sopranos' : 'Los Angeles · Heat';
+    otherBtn.addEventListener('click', () => { location.search = toVice ? '' : '?city=la'; });
+    const thirdBtn = document.getElementById('third'), yearBtn = document.getElementById('year');
+    if (thirdBtn) { thirdBtn.textContent = NEXUS ? 'Vice City · The Sopranos' : 'Blade Runner 2049'; thirdBtn.addEventListener('click', () => { location.search = NEXUS ? '' : '?city=nexus'; }); }
+    if (yearBtn && !NEXUS) { yearBtn.hidden = false; yearBtn.textContent = 'Blade Runner · 2019'; yearBtn.addEventListener('click', () => { location.search = '?city=nexus&story=2019'; }); }
   }
   const startBtn = document.getElementById('start');
   startBtn.disabled = false;
@@ -597,6 +608,19 @@ async function boot() {
     return 1;
   }
 
+  function setClimate(c) {
+    if (c === g.climate) return;
+    g.climate = c;
+    if (!c) { g.setNight(g.night); places.sky.visible = true; return; }
+    applyClimate(c);
+  }
+  function applyClimate(c) {
+    hemi.color.set(c.hemi[0]); hemi.groundColor.set(c.hemi[1]); hemi.intensity = c.hemi[2];
+    sun.color.set(c.sun[0]); sun.intensity = c.sun[1];
+    scene.fog.color.set(c.fog[0]); scene.fog.near = c.fog[1]; scene.fog.far = c.fog[2];
+    places.sky.visible = c.sky !== false;
+  }
+
   function updateCamera(dt) {
     const cam = g.cam;
     if (cam.fixed) {
@@ -788,7 +812,7 @@ async function boot() {
     for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
 
     updateCamera(dt);
-    places.lightRoom(roomAt(camera.position.x, camera.position.z, 3));
+    { const q = roomAt(camera.position.x, camera.position.z, 3); places.lightRoom(q); setClimate(q?.climate || null); }
     updatePeople(dt, camera.position);
     sun.target.position.copy(focus);
     sun.position.copy(focus).addScaledVector(SUN_DIR, 200);
@@ -825,7 +849,7 @@ async function boot() {
       sfx.ambience({
         inCar: !!p.car, speed: p.car ? p.car.speed : 0, throttle: p.car && !p.locked ? (keys.KeyW ? 1 : keys.KeyS ? 0.5 : 0) : 0,
         sliding: p.car && !p.locked ? (keys.Space && Math.abs(p.car.speed) > 5 ? 1 : (keys.KeyA || keys.KeyD) && Math.abs(p.car.speed) > 17 ? 0.5 : 0) : 0,
-        police: g.sirenLevel || 0, night: g.night, la: LA || NEXUS, rain: NEXUS ? 1 : 0,
+        police: g.sirenLevel || 0, night: g.night, la: LA || NEXUS, rain: NEXUS && !g.climate?.dry ? 1 : 0,
         ear, right: { x: -look.z / ll, z: look.x / ll }, room: room ? roomKind(room) : null,
         surface, foot: !p.car && !p.hidden && !p.locked && p.motion && p.motion !== 'idle' ? (p.motion === 'sprint' ? 7.6 : 3.7) : 0,
         shore: clamp(1 - edges[0] / 140, 0, 1) * edges[3], seaward: { x: edges[1], z: edges[2] }, exposed: deck ? 1 : 0,

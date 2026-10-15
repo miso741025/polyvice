@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CITY, STORY_KEY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, floors, mulberry32, groundAt } from './grid.js';
+import { CITY, STORY_KEY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, floors, terrains, mulberry32, groundAt, roomAt } from './grid.js';
+import { buildSets2049 } from './sets2049.js';
+import { buildSets2019 } from './sets2019.js';
 import { makeHuman } from './people.js';
 import { box, makeLook, makeTony, makeDuck, Car } from './entities.js';
 
@@ -20,6 +22,8 @@ const SPECIAL_LA = { '15,1': 'neil', '8,6': 'bank', '2,9': 'drivein', '6,9': 'ka
 // Nexus: the same bones as Los Angeles, with the story's own places on them. The ocean side is a wall now.
 const SPECIAL_NX = { '15,1': 'kblock', '8,6': 'wallace', '7,5': 'moat', '8,5': 'moat', '9,5': 'moat', '7,6': 'moat', '9,6': 'moat', '7,7': 'moat', '8,7': 'moat', '9,7': 'moat', '8,3': 'precinct', '10,3': 'hospital', '10,8': 'stelline', '1,10': 'orphanage', '0,2': 'farm', '2,7': 'yard', '1,8': 'yard', '13,8': 'market',
   '9,12': 'apron', '10,12': 'apron', '11,12': 'terminal', '12,12': 'apron', '13,12': 'hangar', '14,12': 'apron', '15,12': 'hotel' };
+// 2019 is its own city's year: Deckard's tower where K's block will be, the Bradbury and Chew's eye works; none of the later story's places.
+const SPECIAL_OLD = { ...SPECIAL_NX, '15,1': 'dblock', '10,8': 'bradbury', '1,10': 'eyeworks', '0,2': 'yard' };
 const SPECIAL_VICE = { '0,0': 'home', '5,3': 'melfi', '3,5': 'bing', '2,2': 'satriale', '6,1': 'vesuvio', '1,4': 'livia', '0,6': 'grove', '5,5': 'hesh', '0,3': 'kolar',
   '4,0': 'comley', '2,4': 'bodyshop', '6,4': 'school', '4,2': 'cafe', '8,2': 'park', '3,8': 'park', '9,7': 'park', '9,1': 'hospital', '10,5': 'motel',
   '13,0': 'college', '12,2': 'travel', // episode five: up the coast
@@ -567,7 +571,7 @@ export function buildWorld(scene) {
     }
     // The word down the face.
     if (rand() < 0.3 && h > 30) {
-      const name = pick([...HOTELS, 'SOY', 'OFFWORLD', 'PACHINKO', 'VOID', 'ATARI', 'LUCKY']), neon = neonFor(name), n = name.length, sh = Math.min(h - base - 6, n * 2.4), fzz = z + fz * (d / 2 + 0.75);
+      const name = pick([...HOTELS, 'SOY', 'OFFWORLD', 'PACHINKO', 'VOID', 'ARCADE', 'LUCKY']), neon = neonFor(name), n = name.length, sh = Math.min(h - base - 6, n * 2.4), fzz = z + fz * (d / 2 + 0.75);
       slab(DARK, 1.2, sh + 1, 1.2, x - w / 2 + 3, CURB + base + 2, fzz - fz * 0.2);
       sign(name.split(''), x - w / 2 + 3, CURB + base + 2 + sh / 2, fzz + fz * 0.42, facing(0, fz), { w: 2.2, h: sh, color: neon, bg: '#0c0c12', size: 0.8 });
       halo(x - w / 2 + 3, CURB + base + sh * 0.6, fzz + fz * 1.2, hexOf(neon), 10);
@@ -748,7 +752,7 @@ export function buildWorld(scene) {
   };
   for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) {
     const c = blockCenter(i, j), core = LA && !NEXUS && Math.abs(i - 8) <= 2 && Math.abs(j - 6) <= 1; // the downtown core: nothing but towers (on Nexus the middle is Wallace's lake, and nothing near it is allowed its height)
-    const kind = (NEXUS ? SPECIAL_NX : LA ? SPECIAL_LA : SPECIAL_VICE)[`${i},${j}`] ?? (LA && i === 11 ? 'river' : core ? 'tower' : pickBlock(district(i, j), i, j));
+    const kind = (NEXUS ? (OLD ? SPECIAL_OLD : SPECIAL_NX) : LA ? SPECIAL_LA : SPECIAL_VICE)[`${i},${j}`] ?? (LA && i === 11 ? 'river' : core ? 'tower' : pickBlock(district(i, j), i, j));
     if (kind === 'bing') { // a ring of sidewalk around a car park at road level
       for (const s of [-1, 1]) {
         slab(0xffffff, BLOCK, CURB, 5, c.x, 0, c.z + s * (BLOCK / 2 - 2.5), M.paver, 6);
@@ -764,6 +768,9 @@ export function buildWorld(scene) {
 
     if (kind === 'neil') buildNeil(c);
     else if (kind === 'kblock') buildKBlock(c);
+    else if (kind === 'dblock') buildKBlock(c, true);
+    else if (kind === 'bradbury') buildBradbury(c);
+    else if (kind === 'eyeworks') buildEyeWorks(c);
     else if (kind === 'precinct' && NEXUS) buildPolice(c);
     else if (kind === 'wallace') buildWallace(c);
     else if (kind === 'moat') buildMoat(c);
@@ -1789,7 +1796,7 @@ export function buildWorld(scene) {
   }
 
   // ----- Nexus: K's block, a residential slab on the sea road. Four hundred flats stacked on a lobby, a lift core, antennae -----
-  function buildKBlock(c) {
+  function buildKBlock(c, deckard = false) { // (2019: the same kind of tower, Deckard's, and its own door)
     const y = CURB, bx = c.x + 4, bz = c.z - 2, W = 34, D = 30, H = 62, CONC = 0x3a3a40;
     flat(M.paint, 0x2e2e34, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z);
     slab(CONC, W, H, D, bx, y, bz, M.gravel, 6); collide(bx, bz, W, D, y + H);
@@ -1801,15 +1808,15 @@ export function buildWorld(scene) {
     for (const s2 of [-1, 1]) slab(0x2e2e34, 3, H + 2, 3, bx + s2 * (W / 2 - 1), y, bz + D / 2 - 1.5);                               // the lift and stair cores, proud of the face
     slab(0x2a2a30, W + 0.6, 0.6, D + 0.6, bx, y + H, bz); for (let n = 0; n < 5; n++) post(0x8a8d96, 0.06, 6 + n * 2, bx - 10 + n * 5, y + H, bz - 6 + (n % 2) * 8, 4); ball(0xff3b3b, 0.22, bx - 10, y + H + 6.1, bz - 6, M.glow); halo(bx - 10, y + H + 6.1, bz - 6, 0xff3030, 4);
     slab(0x2a2a30, 10, 4.2, 4, bx, y, bz + D / 2 + 1.5); collide(bx, bz + D / 2 + 1.5, 10, 4, y + 4.2); slab(0xffd9a8, 3.6, 2.9, 0.1, bx, y + 0.2, bz + D / 2 + 3.46, M.glow); slab(0x16161c, 1.4, 2.9, 0.12, bx, y, bz + D / 2 + 3.5);   // the lobby, lit, and its door
-    sign(['BLOCK 9', 'RESIDENTS ONLY'], bx, y + 3.6, bz + D / 2 + 3.52, 0, { w: 5, h: 1, color: '#49e0ff', bg: '#16161c', size: 0.6, glow: true });
+    sign(deckard ? ['NINETY-SEVEN', 'RESIDENTS ONLY'] : ['BLOCK 9', 'RESIDENTS ONLY'], bx, y + 3.6, bz + D / 2 + 3.52, 0, { w: 5, h: 1, color: '#49e0ff', bg: '#16161c', size: 0.6, glow: true });
     for (let k = 0; k < 4; k++) { post(0x8a8d96, 0.07, 4, bx - 9 + k * 6, y, bz + D / 2 + 6, 5); slab(0xcfe0ff, 0.6, 0.08, 0.3, bx - 9 + k * 6, y + 4, bz + D / 2 + 6, M.glow); halo(bx - 9 + k * 6, y + 3.9, bz + D / 2 + 6, 0xcfe0ff, 4); }
     for (const [px, pz] of [[-24, 20], [-24, 12], [-24, 4]]) { slab(0x3a3a44, 1.8, 1.6, 1.4, c.x + px, y, c.z + pz); slab(0x49e0ff, 1, 0.5, 0.04, c.x + px, y + 0.9, c.z + pz + 0.72, M.glow); } // vending machines along the west side
-    shopDoors.push({ shop: 'KFLAT', outside: { x: bx, z: bz + D / 2 + 5.2, h: Math.PI } });
+    shopDoors.push({ shop: deckard ? 'DFLAT' : 'KFLAT', outside: { x: bx, z: bz + D / 2 + 5.2, h: Math.PI } });
     places.home = {
       spawn: { x: bx, z: bz + D / 2 + 6.5 }, door: { x: bx, z: bz + D / 2 + 5.2 }, wake: { x: bx - 2, z: bz + D / 2 + 7 }, car: { x: c.x - 18, z: c.z + 14, h: 0 },
       drive: { x: c.x - 18, z: c.z + 20 }, road: { x: c.x - 18, z: c.z + 34 }, ducks: [],
     };
-    places.kblock = { door: places.home.door, kerb: { x: c.x - 18, z: c.z + 34, h: Math.PI / 2 } };
+    if (!deckard) places.kblock = { door: places.home.door, kerb: { x: c.x - 18, z: c.z + 34, h: Math.PI / 2 } };
   }
   // ----- Police headquarters on Nexus: one brutalist slab of rain-stained concrete, a landing deck for the spinners, and a great
   // round emblem over a mouth of an entrance. (Owner: the Los Angeles precinct looked like an old building with lights on it.)
@@ -1823,7 +1830,7 @@ export function buildWorld(scene) {
     for (const s2 of [-1, 1]) slab(CONC, 2, 14, 7, hx + s2 * 9, y, hz + D / 2 - 2.4);
     put(M.glow, new THREE.TorusGeometry(9, 0.5, 8, 48).translate(hx, y + 34, hz + D / 2 + 0.6), BLUE); put(M.plain, new THREE.CylinderGeometry(8.4, 8.4, 0.4, 48).rotateX(Math.PI / 2).translate(hx, y + 34, hz + D / 2 + 0.3), DARK); // the emblem: a ring of light on a black disc
     sign(['POLICE'], hx, y + 34, hz + D / 2 + 0.62, 0, { w: 12, h: 3, color: '#dfeeff', bg: '#101014', size: 0.9, glow: true }); halo(hx, y + 34, hz + D / 2 + 3, 0x6fa0ff, 10);
-    sign(['NEXUS POLICE DEPARTMENT', 'HEADQUARTERS · SECTOR 9'], hx, y + 16, hz + D / 2 + 0.1, 0, { w: 18, h: 2.6, color: '#8fb0ff', bg: '#16161c', size: 0.6, glow: false });
+    sign(OLD ? ['POLICE DEPARTMENT', 'CENTRAL DIVISION'] : ['NEXUS POLICE DEPARTMENT', 'HEADQUARTERS · SECTOR 9'], hx, y + 16, hz + D / 2 + 0.1, 0, { w: 18, h: 2.6, color: '#8fb0ff', bg: '#16161c', size: 0.6, glow: false });
     slab(DARK, W - 8, 0.6, D - 8, hx, y + H, hz); for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; ball(BLUE, 0.3, hx + Math.cos(a) * 11, y + H + 0.9, hz + Math.sin(a) * 11, M.glow); } flat(M.paint, 0x2a2b31, 24, 24, hx, y + H + 0.65, hz); // the landing deck, ringed
     post(0x8a8d96, 0.14, 16, hx + 18, y + H, hz - 14, 6); ball(0xff3b3b, 0.4, hx + 18, y + H + 16.2, hz - 14, M.glow); halo(hx + 18, y + H + 16.2, hz - 14, 0xff3030, 4);
     slab(CONC, 18, 22, 14, hx - 26, y, hz + 8, M.gravel, 6); collide(hx - 26, hz + 8, 18, 14, y + 22); for (let k = 1; k < 3; k++) slab(DARK, 18.6, 0.8, 14.6, hx - 26, y + k * 7, hz + 8);   // a lower wing
@@ -1850,8 +1857,9 @@ export function buildWorld(scene) {
     slab(0x2a2a30, 10, 0.4, 36, c.x, y + 0.1, c.z + 16); for (let k = 0; k < 7; k++) for (const s2 of [-1, 1]) { post(BLK, 0.6, 7, c.x + s2 * 4.6, y, c.z + 2 + k * 4.8, 4); slab(AMBER, 0.3, 0.3, 0.3, c.x + s2 * 4.6, y + 7, c.z + 2 + k * 4.8, M.glow); } // the causeway across the water, lit
     slab(0x16161c, 4, 7, 0.3, c.x, y, c.z + 31.1); slab(AMBER, 0.2, 6.4, 0.1, c.x, y + 0.3, c.z + 31.3, M.glow);                                      // the door: a slit of light, seven metres high
     sign([OLD ? 'TYRELL' : 'WALLACE'], c.x, y + 10, c.z + 31.3, 0, { w: 12, h: 2, color: '#ffb347', bg: '#0a0a0c', size: 0.8, glow: true });
-    shopDoors.push({ shop: 'ARCHIVE', outside: { x: c.x, z: c.z + 33.4, h: Math.PI } });
+    shopDoors.push({ shop: OLD ? 'TYRELL' : 'ARCHIVE', outside: { x: c.x, z: c.z + 33.4, h: Math.PI } });
     places.wallace = { door: { x: c.x, z: c.z + 33.4 }, kerb: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 }, plaza: { x: c.x, z: c.z + 34 }, summit: { x: c.x, y: y + 250, z: c.z } };
+    if (OLD) { places.tyrell = places.wallace; delete places.wallace; } // in 2019 it is Tyrell's, and only Tyrell's
   }
   // ----- The lake round Wallace: black water to the kerb, a low rim, and the city's roads crossing it as causeways -----
   function buildMoat(c) {
@@ -1892,6 +1900,34 @@ export function buildWorld(scene) {
     sign(['SECTOR 6 SALVAGE', 'JUVENILE LABOR · NO ADMITTANCE'], c.x, y + 8.6, c.z + 5.1, 0, { w: 11, h: 1.6, color: '#f4f4f0', bg: '#3a1c14', size: 0.6, glow: false });
     shopDoors.push({ shop: 'ORPHANAGE', outside: { x: c.x, z: c.z + 7.2, h: Math.PI } });
     places.orphanage = { door: { x: c.x, z: c.z + 7.2 }, gate: { x: c.x + 24, z: c.z + 34, h: Math.PI / 2 }, yard: { x: c.x, z: c.z + 18 } };
+  }
+  // ----- 2019: the Bradbury. Five storeys of old brick with arched windows and a cornice, a court of light inside, and one tenant -----
+  function buildBradbury(c) {
+    const y = CURB, BRICK = 0x7a4a34, STONE = 0xb8a890, hx = c.x, hz = c.z - 4, W = 40, D = 30, H = 26;
+    flat(M.paint, 0x2e2a28, BLOCK - 4, BLOCK - 4, c.x, y + 0.05, c.z);
+    slab(BRICK, W, H, D, hx, y, hz, M.brick, 3); collide(hx, hz, W, D, y + H);
+    slab(STONE, W + 1.4, 1.4, D + 1.4, hx, y + H, hz); slab(STONE, W + 0.6, 0.5, D + 0.6, hx, y + 5, hz); slab(STONE, W + 0.4, 4.6, D + 0.4, hx, y, hz, M.gravel, 3); // the cornice, a string course, the stone base
+    for (let f = 0; f < 4; f++) for (let k = 0; k < 7; k++) { const wx = hx - W / 2 + 3.5 + k * 5.5, wy = y + 6.5 + f * 4.8, lit = (f * 3 + k) % 4 === 0;
+      slab(lit ? 0xffb860 : 0x1c1814, 2.2, 2.8, 0.1, wx, wy, hz + D / 2 + 0.02, lit ? M.glow : M.plain); put(M.plain, new THREE.CylinderGeometry(1.1, 1.1, 0.3, 12, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(Math.PI / 2).translate(wx, wy + 2.8, hz + D / 2 + 0.1), STONE); }
+    for (let k = 0; k < 6; k++) slab(0x16120e, 0.5, 1.2, 0.3, hx - W / 2 + 4 + k * 6.4, y + 1.6, hz + D / 2 + 0.2);                                    // vents and grilles along the base
+    slab(0x1c1410, 5, 4.2, 1, hx, y, hz + D / 2 + 0.4); put(M.plain, new THREE.CylinderGeometry(2.5, 2.5, 1, 14, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(Math.PI / 2).translate(hx, y + 4.2, hz + D / 2 + 0.4), STONE);
+    slab(0xffd9a0, 3.4, 3.4, 0.1, hx, y + 0.2, hz + D / 2 + 0.95, M.glow); halo(hx, y + 3, hz + D / 2 + 2, 0xffc080, 10);
+    sign(['THE BRADBURY'], hx, y + 4.6, hz + D / 2 + 0.95, 0, { w: 6, h: 0.8, color: '#d8c8a0', bg: '#1c1410', size: 0.7, glow: false });
+    for (let k = 0; k < 9; k++) { post(0x2a2a30, 0.1, 6 + (k % 3) * 2, hx - W / 2 + 2 + k * 4.5, y + H + 1.4, hz - 8 + (k % 2) * 10, 5); }       // the roof's clutter
+    shopDoors.push({ shop: 'BRADBURY', outside: { x: hx, z: hz + D / 2 + 2.6, h: 0 } });
+    places.bradbury = { door: { x: hx, z: hz + D / 2 + 2.6 }, kerb: { x: hx + 8, z: c.z + 34, h: Math.PI / 2 }, street: { x: hx - 12, z: c.z + 26 } };
+  }
+  // ----- 2019: Eye Works. A cold box of a building with frost on its vents, where one old man makes eyes -----
+  function buildEyeWorks(c) {
+    const y = 0.03, hx = c.x, hz = c.z - 2;
+    flat(M.asphalt, 0x3a3a40, BLOCK - 2, BLOCK - 2, c.x, y, c.z, 5); lowGround.push({ x: c.x, z: c.z, half: BLOCK / 2 - 1 });
+    slab(0x6a7078, 30, 9, 20, hx, y, hz, M.siding, 1.4); collide(hx, hz, 30, 20, 9); slab(0x4a5058, 31, 0.6, 21, hx, y + 9, hz);
+    for (let k = 0; k < 5; k++) { slab(0xdfeeff, 2, 1.2, 0.3, hx - 12 + k * 6, y + 6.5, hz + 10.1); put(M.glow, new THREE.PlaneGeometry(1.6, 0.8).translate(hx - 12 + k * 6, y + 7.1, hz + 10.27), 0x9fd0ff); } // vents, breathing cold
+    slab(0x2a2a30, 2.4, 3, 0.3, hx, y, hz + 10.1); slab(0x9fd0ff, 2, 2.6, 0.1, hx, y + 0.1, hz + 10.3, M.glow);
+    sign(['EYE WORKS'], hx, y + 4.4, hz + 10.3, 0, { w: 6, h: 1.2, color: '#9fd0ff', bg: '#16161c', size: 0.75 });
+    for (const [hx2, hz2] of [[-22, 14], [20, 16]]) { post(0x3a3a44, 0.45, 0.9, c.x + hx2, y, c.z + hz2, 10); ball(0xff7a20, 0.4, c.x + hx2, y + 1.1, c.z + hz2, M.glow); halo(c.x + hx2, y + 1.3, c.z + hz2, 0xff8a30, 4); }
+    shopDoors.push({ shop: 'CHEW', outside: { x: hx, z: hz + 12.4, h: 0 } });
+    places.chew = { door: { x: hx, z: hz + 12.4 }, kerb: { x: hx + 20, z: c.z + 34, h: Math.PI / 2 } };
   }
   // ----- The protein farm: a block of mud at the city's edge, greenhouses glowing in rows, a farmhouse, one dead tree -----
   function buildFarm(c) {
@@ -3890,7 +3926,7 @@ export function buildWorld(scene) {
     q.vault = q.at(9, -6); q.floor = q.at(0, 2);
   }
 
-  if (NEXUS) { // ----- Rooms the Blade Runner story needs -----
+  if (NEXUS && !OLD) { // ----- Rooms the 2049 story needs (2019 builds its own, in sets2019.js) -----
     const INK = 0x16161c, STEELC = 0xc9cbd2, WHITE = 0xf4f4f0;
     { // K's flat: one room over the sea road. A bed, a chair, a wall that is a screen, and the projector on the ceiling that is Joi's whole world.
       const q = rooms.KFLAT = room(9, 7, 3, { floor: M.gravel, floorTint: 0x3a3a40, floorScale: 3, wall: M.plain, wallTint: 0x4a4a52, ceil: 0x2a2a30, door: INK, doorX: 2.5 });
@@ -3967,7 +4003,7 @@ export function buildWorld(scene) {
     }
   }
   const SHOP_ROOM = { BAR: 'BAR', NOODLES: 'DINER', RAMEN: 'DINER', PHARMA: 'STORE', PACHINKO: 'BAR', CAFE: 'DINER', PIZZA: 'DINER', DINER: 'DINER', DELI: 'DINER', LIQUOR: 'LIQUOR', PAWN: 'PAWN', GUNS: 'GUNS', TACOS: 'FASTFOOD', DONUTS: 'FASTFOOD', BURGERS: 'FASTFOOD', 'AUTO PARTS': 'PARTS', LAUNDRY: 'LAUNDRY', 'CHECKS CASHED': 'OFFICE', VIDEO: 'STORE', SURF: 'STORE', RECORDS: 'STORE', TAILOR: 'STORE', CIGARS: 'STORE' };
-  const SHOP_NAME = { NOODLES: 'the noodle bar', RAMEN: 'the ramen bar', PHARMA: 'the pharmacy', PACHINKO: 'the pachinko parlour', CHRIS: "Christopher's place", KFLAT: "K's flat", ARCHIVE: 'the Wallace archive', STELLINE: 'the laboratory', ORPHANAGE: 'the orphanage', FARMHOUSE: 'the farmhouse', HOTEL: 'the hotel', CARDROOM: 'room six', BANQUET: 'the Manor', BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
+  const SHOP_NAME = { NOODLES: 'the noodle bar', RAMEN: 'the ramen bar', PHARMA: 'the pharmacy', PACHINKO: 'the pachinko parlour', CHRIS: "Christopher's place", KFLAT: "K's flat", DFLAT: "Deckard's apartment", TYRELL: 'the Tyrell building', BRADBURY: 'the Bradbury', CHEW: 'Eye Works', ARCHIVE: 'the Wallace archive', STELLINE: 'the laboratory', ORPHANAGE: 'the orphanage', FARMHOUSE: 'the farmhouse', HOTEL: 'the hotel', CARDROOM: 'room six', BANQUET: 'the Manor', BAR: 'the bar', CAFE: 'the cafe', PIZZA: 'the pizzeria', DINER: 'the diner', DELI: 'the deli', LIQUOR: 'the liquor store', PAWN: 'the pawn shop', GUNS: 'the gun shop', TACOS: 'the taco stand', DONUTS: 'the donut shop', BURGERS: 'the burger place', 'AUTO PARTS': 'the parts store', LAUNDRY: 'the laundromat', 'CHECKS CASHED': 'the check casher', VIDEO: 'the video store', SURF: 'the surf shop', RECORDS: 'the record store', TAILOR: 'the tailor', CIGARS: 'the cigar store',
     HOUSE: 'the house', NEIL: 'the house', BANK: 'the bank', STORE: 'the store', BOOKS: 'the bookstore', LIVIA: "Livia's house", WAREHOUSE: 'the warehouse', KIOSK: 'the kiosk', SHOWROOM: 'the showroom', CHURCH: 'the church', OFFICE: 'the office', SCHOOL: 'the hall' };
   places.rooms = rooms;
   places.parkedSpots = parkedSpots;
@@ -4026,7 +4062,11 @@ export function buildWorld(scene) {
   }
 
   const beachLen = bounds.maxZ - bounds.minZ;
-  if (NEXUS) { // ----- The sea wall: thirty metres of concrete between the city and what the ocean has become -----
+  if (OLD) { // ----- 2019: no sea wall yet. A harbour embankment, a rail along it, lamps, the black water below -----
+    const EX = SHORE + 3, mid = (bounds.minZ + bounds.maxZ) / 2;
+    slab(0x3a3a40, 6, 1.6, beachLen + 40, EX, -1.5, mid, M.gravel, 4); slab(0x2a2a30, 0.3, 1.1, beachLen + 40, EX + 3, 0.1, mid); collide(EX + 3, mid, 0.4, beachLen + 40, 1.2);
+    for (let z = bounds.minZ - 10; z < bounds.maxZ + 10; z += 30) { post(0x55525a, 0.08, 5, EX + 2.6, 0.1, z, 6); ball(0xffb860, 0.22, EX + 2.6, 5.2, z, M.glow); halo(EX + 2.6, 5.2, z, 0xff9a40, 4); }
+  } else if (NEXUS) { // ----- The sea wall: thirty metres of concrete between the city and what the ocean has become -----
     const WX = SHORE + 14, mid = (bounds.minZ + bounds.maxZ) / 2, CONC = 0x4a4a52, H = 30;
     slab(CONC, 12, H + 1, beachLen + 40, WX, -1, mid, M.gravel, 8); collide(WX, mid, 12, beachLen + 40, H);
     slab(0x55555e, 13, 0.8, beachLen + 40, WX, H - 0.4, mid); slab(0x3a3a42, 0.6, 1.4, beachLen + 40, WX - 6.2, H, mid); slab(0x3a3a42, 0.6, 1.4, beachLen + 40, WX + 6.2, H, mid); // the walkway along the top and its parapets
@@ -4296,6 +4336,10 @@ export function buildWorld(scene) {
     approach: { x: nodeX(NX) + 3.6, z: blockCenter(NX - 1, 8).z - 22 },
   };
 
+  // The second half of 2049 goes where the city does not: the dead city in the dust, the top of the sea wall, Wallace's hall.
+  if (OLD) places.sets = buildSets2019({ scene, M, put, slab, post, ball, collide, sign, halo, updaters, places, rooms, interiors, floors, room, texture, CURB });
+  if (NEXUS && !OLD) places.sets = buildSets2049({ scene, M, put, slab, post, ball, collide, sign, halo, updaters, places, rooms, interiors, terrains, floors, room, texture });
+
   // ----- Merge everything into one mesh per material -----
   M.sign.map.needsUpdate = true;
   scene.add(merged(buckets));
@@ -4347,6 +4391,7 @@ export function buildWorld(scene) {
     { name: 'the Kolar office', outside: places.kolar.door, inside: rooms.OFFICE.inside },
     ...shopList,
   ];
+  if (places.sets?.vegas) places.doors.push({ name: 'the casino', outside: places.sets.vegas.door, inside: rooms.CASINO.inside });
   // The lights inside rooms are a handful of shared lights that follow the camera from room to room.
   const rig = Array.from({ length: 6 }, () => { const l = new THREE.PointLight(0xffffff, 0, 1); scene.add(l); return l; });
   let litRoom = null;
@@ -4365,7 +4410,7 @@ export function buildWorld(scene) {
       const N = 1400, pos = new Float32Array(N * 6), seed = Array.from({ length: N }, (_, k) => [(mulberry32(k + 7)() - 0.5) * 60, mulberry32(k + 99)() * 40, (mulberry32(k + 3)() - 0.5) * 60]);
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       const rain = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x9fb0c8, transparent: true, opacity: 0.28, fog: false, depthWrite: false })); rain.frustumCulled = false; places.sky.add(rain);
-      updaters.push(t => { for (let k = 0; k < N; k++) { const [x, y0, z] = seed[k], y = 40 - ((y0 + t * 26) % 40); pos[k * 6] = x; pos[k * 6 + 1] = y; pos[k * 6 + 2] = z; pos[k * 6 + 3] = x + 0.08; pos[k * 6 + 4] = y + 0.9; pos[k * 6 + 5] = z; } geo.attributes.position.needsUpdate = true; });
+      updaters.push(t => { const at = places.sky.position, q = roomAt(at.x, at.z, 3); rain.visible = !q || (!!q.open && !q.climate?.dry); if (!rain.visible) return; for (let k = 0; k < N; k++) { const [x, y0, z] = seed[k], y = 40 - ((y0 + t * 26) % 40); pos[k * 6] = x; pos[k * 6 + 1] = y; pos[k * 6 + 2] = z; pos[k * 6 + 3] = x + 0.08; pos[k * 6 + 4] = y + 0.9; pos[k * 6 + 5] = z; } geo.attributes.position.needsUpdate = true; });
     }
     { // Spinners: the traffic that goes over the top of everything, in lanes of its own, with their lights
       const kinds = [];
@@ -4380,11 +4425,11 @@ export function buildWorld(scene) {
       updaters.push(t => { for (const s2 of kinds) { const a = t * s2.w + s2.ph, x = s2.cx + Math.cos(a) * s2.r, z = s2.cz + Math.sin(a) * s2.r * 0.7; s2.grp.position.set(x, s2.y + Math.sin(t * 0.7 + s2.ph) * 2, z); s2.grp.rotation.y = -a + (s2.w > 0 ? Math.PI : 0); s2.grp.rotation.z = -0.12 * Math.sign(s2.w); } });
     }
     { // Adverts: tall sheets of light on the faces of the towers, and they flicker. The words are the game's own.
-      const ADS = [['NEW LIVES', 'OFF-WORLD'], ['EVERYTHING', 'YOU WANT', 'TO HEAR'], ['SOY · PROTEIN', 'FARMED FRESH'], ['REAL EYES', 'WALLACE OPTICS'], ['PACHINKO', 'SECTOR 9'], ['SLEEP', 'WITHOUT', 'DREAMS']];
+      const ADS = OLD ? [['THE COLONIES', 'ARE HIRING'], ['TYRELL', 'CORPORATION'], ['PAN', 'AMERICAN'], ['PACHINKO', 'SECTOR 9'], ['ENJOY', 'NOODLES'], ['STAY', 'AWAKE']] : [['NEW LIVES', 'OFF-WORLD'], ['EVERYTHING', 'YOU WANT', 'TO HEAR'], ['SOY · PROTEIN', 'FARMED FRESH'], ['REAL EYES', 'WALLACE OPTICS'], ['PACHINKO', 'SECTOR 9'], ['SLEEP', 'WITHOUT', 'DREAMS']];
       const holos = [], HEX = [0xff3fa8, 0x49e0ff, 0xffb347, 0x8f7bff, 0x7dffb0];
       let n = 0;
       for (const [key, kind] of Object.entries(places.kinds)) {
-        if (kind !== 'tower' && kind !== 'wallace') continue;
+        if (kind !== 'tower' && kind !== 'wallace') continue; // (the pyramid's block keeps its kind in both years)
         const [i, j] = key.split(',').map(Number), c = blockCenter(i, j); if ((i * 3 + j) % 2) continue;
         const w = 14, h = 36, hex = HEX[n % HEX.length], face = (n % 4), tx = c.x + (face === 1 ? 19.5 : face === 3 ? -19.5 : 0), tz = c.z + (face === 0 ? 19.5 : face === 2 ? -19.5 : 0), turn = face === 0 ? 0 : face === 1 ? Math.PI / 2 : face === 2 ? Math.PI : -Math.PI / 2;
         const tex = texture(256, 640, (cv, W, H) => { cv.fillStyle = '#000'; cv.fillRect(0, 0, W, H); cv.fillStyle = '#' + hex.toString(16).padStart(6, '0'); cv.font = 'bold 54px "Bebas Neue", sans-serif'; cv.textAlign = 'center'; const rows = ADS[n % ADS.length]; rows.forEach((r, k) => cv.fillText(r, W / 2, H * 0.35 + k * 70)); cv.globalAlpha = 0.35; for (let y = 0; y < H; y += 4) cv.fillRect(0, y, W, 1); });
@@ -4405,13 +4450,13 @@ export function buildWorld(scene) {
       }
       updaters.push(t => { for (const f of flames) { const k = 0.5 + 0.5 * Math.sin(t * 7 + f.ph) * Math.sin(t * 2.3 + f.ph * 2), burst = Math.sin(t * 0.6 + f.ph) > 0.7 ? 1 : 0.35; f.fl.scale.set(1 + k * 0.3, (0.6 + k * 0.8) * (0.5 + burst), 1 + k * 0.3); f.core.scale.set(1, (0.5 + k * 0.7) * (0.5 + burst), 1); f.fl.rotation.y = t * 2; f.lamp.intensity = 400 * burst * (0.6 + k * 0.4); } });
       const ship = new THREE.Group(), hull = new THREE.Mesh(new THREE.CapsuleGeometry(9, 40, 6, 14).rotateZ(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a3a44 })), gondola = new THREE.Mesh(new THREE.BoxGeometry(14, 3, 4).translate(0, -10, 0), new THREE.MeshLambertMaterial({ color: 0x1c1c22 }));
-      const ad = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), new THREE.MeshBasicMaterial({ map: texture(512, 170, (cv, W, H) => { cv.fillStyle = '#101018'; cv.fillRect(0, 0, W, H); cv.fillStyle = '#ff8a2c'; cv.font = 'bold 64px "Bebas Neue", sans-serif'; cv.textAlign = 'center'; cv.fillText('A NEW LIFE AWAITS YOU', W / 2, 70); cv.fillStyle = '#49e0ff'; cv.font = 'bold 44px "Bebas Neue", sans-serif'; cv.fillText('IN THE OFF-WORLD COLONIES', W / 2, 130); }), transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+      const ad = new THREE.Mesh(new THREE.PlaneGeometry(30, 10), new THREE.MeshBasicMaterial({ map: texture(512, 170, (cv, W, H) => { cv.fillStyle = '#101018'; cv.fillRect(0, 0, W, H); cv.fillStyle = '#ff8a2c'; cv.font = 'bold 64px "Bebas Neue", sans-serif'; cv.textAlign = 'center'; cv.fillText('A CLEAN START, OFF-WORLD', W / 2, 70); cv.fillStyle = '#49e0ff'; cv.font = 'bold 44px "Bebas Neue", sans-serif'; cv.fillText('THE COLONIES ARE CALLING', W / 2, 130); }), transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
       const beam = new THREE.Mesh(new THREE.ConeGeometry(14, 90, 12, 1, true).translate(0, -45, 0), new THREE.MeshBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
       for (const s2 of [-1, 1]) { const l = new THREE.Mesh(new THREE.SphereGeometry(0.6, 6, 5), new THREE.MeshBasicMaterial({ color: s2 > 0 ? 0xff2a3c : 0x3dff7a })); l.position.set(s2 * 20, 2, 0); ship.add(l); }
       ad.position.set(0, 0, 9.5); beam.position.set(0, -11, 0); ship.add(hull, gondola, ad, beam); scene.add(ship);
       updaters.push(t => { const a = t * 0.018; ship.position.set(Math.cos(a) * 420, 150 + Math.sin(t * 0.3) * 4, Math.sin(a) * 300); ship.rotation.y = -a + Math.PI / 2; beam.rotation.z = Math.sin(t * 0.4) * 0.5; beam.rotation.x = Math.cos(t * 0.31) * 0.4; ad.material.opacity = 0.7 + 0.25 * Math.sin(t * 3); });
     }
-    if (places.wallace) { // the one that dances on the plaza by the water, eight storeys tall, lit from inside
+    if (places.wallace && !OLD) { // the one that dances on the plaza by the water, eight storeys tall, lit from inside (2049 only)
       const her = makeHuman({ body: 'female', shirt: 0x9fd0f5, tee: true, pants: 0x49e0ff, hair: 0x1c1c3a, hairMesh: 'long', hairScale: [1.05, 1.1, 1.05] });
       her.group.scale.setScalar(9); her.group.position.set(places.wallace.plaza.x - 22, CURB, places.wallace.plaza.z + 1); her.group.rotation.y = Math.PI;
       her.group.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.42; o.material.depthWrite = false; o.material.emissive?.set(0x3060a0); if (o.material.emissiveIntensity !== undefined) o.material.emissiveIntensity = 0.9; o.castShadow = false; } });
