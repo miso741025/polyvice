@@ -1,8 +1,24 @@
 // Phone and tablet controls: a stick under the left thumb, the camera under the right, and a few buttons that show
 // only when they can be used. Only on touch screens (or with ?touch=1 in the address). Every button presses the key
 // the keyboard would, through g.touchKey(code, down), so missions, side jobs and the studio's test bot see one game.
-// The game is played sideways: stood upright, a phone shows a "turn me" card instead (owner, 2026-10-23).
+// The game is played sideways. A phone held upright draws the whole page turned a quarter, top of the game to the left,
+// so it is sideways at once and the player only has to turn the phone (it works with an iPhone's rotation lock on).
 export const TOUCH = /[?&]touch=1\b/.test(location.search) || matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+// Upright or not, and the size the game sees: the turned page is the screen's height wide and its width tall.
+// Called on every resize (main.js) before the renderer is sized.
+export let ROT = false;
+export function applyRotation() {
+  ROT = TOUCH && innerHeight > innerWidth;
+  const b = document.body, W = ROT ? innerHeight : innerWidth, H = ROT ? innerWidth : innerHeight;
+  b.classList.toggle('rot', ROT);
+  Object.assign(b.style, ROT ? { width: W + 'px', height: H + 'px', transform: `translateY(${innerHeight}px) rotate(-90deg)` } : { width: '', height: '', transform: '' });
+  document.documentElement.style.setProperty('--vw', ROT ? W / 100 + 'px' : '1vw');
+  document.documentElement.style.setProperty('--vh', ROT ? H / 100 + 'px' : '1vh');
+  return [W, H];
+}
+// A touch on the screen, in the game's own coordinates (the page may be drawn turned).
+const at = t => (ROT ? { x: innerHeight - t.clientY, y: t.clientX } : { x: t.clientX, y: t.clientY });
 
 // What each button is. `key` is held down while the thumb is on it (a tap is a short press).
 // The ACTION button has no key of its own: it presses whatever the game is offering right now (see offer() below).
@@ -29,8 +45,8 @@ export function installTouch(g, canvas) {
   document.body.appendChild(pad);
   const turn = document.createElement('div');
   turn.id = 'turn';
-  turn.innerHTML = `<div class="phone"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="20" y="6" width="24" height="44" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="44" r="2" fill="currentColor"/><path d="M50 30a18 18 0 0 1-8 22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M38 50l4 2 1-5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-    <b>Turn your phone sideways</b><span>請把手機橫過來玩</span>`;
+  turn.innerHTML = `<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="20" width="44" height="24" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M14 12a22 22 0 0 1 30-2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M40 4l5 6-7 3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Turn your phone sideways · 把手機轉橫來玩</span>`;
   document.body.appendChild(turn);
 
   // Nothing on the page scrolls, zooms or selects under a thumb.
@@ -63,34 +79,33 @@ export function installTouch(g, canvas) {
     g.stick.x = k * dx / R; g.stick.y = k * dy / R; g.stick.run = m > SPRINT;
     stick.classList.toggle('run', g.stick.run && !g.player.car);
   };
-  // Touches that land on the open game (not a button, not a menu): left of 42% steer, the rest turn the camera.
-  canvas.addEventListener('touchstart', e => {
-    for (const t of e.changedTouches) {
-      if (t.clientX < innerWidth * 0.42 && stickId === null) {
-        stickId = t.identifier; sx = t.clientX; sy = t.clientY; g.stick.on = true;
-        stick.style.left = sx + 'px'; stick.style.top = sy + 'px'; stick.classList.add('on'); moveStick(sx, sy);
-      } else if (lookId === null) { lookId = t.identifier; lx = t.clientX; ly = t.clientY; }
+  // Thumbs that land on the open game (not a button, not a menu): left of 42% steer, the rest turn the camera.
+  // Pointer events, captured by the canvas: on a page drawn turned, Chrome did not always pass touch listeners the thumb's moves.
+  canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') return;
+    const W = ROT ? innerHeight : innerWidth, { x, y } = at(e);
+    if (x < W * 0.42 && stickId === null) {
+      stickId = e.pointerId; sx = x; sy = y; g.stick.on = true;
+      stick.style.left = sx + 'px'; stick.style.top = sy + 'px'; stick.classList.add('on'); moveStick(sx, sy);
+    } else if (lookId === null) { lookId = e.pointerId; lx = x; ly = y; } else return;
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* the moves still arrive */ }
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerId !== stickId && e.pointerId !== lookId) return;
+    const { x, y } = at(e);
+    if (e.pointerId === stickId) moveStick(x, y);
+    else if (!g.paused) {
+      g.cam.yaw -= (x - lx) * 0.0055;
+      g.cam.pitch = Math.max(-0.05, Math.min(1.1, g.cam.pitch + (y - ly) * 0.005));
+      g.cam.lastMouse = g.time; lx = x; ly = y;
     }
-    e.preventDefault();
-  }, { passive: false });
-  canvas.addEventListener('touchmove', e => {
-    for (const t of e.changedTouches) {
-      if (t.identifier === stickId) moveStick(t.clientX, t.clientY);
-      else if (t.identifier === lookId && !g.paused) {
-        g.cam.yaw -= (t.clientX - lx) * 0.0055;
-        g.cam.pitch = Math.max(-0.05, Math.min(1.1, g.cam.pitch + (t.clientY - ly) * 0.005));
-        g.cam.lastMouse = g.time; lx = t.clientX; ly = t.clientY;
-      }
-    }
-    e.preventDefault();
-  }, { passive: false });
+  });
   const end = e => {
-    for (const t of e.changedTouches) {
-      if (t.identifier === stickId) { stickId = null; Object.assign(g.stick, { x: 0, y: 0, on: false, run: false }); stick.classList.remove('on', 'run'); knob.style.transform = ''; }
-      if (t.identifier === lookId) lookId = null;
-    }
+    if (e.pointerId === stickId) { stickId = null; Object.assign(g.stick, { x: 0, y: 0, on: false, run: false }); stick.classList.remove('on', 'run'); knob.style.transform = ''; }
+    if (e.pointerId === lookId) lookId = null;
   };
-  canvas.addEventListener('touchend', end); canvas.addEventListener('touchcancel', end);
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(t, end);
+  canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false }); // (no page scroll, no pretend mouse clicks)
 
   // What the ACTION button would press now, and what it says: whatever the game has put on screen for a key.
   const $ = id => document.getElementById(id);
@@ -134,16 +149,15 @@ export function installTouch(g, canvas) {
     el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
   }
 
-  // Every frame: which buttons are worth showing, what they say, and whether the phone is the right way round.
-  const portrait = matchMedia('(orientation: portrait)');
-  let pausedForTurn = false;
+  // Every frame: which buttons are worth showing and what they say; and, while the page is drawn turned, a hint for a few seconds.
+  let wasRot = false, hintUntil = 0;
   const set = (id, on, label) => { const el = els[id]; el.hidden = !on; if (label && el.firstChild.textContent !== label) el.firstChild.textContent = label; };
   return () => {
-    const p = g.player, car = !!p.car, upright = portrait.matches;
-    turn.classList.toggle('on', upright);
-    if (upright && g.started && !g.paused) { g.paused = pausedForTurn = true; }           // stood up mid-game: everything waits
-    else if (!upright && pausedForTurn) { pausedForTurn = false; if (!g.hud.onMenu) g.paused = false; }
-    pad.classList.toggle('play', g.started && !g.hud.onMenu && !upright);
+    const p = g.player, car = !!p.car, now = performance.now();
+    if (ROT && !wasRot) hintUntil = now + 3200;
+    wasRot = ROT;
+    turn.classList.toggle('on', ROT && now < hintUntil);
+    pad.classList.toggle('play', g.started && !g.hud.onMenu);
     pad.classList.toggle('car', car);
     pad.classList.toggle('talking', !!subtitle.textContent.trim());
     action = offer();

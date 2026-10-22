@@ -1,8 +1,12 @@
 * { box-sizing: border-box; }
+/* The page's width and height, and the safe areas, as the game sees them. On a phone held upright the whole page is drawn
+   turned a quarter (touch.js puts .rot on the body and sets these to the turned sizes), so the game is sideways at once. */
+:root { --vw: 1vw; --vh: 1vh; --st: env(safe-area-inset-top); --sr: env(safe-area-inset-right); --sb: env(safe-area-inset-bottom); --sl: env(safe-area-inset-left); }
+body.rot { position: fixed; left: 0; top: 0; transform-origin: 0 0; --st: env(safe-area-inset-left); --sr: env(safe-area-inset-top); --sb: env(safe-area-inset-right); --sl: env(safe-area-inset-bottom); }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #120a1c; overscroll-behavior: none; }
 body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 
-#game { display: block; width: 100vw; height: 100vh; }
+#game { display: block; width: calc(var(--vw) * 100); height: calc(var(--vh) * 100); }
 
 #fx, #fade, #flash { position: fixed; inset: 0; pointer-events: none; }
 #flash { opacity: 0; }
@@ -36,9 +40,9 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
 #weapon { position: absolute; right: 32px; top: 182px; font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 3px; color: #9ff3ff; text-shadow: 2px 2px 0 #000; }
 #aim { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #000; opacity: 0; }
 #aim.on { opacity: .9; }
-#wasted { position: fixed; left: 0; right: 0; top: 34vh; text-align: center; pointer-events: none; opacity: 0; transition: opacity .7s; }
+#wasted { position: fixed; left: 0; right: 0; top: calc(var(--vh) * 34); text-align: center; pointer-events: none; opacity: 0; transition: opacity .7s; }
 #wasted.on { opacity: 1; }
-#wasted .big { font-family: 'Bebas Neue', Impact, sans-serif; font-size: clamp(64px, 10vw, 130px); letter-spacing: 6px; color: #ff3b4a; text-shadow: 5px 5px 0 #000, 0 0 40px rgba(255, 59, 74, .6); }
+#wasted .big { font-family: 'Bebas Neue', Impact, sans-serif; font-size: clamp(64px, calc(var(--vw) * 10), 130px); letter-spacing: 6px; color: #ff3b4a; text-shadow: 5px 5px 0 #000, 0 0 40px rgba(255, 59, 74, .6); }
 
 #radar {
   position: absolute; left: 28px; bottom: 28px; width: 200px; height: 200px;
@@ -47,7 +51,7 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
 
 #subtitle, #objective, #prompt {
   position: absolute; left: 50%; transform: translateX(-50%);
-  width: min(900px, 76vw); text-align: center; font-weight: 500;
+  width: min(900px, calc(var(--vw) * 76)); text-align: center; font-weight: 500;
   text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 0 0 12px rgba(0, 0, 0, .6);
 }
 #subtitle { bottom: 46px; font-size: 24px; line-height: 1.3; }
@@ -62,16 +66,16 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
   position: fixed; pointer-events: none; opacity: 0; transition: opacity .7s;
 }
 #card.on, #passed.on { opacity: 1; }
-#card { right: 6vw; bottom: 16vh; text-align: right; }
+#card { right: calc(var(--vw) * 6); bottom: calc(var(--vh) * 16); text-align: right; }
 #cardTitle {
-  font-family: 'Mr Dafoe', cursive; font-size: clamp(48px, 7vw, 96px); color: #ff5fd2;
+  font-family: 'Mr Dafoe', cursive; font-size: clamp(48px, calc(var(--vw) * 7), 96px); color: #ff5fd2;
   text-shadow: 4px 4px 0 #1a2c7a, 0 0 28px rgba(255, 95, 210, .55); transform: rotate(-4deg);
 }
 #cardSub { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 3px; color: #9ff3ff; text-shadow: 2px 2px 0 #000; }
 
-#passed { left: 0; right: 0; top: 30vh; text-align: center; }
+#passed { left: 0; right: 0; top: calc(var(--vh) * 30); text-align: center; }
 #passed .big {
-  font-family: 'Bebas Neue', Impact, sans-serif; font-size: clamp(56px, 8vw, 110px); letter-spacing: 4px;
+  font-family: 'Bebas Neue', Impact, sans-serif; font-size: clamp(56px, calc(var(--vw) * 8), 110px); letter-spacing: 4px;
   color: #ffb640; text-shadow: 4px 4px 0 #000, 0 0 30px rgba(255, 182, 64, .5);
 }
 #reward { font-family: 'Bebas Neue', sans-serif; font-size: 44px; letter-spacing: 3px; color: #3fd16b; text-shadow: 3px 3px 0 #000; }
@@ -85,25 +89,25 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
 #title.off { opacity: 0; pointer-events: none; }
 .logo { display: flex; flex-direction: column; align-items: center; line-height: .9; }
 .logo .sop {
-  font-family: 'Bebas Neue', Impact, sans-serif; font-size: clamp(60px, 10vw, 150px); letter-spacing: 6px;
+  font-family: 'Bebas Neue', Impact, sans-serif; font-size: clamp(60px, calc(var(--vw) * 10), 150px); letter-spacing: 6px;
   color: #f6f1e7; text-shadow: 5px 5px 0 #000;
 }
 .logo .vc {
-  font-family: 'Mr Dafoe', cursive; font-size: clamp(64px, 10vw, 150px); color: #ff5fd2; margin-top: -0.12em;
+  font-family: 'Mr Dafoe', cursive; font-size: clamp(64px, calc(var(--vw) * 10), 150px); color: #ff5fd2; margin-top: -0.12em;
   transform: rotate(-5deg); text-shadow: 5px 5px 0 #1a2c7a, 0 0 40px rgba(255, 95, 210, .7);
 }
 .logo .tag { display: none; }
 /* Vice Web: cream lettering on a sunset stripe, the pastry's own colours. (The other worlds restyle the logo below.) */
 body:not(.la):not(.nexus) .logo .sop {
-  font-size: clamp(64px, 13vw, 170px); letter-spacing: 10px; color: #fff4dc;
+  font-size: clamp(64px, calc(var(--vw) * 13), 170px); letter-spacing: 10px; color: #fff4dc;
   text-shadow: 0 6px 0 #c2410c, 0 12px 0 #7c1d4f, 0 18px 30px rgba(0, 0, 0, .55);
 }
 body:not(.la):not(.nexus) .logo .vc {
   font-family: 'Bebas Neue', Impact, sans-serif; transform: none; margin-top: 18px; padding: 2px 34px 0;
-  font-size: clamp(34px, 6vw, 72px); letter-spacing: .55em; text-indent: .55em; color: #12353a;
+  font-size: clamp(34px, calc(var(--vw) * 6), 72px); letter-spacing: .55em; text-indent: .55em; color: #12353a;
   background: linear-gradient(90deg, #ffb347, #ff7a59 45%, #3ad6b4); text-shadow: none; box-shadow: 0 6px 0 #12353a;
 }
-body:not(.la):not(.nexus) .logo .tag { display: block; margin-top: 18px; font-family: 'Rubik', sans-serif; font-weight: 700; font-size: clamp(13px, 1.8vw, 18px); letter-spacing: 4px; text-transform: uppercase; color: #ffd9a8; }
+body:not(.la):not(.nexus) .logo .tag { display: block; margin-top: 18px; font-family: 'Rubik', sans-serif; font-weight: 700; font-size: clamp(13px, calc(var(--vw) * 1.8), 18px); letter-spacing: 4px; text-transform: uppercase; color: #ffd9a8; }
 body:not(.la):not(.nexus) #title { background: linear-gradient(180deg, rgba(18, 26, 48, .78), rgba(120, 40, 50, .35) 55%, rgba(10, 6, 18, .9)); }
 body:not(.la):not(.nexus) #start { background: #ffd9a8; box-shadow: 0 0 0 3px #120a1c, 0 0 0 6px #ff7a59, 0 0 34px rgba(255, 179, 71, .55); }
 .touchkeys { display: none; }
@@ -130,7 +134,7 @@ body:not(.la):not(.nexus) #start { background: #ffd9a8; box-shadow: 0 0 0 3px #1
 }
 
 #ammo { position: absolute; right: 32px; top: 206px; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; color: #f4f1e6; text-shadow: 2px 2px 0 #000; }
-#map { position: fixed; left: 50%; top: 50%; width: min(90vw, 900px); height: auto; aspect-ratio: 900 / 760; transform: translate(-50%, -50%); border: 3px solid #ff5fd2; box-shadow: 0 0 0 3px #000, 0 0 40px rgba(0,0,0,.6); display: none; z-index: 20; }
+#map { position: fixed; left: 50%; top: 50%; width: min(calc(var(--vw) * 90), 900px); height: auto; aspect-ratio: 900 / 760; transform: translate(-50%, -50%); border: 3px solid #ff5fd2; box-shadow: 0 0 0 3px #000, 0 0 40px rgba(0,0,0,.6); display: none; z-index: 20; }
 #map.on { display: block; }
 #menu { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 520px; padding: 22px 28px; background: rgba(8, 10, 24, .92); border: 3px solid #ff5fd2; box-shadow: 0 0 0 3px #000; color: #f4f1e6; font-family: 'Poppins', sans-serif; display: none; z-index: 21; }
 #menu.on { display: block; }
@@ -159,7 +163,7 @@ body.nexus #title { background: radial-gradient(ellipse at 50% 80%, rgba(80, 30,
 #mute.on { display: block; }
 
 /* The radio's display: top left, while a song is new. */
-#radio { position: absolute; left: 32px; top: 26px; max-width: 46vw; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 26px; letter-spacing: 2px; color: #ffe066;
+#radio { position: absolute; left: 32px; top: 26px; max-width: calc(var(--vw) * 46); font-family: 'Bebas Neue', Impact, sans-serif; font-size: 26px; letter-spacing: 2px; color: #ffe066;
   text-shadow: 3px 3px 0 #000, -1px -1px 0 #000; opacity: 0; transform: translateX(-12px); transition: opacity .4s, transform .4s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #radio.on { opacity: 1; transform: none; }
 
@@ -176,7 +180,7 @@ body.nexus #title { background: radial-gradient(ellipse at 50% 80%, rgba(80, 30,
 /* Distance to the marker. */
 #dist { position: absolute; left: 0; right: 0; bottom: 92px; text-align: center; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; color: #ffe066; text-shadow: 2px 2px 0 #000; }
 /* A lower third: who this is. */
-#intro { position: absolute; left: 6vw; bottom: 232px; opacity: 0; transform: translateX(-16px); transition: opacity .4s, transform .4s; border-left: 5px solid #ff5fd2; padding: 4px 14px; background: linear-gradient(90deg, rgba(20, 8, 15, .8), rgba(20, 8, 15, 0)); min-width: 260px; }
+#intro { position: absolute; left: calc(var(--vw) * 6); bottom: 232px; opacity: 0; transform: translateX(-16px); transition: opacity .4s, transform .4s; border-left: 5px solid #ff5fd2; padding: 4px 14px; background: linear-gradient(90deg, rgba(20, 8, 15, .8), rgba(20, 8, 15, 0)); min-width: 260px; }
 #intro.on { opacity: 1; transform: none; }
 #intro b { display: block; font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 2px; color: #fff; text-shadow: 2px 2px 0 #000; }
 #intro span { font-family: 'Rubik', sans-serif; font-size: 15px; color: #9ff3ff; text-shadow: 1px 1px 0 #000; }
@@ -197,56 +201,65 @@ body.touch .touchkeys { display: block; }
 .tb[hidden] { display: none; }
 .tb.down { background: rgba(255, 122, 89, .75); border-color: #ffd9a8; }
 /* the right thumb: ACTION in the corner, Hit beside it, Jump / Brake above; Lock and Gun small, only when they are any use */
-#tAct { right: calc(18px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 92px; height: 92px; font-size: 19px; background: rgba(255, 179, 71, .85); color: #12353a; border-color: #fff4dc; text-shadow: none; }
+#tAct { right: calc(18px + var(--sr)); bottom: calc(18px + var(--sb)); width: 92px; height: 92px; font-size: 19px; background: rgba(255, 179, 71, .85); color: #12353a; border-color: #fff4dc; text-shadow: none; }
 #tAct span { max-width: 80px; overflow: hidden; }
-#tE { right: calc(122px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 80px; height: 80px; font-size: 22px; }
-#tJump { right: calc(26px + env(safe-area-inset-right)); bottom: calc(124px + env(safe-area-inset-bottom)); width: 68px; height: 68px; font-size: 18px; }
-#tQ { right: calc(124px + env(safe-area-inset-right)); bottom: calc(118px + env(safe-area-inset-bottom)); width: 52px; height: 52px; font-size: 15px; }
-#tGun { right: calc(184px + env(safe-area-inset-right)); bottom: calc(118px + env(safe-area-inset-bottom)); width: 52px; height: 52px; font-size: 15px; }
-#touch.car #tJump { right: calc(122px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 80px; height: 80px; font-size: 20px; } /* in a car the brake takes Hit's place */
+#tE { right: calc(122px + var(--sr)); bottom: calc(22px + var(--sb)); width: 80px; height: 80px; font-size: 22px; }
+#tJump { right: calc(26px + var(--sr)); bottom: calc(124px + var(--sb)); width: 68px; height: 68px; font-size: 18px; }
+#tQ { right: calc(124px + var(--sr)); bottom: calc(118px + var(--sb)); width: 52px; height: 52px; font-size: 15px; }
+#tGun { right: calc(184px + var(--sr)); bottom: calc(118px + var(--sb)); width: 52px; height: 52px; font-size: 15px; }
+#touch.car #tJump { right: calc(122px + var(--sr)); bottom: calc(22px + var(--sb)); width: 80px; height: 80px; font-size: 20px; } /* in a car the brake takes Hit's place */
 /* the top row: settings, map, and skipping a line */
-#tMenu { left: calc(12px + env(safe-area-inset-left)); top: calc(12px + env(safe-area-inset-top)); width: 46px; height: 46px; border-radius: 10px; font-size: 24px; }
-#tMap { left: calc(66px + env(safe-area-inset-left)); top: calc(12px + env(safe-area-inset-top)); width: 56px; height: 46px; border-radius: 10px; font-size: 18px; }
-#tSkip { left: 50%; transform: translateX(-50%); top: calc(10px + env(safe-area-inset-top)); width: auto; height: 40px; padding: 0 18px; border-radius: 20px; font-size: 18px; display: none; }
+#tMenu { left: calc(12px + var(--sl)); top: calc(12px + var(--st)); width: 46px; height: 46px; border-radius: 10px; font-size: 24px; }
+#tMap { left: calc(66px + var(--sl)); top: calc(12px + var(--st)); width: 56px; height: 46px; border-radius: 10px; font-size: 18px; }
+#tSkip { left: 50%; transform: translateX(-50%); top: calc(10px + var(--st)); width: auto; height: 40px; padding: 0 18px; border-radius: 20px; font-size: 18px; display: none; }
 #touch.talking #tSkip { display: flex; border-color: #ffd34d; }
-/* stood upright: a card asks for the phone to be turned (the game waits behind it) */
-#turn { position: fixed; inset: 0; z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #120a1c; color: #fff4dc; text-align: center; padding: 24px; }
-body.touch #turn.on { display: flex; }
-#turn .phone { width: 96px; height: 96px; color: #ffb347; animation: tilt 2.4s ease-in-out infinite; }
-#turn b { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 34px; letter-spacing: 3px; }
-#turn span { font-size: 17px; color: #ffd9a8; }
-@keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+/* drawn turned: a small hint, gone after a few seconds */
+#turn { position: fixed; left: 50%; top: calc(12px + var(--st)); transform: translateX(-50%); z-index: 50; display: none; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 22px;
+  background: rgba(18, 10, 28, .82); color: #fff4dc; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity .6s; white-space: nowrap; }
+body.rot #turn { display: flex; }
+#turn.on { opacity: 1; }
+#turn svg { width: 26px; height: 26px; color: #ffb347; }
 /* the HUD makes room: smaller, and clear of the buttons and the notch */
-body.touch #radar { width: 112px; height: 112px; left: calc(12px + env(safe-area-inset-left)); bottom: auto; top: calc(66px + env(safe-area-inset-top)); border-width: 3px; }
-body.touch #clock { top: calc(10px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); font-size: 22px; }
-body.touch #money { top: calc(34px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); font-size: 28px; }
-body.touch #wanted { top: calc(66px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); font-size: 20px; }
-body.touch #health, body.touch #armour { right: calc(14px + env(safe-area-inset-right)); width: 120px; }
-body.touch #health { top: calc(94px + env(safe-area-inset-top)); height: 10px; } body.touch #armour { top: calc(108px + env(safe-area-inset-top)); }
-body.touch #weapon { right: calc(14px + env(safe-area-inset-right)); top: calc(116px + env(safe-area-inset-top)); font-size: 17px; }
-body.touch #ammo { right: calc(14px + env(safe-area-inset-right)); top: calc(134px + env(safe-area-inset-top)); font-size: 16px; }
-body.touch #carhp { right: calc(14px + env(safe-area-inset-right)); top: calc(152px + env(safe-area-inset-top)); font-size: 15px; }
+body.touch #radar { width: 112px; height: 112px; left: calc(12px + var(--sl)); bottom: auto; top: calc(66px + var(--st)); border-width: 3px; }
+body.touch #clock { top: calc(10px + var(--st)); right: calc(14px + var(--sr)); font-size: 22px; }
+body.touch #money { top: calc(34px + var(--st)); right: calc(14px + var(--sr)); font-size: 28px; }
+body.touch #wanted { top: calc(66px + var(--st)); right: calc(14px + var(--sr)); font-size: 20px; }
+body.touch #health, body.touch #armour { right: calc(14px + var(--sr)); width: 120px; }
+body.touch #health { top: calc(94px + var(--st)); height: 10px; } body.touch #armour { top: calc(108px + var(--st)); }
+body.touch #weapon { right: calc(14px + var(--sr)); top: calc(116px + var(--st)); font-size: 17px; }
+body.touch #ammo { right: calc(14px + var(--sr)); top: calc(134px + var(--st)); font-size: 16px; }
+body.touch #carhp { right: calc(14px + var(--sr)); top: calc(152px + var(--st)); font-size: 15px; }
 body.touch #gain { right: 140px; top: 36px; font-size: 24px; }
 body.touch #radio { left: 132px; top: 14px; font-size: 18px; }
-body.touch #subtitle, body.touch #objective, body.touch #prompt { width: min(640px, 64vw); }
-body.touch #subtitle { bottom: calc(18px + env(safe-area-inset-bottom)); font-size: 16px; }
-body.touch #objective { bottom: auto; top: calc(60px + env(safe-area-inset-top)); font-size: 15px; }
-body.touch #prompt { bottom: calc(96px + env(safe-area-inset-bottom)); font-size: 14px; }
-body.touch #dist { bottom: auto; top: calc(40px + env(safe-area-inset-top)); font-size: 16px; }
-body.touch #intro { bottom: auto; top: calc(186px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); min-width: 0; }
+body.touch #subtitle, body.touch #objective, body.touch #prompt { width: min(640px, calc(var(--vw) * 64)); }
+body.touch #subtitle { bottom: calc(18px + var(--sb)); font-size: 16px; }
+body.touch #objective { bottom: auto; top: calc(60px + var(--st)); font-size: 15px; }
+body.touch #prompt { bottom: calc(96px + var(--sb)); font-size: 14px; }
+body.touch #dist { bottom: auto; top: calc(40px + var(--st)); font-size: 16px; }
+body.touch #intro { bottom: auto; top: calc(186px + var(--st)); left: calc(12px + var(--sl)); min-width: 0; }
 body.touch #intro b { font-size: 22px; } body.touch #intro span { font-size: 12px; }
 body.touch #weapons { top: 50px; font-size: 14px; }
-body.touch #cardTitle { font-size: clamp(36px, 9vw, 64px); }
+body.touch #cardTitle { font-size: clamp(36px, calc(var(--vw) * 9), 64px); }
 body.touch #cardSub { font-size: 18px; }
-body.touch #card { bottom: auto; top: 30vh; right: 5vw; }
-body.touch #menu { min-width: 0; width: min(560px, 94vw); max-height: 88vh; overflow-y: auto; padding: 14px 16px; touch-action: pan-y; }
+body.touch #card { bottom: auto; top: calc(var(--vh) * 30); right: calc(var(--vw) * 5); }
+body.touch #menu { min-width: 0; width: min(560px, calc(var(--vw) * 94)); max-height: calc(var(--vh) * 88); overflow-y: auto; padding: 14px 16px; touch-action: pan-y; }
 body.touch #menu h2 { font-size: 26px; }
 body.touch #menu .item { padding: 12px 10px; font-size: 15px; }
 body.touch #menu .item .hint, body.touch #menu .info .hint { float: none; display: block; font-size: 12px; margin-top: 2px; }
-body.touch #map { width: min(96vw, 900px); max-height: 92vh; }
+body.touch #map { width: min(calc(var(--vw) * 96), 900px); max-height: calc(var(--vh) * 92); }
 body.touch .keys { font-size: 13px; }
 body.touch #title { gap: 18px; }
 /* sideways on a phone: the HUD down the edges, clear of the notch, the subtitles above the thumbs */
-body.touch #subtitle { width: min(560px, 58vw); bottom: calc(14px + env(safe-area-inset-bottom)); }
-body.touch #objective { width: min(520px, 54vw); top: calc(56px + env(safe-area-inset-top)); }
-body.touch #prompt { bottom: calc(70px + env(safe-area-inset-bottom)); }
+body.touch #subtitle { width: min(560px, calc(var(--vw) * 58)); bottom: calc(14px + var(--sb)); }
+body.touch #objective { width: min(520px, calc(var(--vw) * 54)); top: calc(56px + var(--st)); }
+body.touch #prompt { bottom: calc(70px + var(--sb)); }
+
+/* the title on a phone on its side (about 390 px tall): everything sized to the height so it fits */
+body.touch #title { gap: calc(var(--vh) * 2.5); }
+body.touch:not(.la):not(.nexus) .logo .sop { font-size: calc(var(--vh) * 17); letter-spacing: 8px; text-shadow: 0 4px 0 #c2410c, 0 8px 0 #7c1d4f; }
+body.touch:not(.la):not(.nexus) .logo .vc { font-size: calc(var(--vh) * 8); margin-top: calc(var(--vh) * 3); }
+body.touch:not(.la):not(.nexus) .logo .tag { font-size: 12px; margin-top: calc(var(--vh) * 2.5); }
+body.touch #start { margin-top: 0; padding: 8px 48px; font-size: 26px; }
+body.touch #fresh { margin-top: -6px; font-size: 16px; }
+body.touch .keys { font-size: 12px; line-height: 1.5; }
+body.touch .fine { position: static; font-size: 10px; max-width: 80%; }

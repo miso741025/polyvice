@@ -182,6 +182,11 @@ for (const f of ['License_Standard.txt']) copyFileSync(join(SRC, f), join(DST, f
 mkdirSync(join(DST, 'anim-license'), { recursive: true });
 copyFileSync(join(SRC, 'anim-license/License.txt'), join(DST, 'anim-license/License.txt'));
 
+// The home-screen app: opens full screen and sideways where the phone allows it.
+copyFileSync(join(ROOT, 'manifest.webmanifest'), join(OUT, 'manifest.webmanifest'));
+mkdirSync(join(OUT, 'icons'), { recursive: true });
+for (const f of readdirSync(join(ROOT, 'icons'))) copyFileSync(join(ROOT, 'icons', f), join(OUT, 'icons', f));
+
 // ---------- The page ----------
 let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
 const cut = (re, what) => { if (!re.test(html)) throw new Error(`index.html: could not find ${what}`); html = html.replace(re, ''); };
@@ -201,7 +206,7 @@ const walk = d => { for (const f of readdirSync(d)) { const p = join(d, f); if (
 walk(OUT);
 let total = 0, wire = 0;
 const rows = files.map(p => {
-  const b = readFileSync(p), size = b.length, text = /\.(js|css|html|gltf|txt)$/.test(p), gz = text ? brotliCompressSync(b).length : (/\.(bin|glb)$/.test(p) ? gzipSync(b).length : size);
+  const b = readFileSync(p), size = b.length, text = /\.(js|css|html|gltf|txt|webmanifest)$/.test(p), gz = text ? brotliCompressSync(b).length : (/\.(bin|glb)$/.test(p) ? gzipSync(b).length : size);
   total += size; wire += gz;
   return { file: p.slice(OUT.length + 1), size, wire: gz };
 }).sort((a, b) => b.size - a.size);
