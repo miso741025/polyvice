@@ -6,7 +6,7 @@ import { loadPeople, makeLook, LOOKS } from './people.js';
 // with no query for the whole list. ?city=nexus etc. is not needed: looks do not depend on the city.
 
 const WHO = {
-  'Vice City': ['tony', 'carmela', 'christopher', 'junior', 'livia', 'melfi', 'silvio', 'paulie', 'pussy', 'hesh', 'meadow', 'aj', 'adriana', 'jackie', 'mikey'],
+  'Port Paloma': ['tony', 'carmela', 'christopher', 'junior', 'livia', 'melfi', 'silvio', 'paulie', 'pussy', 'hesh', 'meadow', 'aj', 'adriana', 'jackie', 'mikey'],
   'Los Angeles': ['neil', 'hanna', 'shiherlis', 'cheritto', 'eady', 'waingro', 'nate', 'trejo', 'vanzant'],
   'Nexus': ['k', 'joi', 'joshi', 'luv', 'wallace', 'sapper', 'coco', 'cotton', 'stelline', 'mariette', 'freysa'],
 };

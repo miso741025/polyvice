@@ -1,8 +1,8 @@
 // City layout constants and the shared collision list.
 // The city is a grid of NX x NZ blocks separated by roads; +x is east (the ocean), +z is south.
 
-// Two cities share the engine: Vice City (The Sopranos) and Los Angeles (Heat). The page's ?city= picks one.
-// Three worlds share the engine: Vice City (The Sopranos), Los Angeles (Heat) and Nexus, a planet seen from Vice City's sky (Blade Runner 2049).
+// Two cities share the engine: Port Paloma (The Bellacostas) and Los Angeles (Heat). The page's ?city= picks one.
+// Three worlds share the engine: Port Paloma (The Bellacostas), Los Angeles (Heat) and Nexus, a planet seen from Port Paloma's sky (Blade Runner 2049).
 const want = new URLSearchParams(location.search).get('city');
 export const CITY = want === 'la' ? 'la' : want === 'nexus' ? 'nexus' : 'vice';
 // Nexus tells two stories in one city: 2049 (K) by default, and ?story=2019 (Deckard, the first film).
@@ -14,7 +14,7 @@ export const nodeX = k => OX + k * CELL; // centre line of north-south road k (0
 export const nodeZ = k => OZ + k * CELL; // centre line of east-west road k (0..NZ)
 export const blockCenter = (i, j) => ({ x: OX + i * CELL + CELL / 2, z: OZ + j * CELL + CELL / 2 });
 
-export const SHORE = OX + NX * CELL + ROAD / 2; // east kerb of Ocean Drive, where the sand starts
+export const SHORE = OX + NX * CELL + ROAD / 2; // east kerb of Seaview Drive, where the sand starts
 export const bounds = {
   minX: OX - ROAD / 2 - 20, maxX: SHORE + 60,
   minZ: OZ - ROAD / 2 - 20, maxZ: OZ + NZ * CELL + ROAD / 2 + 20,

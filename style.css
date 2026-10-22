@@ -1,6 +1,6 @@
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #120a1c; }
-body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: none; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #120a1c; overscroll-behavior: none; }
+body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 
 #game { display: block; width: 100vw; height: 100vh; }
 
@@ -92,6 +92,21 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
   font-family: 'Mr Dafoe', cursive; font-size: clamp(64px, 10vw, 150px); color: #ff5fd2; margin-top: -0.12em;
   transform: rotate(-5deg); text-shadow: 5px 5px 0 #1a2c7a, 0 0 40px rgba(255, 95, 210, .7);
 }
+.logo .tag { display: none; }
+/* Cannoli Coast: cream lettering on a sunset stripe, the pastry's own colours. (The other worlds restyle the logo below.) */
+body:not(.la):not(.nexus) .logo .sop {
+  font-size: clamp(64px, 13vw, 170px); letter-spacing: 10px; color: #fff4dc;
+  text-shadow: 0 6px 0 #c2410c, 0 12px 0 #7c1d4f, 0 18px 30px rgba(0, 0, 0, .55);
+}
+body:not(.la):not(.nexus) .logo .vc {
+  font-family: 'Bebas Neue', Impact, sans-serif; transform: none; margin-top: 18px; padding: 2px 34px 0;
+  font-size: clamp(34px, 6vw, 72px); letter-spacing: .55em; text-indent: .55em; color: #12353a;
+  background: linear-gradient(90deg, #ffb347, #ff7a59 45%, #3ad6b4); text-shadow: none; box-shadow: 0 6px 0 #12353a;
+}
+body:not(.la):not(.nexus) .logo .tag { display: block; margin-top: 18px; font-family: 'Rubik', sans-serif; font-weight: 700; font-size: clamp(13px, 1.8vw, 18px); letter-spacing: 4px; text-transform: uppercase; color: #ffd9a8; }
+body:not(.la):not(.nexus) #title { background: linear-gradient(180deg, rgba(18, 26, 48, .78), rgba(120, 40, 50, .35) 55%, rgba(10, 6, 18, .9)); }
+body:not(.la):not(.nexus) #start { background: #ffd9a8; box-shadow: 0 0 0 3px #120a1c, 0 0 0 6px #ff7a59, 0 0 34px rgba(255, 179, 71, .55); }
+.touchkeys { display: none; }
 #start {
   pointer-events: auto; cursor: pointer; margin-top: 18px; padding: 12px 64px;
   font-family: 'Bebas Neue', sans-serif; font-size: 34px; letter-spacing: 6px; color: #120a1c;
@@ -166,3 +181,68 @@ body.nexus #title { background: radial-gradient(ellipse at 50% 80%, rgba(80, 30,
 #intro b { display: block; font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 2px; color: #fff; text-shadow: 2px 2px 0 #000; }
 #intro span { font-family: 'Rubik', sans-serif; font-size: 15px; color: #9ff3ff; text-shadow: 1px 1px 0 #000; }
 #passed #earned { font-family: 'Rubik', sans-serif; font-weight: 700; font-size: 17px; color: #f0ecff; text-shadow: 2px 2px 0 #000; margin-top: 6px; }
+
+/* ---------- Phones and tablets (touch.js puts .touch on the body) ---------- */
+body.touch .deskkeys { display: none; }
+body.touch .touchkeys { display: block; }
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 15; display: none; font-family: 'Bebas Neue', Impact, sans-serif; }
+#touch.play { display: block; }
+#tStick { position: fixed; width: 132px; height: 132px; margin: -66px 0 0 -66px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .35); background: rgba(10, 10, 24, .25); opacity: 0; transition: opacity .15s; }
+#tStick.on { opacity: 1; }
+#tKnob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: rgba(255, 244, 220, .75); box-shadow: 0 2px 8px rgba(0, 0, 0, .5); }
+.tb { position: fixed; pointer-events: auto; touch-action: none; width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .55); background: rgba(14, 12, 30, .5);
+  color: #fff4dc; font-family: inherit; font-size: 21px; letter-spacing: 1px; line-height: 1; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-shadow: 1px 1px 0 #000; }
+.tb small { font-family: 'Rubik', sans-serif; font-size: 9px; letter-spacing: 0; opacity: .8; margin-top: 2px; }
+.tb.down { background: rgba(255, 122, 89, .75); border-color: #ffd9a8; }
+/* the right thumb's cluster, from the corner out */
+#tE { right: calc(18px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 78px; height: 78px; font-size: 26px; }
+#tF { right: calc(108px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); }
+#tJump { right: calc(26px + env(safe-area-inset-right)); bottom: calc(116px + env(safe-area-inset-bottom)); }
+#tRun { right: calc(104px + env(safe-area-inset-right)); bottom: calc(96px + env(safe-area-inset-bottom)); }
+#tQ { right: calc(182px + env(safe-area-inset-right)); bottom: calc(30px + env(safe-area-inset-bottom)); width: 54px; height: 54px; font-size: 17px; }
+#tGun { right: calc(176px + env(safe-area-inset-right)); bottom: calc(96px + env(safe-area-inset-bottom)); width: 54px; height: 54px; font-size: 17px; }
+#tR { right: calc(30px + env(safe-area-inset-right)); bottom: calc(194px + env(safe-area-inset-bottom)); width: 48px; height: 48px; font-size: 17px; }
+#tG { right: calc(92px + env(safe-area-inset-right)); bottom: calc(170px + env(safe-area-inset-bottom)); width: 48px; height: 48px; font-size: 15px; }
+/* the top row: settings, map, and skipping a line */
+#tMenu { left: calc(12px + env(safe-area-inset-left)); top: calc(12px + env(safe-area-inset-top)); width: 46px; height: 46px; border-radius: 10px; font-size: 24px; }
+#tMap { left: calc(66px + env(safe-area-inset-left)); top: calc(12px + env(safe-area-inset-top)); width: 56px; height: 46px; border-radius: 10px; font-size: 18px; }
+#tSkip { left: 50%; transform: translateX(-50%); top: calc(12px + env(safe-area-inset-top)); width: auto; height: 40px; padding: 0 16px; border-radius: 20px; font-size: 18px; opacity: .45; }
+#touch.talking #tSkip { opacity: 1; border-color: #ffd34d; }
+#touch.car #tE, #touch.car #tRun, #touch.car #tQ, #touch.car #tGun { display: none; }
+/* the HUD makes room: smaller, and clear of the buttons and the notch */
+body.touch #radar { width: 112px; height: 112px; left: calc(12px + env(safe-area-inset-left)); bottom: auto; top: calc(66px + env(safe-area-inset-top)); border-width: 3px; }
+body.touch #clock { top: calc(10px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); font-size: 22px; }
+body.touch #money { top: calc(34px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); font-size: 28px; }
+body.touch #wanted { top: calc(66px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); font-size: 20px; }
+body.touch #health, body.touch #armour { right: calc(14px + env(safe-area-inset-right)); width: 120px; }
+body.touch #health { top: calc(94px + env(safe-area-inset-top)); height: 10px; } body.touch #armour { top: calc(108px + env(safe-area-inset-top)); }
+body.touch #weapon { right: calc(14px + env(safe-area-inset-right)); top: calc(116px + env(safe-area-inset-top)); font-size: 17px; }
+body.touch #ammo { right: calc(14px + env(safe-area-inset-right)); top: calc(134px + env(safe-area-inset-top)); font-size: 16px; }
+body.touch #carhp { right: calc(14px + env(safe-area-inset-right)); top: calc(152px + env(safe-area-inset-top)); font-size: 15px; }
+body.touch #gain { right: 140px; top: 36px; font-size: 24px; }
+body.touch #radio { left: 132px; top: 14px; font-size: 18px; }
+body.touch #subtitle, body.touch #objective, body.touch #prompt { width: min(640px, 64vw); }
+body.touch #subtitle { bottom: calc(18px + env(safe-area-inset-bottom)); font-size: 16px; }
+body.touch #objective { bottom: auto; top: calc(60px + env(safe-area-inset-top)); font-size: 15px; }
+body.touch #prompt { bottom: calc(96px + env(safe-area-inset-bottom)); font-size: 14px; }
+body.touch #dist { bottom: auto; top: calc(40px + env(safe-area-inset-top)); font-size: 16px; }
+body.touch #intro { bottom: auto; top: 40vh; left: 12px; min-width: 0; }
+body.touch #intro b { font-size: 22px; } body.touch #intro span { font-size: 12px; }
+body.touch #weapons { top: 50px; font-size: 14px; }
+body.touch #cardTitle { font-size: clamp(36px, 9vw, 64px); }
+body.touch #cardSub { font-size: 18px; }
+body.touch #card { bottom: auto; top: 30vh; right: 5vw; }
+body.touch #menu { min-width: 0; width: min(560px, 94vw); max-height: 88vh; overflow-y: auto; padding: 14px 16px; touch-action: pan-y; }
+body.touch #menu h2 { font-size: 26px; }
+body.touch #menu .item { padding: 12px 10px; font-size: 15px; }
+body.touch #menu .item .hint, body.touch #menu .info .hint { float: none; display: block; font-size: 12px; margin-top: 2px; }
+body.touch #map { width: min(96vw, 900px); max-height: 92vh; }
+body.touch .keys { font-size: 13px; }
+body.touch #title { gap: 18px; }
+/* standing the phone up: the subtitles get the whole width and climb over the buttons */
+@media (orientation: portrait) {
+  body.touch #subtitle { width: 92vw; bottom: calc(250px + env(safe-area-inset-bottom)); }
+  body.touch #objective { width: 70vw; left: auto; right: 10px; transform: none; text-align: right; top: calc(212px + env(safe-area-inset-top)); }
+  body.touch #prompt { width: 92vw; bottom: calc(306px + env(safe-area-inset-bottom)); }
+  body.touch #dist { top: calc(186px + env(safe-area-inset-top)); left: auto; right: 12px; text-align: right; }
+}

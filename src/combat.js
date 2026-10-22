@@ -114,7 +114,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
 
   // ----- Lock-on -----
   // Hold the right mouse button (or tap Q / Tab) to lock onto the best target in front of the camera:
-  // Tony faces them, the camera swings round, and shots and punches go their way. Q / Tab cycles.
+  // Nico faces them, the camera swings round, and shots and punches go their way. Q / Tab cycles.
   const ringTex = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 64;
     const x = c.getContext('2d');

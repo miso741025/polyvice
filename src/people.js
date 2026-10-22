@@ -1082,7 +1082,7 @@ export function updatePeople(dt, eye) {
 }
 
 // The crew's looks, taken from the reference image (left to right).
-// Hesh runs his record label in this world; Furio only arrives late in the storyline.
+// Morty runs his record label in this world; another cousin only arrives late in the storyline.
 export const LOOKS = {
   // ----- Nexus (Blade Runner 2049). Generic figures in the film's wardrobe: build, hair and clothes, not anybody's face. -----
   k: { coat: 0x3a4238, coatLen: 0.52, sheen: 0.14, collar: 0xbfb49e, collarSize: 1.3, shirt: 0x3a3d44, turtle: 0x3a3d44, pants: 0x23242a, shoes: 0x1c1c22, hair: 0x5a4328, hairMesh: 'parted', hairScale: [1.0, 0.92, 1.02], hairShift: [0, -0.004, 0], bulk: 1.06, height: 1.04, stubble: 0.15, face: { jaw: 0.1, brow: 0.3, cheeks: -0.35, chin: 0.1 } },

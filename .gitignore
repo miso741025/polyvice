@@ -10,3 +10,5 @@ shots/
 # Working notes and tooling stay on this computer.
 notes/
 .claude/
+# The web build (tools/build-web.mjs) is made, not kept.
+dist/

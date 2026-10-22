@@ -19,7 +19,7 @@ export class Hud {
   money(n) {
     const el = $('money'), was = this.cash;
     this.cash = n;
-    el.textContent = '$' + String(n).padStart(8, '0');
+    el.textContent = (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US'); // (a plain amount: not the zero-padded counter of the games this began from)
     const gain = $('gain'), diff = n - (was ?? 0);
     if (!gain || !diff) return;
     gain.textContent = (diff > 0 ? '+$' : '-$') + Math.abs(diff).toLocaleString('en-US');
