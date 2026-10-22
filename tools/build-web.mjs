@@ -211,4 +211,4 @@ console.log(`\n${files.length} files, ${mb(total)} on disk, about ${mb(wire)} ov
 if (rows[0].size > 25 * 1048576) throw new Error('a file is over the 25 MB Workers limit');
 if (visible.length) { console.log('\nNames that must not ship:\n' + [...new Set(visible)].join('\n')); process.exitCode = 1; }
 else console.log('No names from other worlds or from the source works in the shipped text.');
-writeFileSync(join(OUT, 'build.json'), JSON.stringify({ script: jsName, style: cssName, files: rows, bytes: total, wire }, null, 1));
+writeFileSync(join(dirname(OUT), 'build-' + OUT.split(/[\/]/).pop() + '.json'), JSON.stringify({ script: jsName, style: cssName, files: rows, bytes: total, wire }, null, 1));
