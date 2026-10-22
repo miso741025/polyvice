@@ -208,7 +208,8 @@ body.touch .touchkeys { display: block; }
 #tAct { right: calc(122px + var(--sr)); bottom: calc(18px + var(--sb)); width: 86px; height: 86px; font-size: 13px; background: rgba(255, 179, 71, .9); color: #12353a; border-color: #fff4dc; text-shadow: none; }
 #tAct i svg { filter: none; }
 #tJump { right: calc(26px + var(--sr)); bottom: calc(122px + var(--sb)); width: 70px; height: 70px; }
-#tGun { right: calc(128px + var(--sr)); bottom: calc(116px + var(--sb)); width: 64px; height: 64px; }
+#tGun { right: calc(128px + var(--sr)); bottom: calc(116px + var(--sb)); width: 70px; height: 70px; font-size: 10px; }
+#tGun span { white-space: normal; line-height: 1; }
 #touch.car #tJump { right: calc(16px + var(--sr)); bottom: calc(16px + var(--sb)); width: 94px; height: 94px; font-size: 14px; }
 /* the top row: settings, map, and skipping a line */
 #tMenu { left: calc(12px + var(--sl)); top: calc(10px + var(--st)); width: 50px; height: 50px; border-radius: 12px; }
