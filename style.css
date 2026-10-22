@@ -93,7 +93,7 @@ body { font-family: 'Rubik', system-ui, sans-serif; color: #fff; user-select: no
   transform: rotate(-5deg); text-shadow: 5px 5px 0 #1a2c7a, 0 0 40px rgba(255, 95, 210, .7);
 }
 .logo .tag { display: none; }
-/* Cannoli Coast: cream lettering on a sunset stripe, the pastry's own colours. (The other worlds restyle the logo below.) */
+/* Vice Web: cream lettering on a sunset stripe, the pastry's own colours. (The other worlds restyle the logo below.) */
 body:not(.la):not(.nexus) .logo .sop {
   font-size: clamp(64px, 13vw, 170px); letter-spacing: 10px; color: #fff4dc;
   text-shadow: 0 6px 0 #c2410c, 0 12px 0 #7c1d4f, 0 18px 30px rgba(0, 0, 0, .55);

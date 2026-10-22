@@ -2,11 +2,11 @@
 
 A PS2-era open-world game that runs in the browser (Three.js, no build step): the look and feel of the open-world games of the early 2000s, flat-shaded and chunky, with a city you can drive, walk and fly through. Story missions, driving, fist fights and gunfights, police chases, side jobs, and on one world a spinner that flies. One engine; the worlds and stories keep being added. So far:
 
-- **Port Paloma** – *Cannoli Coast*, an original crime comedy in a pastel seaside city: Nico Bellacosta, his family, his crew, his therapist and his flamingos. This is the world published on the web (see `tools/build-web.mjs`).
+- **Port Paloma** – *Vice Web*, an original crime comedy in a pastel seaside city: Nico Bellacosta, his family, his crew, his therapist and his flamingos. This is the world published on the web (see `tools/build-web.mjs`).
 - **Los Angeles** (`?city=la`) – the story of *Heat*, played as Neil McCauley.
 - **Nexus** (`?city=nexus`) – a rain-soaked planet seen hanging in Vice City's sky; *Blade Runner 2049* played as K, and (`&story=2019`) the first *Blade Runner* played as Deckard, in the same city thirty years earlier.
 
-*Cannoli Coast* (Port Paloma) has its own characters and places, and its story is being reworked into its own. The other two worlds are an **unofficial, non-commercial fan project**, kept for local play only and not published. It is not affiliated with, endorsed by or connected to HBO, Warner Bros., Alcon Entertainment, Rockstar Games or anyone else who owns the works it is a tribute to. The stories follow the plots of those works, but every line of dialogue is written for the game; no footage, music, artwork or other media from them is included. Characters are generic figures in the right clothes, not likenesses of any actor. If you are a rights holder and want something changed or removed, open an issue.
+*Vice Web* (Port Paloma) has its own characters and places, and its story is being reworked into its own. The other two worlds are an **unofficial, non-commercial fan project**, kept for local play only and not published. It is not affiliated with, endorsed by or connected to HBO, Warner Bros., Alcon Entertainment, Rockstar Games or anyone else who owns the works it is a tribute to. The stories follow the plots of those works, but every line of dialogue is written for the game; no footage, music, artwork or other media from them is included. Characters are generic figures in the right clothes, not likenesses of any actor. If you are a rights holder and want something changed or removed, open an issue.
 
 ## Run
 

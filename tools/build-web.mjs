@@ -1,4 +1,4 @@
-// Builds the web release of Port Paloma (Cannoli Coast) alone: one minified script, the character models it needs,
+// Builds the web release of Port Paloma (Vice Web) alone: one minified script, the character models it needs,
 // lighter textures, and a page with no way across to the other worlds. Nothing of Los Angeles or Nexus is in it.
 //
 //   ESBUILD=<path to an esbuild package> node tools/build-web.mjs [outDir]     (outDir defaults to dist/vice)
