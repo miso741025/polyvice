@@ -7,16 +7,22 @@ import { runStory, savedMission, clearSave, storyList, jumpTo, explode, people, 
 import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
 import { installSideJobs } from './sidejobs.js';
+import { TOUCH, installTouch } from './touch.js';
 
 const canvas = document.getElementById('game');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// Detail: phones and tablets get the light version (fewer pixels, cheaper shadows, a nearer haze, a thinner crowd and less traffic).
+// ?quality=low or ?quality=high in the address, or the Detail line in the settings, overrides the guess.
+const DETAIL_KEY = 'cannoli-coast.detail';
+const askedDetail = new URLSearchParams(location.search).get('quality') || (() => { try { return localStorage.getItem(DETAIL_KEY); } catch { return null; } })();
+const LIGHT = askedDetail === 'low' || (askedDetail !== 'high' && TOUCH);
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !LIGHT, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, LIGHT ? 1.25 : 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = LIGHT ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xf2a0b4, 140, 800);
-const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 1900);
+scene.fog = new THREE.Fog(0xf2a0b4, LIGHT ? 70 : 140, LIGHT ? 320 : 800);
+const camera = new THREE.PerspectiveCamera(62, 1, 0.5, LIGHT ? 380 : 1900); // (the light version draws nothing past the haze)
 
 const hemi = new THREE.HemisphereLight(0xffd9ea, 0x5d4c7c, 1.5);
 scene.add(hemi);
@@ -27,9 +33,10 @@ const headLight = new THREE.SpotLight(0xfff2c0, 0, 70, 0.55, 0.5, 1.2);
 // A fill that follows the player on Nexus, so he reads in the dark wherever he stands (the games this is modelled on do the same).
 const fill = new THREE.SpotLight(0xcfd8ff, 0, 9, 0.42, 1, 2); scene.add(fill); scene.add(fill.target); // a narrow soft cone on him alone, so the ground does not get a pool headLight.position.set(0, 1.0, 1.6); headLight.target.position.set(0, -0.6, 30); headLight.add(headLight.target);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(LIGHT ? 1024 : 2048, LIGHT ? 1024 : 2048);
 sun.shadow.bias = -0.0006;
-Object.assign(sun.shadow.camera, { left: -90, right: 90, top: 90, bottom: -90, near: 1, far: 420 });
+const SHADE = LIGHT ? 55 : 90; // the light version shades a smaller square round the player, at the same sharpness
+Object.assign(sun.shadow.camera, { left: -SHADE, right: SHADE, top: SHADE, bottom: -SHADE, near: 1, far: 420 });
 scene.add(sun, sun.target);
 
 function resize() {
@@ -52,7 +59,7 @@ async function boot() {
   const rand = mulberry32(77);
   const hud = new Hud();
   // Settings, kept in the browser: volume, mouse, the crowd, shadows.
-  const SETTINGS = 'sopranos-vice.settings';
+  const SETTINGS = 'cannoli-coast.settings';
   const settings = { volume: 0.7, ambience: 2, radio: 2, sens: 1, invert: false, crowd: 1, shadows: true };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS)) || {}); } catch { /* defaults */ }
   const applySettings = () => {
@@ -62,15 +69,16 @@ async function boot() {
     try { localStorage.setItem(SETTINGS, JSON.stringify(settings)); } catch { /* play on */ }
   };
   const places = buildWorld(scene);
+  if (LIGHT) places.sky.scale.setScalar(0.22); // the sky dome (1500 m) inside the nearer far plane
 
-  // ----- Cars: Tony's SUV, parked cars at the kerb, traffic -----
+  // ----- Cars: Nico's SUV, parked cars at the kerb, traffic -----
   const g_scenery = [];
   const NEXUS = CITY === 'nexus', LA = CITY === 'la';
-  const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, NEXUS ? 0x1c1c22 : LA ? 0x1d1d24 : 0x7a1626, NEXUS ? 'spinner' : LA ? 'sedan' : 'suv'); // the player's own car: Tony's SUV, Neil's sedan, K's spinner
-  const cars = [tonyCar, ...spawnTraffic(scene, 46, rand)];
+  const tonyCar = new Car(scene, places.home.car.x, places.home.car.z, places.home.car.h, NEXUS ? 0x1c1c22 : LA ? 0x1d1d24 : 0x7a1626, NEXUS ? 'spinner' : LA ? 'sedan' : 'suv'); // the player's own car: Nico's SUV, Neil's sedan, K's spinner
+  const cars = [tonyCar, ...spawnTraffic(scene, LIGHT ? 18 : 46, rand)];
   const parkedColors = NEXUS ? [0x1c1c22, 0x2a2a30, 0x3a3a44, 0x16161c, 0x4a4446, 0x23232b, 0x2f2a38, 0x1a2028, 0x5a2a2a] : [0xffffff, 0x29c7c0, 0xff5fa8, 0xffd23f, 0xd9342b, 0x8ecbff, 0xf08a3c, 0x7d5cff, 0x1d1d24];
   const parkedKinds = ['sedan', 'coupe', 'sedan', 'suv', 'coupe', 'van', 'pickup'];
-  for (let n = 0; n < 44; n++) {
+  for (let n = 0; n < (LIGHT ? 22 : 44); n++) {
     const off = (rand() - 0.5) * 36, far = ROAD / 2 - 1.2, color = parkedColors[n % parkedColors.length];
     if (rand() < 0.5) { // on a north-south road, facing south on the west kerb
       const i = Math.floor(rand() * (NX + 1)), j = Math.floor(rand() * NZ);
@@ -91,7 +99,7 @@ async function boot() {
   }
 
   // ----- Pedestrians -----
-  // A random block within `far` of a point, never Tony's own.
+  // A random block within `far` of a point, never Nico's own.
   const blockNear = (at, far) => {
     for (let tries = 0; tries < 20; tries++) {
       const i = Math.floor(rand() * NX), j = Math.floor(rand() * NZ), c = blockCenter(i, j), d = Math.hypot(c.x - at.x, c.z - at.z);
@@ -101,8 +109,9 @@ async function boot() {
     do { i = Math.floor(rand() * NX); j = Math.floor(rand() * NZ); } while (i === 0 && j === 0);
     return blockCenter(i, j);
   };
-  const peds = [], CROWD = [45, 90, 130];
-  for (let n = 0; n < 130; n++) peds.push(new Ped(scene, blockNear(places.home.spawn, 220), rand));
+  const peds = [], CROWD = LIGHT ? [20, 34, 48] : [45, 90, 130];
+  if (LIGHT) Ped.sight = 95; // (they fade into the nearer haze sooner)
+  for (let n = 0; n < CROWD[2]; n++) peds.push(new Ped(scene, blockNear(places.home.spawn, 220), rand));
   const crowdLimit = () => { peds.forEach((ped, i) => { ped.parked = i >= CROWD[settings.crowd]; if (ped.parked) ped.human.group.visible = false; }); };
   crowdLimit();
 
@@ -113,7 +122,7 @@ async function boot() {
   sessionStorage.removeItem('crossing');
   const heatOver = LA && savedMission() >= storyList().reduce((n, e) => n + e.titles.length, 0); // after the runway, Los Angeles is Hanna's
   const local = NEXUS ? (STORY_KEY === '2019' ? 'deckard' : 'k') : LA ? (heatOver ? 'hanna' : 'neil') : 'tony', who = carry?.who || local;
-  const tony = makeLook(who); // the player: Tony Soprano in Vice City, Neil McCauley in Los Angeles, or a visitor from across the water
+  const tony = makeLook(who); // the player: Nico Bellacosta in Port Paloma, Neil McCauley in Los Angeles, or a visitor from across the water
   scene.add(tony.group);
 
   // ----- Game state shared with the mission scripts -----
@@ -165,7 +174,7 @@ async function boot() {
       car.remove(scene);
       cars.splice(cars.indexOf(car), 1);
     },
-    // Play as someone else (Christopher has a mission of his own); the previous body is hidden.
+    // Play as someone else (Enzo has a mission of his own); the previous body is hidden.
     setPlayer(human) {
       p.human.group.visible = false;
       p.human = human;
@@ -312,12 +321,12 @@ async function boot() {
     { ...places.drivein.lot, label: 'D', name: 'Drive-in', color: '#49a0d0' }, { ...places.depository.gate, label: 'M', name: 'Metals depository', color: '#8d8a8e' }, { ...places.bookstore.door, label: 'B', name: 'Bookstore', color: '#8a6f8f' },
     { ...places.airport.door, label: 'A', name: 'Airport', color: '#f4f2ee' }, { ...places.bar.door, label: 'N', name: "Nate's bar", color: '#e0a12c' },
   ] : [
-    { ...places.home.spawn, label: 'H', name: 'Home', color: '#2f9c5a' }, { ...places.bing.door, label: 'B', name: 'Bada Bing', color: '#ff5fd2' }, { ...places.satriale.door, label: 'S', name: "Satriale's", color: '#d8342c' },
-    { ...places.melfi.door, label: 'M', name: 'Dr. Melfi', color: '#1f9c8f' }, { ...places.vesuvio.door, label: 'V', name: 'Vesuvio', color: '#e0a12c' }, { ...places.hesh.door, label: 'F', name: 'F-Note Records', color: '#49a0d0' },
+    { ...places.home.spawn, label: 'H', name: 'Home', color: '#2f9c5a' }, { ...places.bing.door, label: 'B', name: 'Pink Pelican', color: '#ff5fd2' }, { ...places.satriale.door, label: 'S', name: "Mancuso's", color: '#d8342c' },
+    { ...places.melfi.door, label: 'M', name: 'Dr. Vos', color: '#1f9c8f' }, { ...places.vesuvio.door, label: 'V', name: 'Il Gabbiano', color: '#e0a12c' }, { ...places.hesh.door, label: 'F', name: 'Low Tide Records', color: '#49a0d0' },
     { ...places.hospital.door, label: '+', name: 'Hospital', color: '#2f56c8' }, { ...places.bodyshop.door, label: 'A', name: 'Auto body', color: '#8a1c1c' }, { ...places.cafe.door, label: 'C', name: 'Bean Scene', color: '#1f6b4a' },
-    { ...places.livia.porch, label: 'L', name: "Livia's house", color: '#8a6f8f' }, { ...places.grove.gate, label: 'G', name: 'Green Grove', color: '#5f8a84' }, { ...places.motel.office, label: 'T', name: 'Motel', color: '#f08a3c' },
+    { ...places.livia.porch, label: 'L', name: "Rita's house", color: '#8a6f8f' }, { ...places.grove.gate, label: 'G', name: 'Seabreeze', color: '#5f8a84' }, { ...places.motel.office, label: 'T', name: 'Motel', color: '#f08a3c' },
     { ...places.church?.door, label: '†', name: 'Church', color: '#f4f2ee' }, { ...places.gas?.pumps, label: 'P', name: 'Gas station', color: '#d8342c' }, { ...places.carlot?.lot, label: '$', name: 'Sunshine Autos', color: '#2f56c8' },
-    { ...places.bridge.start, label: '⇄', name: `Bridge to ${LA ? 'Vice City' : 'Los Angeles'}`, color: '#8a2f2a' },
+    { ...places.bridge.start, label: '⇄', name: `Bridge to ${LA ? 'Port Paloma' : 'Los Angeles'}`, color: '#8a2f2a' },
   ]).filter(l => l.x !== undefined);
   for (const d of places.gunShops || []) landmarks.push({ x: d.x, z: d.z, label: 'W', name: 'Guns', color: '#5c6157' });
   const fade = (to, seconds) => { hud.fade(to, seconds); return g.wait(seconds + 0.05); };
@@ -347,6 +356,10 @@ async function boot() {
   g.sfx = sfx;
   window.game = g; // handy in the console
   g.renderer = renderer;
+  g.light = LIGHT;
+  // The phone's buttons press the same keys as the keyboard (touch.js).
+  g.touchKey = (code, down) => { if (hud.onMenu) { if (down) hud.onMenu(code); return; } keys[code] = down; if (down) pressed.add(code); };
+  const touchFrame = installTouch(g, canvas);
 
   // ----- Input -----
   addEventListener('keydown', e => {
@@ -378,23 +391,24 @@ async function boot() {
   g.cam.fixed = { pos: new THREE.Vector3(), look: new THREE.Vector3(0, 10, 0) };
   g.updaters.push(() => {
     if (g.started) return false;
-    g.cam.fixed.pos.set(Math.sin(g.time * 0.05) * 600, 150, Math.cos(g.time * 0.05) * 600);
+    const orbit = LIGHT ? 250 : 600; // (closer in the light version, inside its haze)
+    g.cam.fixed.pos.set(Math.sin(g.time * 0.05) * orbit, LIGHT ? 95 : 150, Math.cos(g.time * 0.05) * orbit);
     return true;
   });
   hud.fade(0, 1.2);
   // Each city has its own title, and a way across to the other.
   if (LA) { document.body.classList.add('la'); document.querySelector('.logo .sop').textContent = 'Heat'; document.querySelector('.logo .vc').textContent = 'Los Angeles'; document.title = 'Heat: Los Angeles'; g.setNight(0); }
   // The two Blade Runner stories are two separate games that happen to share a city: neither title offers the other, and
-  // each is reached from Vice City's or Los Angeles's title (owner, 2026-10-15: keep them apart).
+  // each is reached from Port Paloma's or Los Angeles's title (owner, 2026-10-15: keep them apart).
   const OLD = NEXUS && STORY_KEY === '2019';
   if (NEXUS) { document.body.classList.add('nexus'); document.querySelector('.logo .sop').textContent = 'Blade Runner'; document.querySelector('.logo .vc').textContent = OLD ? 'Los Angeles 2019' : 'Nexus 2049'; document.title = OLD ? 'Blade Runner: 2019' : 'Blade Runner: Nexus 2049'; g.setNight(1); }
   const otherBtn = document.getElementById('other');
   if (otherBtn) { // (an old cached page may not have the button)
     const toVice = LA && !NEXUS;
-    otherBtn.textContent = toVice ? 'Vice City · The Sopranos' : 'Los Angeles · Heat';
+    otherBtn.textContent = toVice ? 'Port Paloma · The Bellacostas' : 'Los Angeles · Heat';
     otherBtn.addEventListener('click', () => { location.search = toVice ? '' : '?city=la'; });
     const thirdBtn = document.getElementById('third'), yearBtn = document.getElementById('year');
-    if (thirdBtn) { thirdBtn.textContent = NEXUS ? 'Vice City · The Sopranos' : 'Blade Runner 2049'; thirdBtn.addEventListener('click', () => { location.search = NEXUS ? '' : '?city=nexus'; }); }
+    if (thirdBtn) { thirdBtn.textContent = NEXUS ? 'Port Paloma · The Bellacostas' : 'Blade Runner 2049'; thirdBtn.addEventListener('click', () => { location.search = NEXUS ? '' : '?city=nexus'; }); }
     if (yearBtn && !NEXUS) { yearBtn.hidden = false; yearBtn.textContent = 'Blade Runner · 2019'; yearBtn.addEventListener('click', () => { location.search = '?city=nexus&story=2019'; }); }
   }
   const startBtn = document.getElementById('start');
@@ -419,7 +433,7 @@ async function boot() {
     p.pos.set(at.x, 0, at.z); p.heading = g.cam.yaw = at.h; p.locked = false;
     if (ride) { ride.mission = false; g.enterCar(ride); ride.speed = 12; }
     hud.fade(1, 0); hud.fade(0, 1.6);
-    hud.card(NEXUS ? 'Nexus' : LA ? 'Los Angeles' : 'Vice City', g.visitor ? 'You are a long way from home' : 'Home');
+    hud.card(NEXUS ? 'Nexus' : LA ? 'Los Angeles' : 'Port Paloma', g.visitor ? 'You are a long way from home' : 'Home');
     g.wait(3.5).then(() => { hud.card(); return g.visitor ? null : runStory(g); }).then(() => { g.storyDone = true; }).catch(err => console.error(err));
     addEventListener('pointerdown', () => sfx.unlock(), { once: true }); addEventListener('keydown', () => sfx.unlock(), { once: true });
   }
@@ -440,8 +454,9 @@ async function boot() {
     return [[car.pos.x + fx, car.pos.z + fz], [car.pos.x - fx, car.pos.z - fz]];
   };
 
+  const still = { x: 0, y: 0 };
   function updatePlayer(dt) {
-    const car = p.car;
+    const car = p.car, stick = g.stick || still;
     if (car) {
       const up = keys.ShiftLeft || keys.ShiftRight, down = keys.ControlLeft || keys.ControlRight;
       const flying = car.kind === 'spinner' && (car.alt > 0.5 || (!p.locked && up));
@@ -451,7 +466,7 @@ async function boot() {
         if (car.alt > 0.5) { const before = car.pos.clone(); if (pushOutAbove(car.pos, car.reach, car.alt + groundAt(car.pos.x, car.pos.z) + 0.5)) { const jolt = before.distanceTo(car.pos) * 8; if (jolt > 1) { sfx.crash(Math.min(1, jolt / 10)); g.hurtCar(car, jolt * 2); car.speed *= 0.3; } } }
       }
       if (p.locked || car.wreck) { if (!flying) car.drive(dt, 0, 0, true); }
-      else if (!flying) car.drive(dt, (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0), keys.Space);
+      else if (!flying) car.drive(dt, (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) || (stick.y < -0.3 ? 1 : stick.y > 0.3 ? -1 : 0), (keys.KeyA ? 1 : 0) - (keys.KeyD ? 1 : 0) || -stick.x, keys.Space); // (on a phone: the stick forward is the throttle, back the brake, sideways the wheel)
       const wasGoing = car.speed;
       if (!flying) car.collide();
       const jolt = Math.abs(wasGoing - car.speed);
@@ -492,7 +507,7 @@ async function boot() {
       return;
     }
 
-    const mx = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0), mz = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
+    const mx = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) || stick.x, mz = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) || -stick.y;
     p.motion = 'idle';
     // A jump: up, over, and down again, the legs tucked.
     if (!p.locked && !p.jumping && g.consume('Space')) { p.jumping = true; p.jumpV = 4.4; p.jumpY = 0; p.human.play('jumpStart', 'jumpLoop', 1.6); }
@@ -509,7 +524,7 @@ async function boot() {
       if (p.weapon !== 'pistol' && !g.lockTarget) p.heading += wrapAngle(Math.atan2(vx, vz) - p.heading) * (1 - Math.exp(-12 * dt));
       p.motion = speed > 5 ? 'sprint' : 'run';
     }
-    if (p.aiming) p.heading = g.cam.yaw; // armed and free-aiming, Tony faces where the camera looks
+    if (p.aiming) p.heading = g.cam.yaw; // armed and free-aiming, Nico faces where the camera looks
     pushOut(p.pos, 0.45);
     for (const ped of peds) { // the crowd is solid; sprinting into someone knocks them aside
       if (ped.dead || Math.abs(ped.pos.x - p.pos.x) > 2 || Math.abs(ped.pos.z - p.pos.z) > 2) continue;
@@ -689,19 +704,21 @@ async function boot() {
     ], code => { if (code === 'KeyQ' && page > 0) { page--; show(); } else if (code === 'KeyE' && page < n - 1) { page++; show(); } else if (code === 'Escape') openSettings(); });
     show();
   };
+  const SILENT = sfx.state === 'off'; // this build makes no sound: the sound lines are left out of the settings
   const openSettings = () => {
     g.paused = true;
     const pr = g.progress, story = !pr ? 'Not started' : pr.done ? `All ${pr.total} missions complete` : `${pr.episode}: ${pr.title}  ·  mission ${pr.k} of ${pr.of}, "${pr.mission}"`;
     const show = () => hud.menu('Settings', [
       { label: 'Story', hint: story }, ...(pr && !pr.done ? [{ label: 'Overall', hint: `${pr.n - 1} of ${pr.total} missions done` }] : []),
-      { key: 'Digit1', label: 'Volume', hint: `${Math.round(settings.volume * 100)}%  (1 lower, 2 higher)` }, { key: 'Digit2', label: '' },
+      ...(SILENT ? [] : [{ key: 'Digit1', label: 'Volume', hint: `${Math.round(settings.volume * 100)}%  (1 lower, 2 higher)` }, { key: 'Digit2', label: '' }]),
       { key: 'Digit3', label: 'Mouse sensitivity', hint: `${settings.sens.toFixed(1)}  (3 lower, 4 higher)` }, { key: 'Digit4', label: '' },
       { key: 'Digit5', label: 'Invert mouse Y', hint: settings.invert ? 'on' : 'off' },
       { key: 'Digit6', label: 'Crowd', hint: ['light', 'normal', 'heavy'][settings.crowd] },
       { key: 'Digit7', label: 'Shadows', hint: settings.shadows ? 'on' : 'off' },
-      { key: 'Digit9', label: 'Ambient sound', hint: ['off', 'quiet', 'normal', 'loud'][settings.ambience] },
-      { key: 'KeyR', label: 'Radio', hint: sfx.radio.count ? `${sfx.radio.count} songs  ·  ${['off', 'quiet', 'normal', 'loud'][settings.radio]}  ·  in the car: N next, B back, V off` : 'no songs yet: put audio files in the music folder' },
-      { key: 'KeyT', label: 'Test the sound', hint: settings.volume === 0 ? 'the volume is at 0%' : sfx.state === 'running' ? 'plays a chime: if you hear nothing, it is the browser or the computer' : 'the browser is holding the sound back: click the page once' },
+      { key: 'KeyO', label: 'Detail', hint: `${LIGHT ? 'light (for phones)' : 'full'}  ·  changing it restarts the page` },
+      ...(SILENT ? [] : [{ key: 'Digit9', label: 'Ambient sound', hint: ['off', 'quiet', 'normal', 'loud'][settings.ambience] },
+        { key: 'KeyR', label: 'Radio', hint: sfx.radio.count ? `${sfx.radio.count} songs  ·  ${['off', 'quiet', 'normal', 'loud'][settings.radio]}  ·  in the car: N next, B back, V off` : 'no songs yet: put audio files in the music folder' },
+        { key: 'KeyT', label: 'Test the sound', hint: settings.volume === 0 ? 'the volume is at 0%' : sfx.state === 'running' ? 'plays a chime: if you hear nothing, it is the browser or the computer' : 'the browser is holding the sound back: click the page once' }]),
       { key: 'Digit8', label: 'Missions', hint: 'play any mission again, or skip ahead' },
       { key: 'KeyP', label: 'People', hint: `${people(g).length} met so far` },
       { key: 'KeyL', label: 'Earnings', hint: `$${Object.values(g.ledger || {}).reduce((a, r) => a + r.m, 0).toLocaleString('en-US')} from ${Object.keys(g.ledger || {}).length} missions` },
@@ -722,6 +739,7 @@ async function boot() {
       else if (code === 'KeyP') { pages('People', people(g).map(x => ({ label: x.name, hint: x.role })), 'Nobody yet.'); return; }
       else if (code === 'KeyL') { pages('Earnings', Object.entries(g.ledger || {}).sort((a, b) => a[0] - b[0]).map(([n, r]) => ({ label: `${n}.  ${r.t}`, hint: '$' + r.m.toLocaleString('en-US') })), 'Nothing yet: every mission pays when it is passed.'); return; }
       else if (code === 'Digit0') { applySettings(); location.reload(); return; }
+      else if (code === 'KeyO') { try { localStorage.setItem(DETAIL_KEY, LIGHT ? 'high' : 'low'); } catch { /* stays as it is */ } applySettings(); location.reload(); return; }
       else if (code === 'Escape' || code === 'Enter') { applySettings(); hud.menu(); g.paused = false; for (const k in keys) keys[k] = false; return; }
       else return;
       applySettings(); show();
@@ -734,7 +752,7 @@ async function boot() {
   const GREEN = new Set(['houses', 'park', 'church', 'home', 'livia', 'grove', 'neil', 'college', 'school', 'manor', 'motel', 'drivein']);
   const DENSE = new Set(['tower', 'lots', 'lowrise', 'bank', 'hotel', 'precinct', 'bookstore', 'depository', 'hesh', 'cafe', 'vesuvio', 'satriale', 'melfi', 'bing', 'travel', 'hospital', 'kates', 'truckstop']);
   const ROOM_SOUND = { BAR: 'bar', DINER: 'diner', FASTFOOD: 'diner', VESUVIO: 'diner', VKITCHEN: 'diner', BEAN: 'diner', BANQUET: 'diner', LIQUOR: 'store', PAWN: 'store', STORE: 'store', KIOSK: 'store', BOOKS: 'store', PARTS: 'store',
-    LAUNDRY: 'store', SHOWROOM: 'hall', GUNS: 'guns', CHURCH: 'church', BODYSHOP: 'garage', WAREHOUSE: 'garage', HOUSE: 'house', LIVIA: 'house', LIVIA_UP: 'house', BRENDAN: 'house', CHRIS: 'house', NEIL: 'house', UPSTAIRS: 'house', CARDROOM: 'house', SUITE: 'house', MOTEL: 'house',
+    LAUNDRY: 'store', SHOWROOM: 'hall', GUNS: 'guns', CHURCH: 'church', BODYSHOP: 'garage', WAREHOUSE: 'garage', HOUSE: 'house', RITA: 'house', LIVIA_UP: 'house', BRENDAN: 'house', CHRIS: 'house', NEIL: 'house', UPSTAIRS: 'house', CARDROOM: 'house', SUITE: 'house', MOTEL: 'house',
     JUSTINE: 'house', VANZANT: 'house', TREJO: 'house', KELSO: 'house', OFFICE: 'office', FNOTE: 'office', HESH: 'office', SCHOOL: 'hall', HOSPITAL: 'hall', WARDHALL: 'hall', GROVE: 'hall', BANK: 'hall', HOTEL: 'hall' };
   const roomKinds = new Map();
   const roomKind = q => {
@@ -751,6 +769,7 @@ async function boot() {
   const muteEl = document.getElementById('mute');
 
   function step(dt) {
+    touchFrame();
     if (g.paused) { if (!g.skipRender) renderer.render(scene, camera); pressed.clear(); return; }
     if (g.started && g.consume('Escape')) { openSettings(); pressed.clear(); return; }
     if (g.started && g.consume('KeyM')) g.mapOpen = !g.mapOpen;
@@ -790,7 +809,7 @@ async function boot() {
       }
     }
     if (p.health <= 0 && !p.dying) g.wasted();
-    if (p.inside && Math.hypot(p.pos.x - p.inside.inside.x, p.pos.z - p.inside.inside.z) > 40) { // a mission moved Tony outside
+    if (p.inside && Math.hypot(p.pos.x - p.inside.inside.x, p.pos.z - p.inside.inside.z) > 40) { // a mission moved Nico outside
       for (const h of p.inside.hide || []) h.group.visible = true;
       p.inside = null;
     }

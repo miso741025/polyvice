@@ -2,11 +2,11 @@
 
 A PS2-era open-world game that runs in the browser (Three.js, no build step): the look and feel of the open-world games of the early 2000s, flat-shaded and chunky, with a city you can drive, walk and fly through. Story missions, driving, fist fights and gunfights, police chases, side jobs, and on one world a spinner that flies. One engine; the worlds and stories keep being added. So far:
 
-- **Vice City** – an 80s Miami-style city; the story follows *The Sopranos*, played as Tony.
+- **Port Paloma** – *Vice Web*, an original crime comedy in a pastel seaside city: Nico Bellacosta, his family, his crew, his therapist and his flamingos. This is the world published on the web (see `tools/build-web.mjs`).
 - **Los Angeles** (`?city=la`) – the story of *Heat*, played as Neil McCauley.
 - **Nexus** (`?city=nexus`) – a rain-soaked planet seen hanging in Vice City's sky; *Blade Runner 2049* played as K, and (`&story=2019`) the first *Blade Runner* played as Deckard, in the same city thirty years earlier.
 
-This is an **unofficial, non-commercial fan project**. It is not affiliated with, endorsed by or connected to HBO, Warner Bros., Alcon Entertainment, Rockstar Games or anyone else who owns the works it is a tribute to. The stories follow the plots of those works, but every line of dialogue is written for the game; no footage, music, artwork or other media from them is included. Characters are generic figures in the right clothes, not likenesses of any actor. If you are a rights holder and want something changed or removed, open an issue.
+*Vice Web* (Port Paloma) has its own characters and places, and its story is being reworked into its own. The other two worlds are an **unofficial, non-commercial fan project**, kept for local play only and not published. It is not affiliated with, endorsed by or connected to HBO, Warner Bros., Alcon Entertainment, Rockstar Games or anyone else who owns the works it is a tribute to. The stories follow the plots of those works, but every line of dialogue is written for the game; no footage, music, artwork or other media from them is included. Characters are generic figures in the right clothes, not likenesses of any actor. If you are a rights holder and want something changed or removed, open an issue.
 
 ## Run
 
@@ -17,6 +17,14 @@ python3 serve.py
 Then open http://localhost:8137. The title screen switches between the worlds. The bundled server tells the browser not to cache, which matters because the game is plain ES modules: a plain `python3 -m http.server` works too, but after an update the browser can mix old and new files and hang on "Loading…" (a hard reload, Cmd+Shift+R, fixes that).
 
 The car radio plays your own files from `music/` and the city can use your own field recordings from `sounds/` (see the READMEs there). Neither folder is committed.
+
+## Web build
+
+```bash
+ESBUILD=<path to an esbuild package> node tools/build-web.mjs
+```
+
+writes `dist/vice/`: Port Paloma alone, minified, with lighter textures and only the animations the game plays. Phones get touch controls and a lighter detail level automatically (`?quality=low` / `?quality=high` override it; `?touch=1` shows the touch controls on a desktop).
 
 ## Controls
 

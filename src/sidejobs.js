@@ -13,20 +13,20 @@ import { evening } from './missions.js';
 // ring is only there when a week has gone by since he last collected (owner: it comes round weekly, not all the time).
 // The calendar: a second of play is a minute; every finished job moves it on two days; a night's sleep, eight hours. -----
 const STAKES = [
-  { key: 'bing', door: 'the Bada Bing', name: 'The Bada Bing', from: 0, rate: 400, cap: 2400, who: 'Floor manager', look: { jacket: 0x2a2a30, shirt: 0x8a1c2a, tee: true, pants: 0x23232b, hair: 0x111111, hairMesh: 'parted', bulk: 1.1 },
-    lines: ['The week, Mr. Soprano. Silvio counted it twice.', 'It was a good week. The conventions are in town.', 'All there. The girls send their love.'] },
-  { key: 'pork', door: "Satriale's", name: "Satriale's", from: 0, rate: 220, cap: 1320, who: 'Counterman', look: { shirt: 0xf4f4f4, sleeves: 'long', pants: 0xf4f4f4, hair: 0x2b1b12, hairStyle: 'balding', mustache: 0x2b1b12, bulk: 1.2, age: 0.5 },
-    lines: ['Yours, and a pound of the gabagool. Do not tell Paulie about the gabagool.', 'Slow week. People are eating chicken. I do not understand it.', 'Here. And tell your mother I asked for her.'] },
-  { key: 'haul', door: 'the Kolar office', name: 'Triborough hauling', from: 5, rate: 320, cap: 1920, who: 'Dispatcher', look: { shirt: 0x5c6157, tee: true, pants: 0x3a3a44, hair: 0x4a3324, hairMesh: 'buzzed', hat: 'cap', hatColor: 0x2f5a3f, bulk: 1.15, stubble: 0.6 },
-    lines: ['The towers, the school, the two diners. It is all in there.', 'Nobody has asked where the Kolars went. Nobody is going to.', 'Your end. The trucks are running on time for once.'] },
+  { key: 'bing', door: 'the Pink Pelican', name: 'The Pink Pelican', from: 0, rate: 400, cap: 2400, who: 'Floor manager', look: { jacket: 0x2a2a30, shirt: 0x8a1c2a, tee: true, pants: 0x23232b, hair: 0x111111, hairMesh: 'parted', bulk: 1.1 },
+    lines: ['The week, Mr. Bellacosta. Frankie counted it twice.', 'It was a good week. The conventions are in town.', 'All there. The girls send their love.'] },
+  { key: 'pork', door: "Mancuso's", name: "Mancuso's", from: 0, rate: 220, cap: 1320, who: 'Counterman', look: { shirt: 0xf4f4f4, sleeves: 'long', pants: 0xf4f4f4, hair: 0x2b1b12, hairStyle: 'balding', mustache: 0x2b1b12, bulk: 1.2, age: 0.5 },
+    lines: ['Yours, and a pound of the capocollo. Do not tell Augie about the capocollo.', 'Slow week. People are eating chicken. I do not understand it.', 'Here. And tell your mother I asked for her.'] },
+  { key: 'haul', door: 'the Brandt office', name: 'Bayfront hauling', from: 5, rate: 320, cap: 1920, who: 'Dispatcher', look: { shirt: 0x5c6157, tee: true, pants: 0x3a3a44, hair: 0x4a3324, hairMesh: 'buzzed', hat: 'cap', hatColor: 0x2f5a3f, bulk: 1.15, stubble: 0.6 },
+    lines: ['The towers, the school, the two diners. It is all in there.', 'Nobody has asked where the Brandts went. Nobody is going to.', 'Your end. The trucks are running on time for once.'] },
   { key: 'bean', door: 'Bean Scene', name: 'Bean Scene', from: 9, rate: 160, cap: 960, who: 'Owner', look: { shirt: 0xf4f4f0, sleeves: 'long', tucked: true, pants: 0x23232b, hair: 0x8d8a8e, hairStyle: 'balding', mustache: 0x8d8a8e, age: 0.6 },
-    lines: ['Tuesday, like always. And nobody else has been round for it.', 'Here it is, Mr. Soprano. Take a coffee. Take two.', 'It is in the envelope. I counted it in front of my wife.'] },
-  { key: 'body', door: 'the body shop', name: 'Bonpensiero Bros.', from: 9, rate: 260, cap: 1560, who: 'Mechanic', look: { shirt: 0x2f56c8, sleeves: 'long', tucked: true, pants: 0x2f56c8, hair: 0x4a3324, hairMesh: 'buzzed', bulk: 1.25, stubble: 0.5 },
+    lines: ['Tuesday, like always. And nobody else has been round for it.', 'Here it is, Mr. Bellacosta. Take a coffee. Take two.', 'It is in the envelope. I counted it in front of my wife.'] },
+  { key: 'body', door: 'the body shop', name: 'Lattanzi Bros.', from: 9, rate: 260, cap: 1560, who: 'Mechanic', look: { shirt: 0x2f56c8, sleeves: 'long', tucked: true, pants: 0x2f56c8, hair: 0x4a3324, hairMesh: 'buzzed', bulk: 1.25, stubble: 0.5 },
     lines: ['I pay you. I know who I pay. Here.', 'It is all there. My jaw still clicks, since you ask.', 'Yours. We did nine cars this week, all of them somebody else\'s.'] },
-  { key: 'lodge', door: 'the motel office', name: 'Teittleman Motor Lodge', from: 19, rate: 520, cap: 3120, who: 'Night man', look: { shirt: 0xd9c7a0, tee: true, pants: 0x3b4a66, hair: 0x2b1b12, hairMesh: 'parted', bulk: 0.9, glasses: 'clear' },
-    lines: ['Twenty-five per cent, to the dollar. Mr. Teittleman watched me count it. He did not enjoy it.', 'Your quarter. We are full at the weekend, for once.', 'It is here. He says to tell you the roof needs doing, and that a quarter of the roof is yours as well.'] },
+  { key: 'lodge', door: 'the motel office', name: 'Rosen Motor Lodge', from: 19, rate: 520, cap: 3120, who: 'Night man', look: { shirt: 0xd9c7a0, tee: true, pants: 0x3b4a66, hair: 0x2b1b12, hairMesh: 'parted', bulk: 0.9, glasses: 'clear' },
+    lines: ['Twenty-five per cent, to the dollar. Mr. Rosen watched me count it. He did not enjoy it.', 'Your quarter. We are full at the weekend, for once.', 'It is here. He says to tell you the roof needs doing, and that a quarter of the roof is yours as well.'] },
 ];
-// ----- Irina. A violet ring outside her building on Ocean Drive (not the story's pink, not its yellow), once the story has got as far as the fourth job; one
+// ----- Katya. A violet ring outside her building on Seaview Drive (not the story's pink, not its yellow), once the story has got as far as the fourth job; one
 // evening between each job and the next. -----
 function installDates(g) {
   const { places, player: p } = g, FROM = 3;
@@ -44,7 +44,7 @@ function installDates(g) {
       if (!mark) {
         const mesh = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 2.2, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0x9b6bff, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false }));
         mesh.position.set(at.x, groundAt(at.x, at.z) + 1.1, at.z); g.scene.add(mesh);
-        mark = { mesh, blip: { x: at.x, z: at.z, color: '#9b6bff', name: 'Irina (side job)' }, her: null };
+        mark = { mesh, blip: { x: at.x, z: at.z, color: '#9b6bff', name: 'Katya (side job)' }, her: null };
         g.blips.push(mark.blip);
       }
       const d = Math.hypot(p.pos.x - at.x, p.pos.z - at.z);
@@ -54,7 +54,7 @@ function installDates(g) {
         mark.her.group.position.set(at.x - 2.2, groundAt(at.x - 2.2, at.z - 1.2), at.z - 1.2); mark.her.group.rotation.y = 0; g.scene.add(mark.her.group);
       } else if (d > 80 && mark.her) { g.scene.remove(mark.her.group); mark.her = null; }
       const near2 = d < 2.6 && !p.car && !p.locked && !p.inside && mark.her && !g.sideBusy;
-      if (near2) g.hud.prompt(`G  ·  Take Irina out ($150)${g.cash < 150 ? ': not enough' : ''}`);
+      if (near2) g.hud.prompt(`G  ·  Take Katya out ($150)${g.cash < 150 ? ': not enough' : ''}`);
       if (near2 && g.consume('KeyG')) {
         busy = true; g.sideBusy = true; g.hud.prompt('');
         const her = mark.her, home = { x: at.x + 4, z: at.z + 3 };
@@ -197,7 +197,7 @@ export function installSideJobs(g) {
         if (!p.weapons[w]) items.push({ key: 'Digit' + n++, label: `${W.name}, with ${W.mag * 2} rounds`, hint: `$${W.price}`, buy: () => { if (g.cash < W.price) return false; g.addMoney(-W.price); g.giveWeapon(w); return true; } });
         else items.push({ key: 'Digit' + n++, label: `${W.name} ammunition, ${W.pack} rounds`, hint: `$${W.ammoPrice}`, buy: () => { if (g.cash < W.ammoPrice) return false; g.addMoney(-W.ammoPrice); g.giveAmmo(w, W.pack); return true; } });
       }
-      items.push({ key: 'Digit' + n++, label: 'Kevlar vest', hint: p.armour >= 100 ? 'wearing one' : '$400', buy: () => { if (g.cash < 400 || p.armour >= 100) return false; g.addMoney(-400); p.armour = 100; hud.armour(100); return true; } });
+      items.push({ key: 'Digit' + n++, label: 'Body armour', hint: p.armour >= 100 ? 'wearing one' : '$400', buy: () => { if (g.cash < 400 || p.armour >= 100) return false; g.addMoney(-400); p.armour = 100; hud.armour(100); return true; } });
       items.push({ key: 'Escape', label: 'Leave', hint: `$${g.cash}` });
       hud.menu(title, items, code => {
         const it = items.find(i => i.key === code);
@@ -227,7 +227,7 @@ export function installSideJobs(g) {
       girl.group.position.set(vip.stage.x + 0.35, vip.stage.y, vip.stage.z + 0.2); girl.group.rotation.y = Math.PI; girl.set('dance');
       g.cam.fixed = vip.cam;
       hud.fade(0, 0.6); await g.wait(0.8);
-      const t0 = g.time, LINES = [[3, name, 'You are the quiet one. Paulie talks the whole song.'], [9, 'Tony', 'Paulie talks through funerals.'], [15, name, 'You want to tell me about your week? Everybody does, in here.'], [21, 'Tony', 'I pay somebody for that already. Just dance.']];
+      const t0 = g.time, LINES = [[3, name, 'You are the quiet one. Augie talks the whole song.'], [9, 'Nico', 'Augie talks through funerals.'], [15, name, 'You want to tell me about your week? Everybody does, in here.'], [21, 'Nico', 'I pay somebody for that already. Just dance.']];
       let said = 0;
       g.consume('KeyF');
       await g.until(() => {
@@ -249,9 +249,9 @@ export function installSideJobs(g) {
     g.wait(3.4).then(() => { if (!g.missionActive) hud.subtitle(); }).catch(() => {});
   }
 
-  // The refrigerator, at home: the door swings open, he finds the gabagool, he eats a slice of it standing there.
+  // The refrigerator, at home: the door swings open, he finds the capocollo, he eats a slice of it standing there.
   let ate = -99;
-  async function gabagool() {
+  async function capocollo() {
     const f = places.houseRoom.fridge, door = f.door;
     busy = true; p.locked = true;
     try {
@@ -265,7 +265,7 @@ export function installSideJobs(g) {
       const slice = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.008, 12), new THREE.MeshLambertMaterial({ color: 0xc8503a })), marb = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.009, 8), new THREE.MeshLambertMaterial({ color: 0xf2c8b8 }));
       slice.add(marb); slice.rotation.z = 1.3; g.scene.add(slice);
       const y0 = groundAt(p.pos.x, p.pos.z), fx = Math.sin(p.heading), fz = Math.cos(p.heading), t0 = g.time;
-      hud.subtitle('', 'Gabagool. Out of the paper, standing up, with the door open.');
+      hud.subtitle('', 'Capocollo. Out of the paper, standing up, with the door open.');
       await g.until(() => { // from the shelf to his hand, and from his hand to his mouth
         const t = g.time - t0, k = Math.min(1, t / 0.8), e = k * k * (3 - 2 * k), k2 = Math.max(0, Math.min(1, (t - 1.2) / 0.5));
         const hx = p.pos.x + fx * 0.32, hz = p.pos.z + fz * 0.32;
@@ -292,7 +292,7 @@ export function installSideJobs(g) {
     dates.update();
     if (!busy && !p.locked && p.inside && places.houseRoom?.fridge && near(p.pos, places.houseRoom.fridge.at, 1.3) && g.time - ate > 8) {
       hud.prompt('F  ·  Open the refrigerator');
-      if (g.consume('KeyF')) { hud.prompt(''); gabagool(); }
+      if (g.consume('KeyF')) { hud.prompt(''); capocollo(); }
       return;
     }
     if (!busy && !g.missionActive && !g.sideBusy && !p.locked && p.inside && places.bingRoom?.front && near(p.pos, places.bingRoom.front, 1.8)) { // on the floor, in front of the girl at the middle pole
@@ -332,7 +332,7 @@ export function installSideJobs(g) {
       if (food && p.health < 100 && g.cash >= food[1]) { g.addMoney(-food[1]); p.health = Math.min(100, p.health + 50); hud.health(p.health); g.sfx?.cash(); say('', 'That hit the spot.', 2); }
       else if (key === 'GUNS') gunCounter('Guns and ammunition', ['pistol', 'smg', 'shotgun', 'rifle']);
       else if (key === 'PAWN') gunCounter('Under the counter', ['pistol']);
-      else if (key === 'CHURCH' && g.wanted > 0 && g.cash >= 100) { g.addMoney(-100); g.pardon(); g.sfx?.passed(); say('Father Phil', 'Go in peace, Anthony. And perhaps drive slower.', 3); }
+      else if (key === 'CHURCH' && g.wanted > 0 && g.cash >= 100) { g.addMoney(-100); g.pardon(); g.sfx?.passed(); say('Father Tom', 'Go in peace, Nicholas. And perhaps drive slower.', 3); }
       else if (key === 'MOTEL' && g.cash >= 40) { g.addMoney(-40); p.health = 100; hud.health(100); g.pardon(); g.clockOffset = (g.clockOffset || 0) + 60 * 8; hud.fade(1, 0.4); g.wait(1).then(() => hud.fade(0, 0.8)).catch(() => {}); say('', 'Eight hours, no questions.', 3); }
     } else if (canShake && g.consume('KeyG')) shakedown(q);
   };

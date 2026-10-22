@@ -37,6 +37,34 @@ export function makeDuck() {
   return { group, wingL: wing(1), wingR: wing(-1) };
 }
 
+// The flamingos that wade in Nico's pool: pink, on stilts, with a crooked neck and a black-tipped beak. Same parts as the duck
+// (a group and two wings that open for flight), so the scene that sends them off flies either.
+export function makeFlamingo() {
+  const group = new THREE.Group(), PINK = 0xff7fa6, DEEP = 0xe8577f;
+  const part = (geo, color, x, y, z, parent = group) => {
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color }));
+    m.position.set(x, y, z); parent.add(m);
+    return m;
+  };
+  part(new THREE.SphereGeometry(0.2, 10, 8).scale(0.8, 0.7, 1.35), PINK, 0, 0.62, 0);                     // body
+  part(new THREE.ConeGeometry(0.09, 0.2, 6).rotateX(-2.0), DEEP, 0, 0.66, -0.3);                          // tail
+  part(new THREE.CylinderGeometry(0.035, 0.045, 0.34, 6).rotateX(0.5), PINK, 0, 0.86, 0.2);               // lower neck
+  part(new THREE.CylinderGeometry(0.03, 0.035, 0.3, 6).rotateX(-0.35), PINK, 0, 1.13, 0.25);              // upper neck
+  part(new THREE.SphereGeometry(0.065, 8, 6), PINK, 0, 1.3, 0.3);                                          // head
+  part(new THREE.ConeGeometry(0.03, 0.12, 6).rotateX(2.2), 0xf4efe6, 0, 1.27, 0.38);                      // beak
+  part(new THREE.ConeGeometry(0.018, 0.05, 6).rotateX(2.2), 0x1a1a1a, 0, 1.235, 0.425);                   // its black tip
+  for (const sx of [-0.05, 0.05]) part(new THREE.CylinderGeometry(0.012, 0.012, 0.56, 5), DEEP, sx, 0.26, 0.02); // legs
+  const wing = side => {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * 0.14, 0.7, 0);
+    part(new THREE.SphereGeometry(0.22, 8, 6).scale(1.5, 0.1, 0.8), DEEP, side * 0.3, 0, 0, pivot);
+    pivot.visible = false;
+    group.add(pivot);
+    return pivot;
+  };
+  return { group, wingL: wing(1), wingR: wing(-1) };
+}
+
 // A handful of street outfits; pedestrians sharing one also share its painted texture.
 const PED_LOOKS = [
   { shirt: 0xff5fd2, tee: true, pants: 0xf5f0e6, shoes: 0xf2efe8, hair: 0x2b1b12, hairMesh: 'parted', stubble: 0.3 },
@@ -80,6 +108,7 @@ export const randomPedLook = (rand = Math.random) => ({ ...pick(CROWD, rand), bu
 
 // A pedestrian who walks laps around the sidewalk of one block, runs from trouble, and can be hurt.
 export class Ped {
+  static sight = 135;
   constructor(scene, center, rand) {
     this.c = center; this.s = 27.6;
     this.u = rand() * 8 * this.s;
@@ -146,7 +175,7 @@ export class Ped {
 
   update(dt, cars, threat) {
     const g = this.human.group, h = this.human;
-    if (Ped.eye) g.visible = Math.hypot(this.pos.x - Ped.eye.x, this.pos.z - Ped.eye.z) < 135; // beyond that they are a few pixels in the fog
+    if (Ped.eye) g.visible = Math.hypot(this.pos.x - Ped.eye.x, this.pos.z - Ped.eye.z) < Ped.sight; // beyond that they are a few pixels in the fog
     if (this.fly) { // thrown by a car: an arc through the air, then the ground
       const f = this.fly;
       this.pos.x += f.vx * dt; this.pos.z += f.vz * dt; f.y += f.vy * dt; f.vy -= 14 * dt;

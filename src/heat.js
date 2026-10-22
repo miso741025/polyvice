@@ -96,7 +96,7 @@ async function theCrew(g) {
   place(g, truckstop.door, SOUTH);
   await fade(g, 0, 1);
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 2. Armoured ----------
@@ -321,7 +321,7 @@ async function bearerBonds(g) {
   g.pardon();
   await fade(g, 0, 1);
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 4. Slick ----------
@@ -401,7 +401,7 @@ async function slick(g) {
   asNeil(g, neil);
   await fade(g, 0, 1.2);
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 5. Eady ----------
@@ -473,7 +473,7 @@ async function eady(g) {
   asNeil(g, p.human);
   await fade(g, 0, 1.2);
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 6. The Drive-In ----------
@@ -639,7 +639,7 @@ async function eyesOn(g) {
   asNeil(g, neil);
   await fade(g, 0, 1.2);
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 2. The Next One ----------
@@ -709,7 +709,7 @@ async function theNextOne(g) {
   await say(g, '', 'Neil watched the door close from the car, and drove home to a house with no chairs.');
   await cut(g, () => { dismiss(g, chris, charlene); g.cam.fixed = null; });
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 3. Precious Metals ----------
@@ -806,7 +806,7 @@ async function preciousMetals(g) {
   asNeil(g, p.human);
   await fade(g, 0, 1.2);
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 4. Counter-Surveillance ----------
@@ -881,7 +881,7 @@ async function counterSurveillance(g) {
   asNeil(g, neil);
   await fade(g, 0, 1.2);
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 5. Justine ----------
@@ -938,7 +938,7 @@ async function justine(g) {
   asNeil(g, neil);
   await fade(g, 0, 1.2);
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 6. Coffee ----------
@@ -1190,7 +1190,7 @@ async function kelso(g) {
   ]);
   await cut(g, () => { dismiss(g, chris, cheritto, trejo); g.cam.fixed = null; });
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 2. Wheels ----------
@@ -1783,7 +1783,7 @@ async function trejoHouse(g) {
   await fade(g, 0, 1);
   p.locked = false;
   await phone(g, NATE, 'Van Zant has a house in the hills, a wall of glass and two men on the path. Waingro nobody has seen. I am asking everybody I know, and some I should not.');
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 2. Van Zant ----------
@@ -2001,7 +2001,7 @@ async function laurenNight(g) {
   asNeil(g, neil);
   await fade(g, 0, 1.2);
   p.locked = false;
-  await passed(g, 'Respect +');
+  await passed(g, 'Street cred +');
 }
 
 // ---------- 5. The Airport Hotel ----------
@@ -2208,6 +2208,14 @@ async function theRunway(g) {
   p.locked = false;
   await passed(g, 'Heat', 50000);
 }
+
+// Who is who in Los Angeles: a line for each, shown the first time they speak (missions.js keeps the rest).
+export const HEAT_BIOS = {
+  'Neil': 'Takes scores. Owns nothing he would turn around for', 'Chris': 'Boxman. Married to Charlene, more or less', 'Cheritto': 'Ten years in the crew. Eats like it is a sport', 'Trejo': 'The driver',
+  'Waingro': 'New. Recommended by a man somebody trusts', 'Nate': 'Sells what Neil takes, and finds the next one', 'Hanna': 'Lieutenant, Major Crimes. On his third marriage', 'Eady': 'Works in a bookstore. Draws letters',
+  'Van Zant': 'Whose bonds they were', 'Drucker': 'Sergeant, Major Crimes', 'Casals': 'Detective, Major Crimes', 'Justine': "Hanna's wife", 'Lauren': "Justine's daughter", 'Charlene': "Chris's wife",
+  'Kelso': 'Listens to what banks say to each other', 'Breedan': 'Out eight months. Works a grill',
+};
 
 export const HEAT = [
   { name: 'Chapter One', title: 'Heat', missions: [theCrew, armoured, bearerBonds, slick, eady, theDriveIn],
