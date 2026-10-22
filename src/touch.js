@@ -20,18 +20,38 @@ export function applyRotation() {
 // A touch on the screen, in the game's own coordinates (the page may be drawn turned).
 const at = t => (ROT ? { x: innerHeight - t.clientY, y: t.clientX } : { x: t.clientX, y: t.clientY });
 
+// The buttons: an icon and a short word, in the language the site is set to (the 中 / EN switch on the home page).
+const ZH = (() => { try { return localStorage.getItem('mm-lang') === 'zh'; } catch { return false; } })();
+const say = (en, zh) => (ZH ? zh : en);
+const svg = d => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  fist: svg('<path d="M7 11V8a1.5 1.5 0 0 1 3 0v2M10 10V6.5a1.5 1.5 0 0 1 3 0V10M13 10V7.5a1.5 1.5 0 0 1 3 0V11M16 11V9.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a6 6 0 0 1-6-6v-1.5A2.5 2.5 0 0 1 6.5 11H10"/>'),
+  gun: svg('<path d="M3 8h17v4h-7l-1.5 2.5H9L8 19H4.5l1.2-7H3z"/><path d="M11 12v2.5"/>'),
+  camera: svg('<rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l1.5-3h5L16 7"/>'),
+  jump: svg('<path d="M12 20V5M6 11l6-6 6 6"/>'),
+  brake: svg('<circle cx="12" cy="12" r="8.5"/><path d="M9.5 8.5v7M14.5 8.5v7"/>'),
+  act: svg('<path d="M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21M5.6 5.6l2.5 2.5M15.9 15.9l2.5 2.5M5.6 18.4l2.5-2.5M15.9 8.1l2.5-2.5"/><circle cx="12" cy="12" r="2.5"/>'),
+  door: svg('<path d="M5 21V4h11v17M3 21h18M12.5 12.5h.01"/><path d="M16 8h3v13"/>'),
+  car: svg('<path d="M4 16v-4l2-5h12l2 5v4z M4 16v2.5M20 16v2.5"/><circle cx="7.5" cy="13" r="1"/><circle cx="16.5" cy="13" r="1"/>'),
+  map: svg('<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/>'),
+  menu: svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
+  skip: svg('<path d="M5 5l8 7-8 7zM16 5v14"/>'),
+};
 // What each button is. `key` is held down while the thumb is on it (a tap is a short press).
 // The ACTION button has no key of its own: it presses whatever the game is offering right now (see offer() below).
 const BUTTONS = [
-  { id: 'tAct', label: 'Action', act: true },
-  { id: 'tE', label: 'Hit', key: 'KeyE' },
-  { id: 'tJump', label: 'Jump', key: 'Space' },
-  { id: 'tQ', label: 'Lock', key: 'KeyQ' },
-  { id: 'tGun', label: 'Gun', gun: true },
-  { id: 'tSkip', label: 'Skip ▸', key: 'Enter' },
-  { id: 'tMap', label: 'Map', key: 'KeyM' },
-  { id: 'tMenu', label: '☰', key: 'Escape' },
+  { id: 'tAct', icon: 'act', label: say('Action', '動作'), act: true },
+  { id: 'tE', icon: 'fist', label: say('Punch', '揮拳'), key: 'KeyE' },
+  { id: 'tJump', icon: 'jump', label: say('Jump', '跳'), key: 'Space' },
+  { id: 'tGun', icon: 'gun', label: say('Draw gun', '拿槍'), gun: true },
+  { id: 'tSkip', icon: 'skip', label: say('Skip', '跳過'), key: 'Enter' },
+  { id: 'tMap', icon: 'map', label: say('Map', '地圖'), key: 'KeyM' },
+  { id: 'tMenu', icon: 'menu', label: say('Menu', '選單'), key: 'Escape' },
 ];
+// What the ACTION button offers, in Chinese when the site is (the game's own prompt words otherwise).
+const ACT_ZH = [[/^Enter vehicle|^Take vehicle/, '上車'], [/^Get out/, '下車'], [/^Leave/, '離開'], [/^Begin/, '開始'], [/^Enter\b/, '進去'], [/^Respray/, '噴漆'], [/^Repair/, '修車'],
+  [/^Collect/, '收錢'], [/^Take /, '帶她去'], [/^Ask /, '點舞'], [/^Open/, '打開'], [/^Use/, '使用']];
+const actWord = (label, key) => (!ZH ? label : (ACT_ZH.find(([re]) => re.test(label))?.[1] || label));
 const ORDER = ['fist', 'pistol', 'smg', 'shotgun', 'rifle'];
 const SPRINT = 0.85; // the stick pushed past this much of its reach runs (Shift on a keyboard)
 
@@ -41,7 +61,7 @@ export function installTouch(g, canvas) {
   const pad = document.createElement('div');
   pad.id = 'touch';
   pad.innerHTML = '<div id="tStick"><div id="tKnob"></div></div>' +
-    BUTTONS.map(b => `<button id="${b.id}" class="tb" type="button"><span>${b.label}</span></button>`).join('');
+    BUTTONS.map(b => `<button id="${b.id}" class="tb" type="button"><i>${ICON[b.icon]}</i><span>${b.label}</span></button>`).join('');
   document.body.appendChild(pad);
   const turn = document.createElement('div');
   turn.id = 'turn';
@@ -121,22 +141,18 @@ export function installTouch(g, canvas) {
     if (p.car && !p.locked && Math.abs(p.car.speed) < 4) return { key: 'KeyF', label: 'Get out' };
     return null;
   };
-  // Hit (or Shoot) when there is somebody to fight, a gun in his hand, or the objective asks for it.
-  const fighting = () => {
-    const p = g.player, obj = objective.innerHTML;
-    return !p.car && !p.locked && ((g.hostiles?.length || 0) > 0 || !!g.lockTarget || (p.weapon && p.weapon !== 'fist') || /<b>E<\/b>|press E|<b>Click<\/b>/.test(obj));
-  };
-
   // The buttons. Each holds its key down while the thumb is on it.
   const els = {};
+  let lastGun = null;
   for (const b of BUTTONS) {
     const el = els[b.id] = pad.querySelector('#' + b.id);
     let held = null;
     const down = e => {
       e.preventDefault(); e.stopPropagation();
       el.classList.add('down');
-      if (b.gun) { // the next weapon he has, round to fists
-        const p = g.player, have = ORDER.filter(w => w === 'fist' || p.weapons?.[w]), next = have[(have.indexOf(p.weapon) + 1) % have.length] || 'fist';
+      if (b.gun) { // fists ↔ a gun: the one he last had out, or the first he owns
+        const p = g.player, guns = ORDER.filter(w => w !== 'fist' && p.weapons?.[w]);
+        const next = p.weapon && p.weapon !== 'fist' ? 'fist' : guns.includes(lastGun) ? lastGun : guns[0] || 'fist';
         g.touchKey('Digit' + (ORDER.indexOf(next) + 1), true); g.touchKey('Digit' + (ORDER.indexOf(next) + 1), false);
         return;
       }
@@ -151,7 +167,12 @@ export function installTouch(g, canvas) {
 
   // Every frame: which buttons are worth showing and what they say; and, while the page is drawn turned, a hint for a few seconds.
   let wasRot = false, hintUntil = 0;
-  const set = (id, on, label) => { const el = els[id]; el.hidden = !on; if (label && el.firstChild.textContent !== label) el.firstChild.textContent = label; };
+  const set = (id, on, label, icon) => {
+    const el = els[id]; el.hidden = !on;
+    if (!on) return;
+    if (label && el.lastChild.textContent !== label) el.lastChild.textContent = label;
+    if (icon && el.dataset.icon !== icon) { el.dataset.icon = icon; el.firstChild.innerHTML = ICON[icon]; }
+  };
   return () => {
     const p = g.player, car = !!p.car, now = performance.now();
     if (ROT && !wasRot) hintUntil = now + 3200;
@@ -161,12 +182,13 @@ export function installTouch(g, canvas) {
     pad.classList.toggle('car', car);
     pad.classList.toggle('talking', !!subtitle.textContent.trim());
     action = offer();
-    set('tAct', !!action, action?.label);
-    const fight = fighting();
-    set('tE', fight, p.weapon && p.weapon !== 'fist' ? 'Shoot' : /Photograph/.test(objective.textContent) ? 'Snap' : 'Hit');
-    set('tQ', fight && (g.hostiles?.length || 0) > 0);
-    set('tGun', !car && ORDER.filter(w => w !== 'fist' && p.weapons?.[w]).length > 0);
-    set('tJump', !p.locked, car ? 'Brake' : 'Jump');
+    const armed = p.weapon && p.weapon !== 'fist';
+    if (armed) lastGun = p.weapon;
+    set('tAct', !!action, action && actWord(action.label), !action ? null : action.label === 'Get out' ? 'car' : /^(Enter|Leave)\b/.test(action.label) && action.key === 'KeyF' && !/vehicle/.test(action.label) ? 'door' : /vehicle/.test(action.label) ? 'car' : 'act');
+    const snap = /Photograph/.test(objective.textContent);
+    set('tE', !car && !p.locked, snap ? say('Snap', '拍照') : armed ? say('Shoot', '射擊') : say('Punch', '揮拳'), snap ? 'camera' : armed ? 'gun' : 'fist');
+    set('tGun', !car && !p.locked && !p.fistsOnly && ORDER.some(w => w !== 'fist' && p.weapons?.[w]), armed ? say('Fists', '收槍') : say('Draw gun', '拿槍'), armed ? 'fist' : 'gun');
+    set('tJump', !p.locked, car ? say('Brake', '煞車') : say('Jump', '跳'), car ? 'brake' : 'jump');
     if (stick.classList.contains('run') && car) stick.classList.remove('run');
   };
 }

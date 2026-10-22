@@ -196,22 +196,25 @@ body.touch .touchkeys { display: block; }
 #tStick.run { border-color: #ffb347; box-shadow: 0 0 0 4px rgba(255, 179, 71, .25), 0 0 18px rgba(255, 179, 71, .55); } /* pushed to the rim: running */
 #tKnob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: rgba(255, 244, 220, .75); box-shadow: 0 2px 8px rgba(0, 0, 0, .5); }
 #tStick.run #tKnob { background: rgba(255, 179, 71, .9); }
-.tb { position: fixed; pointer-events: auto; touch-action: none; width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .55); background: rgba(14, 12, 30, .5);
-  color: #fff4dc; font-family: inherit; font-size: 20px; letter-spacing: 1px; line-height: 1; padding: 4px; display: flex; align-items: center; justify-content: center; text-align: center; text-shadow: 1px 1px 0 #000; }
+.tb { position: fixed; pointer-events: auto; touch-action: none; width: 66px; height: 66px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .55); background: rgba(14, 12, 30, .55);
+  color: #fff4dc; font-family: 'Rubik', system-ui, sans-serif; font-weight: 700; font-size: 11px; line-height: 1.05; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; text-shadow: 1px 1px 0 #000; }
+.tb i { display: block; width: 46%; height: 46%; } .tb i svg { width: 100%; height: 100%; display: block; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .6)); }
+.tb span { max-width: 92%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .tb[hidden] { display: none; }
 .tb.down { background: rgba(255, 122, 89, .75); border-color: #ffd9a8; }
-/* the right thumb: ACTION in the corner, Hit beside it, Jump / Brake above; Lock and Gun small, only when they are any use */
-#tAct { right: calc(18px + var(--sr)); bottom: calc(18px + var(--sb)); width: 92px; height: 92px; font-size: 19px; background: rgba(255, 179, 71, .85); color: #12353a; border-color: #fff4dc; text-shadow: none; }
-#tAct span { max-width: 80px; overflow: hidden; }
-#tE { right: calc(122px + var(--sr)); bottom: calc(22px + var(--sb)); width: 80px; height: 80px; font-size: 22px; }
-#tJump { right: calc(26px + var(--sr)); bottom: calc(124px + var(--sb)); width: 68px; height: 68px; font-size: 18px; }
-#tQ { right: calc(124px + var(--sr)); bottom: calc(118px + var(--sb)); width: 52px; height: 52px; font-size: 15px; }
-#tGun { right: calc(184px + var(--sr)); bottom: calc(118px + var(--sb)); width: 52px; height: 52px; font-size: 15px; }
-#touch.car #tJump { right: calc(122px + var(--sr)); bottom: calc(22px + var(--sb)); width: 80px; height: 80px; font-size: 20px; } /* in a car the brake takes Hit's place */
+/* the right thumb, on foot: Punch / Shoot in the corner (always there), ACTION beside it when there is something to do,
+   Jump above, and the gun switch once he owns a gun. In a car: Brake in the corner and ACTION (Get out) beside it. */
+#tE { right: calc(16px + var(--sr)); bottom: calc(16px + var(--sb)); width: 94px; height: 94px; font-size: 14px; background: rgba(214, 62, 72, .78); border-color: #ffd9a8; }
+#tAct { right: calc(122px + var(--sr)); bottom: calc(18px + var(--sb)); width: 86px; height: 86px; font-size: 13px; background: rgba(255, 179, 71, .9); color: #12353a; border-color: #fff4dc; text-shadow: none; }
+#tAct i svg { filter: none; }
+#tJump { right: calc(26px + var(--sr)); bottom: calc(122px + var(--sb)); width: 70px; height: 70px; }
+#tGun { right: calc(128px + var(--sr)); bottom: calc(116px + var(--sb)); width: 64px; height: 64px; }
+#touch.car #tJump { right: calc(16px + var(--sr)); bottom: calc(16px + var(--sb)); width: 94px; height: 94px; font-size: 14px; }
 /* the top row: settings, map, and skipping a line */
-#tMenu { left: calc(12px + var(--sl)); top: calc(12px + var(--st)); width: 46px; height: 46px; border-radius: 10px; font-size: 24px; }
-#tMap { left: calc(66px + var(--sl)); top: calc(12px + var(--st)); width: 56px; height: 46px; border-radius: 10px; font-size: 18px; }
-#tSkip { left: 50%; transform: translateX(-50%); top: calc(10px + var(--st)); width: auto; height: 40px; padding: 0 18px; border-radius: 20px; font-size: 18px; display: none; }
+#tMenu { left: calc(12px + var(--sl)); top: calc(10px + var(--st)); width: 50px; height: 50px; border-radius: 12px; }
+#tMap { left: calc(70px + var(--sl)); top: calc(10px + var(--st)); width: 50px; height: 50px; border-radius: 12px; }
+#tSkip { left: 50%; transform: translateX(-50%); top: calc(10px + var(--st)); width: auto; height: 40px; padding: 0 16px; border-radius: 20px; flex-direction: row; gap: 6px; font-size: 14px; display: none; }
+#tSkip i { width: 18px; height: 18px; }
 #touch.talking #tSkip { display: flex; border-color: #ffd34d; }
 /* drawn turned: a small hint, gone after a few seconds */
 #turn { position: fixed; left: 50%; top: calc(12px + var(--st)); transform: translateX(-50%); z-index: 50; display: none; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 22px;
@@ -254,12 +257,16 @@ body.touch #subtitle { width: min(560px, calc(var(--vw) * 58)); bottom: calc(14p
 body.touch #objective { width: min(520px, calc(var(--vw) * 54)); top: calc(56px + var(--st)); }
 body.touch #prompt { bottom: calc(70px + var(--sb)); }
 
-/* the title on a phone on its side (about 390 px tall): everything sized to the height so it fits */
-body.touch #title { gap: calc(var(--vh) * 2.5); }
-body.touch:not(.la):not(.nexus) .logo .sop { font-size: calc(var(--vh) * 17); letter-spacing: 8px; text-shadow: 0 4px 0 #c2410c, 0 8px 0 #7c1d4f; }
-body.touch:not(.la):not(.nexus) .logo .vc { font-size: calc(var(--vh) * 8); margin-top: calc(var(--vh) * 3); }
-body.touch:not(.la):not(.nexus) .logo .tag { font-size: 12px; margin-top: calc(var(--vh) * 2.5); }
-body.touch #start { margin-top: 0; padding: 8px 48px; font-size: 26px; }
-body.touch #fresh { margin-top: -6px; font-size: 16px; }
-body.touch .keys { font-size: 12px; line-height: 1.5; }
-body.touch .fine { position: static; font-size: 10px; max-width: 80%; }
+/* the title on a short screen (a phone on its side is 320–430 px tall): sized against both the height and the width,
+   so VICE, WEB, the line under it and START always fit, and one small line of fine print that never overlaps */
+@media (max-height: 560px), (pointer: coarse) {
+  #title { gap: calc(var(--vh) * 2.2); justify-content: center; padding: calc(8px + var(--st)) 16px calc(8px + var(--sb)); }
+  body:not(.la):not(.nexus) .logo .sop { font-size: clamp(34px, min(calc(var(--vh) * 16), calc(var(--vw) * 11)), 150px); letter-spacing: 6px; text-shadow: 0 3px 0 #c2410c, 0 6px 0 #7c1d4f; }
+  body:not(.la):not(.nexus) .logo .vc { font-size: clamp(18px, min(calc(var(--vh) * 7.5), calc(var(--vw) * 5)), 64px); margin-top: calc(var(--vh) * 2.5); padding: 1px 24px 0; }
+  body:not(.la):not(.nexus) .logo .tag { font-size: clamp(9px, calc(var(--vh) * 2.8), 14px); margin-top: calc(var(--vh) * 2); letter-spacing: 3px; }
+  #start { margin-top: 0; padding: clamp(4px, calc(var(--vh) * 1.6), 12px) 44px; font-size: clamp(18px, calc(var(--vh) * 6.5), 32px); }
+  #fresh { margin-top: calc(var(--vh) * -1.5); font-size: clamp(12px, calc(var(--vh) * 4), 18px); padding: 2px 16px; }
+  .keys { font-size: clamp(10px, calc(var(--vh) * 3.1), 14px); line-height: 1.45; max-width: 92%; }
+  .fine { position: static; font-size: clamp(8px, calc(var(--vh) * 2.4), 11px); max-width: 94%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0; }
+}
+@media (pointer: coarse) { .deskkeys { display: none; } .touchkeys { display: block; } }
