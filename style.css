@@ -187,28 +187,35 @@ body.touch .deskkeys { display: none; }
 body.touch .touchkeys { display: block; }
 #touch { position: fixed; inset: 0; pointer-events: none; z-index: 15; display: none; font-family: 'Bebas Neue', Impact, sans-serif; }
 #touch.play { display: block; }
-#tStick { position: fixed; width: 132px; height: 132px; margin: -66px 0 0 -66px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .35); background: rgba(10, 10, 24, .25); opacity: 0; transition: opacity .15s; }
+#tStick { position: fixed; width: 132px; height: 132px; margin: -66px 0 0 -66px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, .35); background: rgba(10, 10, 24, .25); opacity: 0; transition: opacity .15s, border-color .15s, box-shadow .15s; }
 #tStick.on { opacity: 1; }
+#tStick.run { border-color: #ffb347; box-shadow: 0 0 0 4px rgba(255, 179, 71, .25), 0 0 18px rgba(255, 179, 71, .55); } /* pushed to the rim: running */
 #tKnob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: rgba(255, 244, 220, .75); box-shadow: 0 2px 8px rgba(0, 0, 0, .5); }
+#tStick.run #tKnob { background: rgba(255, 179, 71, .9); }
 .tb { position: fixed; pointer-events: auto; touch-action: none; width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .55); background: rgba(14, 12, 30, .5);
-  color: #fff4dc; font-family: inherit; font-size: 21px; letter-spacing: 1px; line-height: 1; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-shadow: 1px 1px 0 #000; }
-.tb small { font-family: 'Rubik', sans-serif; font-size: 9px; letter-spacing: 0; opacity: .8; margin-top: 2px; }
+  color: #fff4dc; font-family: inherit; font-size: 20px; letter-spacing: 1px; line-height: 1; padding: 4px; display: flex; align-items: center; justify-content: center; text-align: center; text-shadow: 1px 1px 0 #000; }
+.tb[hidden] { display: none; }
 .tb.down { background: rgba(255, 122, 89, .75); border-color: #ffd9a8; }
-/* the right thumb's cluster, from the corner out */
-#tE { right: calc(18px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 78px; height: 78px; font-size: 26px; }
-#tF { right: calc(108px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); }
-#tJump { right: calc(26px + env(safe-area-inset-right)); bottom: calc(116px + env(safe-area-inset-bottom)); }
-#tRun { right: calc(104px + env(safe-area-inset-right)); bottom: calc(96px + env(safe-area-inset-bottom)); }
-#tQ { right: calc(182px + env(safe-area-inset-right)); bottom: calc(30px + env(safe-area-inset-bottom)); width: 54px; height: 54px; font-size: 17px; }
-#tGun { right: calc(176px + env(safe-area-inset-right)); bottom: calc(96px + env(safe-area-inset-bottom)); width: 54px; height: 54px; font-size: 17px; }
-#tR { right: calc(30px + env(safe-area-inset-right)); bottom: calc(194px + env(safe-area-inset-bottom)); width: 48px; height: 48px; font-size: 17px; }
-#tG { right: calc(92px + env(safe-area-inset-right)); bottom: calc(170px + env(safe-area-inset-bottom)); width: 48px; height: 48px; font-size: 15px; }
+/* the right thumb: ACTION in the corner, Hit beside it, Jump / Brake above; Lock and Gun small, only when they are any use */
+#tAct { right: calc(18px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 92px; height: 92px; font-size: 19px; background: rgba(255, 179, 71, .85); color: #12353a; border-color: #fff4dc; text-shadow: none; }
+#tAct span { max-width: 80px; overflow: hidden; }
+#tE { right: calc(122px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 80px; height: 80px; font-size: 22px; }
+#tJump { right: calc(26px + env(safe-area-inset-right)); bottom: calc(124px + env(safe-area-inset-bottom)); width: 68px; height: 68px; font-size: 18px; }
+#tQ { right: calc(124px + env(safe-area-inset-right)); bottom: calc(118px + env(safe-area-inset-bottom)); width: 52px; height: 52px; font-size: 15px; }
+#tGun { right: calc(184px + env(safe-area-inset-right)); bottom: calc(118px + env(safe-area-inset-bottom)); width: 52px; height: 52px; font-size: 15px; }
+#touch.car #tJump { right: calc(122px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 80px; height: 80px; font-size: 20px; } /* in a car the brake takes Hit's place */
 /* the top row: settings, map, and skipping a line */
 #tMenu { left: calc(12px + env(safe-area-inset-left)); top: calc(12px + env(safe-area-inset-top)); width: 46px; height: 46px; border-radius: 10px; font-size: 24px; }
 #tMap { left: calc(66px + env(safe-area-inset-left)); top: calc(12px + env(safe-area-inset-top)); width: 56px; height: 46px; border-radius: 10px; font-size: 18px; }
-#tSkip { left: 50%; transform: translateX(-50%); top: calc(12px + env(safe-area-inset-top)); width: auto; height: 40px; padding: 0 16px; border-radius: 20px; font-size: 18px; opacity: .45; }
-#touch.talking #tSkip { opacity: 1; border-color: #ffd34d; }
-#touch.car #tE, #touch.car #tRun, #touch.car #tQ, #touch.car #tGun { display: none; }
+#tSkip { left: 50%; transform: translateX(-50%); top: calc(10px + env(safe-area-inset-top)); width: auto; height: 40px; padding: 0 18px; border-radius: 20px; font-size: 18px; display: none; }
+#touch.talking #tSkip { display: flex; border-color: #ffd34d; }
+/* stood upright: a card asks for the phone to be turned (the game waits behind it) */
+#turn { position: fixed; inset: 0; z-index: 50; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #120a1c; color: #fff4dc; text-align: center; padding: 24px; }
+body.touch #turn.on { display: flex; }
+#turn .phone { width: 96px; height: 96px; color: #ffb347; animation: tilt 2.4s ease-in-out infinite; }
+#turn b { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 34px; letter-spacing: 3px; }
+#turn span { font-size: 17px; color: #ffd9a8; }
+@keyframes tilt { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
 /* the HUD makes room: smaller, and clear of the buttons and the notch */
 body.touch #radar { width: 112px; height: 112px; left: calc(12px + env(safe-area-inset-left)); bottom: auto; top: calc(66px + env(safe-area-inset-top)); border-width: 3px; }
 body.touch #clock { top: calc(10px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); font-size: 22px; }
@@ -226,7 +233,7 @@ body.touch #subtitle { bottom: calc(18px + env(safe-area-inset-bottom)); font-si
 body.touch #objective { bottom: auto; top: calc(60px + env(safe-area-inset-top)); font-size: 15px; }
 body.touch #prompt { bottom: calc(96px + env(safe-area-inset-bottom)); font-size: 14px; }
 body.touch #dist { bottom: auto; top: calc(40px + env(safe-area-inset-top)); font-size: 16px; }
-body.touch #intro { bottom: auto; top: 40vh; left: 12px; min-width: 0; }
+body.touch #intro { bottom: auto; top: calc(186px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); min-width: 0; }
 body.touch #intro b { font-size: 22px; } body.touch #intro span { font-size: 12px; }
 body.touch #weapons { top: 50px; font-size: 14px; }
 body.touch #cardTitle { font-size: clamp(36px, 9vw, 64px); }
@@ -239,10 +246,7 @@ body.touch #menu .item .hint, body.touch #menu .info .hint { float: none; displa
 body.touch #map { width: min(96vw, 900px); max-height: 92vh; }
 body.touch .keys { font-size: 13px; }
 body.touch #title { gap: 18px; }
-/* standing the phone up: the subtitles get the whole width and climb over the buttons */
-@media (orientation: portrait) {
-  body.touch #subtitle { width: 92vw; bottom: calc(250px + env(safe-area-inset-bottom)); }
-  body.touch #objective { width: 70vw; left: auto; right: 10px; transform: none; text-align: right; top: calc(212px + env(safe-area-inset-top)); }
-  body.touch #prompt { width: 92vw; bottom: calc(306px + env(safe-area-inset-bottom)); }
-  body.touch #dist { top: calc(186px + env(safe-area-inset-top)); left: auto; right: 12px; text-align: right; }
-}
+/* sideways on a phone: the HUD down the edges, clear of the notch, the subtitles above the thumbs */
+body.touch #subtitle { width: min(560px, 58vw); bottom: calc(14px + env(safe-area-inset-bottom)); }
+body.touch #objective { width: min(520px, 54vw); top: calc(56px + env(safe-area-inset-top)); }
+body.touch #prompt { bottom: calc(70px + env(safe-area-inset-bottom)); }
