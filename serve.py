@@ -90,5 +90,6 @@ class NoCache(SimpleHTTPRequestHandler):
 if __name__ == '__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8137
-    print(f'Serving on http://localhost:{port}')
-    ThreadingHTTPServer(('', port), NoCache).serve_forever()
+    # This computer only: other devices on the Wi-Fi cannot reach it. The game for everyone else is the web build (tools/build-web.mjs).
+    print(f'Serving on http://localhost:{port} (this computer only)')
+    ThreadingHTTPServer(('127.0.0.1', port), NoCache).serve_forever()
