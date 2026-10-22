@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CITY, STORY_KEY, NX, NZ, BLOCK, ROAD, CELL, OX, OZ, nodeX, nodeZ, blockCenter, SHORE, bounds, colliders, lowGround, raise, piers, interiors, floors, terrains, mulberry32, groundAt, roomAt } from './grid.js';
 import { buildSets2049 } from './sets2049.js';
+import { WORLD_MAP, LIGHT as LIGHT_DETAIL } from './detail.js';
 import { buildSets2019 } from './sets2019.js';
 import { makeHuman } from './people.js';
 import { box, makeLook, makeTony, makeDuck, makeFlamingo, Car } from './entities.js';
@@ -35,6 +36,7 @@ const FIRMS = [['VICE FREIGHT', 'INTERSTATE HAULAGE'], ['ATLANTIC SALVAGE', 'SCR
 // ---------- Textures, all drawn in code ----------
 
 function texture(w, h, draw) {
+  if (w > WORLD_MAP || h > WORLD_MAP) { const k = WORLD_MAP / Math.max(w, h); w = Math.round(w * k); h = Math.round(h * k); } // (smaller on a phone: detail.js)
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
@@ -4473,6 +4475,27 @@ export function buildWorld(scene) {
     M.pool.opacity = 0.3 + k * 0.35;
     for (const m of [M.shop, M.deco, M.balcony, M.stucco]) m.emissiveIntensity = 0.85 + k * 0.25;
   };
+  // On a phone the sign atlas (4096 px square, 64 MB) is handed to the GPU at a quarter of the size or less; the slots
+  // are placed by fractions of the atlas, so every sign still finds its own.
+  // On a phone the city's own geometry lets go of its JavaScript copy once the GPU has it (about 100 MB): the city never
+  // changes shape. Not people (their bones move their meshes), not instanced or animated meshes.
+  if (LIGHT_DETAIL) {
+    const drop = function () { this.array = null; };
+    scene.traverse(o => {
+      if (!o.isMesh || o.isSkinnedMesh || o.isInstancedMesh) return;
+      for (let a = o.parent; a; a = a.parent) if (a.isBone || a.isSkinnedMesh) return;
+      const geo = o.geometry;
+      if (!geo.boundingSphere) geo.computeBoundingSphere();
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      for (const k in geo.attributes) if (geo.attributes[k].isBufferAttribute && !geo.attributes[k].isInterleavedBufferAttribute) geo.attributes[k].onUpload(drop);
+      geo.index?.onUpload(drop);
+    });
+  }
+  if (WORLD_MAP < AW) {
+    const small = document.createElement('canvas'); small.width = small.height = WORLD_MAP;
+    const sg = small.getContext('2d'); sg.imageSmoothingQuality = 'high'; sg.drawImage(atlas, 0, 0, WORLD_MAP, WORLD_MAP);
+    M.sign.map.image = small; M.sign.map.needsUpdate = true; atlas.width = atlas.height = 1; // (and the big one is let go)
+  }
   return places;
 }
 

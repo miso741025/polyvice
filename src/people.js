@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mulberry32 } from './grid.js';
+import { PEOPLE_MAP } from './detail.js';
 
 // Characters use the CC0 Quaternius base bodies (rigged, ~13k triangles) and animation library.
 // The bodies come unclothed and built like superheroes, so two things happen per character:
@@ -13,7 +14,7 @@ import { mulberry32 } from './grid.js';
 //     what covers that spot.
 
 const DIR = 'assets/models/';
-const MAP = 1024;                 // texture size per character
+const MAP = PEOPLE_MAP;           // texture size per character (1024; 512 on a phone, see detail.js)
 const STAND_FRAME = 0.25;         // point in the walk cycle whose upper body is used for standing still
 const SEAT_HEIGHT = 0.6;          // hip height when sitting in a chair
 const bodies = {};                // 'male' | 'female' -> prepared base body
