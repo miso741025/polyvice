@@ -4346,6 +4346,7 @@ export function buildWorld(scene) {
   // ----- Merge everything into one mesh per material -----
   M.sign.map.needsUpdate = true;
   scene.add(merged(buckets));
+  buckets = new Map(); // the pieces are in the merged meshes now: let go of them (they were most of the page's memory)
   for (const [size, list] of Object.entries(halos)) {
     const n = list.length / 4, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
