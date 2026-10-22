@@ -7,7 +7,7 @@ import { runStory, savedMission, clearSave, storyList, jumpTo, explode, people, 
 import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
 import { installSideJobs } from './sidejobs.js';
-import { TOUCH, installTouch } from './touch.js';
+import { TOUCH, installTouch, applyRotation } from './touch.js';
 
 const canvas = document.getElementById('game');
 // Detail: phones and tablets get the light version (fewer pixels, cheaper shadows, a nearer haze, a thinner crowd and less traffic).
@@ -40,8 +40,9 @@ Object.assign(sun.shadow.camera, { left: -SHADE, right: SHADE, top: SHADE, botto
 scene.add(sun, sun.target);
 
 function resize() {
-  renderer.setSize(innerWidth, innerHeight, false);
-  camera.aspect = innerWidth / innerHeight;
+  const [W, H] = applyRotation(); // (a phone held upright: the page is drawn turned, the screen's height wide)
+  renderer.setSize(W, H, false);
+  camera.aspect = W / H;
   camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize);
