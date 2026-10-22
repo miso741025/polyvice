@@ -7,16 +7,14 @@ import { runStory, savedMission, clearSave, storyList, jumpTo, explode, people, 
 import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
 import { installSideJobs } from './sidejobs.js';
-import { TOUCH, installTouch, applyRotation } from './touch.js';
+import { installTouch, applyRotation } from './touch.js';
+import { LIGHT, EXTRA_LIGHT, DETAIL_KEY, markIndoors } from './detail.js';
 
 const canvas = document.getElementById('game');
 // Detail: phones and tablets get the light version (fewer pixels, cheaper shadows, a nearer haze, a thinner crowd and less traffic).
 // ?quality=low or ?quality=high in the address, or the Detail line in the settings, overrides the guess.
-const DETAIL_KEY = 'cannoli-coast.detail';
-const askedDetail = new URLSearchParams(location.search).get('quality') || (() => { try { return localStorage.getItem(DETAIL_KEY); } catch { return null; } })();
-const LIGHT = askedDetail === 'low' || (askedDetail !== 'high' && TOUCH);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !LIGHT, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, LIGHT ? 1.25 : 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, LIGHT ? 1 : 2)); // (one pixel per CSS pixel on a phone: memory first)
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = LIGHT ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 
@@ -63,6 +61,7 @@ async function boot() {
   const SETTINGS = 'cannoli-coast.settings';
   const settings = { volume: 0.7, ambience: 2, radio: 2, sens: 1, invert: false, crowd: 1, shadows: true };
   try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS)) || {}); } catch { /* defaults */ }
+  if (EXTRA_LIGHT) { settings.shadows = false; settings.crowd = 0; } // the last visit died indoors: no shadows, the thinnest crowd
   const applySettings = () => {
     sfx.setVolume(settings.volume); sfx.setAmbience([0, 0.5, 1, 1.6][settings.ambience] ?? 1); sfx.radio.volume([0, 0.4, 0.7, 1][settings.radio] ?? 0.7);
     renderer.shadowMap.enabled = settings.shadows; sun.castShadow = settings.shadows;
@@ -456,6 +455,7 @@ async function boot() {
   };
 
   const still = { x: 0, y: 0 };
+  let indoors = false;
   function updatePlayer(dt) {
     const car = p.car, stick = g.stick || still;
     if (car) {
@@ -832,7 +832,7 @@ async function boot() {
     for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
 
     updateCamera(dt);
-    { const q = roomAt(camera.position.x, camera.position.z, 3); places.lightRoom(q); setClimate(q?.climate || null); }
+    { const q = roomAt(camera.position.x, camera.position.z, 3); places.lightRoom(q); setClimate(q?.climate || null); if (!!q !== indoors) markIndoors(indoors = !!q); } // (the crash guard: detail.js)
     updatePeople(dt, camera.position);
     sun.target.position.copy(focus);
     sun.position.copy(focus).addScaledVector(SUN_DIR, 200);
