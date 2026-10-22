@@ -518,7 +518,7 @@ async function boot() {
     if (!p.locked && (mx || mz)) {
       const s = Math.sin(g.cam.yaw), c = Math.cos(g.cam.yaw);
       let vx = s * mz - c * mx, vz = c * mz + s * mx;
-      const n = Math.hypot(vx, vz), speed = keys.ShiftLeft || keys.ShiftRight ? 7.6 : 3.7;
+      const n = Math.hypot(vx, vz), speed = keys.ShiftLeft || keys.ShiftRight || stick.run ? 7.6 : 3.7; // (on a phone: the stick pushed to its rim)
       vx /= n; vz /= n;
       p.pos.x += vx * speed * dt; p.pos.z += vz * speed * dt;
       if (p.weapon !== 'pistol' && !g.lockTarget) p.heading += wrapAngle(Math.atan2(vx, vz) - p.heading) * (1 - Math.exp(-12 * dt));
