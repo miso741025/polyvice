@@ -72,7 +72,7 @@ export function installTouch(g, canvas) {
   // Nothing on the page scrolls, zooms or selects under a thumb.
   for (const el of [document.documentElement, document.body, canvas, pad]) el.style.touchAction = 'none';
   document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
-  document.addEventListener('touchmove', e => { if (!e.target.closest?.('#menu')) e.preventDefault(); }, { passive: false });
+  document.addEventListener('touchmove', e => { if (e.cancelable && !e.target.closest?.('#menu')) e.preventDefault(); }, { passive: false }); // (only when the browser lets it: otherwise it logs an error)
   document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
 
   // The first tap asks for the whole screen, turned sideways, where the browser allows it (Android Chrome does;
@@ -125,7 +125,7 @@ export function installTouch(g, canvas) {
     if (e.pointerId === lookId) lookId = null;
   };
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(t, end);
-  canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false }); // (no page scroll, no pretend mouse clicks)
+  canvas.addEventListener('touchstart', e => { if (e.cancelable) e.preventDefault(); }, { passive: false }); // (no page scroll, no pretend mouse clicks)
 
   // What the ACTION button would press now, and what it says: whatever the game has put on screen for a key.
   const $ = id => document.getElementById(id);
@@ -148,7 +148,7 @@ export function installTouch(g, canvas) {
     const el = els[b.id] = pad.querySelector('#' + b.id);
     let held = null;
     const down = e => {
-      e.preventDefault(); e.stopPropagation();
+      if (e.cancelable) e.preventDefault(); e.stopPropagation();
       el.classList.add('down');
       if (b.gun) { // fists ↔ a gun: the one he last had out, or the first he owns
         const p = g.player, guns = ORDER.filter(w => w !== 'fist' && p.weapons?.[w]);
@@ -160,7 +160,7 @@ export function installTouch(g, canvas) {
       held = b.act ? action?.key : b.key;
       if (held) g.touchKey(held, true);
     };
-    const up = e => { e.preventDefault(); el.classList.remove('down'); if (held) setTimeout(k => g.touchKey(k, false), 40, held); held = null; };
+    const up = e => { if (e.cancelable) e.preventDefault(); el.classList.remove('down'); if (held) setTimeout(k => g.touchKey(k, false), 40, held); held = null; };
     el.addEventListener('touchstart', down, { passive: false });
     el.addEventListener('touchend', up, { passive: false }); el.addEventListener('touchcancel', up, { passive: false });
   }
