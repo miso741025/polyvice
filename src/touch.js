@@ -129,7 +129,7 @@ export function installTouch(g, canvas) {
 
   // What the ACTION button would press now, and what it says: whatever the game has put on screen for a key.
   const $ = id => document.getElementById(id);
-  const prompt = $('prompt'), objective = $('objective'), subtitle = $('subtitle');
+  const prompt = $('prompt'), objective = $('objective'), subtitle = $('subtitle'), card = $('card');
   const WORDS = { KeyF: 'Use', KeyR: 'Fix', KeyG: 'Do it', Enter: 'Begin' };
   let action = null;
   const offer = () => {
@@ -180,7 +180,7 @@ export function installTouch(g, canvas) {
     turn.classList.toggle('on', ROT && now < hintUntil);
     pad.classList.toggle('play', g.started && !g.hud.onMenu);
     pad.classList.toggle('car', car);
-    pad.classList.toggle('talking', !!subtitle.textContent.trim());
+    pad.classList.toggle('talking', !!subtitle.textContent.trim() || card.classList.contains('on')); // (a title card can be skipped too)
     action = offer();
     const armed = p.weapon && p.weapon !== 'fist';
     if (armed) lastGun = p.weapon;

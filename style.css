@@ -271,3 +271,6 @@ body.touch #prompt { bottom: calc(70px + var(--sb)); }
   .fine { position: static; font-size: clamp(8px, calc(var(--vh) * 2.4), 11px); max-width: 94%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0; }
 }
 @media (pointer: coarse) { .deskkeys { display: none; } .touchkeys { display: block; } }
+
+/* a staged scene (the player held, the camera placed): only the words and the lower third */
+#hud.cine > :not(#subtitle):not(#intro) { opacity: 0; transition: opacity .4s; }
