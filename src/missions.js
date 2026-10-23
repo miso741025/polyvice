@@ -198,7 +198,8 @@ export async function cut(g, arrange, seconds = 0.8) {
 
 export async function titleCard(g, title, sub) {
   g.hud.card(title, sub);
-  await g.wait(3.2);
+  const t0 = g.time;
+  await g.until(() => g.time - t0 >= 3.2 || (g.time - t0 > 0.4 && g.consume('Enter'))); // (Enter, or Skip on a phone, cuts it short)
   g.hud.card();
 }
 
@@ -310,7 +311,19 @@ export async function reach(g, at, text, { r = 6, how, color } = {}) {
   const m = color ? g.addMarker(at.x, at.z, r, color) : g.addMarker(at.x, at.z, r), p = g.player;
   if (color) m.color = '#' + color.toString(16).padStart(6, '0');
   if (!p.locked) g.setCheckpoint?.();   // killed on the way: back to where the errand was given
-  await g.until(() => near(p.pos, m, r + 0.4) && (how === 'car' ? p.car && Math.abs(p.car.speed) < 6 : how === 'foot' ? !p.car : true));
+  // On foot, a walk that gets no closer for 45 s (time he is free to move) makes the marker pulse; after 90 s he is put there.
+  let best = Infinity, still = 0, last = g.time;
+  const stuck = () => {
+    if (how !== 'foot' || p.car) return false;
+    const dt = g.time - last; last = g.time;
+    if (p.locked || g.paused) return false;
+    const d = Math.hypot(p.pos.x - m.x, p.pos.z - m.z);
+    if (d < best - 2) { best = d; still = 0; } else still += dt;
+    if (m.mesh) m.mesh.scale.setScalar(still > 45 ? 1 + Math.abs(Math.sin(g.time * 3)) * 0.6 : 1);
+    if (still > 90) { p.pos.set(m.x, 0, m.z); return true; }
+    return false;
+  };
+  await g.until(() => (near(p.pos, m, r + 0.4) && (how === 'car' ? p.car && Math.abs(p.car.speed) < 6 : how === 'foot' ? !p.car : true)) || stuck());
   g.removeMarker(m);
   g.hud.objective();
   g.setCheckpoint?.();                  // and from here on, back to here
@@ -353,6 +366,9 @@ export function follower(g, human, { lead, gap = 1.6, pace = 3.6, runs = true } 
     }
     const target = lead ? lead.pos : p.pos, dx = target.x - f.pos.x, dz = target.z - f.pos.z, d = Math.hypot(dx, dz);
     if (d > 60 || (p.inside && d > 13)) { f.pos.set(target.x - 1.2, 0, target.z - 1.2); pushOut(f.pos, 0.4); } // the player went through a door (or took a lift, indoors): so did they
+    // Caught on a rail or a wall (they walk straight at whoever they follow): after three seconds of getting no closer, they catch up.
+    if (d > gap + 3) { if (d < (f.best ?? Infinity) - 0.5) { f.best = d; f.bestAt = g.time; } else if (g.time - (f.bestAt ?? g.time) > 3) { f.pos.set(target.x - dx / d * (gap + 0.6), 0, target.z - dz / d * (gap + 0.6)); pushOut(f.pos, 0.4); f.best = undefined; } }
+    else f.best = undefined;
     if (d > gap + 0.25) {
       const speed = runs && d > 6 ? 7.2 : pace, step = Math.min(speed * dt, d - gap);
       f.pos.x += dx / d * step; f.pos.z += dz / d * step;
@@ -4280,7 +4296,13 @@ async function secondOpinion(g) {
     }
     return true;
   });
-  await g.until(() => !p.car && near(p.pos, m, 3) && near(c.pos, m, 10));
+  let atEnd = 0;
+  await g.until(() => { // he is at the end and Doyle is still on the way: after six seconds Doyle is there (he used to be caught on the rail for good)
+    if (p.car || !near(p.pos, m, 3)) { atEnd = g.time; return false; }
+    if (near(c.pos, m, 10)) return true;
+    if (g.time - atEnd > 6) { c.pos.set(m.x - 2, 0, m.z + 1); pushOut(c.pos, 0.4); return true; }
+    return false;
+  });
   g.removeMarker(m);
   g.hud.objective();
 

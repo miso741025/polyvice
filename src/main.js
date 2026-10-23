@@ -14,7 +14,7 @@ const canvas = document.getElementById('game');
 // Detail: phones and tablets get the light version (fewer pixels, cheaper shadows, a nearer haze, a thinner crowd and less traffic).
 // ?quality=low or ?quality=high in the address, or the Detail line in the settings, overrides the guess.
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !LIGHT, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, LIGHT ? 1 : 2)); // (one pixel per CSS pixel on a phone: memory first)
+renderer.setPixelRatio(Math.min(devicePixelRatio, LIGHT ? 1 : 1.5)); // (one pixel per CSS pixel on a phone: memory first; 1.5 at most elsewhere)
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = LIGHT ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 
@@ -29,7 +29,10 @@ const sun = new THREE.DirectionalLight(0xffcf9e, 2.3);
 // The player's own headlamps: a spot that rides on whatever he is driving, lit after dark.
 const headLight = new THREE.SpotLight(0xfff2c0, 0, 70, 0.55, 0.5, 1.2);
 // A fill that follows the player on Nexus, so he reads in the dark wherever he stands (the games this is modelled on do the same).
-const fill = new THREE.SpotLight(0xcfd8ff, 0, 9, 0.42, 1, 2); scene.add(fill); scene.add(fill.target); // a narrow soft cone on him alone, so the ground does not get a pool headLight.position.set(0, 1.0, 1.6); headLight.target.position.set(0, -0.6, 30); headLight.add(headLight.target);
+const fill = new THREE.SpotLight(0xcfd8ff, 0, 9, 0.42, 1, 2); scene.add(fill); scene.add(fill.target); // a narrow soft cone on him alone, so the ground does not get a pool
+// The headlamps are in the scene from the start and follow whatever he drives. (Added to the car the first time he got in, they
+// changed the number of lights in the scene, and every material in the city was compiled again: a frame of more than a second.)
+headLight.target.position.set(0, -1.6, 28); headLight.add(headLight.target); scene.add(headLight);
 sun.castShadow = true;
 sun.shadow.mapSize.set(LIGHT ? 1024 : 2048, LIGHT ? 1024 : 2048);
 sun.shadow.bias = -0.0006;
@@ -411,6 +414,8 @@ async function boot() {
     if (thirdBtn) { thirdBtn.textContent = NEXUS ? 'Port Paloma · The Bellacostas' : 'Blade Runner 2049'; thirdBtn.addEventListener('click', () => { location.search = NEXUS ? '' : '?city=nexus'; }); }
     if (yearBtn && !NEXUS) { yearBtn.hidden = false; yearBtn.textContent = 'Blade Runner · 2019'; yearBtn.addEventListener('click', () => { location.search = '?city=nexus&story=2019'; }); }
   }
+  // Every material is compiled now, behind the title, not the first time it comes into view (a frame of a second or more, mid-drive).
+  try { renderer.compile(scene, camera); } catch (err) { console.warn('shader warm-up skipped', err); }
   const startBtn = document.getElementById('start');
   startBtn.disabled = false;
   startBtn.textContent = 'Start';
@@ -455,6 +460,8 @@ async function boot() {
   };
 
   const still = { x: 0, y: 0 };
+  const hudEl = document.getElementById('hud'), objEl = document.getElementById('objective');
+  let blankSince = 0;
   let indoors = false;
   function updatePlayer(dt) {
     const car = p.car, stick = g.stick || still;
@@ -818,6 +825,13 @@ async function boot() {
     g.updaters = g.updaters.filter(fn => fn(dt));
     g.waiters = g.waiters.filter(w => { if (!w.fn()) return true; w.resolve(); return false; });
 
+    if (g.started && !p.locked && !g.cam.fixed && objEl.innerHTML.trim() && g.firstControlAt == null) g.firstControlAt = g.time; // (the studio's tests read when the player first had control: free, with something to do)
+    hudEl.classList.toggle('cine', g.started && p.locked && !!g.cam.fixed);              // a staged scene: the gauges step aside, the words stay
+    { // a mission is on, he is free to move and there is somewhere to go, but nothing says so: say where (after a moment, so a mission's own line wins)
+      const blank = g.missionActive && !p.locked && g.markers.length > 0 && !objEl.innerHTML.trim();
+      if (!blank) blankSince = 0; else if (!blankSince) blankSince = g.time; else if (g.time - blankSince > 1.5) { hud.objective('Head for the <b>marker</b>.'); blankSince = 0; }
+    }
+
     const me = p.human;
     me.group.visible = !p.car && !p.hidden;
     me.group.position.set(p.pos.x, groundAt(p.pos.x, p.pos.z) + (p.jumpY || 0), p.pos.z);
@@ -842,7 +856,7 @@ async function boot() {
     { // Lights on the cars after dark: beams on the road from everything near, and the spot on his own.
       const dark = Math.max(0, Math.min(1, (g.night - 0.35) / 0.4));
       for (const car of cars) { const b = car.mesh.userData.beam; if (!b) continue; const d = Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z); b.material.opacity = d < 160 && !car.wreck && (car === p.car || ((car.nav || car.ai) && Math.abs(car.speed) > 0.5)) ? dark * 0.32 : 0; } // (a parked car's lamps are off: the pale wedge on the road at K's spawn was his own spinner's)
-      if (p.car) { if (headLight.parent !== p.car.mesh) p.car.mesh.add(headLight); headLight.intensity = dark * 90 * (p.car.wreck ? 0 : 1); } else headLight.intensity = 0;
+      if (p.car) { headLight.position.copy(p.car.mesh.position).add(tmp.set(Math.sin(p.car.heading) * 1.6, 1.0, Math.cos(p.car.heading) * 1.6)); headLight.rotation.set(0, p.car.heading, 0); headLight.intensity = dark * 90 * (p.car.wreck ? 0 : 1); } else headLight.intensity = 0;
     }
 
     // Once the story is told, the days turn on their own: dark from a quarter past eight until a quarter to six.

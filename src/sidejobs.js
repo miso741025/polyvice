@@ -128,6 +128,11 @@ function installStakes(g) {
     },
     pay(n) { // a job is finished: two days have gone by, and anything newly his starts paying
       done = n; g.dayBase += 2;
+      g.wait(6.4).then(() => { // said, after the banner, so the clock's jump reads as meant
+        if (document.getElementById('card').classList.contains('on')) return;
+        g.hud.card(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][((g.day() % 7) + 7) % 7], 'Two days later');
+        return g.wait(2.6).then(() => g.hud.card());
+      }).catch(() => {});
       for (const s2 of STAKES) if (done >= s2.from && last[s2.key] === undefined) last[s2.key] = now() - WEEK;
       clear();
     },
