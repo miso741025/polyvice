@@ -3436,7 +3436,8 @@ export async function runStory(g) {
       for (;;) { // a mission is played again from the start if he is killed before its first checkpoint
         g.missionActive = true; g.checkpoint = null; g.topUp?.();
         if (g.tonyCar) g.tonyCar.hp = Math.max(g.tonyCar.hp ?? 100, 70);
-        try { await mission(g); break; } catch (err) { if (err !== g.WASTED) throw err; }
+        g.stats?.('levelStart', 'm' + n, { mode: 'story' });   // anonymous play statistics (main.js): which mission, won or lost
+        try { await mission(g); g.stats?.('levelEnd', 'm' + n, { result: 'win' }); break; } catch (err) { if (err !== g.WASTED) throw err; g.stats?.('levelEnd', 'm' + n, { result: 'lose' }); }
         finally { g.missionActive = false; }
         await g.respawn();
       }
