@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CITY, STORY_KEY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, blockCenter, colliders, pushOut, pushOutAbove, groundAt, surfaceAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
+import { CITY, STORY_KEY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, blockCenter, colliders, interiors, piers, pushOut, pushOutAbove, groundAt, surfaceAt, roomAt, clamp, wrapAngle, near, mulberry32 } from './grid.js';
 import { buildWorld } from './world.js';
 import { makeLook, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
@@ -358,6 +358,7 @@ async function boot() {
   };
   g.sfx = sfx;
   window.game = g; // handy in the console
+  g.grid = { colliders, interiors, piers }; // (for the studio's autopilot, which cannot import grid.js from a built page)
   g.renderer = renderer;
   g.light = LIGHT;
   // The phone's buttons press the same keys as the keyboard (touch.js).
