@@ -40,7 +40,7 @@ const portPalomaOnly = {
     });
     // Every question the code asks about the city is answered in the text, so the minifier can see which way it goes:
     // `CITY === 'la'` becomes false, and so on, and the NEXUS / LA / OLD flags that world.js and main.js keep become false.
-    b.onLoad({ filter: /src[\\/](main|world|missions|entities|people|combat|sidejobs|hud|touch)\.js$/ }, a => {
+    b.onLoad({ filter: /src[\\/](main|world|missions|entities|people|combat|sidejobs|hud|touch|detail)\.js$/ }, a => {
       let s = readFileSync(a.path, 'utf8');
       s = s.replace(/\bCITY === 'vice'/g, 'true').replace(/\bCITY !== 'vice'/g, 'false').replace(/\bCITY === '(la|nexus)'/g, 'false').replace(/\bCITY !== '(la|nexus)'/g, 'true')
         .replace(/\bSTORY_KEY === '(2019|2049)'/g, 'false');
@@ -50,6 +50,7 @@ const portPalomaOnly = {
         s = s.replace(flags, '').replace(/\b(NEXUS|LA|OLD)\b(?!\s*[:=](?!=))/g, 'false');
       }
       if (a.path.endsWith('world.js')) s = emptyBuilders(s);
+      if (a.path.endsWith('detail.js') && process.env.VICE_VERSION) s = s.replace("export const RELEASE = 'dev';", `export const RELEASE = ${JSON.stringify(String(process.env.VICE_VERSION))};`);
       if (a.path.endsWith('people.js')) { // the skins it paints clothes on are the smaller JPEGs made below
         for (const t of SKINS) { if (!s.includes(`'${t}'`)) throw new Error(`people.js no longer loads ${t}`); s = s.replace(`'${t}'`, `'${t.replace(/\.png$/, '.jpg')}'`); }
       }

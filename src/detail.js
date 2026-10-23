@@ -7,6 +7,8 @@
 import { TOUCH } from './touch.js';
 
 export const DETAIL_KEY = 'cannoli-coast.detail', CRASH_KEY = 'cannoli-coast.indoors';
+// The release number, for the anonymous play statistics: tools/build-web.mjs writes it in (VICE_VERSION); 'dev' when run from source.
+export const RELEASE = 'dev';
 const stored = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const asked = new URLSearchParams(location.search).get('quality') || stored(DETAIL_KEY);
 export const LIGHT = asked === 'low' || (asked !== 'high' && TOUCH);

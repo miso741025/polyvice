@@ -8,7 +8,7 @@ import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
 import { installSideJobs } from './sidejobs.js';
 import { installTouch, applyRotation } from './touch.js';
-import { LIGHT, EXTRA_LIGHT, DETAIL_KEY, markIndoors } from './detail.js';
+import { LIGHT, EXTRA_LIGHT, DETAIL_KEY, RELEASE, markIndoors } from './detail.js';
 
 const canvas = document.getElementById('game');
 // Detail: phones and tablets get the light version (fewer pixels, cheaper shadows, a nearer haze, a thinner crowd and less traffic).
@@ -362,6 +362,16 @@ async function boot() {
   g.renderer = renderer;
   g.light = LIGHT;
   // The phone's buttons press the same keys as the keyboard (touch.js).
+  // Anonymous play statistics (the site's shared /shared/mm_stats_v1.js, loaded beside the page): which missions are started, won,
+  // lost or left. No account, no personal data; nothing at all is sent for automated browsers, Do Not Track, or with the setting off.
+  let statsReady = false;
+  const statsOn = () => { try { return localStorage.getItem('mm_stats_off') !== '1'; } catch { return true; } }; // (one choice for the whole site, kept by the shared script)
+  g.stats = (call, ...args) => {
+    const s = window.mmStats; if (!s) return;
+    if (!statsReady) { statsReady = true; s.init('vice', RELEASE, { lang: (() => { try { return localStorage.getItem('mm-lang') || 'en'; } catch { return 'en'; } })() }); }
+    s[call]?.(...args);
+  };
+  addEventListener('pagehide', () => { if (g.missionActive && g.progress?.n) g.stats('levelEnd', 'm' + g.progress.n, { result: 'quit' }); });
   g.touchKey = (code, down) => { if (hud.onMenu) { if (down) hud.onMenu(code); return; } keys[code] = down; if (down) pressed.add(code); };
   const touchFrame = installTouch(g, canvas);
 
@@ -724,6 +734,8 @@ async function boot() {
       { key: 'Digit5', label: 'Invert mouse Y', hint: settings.invert ? 'on' : 'off' },
       { key: 'Digit6', label: 'Crowd', hint: ['light', 'normal', 'heavy'][settings.crowd] },
       { key: 'Digit7', label: 'Shadows', hint: settings.shadows ? 'on' : 'off' },
+      { key: 'KeyU', label: 'Anonymous play statistics', hint: statsOn() ? 'on' : 'off' },
+      { label: 'We collect anonymous play statistics (no account, no personal data) to improve the games.', hint: '' },
       { key: 'KeyO', label: 'Detail', hint: `${LIGHT ? 'light (for phones)' : 'full'}  ·  changing it restarts the page` },
       ...(SILENT ? [] : [{ key: 'Digit9', label: 'Ambient sound', hint: ['off', 'quiet', 'normal', 'loud'][settings.ambience] },
         { key: 'KeyR', label: 'Radio', hint: sfx.radio.count ? `${sfx.radio.count} songs  ·  ${['off', 'quiet', 'normal', 'loud'][settings.radio]}  ·  in the car: N next, B back, V off` : 'no songs yet: put audio files in the music folder' },
@@ -748,6 +760,7 @@ async function boot() {
       else if (code === 'KeyP') { pages('People', people(g).map(x => ({ label: x.name, hint: x.role })), 'Nobody yet.'); return; }
       else if (code === 'KeyL') { pages('Earnings', Object.entries(g.ledger || {}).sort((a, b) => a[0] - b[0]).map(([n, r]) => ({ label: `${n}.  ${r.t}`, hint: '$' + r.m.toLocaleString('en-US') })), 'Nothing yet: every mission pays when it is passed.'); return; }
       else if (code === 'Digit0') { applySettings(); location.reload(); return; }
+      else if (code === 'KeyU') { const on = !statsOn(); if (window.mmStats) window.mmStats.off(!on); else try { localStorage.setItem('mm_stats_off', on ? '0' : '1'); } catch { /* no storage */ } }
       else if (code === 'KeyO') { try { localStorage.setItem(DETAIL_KEY, LIGHT ? 'high' : 'low'); } catch { /* stays as it is */ } applySettings(); location.reload(); return; }
       else if (code === 'Escape' || code === 'Enter') { applySettings(); hud.menu(); g.paused = false; for (const k in keys) keys[k] = false; return; }
       else return;
