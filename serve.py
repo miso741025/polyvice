@@ -34,7 +34,23 @@ class NoCache(SimpleHTTPRequestHandler):
             self.send_response(204); self.end_headers(); return
         self.send_response(404); self.end_headers()
 
+    # Only the game is served: nothing hidden (.git, .claude), and not the private notes, the shots or the build tools.
+    PRIVATE = ('notes', 'shots', 'tools', 'dist')
+
+    def private(self):
+        from urllib.parse import unquote
+        parts = [p for p in unquote(self.path.split('?')[0]).split('/') if p]
+        return any(p.startswith('.') for p in parts) or (parts and parts[0] in self.PRIVATE)
+
+    def do_HEAD(self):
+        if self.private(): self.send_error(404); return
+        super().do_HEAD()
+
+    def list_directory(self, path):  # no folder listings either
+        self.send_error(404); return None
+
     def do_GET(self):
+        if self.private(): self.send_error(404); return
         # /music/list.json and /sounds/list.json: what is in those folders right now, so songs and
         # recordings can be dropped in without touching the code.
         path = self.path.split('?')[0]

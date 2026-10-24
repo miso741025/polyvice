@@ -45,6 +45,15 @@ const portPalomaOnly = {
       s = s.replace(/\bCITY === 'vice'/g, 'true').replace(/\bCITY !== 'vice'/g, 'false').replace(/\bCITY === '(la|nexus)'/g, 'false').replace(/\bCITY !== '(la|nexus)'/g, 'true')
         .replace(/\bSTORY_KEY === '(2019|2049)'/g, 'false');
       const flags = { main: "const NEXUS = false, LA = false;", world: "const NEXUS = false, LA = false, OLD = NEXUS && false;" }[a.path.match(/(\w+)\.js$/)[1]];
+      if (a.path.endsWith('main.js')) { // the title's buttons across to the other worlds are not on this page: their code goes too
+        const across = 'if (otherBtn) {';
+        if (!s.includes(across)) throw new Error('main.js no longer offers the other worlds the way this build expects');
+        s = s.replace(across, 'if (false) {');
+        // and the bridge leads nowhere else here: no "to Los Angeles" on the map, no reload at its far end
+        const bridgeName = "name: `Bridge to ${LA ? 'Port Paloma' : 'Los Angeles'}`", cross = 'const crossBridge = () => {';
+        if (!s.includes(bridgeName) || !s.includes(cross)) throw new Error('main.js no longer names or crosses the bridge the way this build expects');
+        s = s.replace(bridgeName, "name: 'The bridge'").replace(cross, cross + ' return;');
+      }
       if (flags) {
         if (!s.includes(flags)) throw new Error(`${a.path}: the city flags are no longer written the way this build expects`);
         s = s.replace(flags, '').replace(/\b(NEXUS|LA|OLD)\b(?!\s*[:=](?!=))/g, 'false');
@@ -108,8 +117,9 @@ writeFileSync(join(OUT, jsName), js);
 const BANNED = ['Soprano', 'Melfi', 'Vice City', 'Bada Bing', 'Satriale', 'Vesuvio', 'Moltisanti', 'Livia', 'Paulie', 'Silvio', 'Carmela', 'Junior', 'Meadow',
   'Christopher', 'Hesh', 'Kolar', 'Jackie', 'Verbum', 'Green Grove', 'Bowdoin', 'Comley', 'Pussy', 'Wasted',
   'Heat', 'McCauley', 'Hanna', 'Waingro', 'Cheritto', 'Shiherlis', 'Far East Pacific', 'Blade Runner', 'Deckard', 'Tyrell', 'Wallace', 'Rachael', 'Replicant', 'Nexus', 'Joi', 'Gaff', 'Stelline', 'Los Angeles'];
+// (The whole script is searched, not just what looks like a string: an apostrophe inside a string once hid two of them.)
 const visible = [];
-for (const m of js.matchAll(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g)) for (const w of BANNED) if (new RegExp(`\\b${w}\\b`).test(m[0])) visible.push(`${w}: ${m[0].slice(0, 90)}`);
+for (const w of BANNED) for (const m of js.matchAll(new RegExp(`\\b${w}\\b`, 'g'))) visible.push(`${w}: …${js.slice(Math.max(0, m.index - 40), m.index + 50)}…`);
 
 // ---------- Models and textures ----------
 const SRC = join(ROOT, 'assets/models'), DST = join(OUT, 'assets/models');
