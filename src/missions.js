@@ -3,7 +3,7 @@ import { CITY, STORY_KEY, near, clamp, bounds, SHORE, groundAt, pushOut, collide
 import { HEAT, HEAT_BIOS } from './heat.js';
 import { NEXUS_STORY } from './nexus.js';
 import { BLADE_STORY } from './bladerunner.js';
-import { makeLook, makeHuman, randomPedLook, Car, roam, nearestNode } from './entities.js';
+import { makeLook, makeHuman, randomPedLook, Car, Ped, roam, nearestNode } from './entities.js';
 
 // The story is written as plain async functions: each `await` waits on the game loop
 // (a line of dialogue, the player reaching a marker, a fade), so a mission reads top to bottom.
@@ -36,7 +36,9 @@ export const storyList = () => (CITY === 'la' ? HEAT : CITY === 'nexus' ? (STORY
 export function jumpTo(n, cash) { save(n, cash); }
 function save(mission, cash, more = {}) { try { localStorage.setItem(SAVE, JSON.stringify({ ...readSave(), mission, cash, ...more })); } catch { /* play on without saving */ } }
 // Everything beside the mission number: each character's pockets, what each mission paid, who has been introduced.
-const keep = g => ({ chars: g.profilesOut?.(), earned: g.ledger || {}, met: [...(g.met || [])], stakes: g.stakes?.out(), dates: g.dates?.out() });
+const keep = g => ({ chars: g.profilesOut?.(), earned: g.ledger || {}, met: [...(g.met || [])], stakes: g.stakes?.out(), dates: g.dates?.out(), medals: g.medals || {} });
+// The best medal won on each mission (the save's mission number), and whether its bonus goal was ever done: for Settings > Missions.
+export const bestMedals = g => g.medals || readSave().medals || {};
 
 // ---------- Who is who ----------
 // A line for each person, shown the first time they speak and kept on the People page. Written for the game.
@@ -209,7 +211,7 @@ export async function passed(g, reward, money = 0) {
   const pr = g.progress || {}, n = pr.n || 1, pay = money || Math.round((700 + n * 110) / 50) * 50;
   const sum = '$' + pay.toLocaleString('en-US'), label = /^(Respect|Street cred)/.test(reward) || /^\$/.test(reward) ? sum : `${reward}  ·  ${sum}`;
   (g.ledger ??= {})[n] = { t: pr.mission || '', m: pay };
-  g.hud.passed(label, pr.mission, Object.values(g.ledger).reduce((a, r) => a + r.m, 0));
+  g.hud.passed(label, pr.mission, Object.values(g.ledger).reduce((a, r) => a + r.m, 0), award(g));
   g.sfx?.passed();
   g.addMoney(pay);
   await g.wait(6);
@@ -593,6 +595,7 @@ export function careful(g, label, failText, reset) {
         g.removeMarker(m);
         g.hud.objective();
         if (hits < 3) return;
+        g.spills = (g.spills || 0) + 1; // (the 'cargo' bonus goal counts these)
         p.locked = true;
         await fade(g, 1, 0.8);
         await say(g, '', failText);
@@ -2985,6 +2988,125 @@ const EPISODES = [
     titles: ['The Coach', 'A Gift', 'Away Game', 'What Lucia Said', 'Second Thoughts', "No Harm Done"] },
 ];
 
+// ---------- Medals, and a bonus goal on every mission ----------
+// One row per story mission, in order (the save's mission number, 0-58): gold and silver in seconds of free play (only
+// while he is free to move: scenes and talk, which can be skipped, never cost a medal; bronze is any clear), then one
+// bonus goal from that mission's own moment: a check from BONUS, and the words for it. The goal is never needed to clear.
+// Times are 1.3x and 1.8x the studio bot's free play on its best clear; rows marked "est." had no clear measured yet.
+const MEDALS = [
+  [60, 85, 'noStar', 'No police at the birthday party'],
+  [210, 295, 'noGun', 'Collect with fists, not bullets'],
+  [70, 100, 'noStar', "No police at Gus's door"],
+  [150, 205, 'carIntact', 'A smooth ride for your mother'],
+  [150, 205, 'noCivilian', 'Nobody but Pieter gets hurt'],
+  [280, 390, 'noStar', 'It has to look like an accident: no police'],
+  [175, 245, 'noStar', "Keep Morty's clinic quiet: no police"],
+  [120, 165, 'quickLeg', 'Save the sausage: at the grill in 0:30', { leg: 'Take over at the grill', secs: 30 }],
+  [150, 210, 'noStar', "The week's money rides without police"], // est.
+  [195, 270, 'carIntact', 'The truck is the prize: keep it in one piece'],
+  [270, 370, 'cargo', 'Not one carton on the road'],
+  [350, 485, 'cargo', "Not a dent in the teacher's car"],
+  [95, 135, 'quickLeg', 'Beat the fire engines to her house', { leg: "your mother's house", secs: 80 }],
+  [150, 210, 'cargo', 'Not one suit on the road'],
+  [95, 135, 'noGun', 'A lesson with a telephone, not a gun'],
+  [290, 405, 'noStar', 'Leo is watched: no police at the hospital'],
+  [205, 285, 'noGun', 'A favour for Lucia: no shots fired'],
+  [100, 135, 'noStar', 'Uncle Sergio wants no police in his park'],
+  [230, 320, 'noGun', 'Avi wants him scared, not shot'],
+  [440, 610, 'noDeath', 'Stay on your feet: no checkpoint returns'],
+  [5, 10, 'noStar', "No police at Gina's benefit"],
+  [240, 335, 'noStar', 'Look for Duffy quietly: no police'],
+  [140, 190, 'noStar', 'Meeting a detective: arrive with no stars'],
+  [95, 130, 'noGun', 'Nothing happens, Nico said: no shots'],
+  [150, 210, 'noStar', 'Dr. Vos must never know: no police'], // est.
+  [280, 385, 'carIntact', "Benny's school run: car in one piece"],
+  [210, 295, 'noGun', 'Joey gets fists, not bullets'],
+  [150, 210, 'noGun', 'Lenny pays, nobody gets shot'], // est.
+  [35, 50, 'noStar', 'The feds are taking pictures: no stars'],
+  [150, 210, 'carIntact', 'The college trip: car in one piece'], // est.
+  [150, 210, 'noStar', 'Lucia is in the car: no police'], // est.
+  [10, 10, 'noStar', 'A quiet night in: no police at the door'],
+  [60, 85, 'noGun', 'Just a look at Stan: no shots'],
+  [150, 210, 'quickLeg', "Lucia's interview: there in 1:15", { leg: 'Drive Lucia to her interview', secs: 75 }], // est.
+  [240, 330, 'noStar', 'Lucia already wonders: no police'],
+  [150, 210, 'cargo', "Not a scratch on Dr. Vos's car"], // est.
+  [195, 270, 'noGun', 'Sergio wants it tidy: no shots'],
+  [320, 440, 'noStar', 'Meeting New York: no police on your tail'],
+  [90, 130, 'cargo', 'No bumps for Uncle Sergio'],
+  [145, 200, 'carIntact', 'The anniversary gift gets home safe'],
+  [215, 300, 'noStar', "The new boss's dinner: no police"],
+  [150, 210, 'quickLeg', 'Two laps before the coach looks: 0:30', { leg: 'Two laps', secs: 30 }], // est.
+  [180, 250, 'noStar', 'Benny has had enough trouble: no police'],
+  [150, 210, 'noDeath', 'Home without a scratch: no checkpoint returns'],
+  [20, 25, 'noStar', 'Slip past the policemen: no stars'],
+  [160, 225, 'carIntact', "Benny's Sunday visit: car in one piece"],
+  [330, 455, 'quickLeg', 'Home in 1:15, before the ice cream melts', { leg: 'before it melts', secs: 75 }],
+  [400, 555, 'noStar', 'No police at the house before it is clean'],
+  [150, 210, 'noStar', 'Burn nothing in front of the police'], // est.
+  [150, 210, 'cargo', 'The trunk stays shut'], // est.
+  [60, 85, 'noCivilian', 'One shot, in the floor: nobody else hurt'],
+  [15, 20, 'noCivilian', 'A warrant, not a war: no bystanders hurt'],
+  [295, 410, 'noStar', 'His name in the paper, not on a police report'],
+  [105, 145, 'noStar', "Lucia's semi-final: no police"],
+  [115, 160, 'cargo', 'The screen arrives without a tink'],
+  [85, 120, 'noStar', 'Uncle Sergio wants it kept quiet: no police'],
+  [215, 300, 'noDeath', 'Frankie walks away clean: no checkpoint returns'],
+  [130, 180, 'noGun', 'He hesitates: no shots fired'],
+  [210, 290, 'cargo', 'Not one hedge'],
+];
+// The checks a bonus goal can make, all on what the game already keeps: stars (g.wanted), checkpoint returns (g.revived,
+// main.js), shots (g.shots, combat.js), passers-by he killed (Ped.killed, entities.js), cargo meters that failed (g.spills,
+// careful), and the car he is driving. `leg` is a piece of the objective's text: the part of the mission it means.
+const BONUS = {
+  noStar: (g, s) => { const w = Math.floor(g.wanted || 0); s.stars = Math.min(s.stars ?? w, w); return w <= s.stars; },
+  noDeath: (g, s) => (g.revived || 0) === s.revived,
+  noGun: (g, s) => (g.shots || 0) === s.shots,
+  noCivilian: (g, s) => Ped.killed === s.peds,
+  cargo: (g, s) => (g.spills || 0) === s.spills,
+  quickLeg: (g, s, o, free, dt) => { if (free && s.on) s.leg = (s.leg || 0) + dt; return (s.leg || 0) <= o.secs; },
+  onFoot: (g, s) => !(s.on && g.player.car),
+  // The car he drove last, losing no more than 30 of its 100 while he was at the wheel.
+  carIntact: (g, s, o, free) => {
+    const car = g.player.car;
+    if (!free || !car) return s.ok ?? true;
+    const hp = car.hp ?? 100;
+    if (car !== s.car) { s.car = car; s.lost ??= new Map(); if (!s.lost.has(car)) s.lost.set(car, 0); }
+    else if (hp < s.hp) s.lost.set(car, s.lost.get(car) + s.hp - hp);
+    s.hp = hp;
+    return (s.ok = s.lost.get(car) <= 30);
+  },
+};
+// Arm mission n's bonus goal and its free-play clock (g.bonus). It is armed again if the mission is played again from the start.
+function bonus(g, n) {
+  const row = MEDALS[n];
+  if (!row) return;
+  const [, , key, text, o = {}] = row, p = g.player, obj = document.getElementById('objective');
+  const b = g.bonus = { n, key, text, ok: true, free: 0 }, s = { revived: g.revived || 0, shots: g.shots || 0, peds: Ped.killed, spills: g.spills || 0 };
+  const fails = key === 'carIntact' ? null : true; // every check but the car's is lost for good once missed
+  g.updaters.push(dt => {
+    if (g.bonus !== b || b.done) return false;
+    const free = g.missionActive && !p.locked && !g.cam.fixed && !g.paused;
+    if (free) b.free += dt;
+    if (free && !b.told && b.free > 2) { b.told = true; g.hud.intro?.('Bonus goal', text); }
+    s.on = !!o.leg && !!obj?.textContent.includes(o.leg);
+    const ok = BONUS[key](g, s, o, free, dt);
+    b.ok = fails ? b.ok && ok : ok;
+    return true;
+  });
+}
+const RANK = { bronze: 1, silver: 2, gold: 3 }, ICON = { gold: '🥇', silver: '🥈', bronze: '🥉' };
+const clock = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+// The mission is cleared: its medal and bonus are kept if they beat the best so far, and said in one line for the Job done card.
+function award(g) {
+  const b = g.bonus, row = b && MEDALS[b.n];
+  if (!row || b.done) return '';
+  b.done = true;
+  const m = b.free <= row[0] ? 'gold' : b.free <= row[1] ? 'silver' : 'bronze', was = (g.medals ??= {})[b.n] || {};
+  g.medals[b.n] = { m: RANK[m] > (RANK[was.m] || 0) ? m : was.m, b: !!(was.b || b.ok) };
+  return `${ICON[m]} ${m[0].toUpperCase() + m.slice(1)} ${clock(b.free)}  ·  Bonus: ${b.text} ${b.ok ? '✓' : '✗'}`;
+}
+export const medalIcon = m => ICON[m] || '';
+
 // ---------- Things to do ----------
 // The pieces missions are built from, beside driving somewhere and talking: a round of calls, a car to run down,
 // a tail to shake, the police to lose, a conversation that happens while he drives.
@@ -3419,6 +3541,7 @@ export async function runStory(g) {
   const STORY = CITY === 'la' ? HEAT : CITY === 'nexus' ? (STORY_KEY === '2019' ? BLADE_STORY : NEXUS_STORY) : EPISODES; // each city tells its own
   const total = STORY.reduce((n, e) => n + e.missions.length, 0);
   const saved = readSave(), from = clamp(saved.mission || 0, 0, total);
+  g.medals = saved.medals || {}; // (a save from before medals has none)
   if (from > 0) { // pick up a saved game at home
     const { home, vesuvio } = g.places, p = g.player;
     g.profilesIn?.(saved.chars); g.ledger = saved.earned || {}; g.met = new Set(saved.met || []);
@@ -3445,7 +3568,8 @@ export async function runStory(g) {
         g.missionActive = true; g.checkpoint = null; g.topUp?.();
         if (g.tonyCar) g.tonyCar.hp = Math.max(g.tonyCar.hp ?? 100, 70);
         g.stats?.('levelStart', 'm' + n, { mode: 'story' });   // anonymous play statistics (main.js): which mission, won or lost
-        try { await mission(g); g.stats?.('levelEnd', 'm' + n, { result: 'win' }); break; } catch (err) { if (err !== g.WASTED) throw err; g.stats?.('levelEnd', 'm' + n, { result: 'lose' }); }
+        if (STORY === EPISODES) bonus(g, n - 1);                // its medal clock and bonus goal (Port Paloma's story)
+        try { await mission(g); award(g); g.stats?.('levelEnd', 'm' + n, { result: 'win' }); break; } catch (err) { if (err !== g.WASTED) throw err; g.stats?.('levelEnd', 'm' + n, { result: 'lose' }); }
         finally { g.missionActive = false; }
         await g.respawn();
       }

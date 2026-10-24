@@ -75,10 +75,11 @@ export class Hud {
     $('cardTitle').textContent = title; $('cardSub').textContent = sub || '';
     $('card').classList.add('on');
   }
-  passed(reward, title, total) {
+  passed(reward, title, total, medal) {
     if (reward === undefined) { $('passed').classList.remove('on'); return; }
     $('reward').textContent = reward;
     $('earned').textContent = title ? `${title}${total ? `   ·   earned so far $${total.toLocaleString('en-US')}` : ''}` : '';
+    if ($('medal')) $('medal').textContent = medal || ''; // the medal and the bonus goal, on a story mission
     $('passed').classList.add('on');
   }
 

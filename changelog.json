@@ -1,6 +1,11 @@
 [
  {
   "date": "2026-10-25",
+  "en": "Every mission now has a medal to earn and a bonus goal.",
+  "zh": "每個任務都有獎牌可拿，還有一個額外挑戰。"
+ },
+ {
+  "date": "2026-10-25",
   "en": "Phones: scenes that need a key now show it, and tapping Use works as well as holding.",
   "zh": "手機：需要按鍵的場景會顯示提示，點按「使用」和按住一樣有效。"
  },

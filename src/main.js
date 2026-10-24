@@ -3,7 +3,7 @@ import { CITY, STORY_KEY, NX, NZ, ROAD, CELL, OX, OZ, SHORE, nodeX, nodeZ, block
 import { buildWorld } from './world.js';
 import { makeLook, Car, Ped, spawnTraffic, driveAI, roam, loadPeople, updatePeople } from './entities.js';
 import { Hud } from './hud.js';
-import { runStory, savedMission, clearSave, storyList, jumpTo, explode, people, respray } from './missions.js';
+import { runStory, savedMission, clearSave, storyList, jumpTo, explode, people, respray, bestMedals, medalIcon } from './missions.js';
 import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
 import { installSideJobs } from './sidejobs.js';
@@ -195,6 +195,7 @@ async function boot() {
     // Killed in a mission that has a checkpoint: a moment of black, and he is back there, whole. The mission never knew.
     async revive() {
       const cp = g.checkpoint, wasLocked = p.locked;
+      g.revived = (g.revived || 0) + 1; // (the 'noDeath' bonus goal counts these)
       try {
         await g.wait(1.9);
         hud.wasted(true);
@@ -712,11 +713,13 @@ async function boot() {
     let n = 0;
     for (const e of story) { starts.push(n); n += e.titles.length; }
     let page = Math.max(0, starts.findLastIndex(s => s <= current));
+    const medals = bestMedals(g); // the best medal on each, and a star for a bonus goal ever done
+    const won = i => [medalIcon(medals[i]?.m), medals[i]?.b ? '★' : '', i === current ? 'you are here' : ''].filter(Boolean).join('  ');
     const show = () => {
       const e = story[page], KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9'];
       const items = [
         { label: `${e.name}: ${e.title}`, hint: `page ${page + 1} of ${story.length}` },
-        ...e.titles.map((t, k) => ({ key: KEYS[k], label: t, hint: starts[page] + k === current ? 'you are here' : '' })),
+        ...e.titles.map((t, k) => ({ key: KEYS[k], label: t, hint: won(starts[page] + k) })),
         ...(page > 0 ? [{ key: 'KeyQ', label: 'Previous chapter' }] : []), ...(page < story.length - 1 ? [{ key: 'KeyE', label: 'Next chapter' }] : []),
         { key: 'Escape', label: 'Back' },
       ];
@@ -826,7 +829,7 @@ async function boot() {
     combat.update(dt);
     sideJobs.update();
     const scare = g.time - g.scare < 1 && !p.hidden ? p.pos : null;
-    Ped.eye = camera.position;
+    Ped.eye = camera.position; Ped.mine = p.car; // (a passer-by run down by his car counts against the 'noCivilian' bonus goal)
     peds.forEach((ped, i) => {
       if (ped.parked) return;
       ped.update(dt, cars, scare);

@@ -185,6 +185,11 @@ body.nexus #title { background: radial-gradient(ellipse at 50% 80%, rgba(80, 30,
 #intro b { display: block; font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 2px; color: #fff; text-shadow: 2px 2px 0 #000; }
 #intro span { font-family: 'Rubik', sans-serif; font-size: 15px; color: #9ff3ff; text-shadow: 1px 1px 0 #000; }
 #passed #earned { font-family: 'Rubik', sans-serif; font-weight: 700; font-size: 17px; color: #f0ecff; text-shadow: 2px 2px 0 #000; margin-top: 6px; }
+#passed #medal { font-family: 'Rubik', sans-serif; font-weight: 700; font-size: 17px; color: #ffe066; text-shadow: 2px 2px 0 #000; margin: 6px auto 0; max-width: calc(var(--vw) * 92); }
+body.touch #passed { top: calc(var(--vh) * 24); }
+body.touch #passed .big { font-size: clamp(40px, calc(var(--vh) * 13), 72px); }
+body.touch #reward { font-size: 30px; }
+body.touch #passed #earned, body.touch #passed #medal { font-size: 14px; }
 
 /* ---------- Phones and tablets (touch.js puts .touch on the body) ---------- */
 body.touch .deskkeys { display: none; }

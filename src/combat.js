@@ -401,7 +401,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     const w = WEAPONS[p.weapon];
     if (p.mag[p.weapon] <= 0) { if (p.ammo[p.weapon] > 0) g.reload(); else g.sfx?.click(); return; }
     if (p.reloading > g.time || p.drawing > g.time) return;
-    lastShot = g.time;
+    lastShot = g.time; g.shots = (g.shots || 0) + 1; // (the 'noGun' bonus goal counts these)
     p.mag[p.weapon]--; showAmmo();
     if (!p.car) p.human.layer('shoot', { once: true, speed: 1.5 }); // the arms fire; the legs keep doing what they were doing
     g.sfx?.shot(); if (Math.random() < 0.3) g.sfx?.scream();

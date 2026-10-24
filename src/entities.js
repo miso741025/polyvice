@@ -166,8 +166,10 @@ export class Ped {
     this.human.play(Math.random() < 0.5 ? 'hitHead' : 'hitChest', 'idle');
     this.flee(from, 9);
   }
-  die() {
+  // `by` is the car that ran him down; anything else (a shot, a punch, a blast) is put down to the player.
+  die(by) {
     if (this.dead) return;
+    if (!by || by === Ped.mine) Ped.killed++;
     this.dead = true; this.diedAt = 0;
     this.human.after = null;
     this.human.set('down');
@@ -232,7 +234,7 @@ export class Ped {
         const s = Math.abs(car.speed), fx = Math.sin(car.heading) * Math.sign(car.speed), fz = Math.cos(car.heading) * Math.sign(car.speed);
         const sx = this.pos.x - car.pos.x, sz = this.pos.z - car.pos.z, side = sx * fz - sz * fx;
         this.fly = { vx: fx * s * 0.8 + fz * Math.sign(side) * s * 0.25, vz: fz * s * 0.8 - fx * Math.sign(side) * s * 0.25, vy: 2.8 + s * 0.22, y: 0.05, spin: (Math.random() - 0.5) * 6 };
-        if (s > 9) this.die();
+        if (s > 9) this.die(car);
         else { this.down = 9; h.after = null; h.set('down'); }
         break;
       }
@@ -240,6 +242,7 @@ export class Ped {
   }
 }
 Ped.eye = null; // where the camera is, for culling the far crowd; set by main.js each frame
+Ped.mine = null; Ped.killed = 0; // the car the player is driving (main.js), and the passers-by he has killed (the 'noCivilian' bonus goal)
 const tmpPed = new THREE.Vector3();
 
 // ---------- Cars ----------
