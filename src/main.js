@@ -7,6 +7,7 @@ import { runStory, savedMission, clearSave, storyList, jumpTo, explode, people, 
 import { installCombat } from './combat.js';
 import { sfx } from './audio.js';
 import { installSideJobs } from './sidejobs.js';
+import { WHATS_NEW } from './whatsnew.js';
 import { installTouch, applyRotation } from './touch.js';
 import { LIGHT, EXTRA_LIGHT, DETAIL_KEY, RELEASE, markIndoors } from './detail.js';
 
@@ -427,6 +428,22 @@ async function boot() {
   }
   // Every material is compiled now, behind the title, not the first time it comes into view (a frame of a second or more, mid-drive).
   try { renderer.compile(scene, camera); } catch (err) { console.warn('shader warm-up skipped', err); }
+  // What's new: the latest entries in a small card in the corner of the title (never over Start). Closed, it folds to a tab until
+  // there is something newer than what was last seen.
+  { const box = document.getElementById('whatsnew'), list = WHATS_NEW.slice(0, 3);
+    if (box && list.length) {
+      const zh = (() => { try { return localStorage.getItem('mm-lang') === 'zh'; } catch { return false; } })(), SEEN = 'cannoli-coast.whatsnew';
+      const seen = (() => { try { return localStorage.getItem(SEEN); } catch { return null; } })(), esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const day = d => new Date(d + 'T12:00:00').toLocaleDateString(zh ? 'zh-TW' : 'en-GB', { month: 'short', day: 'numeric' });
+      box.innerHTML = `<button class="wn-tab" type="button">★ ${zh ? '最新更新' : "What's new"}</button><div class="wn-card"><div class="wn-head"><b>${zh ? '最新更新' : "What's new"}</b><button class="wn-x" type="button" aria-label="Close">✕</button></div>` +
+        list.map(e => `<p><span>${day(e.date)}</span>${esc(zh ? e.zh || e.en : e.en)}</p>`).join('') + '</div>';
+      const open = on => box.classList.toggle('open', on);
+      open(seen !== list[0].date);
+      box.querySelector('.wn-x').addEventListener('click', e => { e.stopPropagation(); open(false); try { localStorage.setItem(SEEN, list[0].date); } catch { /* shows again next time */ } });
+      box.querySelector('.wn-tab').addEventListener('click', e => { e.stopPropagation(); open(true); });
+      box.hidden = false;
+    }
+  }
   const startBtn = document.getElementById('start');
   startBtn.disabled = false;
   startBtn.textContent = 'Start';

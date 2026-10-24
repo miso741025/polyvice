@@ -274,3 +274,18 @@ body.touch #prompt { bottom: calc(70px + var(--sb)); }
 
 /* a staged scene (the player held, the camera placed): only the words and the lower third */
 #hud.cine > :not(#subtitle):not(#intro) { opacity: 0; transition: opacity .4s; }
+
+/* What's new: a small card in the title's top-right corner, folded to a tab once read */
+#whatsnew { position: absolute; top: calc(14px + var(--st)); right: calc(14px + var(--sr)); z-index: 2; max-width: min(320px, calc(var(--vw) * 38)); text-align: left; font-family: 'Rubik', system-ui, sans-serif; }
+#whatsnew .wn-tab { display: block; margin-left: auto; padding: 6px 12px; border-radius: 16px; border: 1px solid rgba(255, 217, 168, .6); background: rgba(18, 10, 28, .7); color: #ffd9a8; font: 700 12px/1 'Rubik', sans-serif; letter-spacing: 1px; cursor: pointer; }
+#whatsnew .wn-card { display: none; padding: 10px 12px 6px; border-radius: 12px; background: rgba(18, 10, 28, .82); border: 1px solid rgba(255, 179, 71, .55); box-shadow: 0 6px 20px rgba(0, 0, 0, .4); }
+#whatsnew.open .wn-card { display: block; } #whatsnew.open .wn-tab { display: none; }
+#whatsnew .wn-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+#whatsnew .wn-head b { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 20px; letter-spacing: 2px; color: #ffb347; }
+#whatsnew .wn-x { background: none; border: 0; color: #fff4dc; font-size: 16px; cursor: pointer; padding: 2px 4px; }
+#whatsnew p { margin: 0 0 6px; font-size: 13px; line-height: 1.35; color: #fff4dc; }
+#whatsnew p span { display: inline-block; min-width: 46px; margin-right: 6px; color: #ffd9a8; font-weight: 700; font-size: 11px; }
+@media (max-height: 560px), (pointer: coarse) {
+  #whatsnew { max-width: min(260px, calc(var(--vw) * 34)); }
+  #whatsnew p { font-size: 11px; margin-bottom: 4px; } #whatsnew .wn-head b { font-size: 16px; }
+}

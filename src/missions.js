@@ -7214,7 +7214,7 @@ async function homeSick(g) {
   g.cam.fixed = null;
   phil.group.position.set(R.X + 4.5, R.Y, R.Z - 4.1); phil.group.rotation.y = SOUTH; phil.set('sit');
   p.locked = false;
-  await reach(g, at(-1.2, -4.2), 'Heat the <b>ziti</b> on the stove.', { r: 1.4, how: 'foot' });
+  await reach(g, at(-1.2, -4.2), 'Warm up the <b>ziti</b> on the stove.', { r: 1.4, how: 'foot' });
   p.locked = true; p.heading = NORTH; p.human.play('interact', 'idle'); await g.wait(1.4); p.locked = false;
   await reach(g, at(5.2, -1.4), 'Put the <b>film</b> on.', { r: 1.4, how: 'foot' });
   p.locked = true; p.heading = SOUTH; p.human.play('pickup', 'idle'); await g.wait(1.2);
