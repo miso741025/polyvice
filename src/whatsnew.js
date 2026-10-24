@@ -1,0 +1,9 @@
+// What's new in Vice Web, newest first: the title screen shows the top three. One entry per release that a player would notice.
+// Add a line at the TOP: { date: 'YYYY-MM-DD', en: 'One short sentence.', zh: '一句話。' }. Plain text, no HTML, under about 90 characters.
+export const WHATS_NEW = [
+  { date: '2026-10-24', en: "New: this What's new card. See what changed, every day.", zh: '新增：「最新更新」卡片，每天的改動都在這裡。' },
+  { date: '2026-10-23', en: 'Phones: Punch is always at hand, and every button has an icon.', zh: '手機：「揮拳」隨時可按，每個按鈕都有圖示。' },
+  { date: '2026-10-23', en: 'Phones no longer crash when you walk into a building.', zh: '手機走進建築物不會再當掉。' },
+  { date: '2026-10-23', en: 'Hold your phone upright and the game turns sideways for you.', zh: '手機直拿也能玩：畫面會自動轉成橫向。' },
+  { date: '2026-10-22', en: 'Port Paloma opens on the web: free, in your browser.', zh: 'Port Paloma 上線：免費、用瀏覽器就能玩。' },
+];
