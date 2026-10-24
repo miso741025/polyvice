@@ -925,9 +925,17 @@ async function boot() {
   g.keys = keys;
 
   const clock = new THREE.Clock();
+  // A frame that took over half a second is written down, with when, which mission and where (game.slowFrames, the last 50), to find where the dips are.
+  g.slowFrames = [];
   function frame() {
     requestAnimationFrame(frame);
-    step(Math.min(clock.getDelta(), 0.05));
+    const dt = clock.getDelta();
+    if (dt > 0.5 && g.started) {
+      const at = p.car ? p.car.pos : p.pos, q = g.progress, e = { t: +g.time.toFixed(1), ms: Math.round(dt * 1000), mission: q ? `${q.n} ${q.mission}` : '-', active: g.missionActive, x: Math.round(at.x), z: Math.round(at.z), car: !!p.car, inside: p.inside?.name || null, hidden: document.hidden };
+      g.slowFrames.push(e); if (g.slowFrames.length > 50) g.slowFrames.shift();
+      console.warn('[slow frame]', JSON.stringify(e));
+    }
+    step(Math.min(dt, 0.05));
   }
   frame();
 }
