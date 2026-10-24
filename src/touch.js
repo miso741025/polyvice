@@ -137,7 +137,11 @@ export function installTouch(g, canvas) {
     const m = pr.match(/^([FRG])\s+·\s+([^($:]+)/);                                        // "F  ·  Enter vehicle", "R  ·  Respray: …", "G  ·  Collect your end ($…)"
     if (m) return { key: 'Key' + m[1], label: m[2].trim().split(/\s+/).slice(0, 2).join(' ') };
     if (/[Pp]ress <b>Enter<\/b> to begin/.test(obj)) return { key: 'Enter', label: 'Begin' };
-    if (/press <b>F<\/b>/.test(obj)) return { key: 'KeyF', label: (obj.replace(/<[^>]+>/g, '').match(/^([^:.]{1,18})[:.]/)?.[1] || 'Use').trim() };
+    if (/press <b>F<\/b> and hold it/.test(obj)) { // hold (or keep tapping): the button says so, with how far along it is
+      const t = obj.replace(/<[^>]+>/g, ''), done = (t.match(/▮/g) || []).length, all = done + (t.match(/▯/g) || []).length;
+      return { key: 'KeyF', label: `${say('Hold', '按住')}${all ? ' ' + Math.round(done / all * 100) + '%' : ''}`, hold: true };
+    }
+    if (/press <b>F<\/b>/.test(obj)) { const t = obj.replace(/<[^>]+>/g, ''); return { key: 'KeyF', label: (t.match(/^([^:.]{1,18})[:.]/)?.[1] || t.split(/[:.]/)[0].split(/\s+/).slice(0, 2).join(' ') || say('Use', '使用')).trim() }; }
     if (p.car && !p.locked && Math.abs(p.car.speed) < 4) return { key: 'KeyF', label: 'Get out' };
     return null;
   };

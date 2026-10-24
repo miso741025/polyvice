@@ -1,5 +1,10 @@
 [
  {
+  "date": "2026-10-25",
+  "en": "Phones: scenes that need a key now show it, and tapping Use works as well as holding.",
+  "zh": "手機：需要按鍵的場景會顯示提示，點按「使用」和按住一樣有效。"
+ },
+ {
   "date": "2026-10-24",
   "en": "New: this What's new card. See what changed, every day.",
   "zh": "新增：「最新更新」卡片，每天的改動都在這裡。"

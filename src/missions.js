@@ -4368,7 +4368,8 @@ async function secondOpinion(g) {
     const yell = ['I am listening! I am LISTENING!', 'There are rocks! Nico, there are rocks down there!', 'My glasses! My glasses went in!'];
     await g.until(() => {
       const dt = Math.min(0.1, g.time - last); last = g.time;
-      held = g.keys.KeyF ? held + dt : Math.max(0, held - dt * 0.6);
+      held = g.keys.KeyF ? held + dt : Math.max(0, held - dt * 0.35);
+      if (g.consume('KeyF')) held += 0.5; // a tap counts too (a phone's Use button is tapped more often than held), holding still works
       alex.group.rotation.x = 0.7 + Math.min(1, held / 3.2) * 0.55 + Math.sin(g.time * 9) * 0.02 * held;
       alex.group.position.y = deckY + 0.16 + Math.min(1, held / 3.2) * 0.2;
       if (said < 3 && held > 0.5 + said * 0.95) { say(g, DEBTOR, yell[said], 1.7).catch(() => {}); said++; }
