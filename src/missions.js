@@ -311,19 +311,27 @@ export async function reach(g, at, text, { r = 6, how, color } = {}) {
   const m = color ? g.addMarker(at.x, at.z, r, color) : g.addMarker(at.x, at.z, r), p = g.player;
   if (color) m.color = '#' + color.toString(16).padStart(6, '0');
   if (!p.locked) g.setCheckpoint?.();   // killed on the way: back to where the errand was given
-  // On foot, a walk that gets no closer for 45 s (time he is free to move) makes the marker pulse; after 90 s he is put there.
-  let best = Infinity, still = 0, last = g.time;
+  // A walk on foot, or a drive at the wheel, that gets no closer for 45 s (time he is free to move) makes the marker pulse,
+  // flashes it on the radar and says so; after 90 s he is put there (the car with him).
+  let best = Infinity, still = 0, last = g.time, hinted = false;
+  const base = m.color, HINT = 'Lost? Follow the <b>flashing marker</b> on the radar.', sub = () => document.getElementById('subtitle');
   const stuck = () => {
-    if (how !== 'foot' || p.car) return false;
     const dt = g.time - last; last = g.time;
+    if (how === 'foot' ? p.car : !p.car) { m.color = base; return false; }
     if (p.locked || g.paused) return false;
     const d = Math.hypot(p.pos.x - m.x, p.pos.z - m.z);
     if (d < best - 2) { best = d; still = 0; } else still += dt;
     if (m.mesh) m.mesh.scale.setScalar(still > 45 ? 1 + Math.abs(Math.sin(g.time * 3)) * 0.6 : 1);
-    if (still > 90) { p.pos.set(m.x, 0, m.z); return true; }
+    m.color = still > 45 && Math.sin(g.time * 8) > 0 ? '#ffffff' : base;
+    if ((still > 45) !== hinted) { hinted = !hinted; if (hinted) g.hud.subtitle('', HINT); else if (sub()?.innerHTML.includes('flashing marker')) g.hud.subtitle(); }
+    if (still > 90) {
+      if (p.car) { p.car.pos.set(m.x, 0, m.z); p.car.heading = at.h ?? p.car.heading; p.car.speed = 0; p.car.sync?.(); }
+      p.pos.set(m.x, 0, m.z); return true;
+    }
     return false;
   };
   await g.until(() => (near(p.pos, m, r + 0.4) && (how === 'car' ? p.car && Math.abs(p.car.speed) < 6 : how === 'foot' ? !p.car : true)) || stuck());
+  if (hinted && sub()?.innerHTML.includes('flashing marker')) g.hud.subtitle();
   g.removeMarker(m);
   g.hud.objective();
   g.setCheckpoint?.();                  // and from here on, back to here
@@ -781,7 +789,7 @@ export async function evening(g, her, home, k) {
 async function toMelfi(g, text = "Thursday. Drive to <b>Dr. Vos's office</b>.") {
   const { melfi } = g.places, p = g.player, office = g.places.doors.find(d => d.name === "Dr. Vos's office");
   p.locked = false; g.cam.fixed = null;
-  await reach(g, melfi.kerb, text);
+  await reach(g, melfi.kerb, text, { r: 8 }); // (the kerb, a car's width wide: in at the wheel or up on foot, either one ends the drive)
   await reach(g, office.outside, 'Go <b>in</b>.', { r: 1.8, how: 'foot' });
 }
 // After a scene in the Pelican he is still in the Pelican: on his feet by the crew's table, the car outside where he left it.
