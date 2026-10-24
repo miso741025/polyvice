@@ -857,7 +857,7 @@ async function boot() {
     g.waiters = g.waiters.filter(w => { if (!w.fn()) return true; w.resolve(); return false; });
 
     if (g.started && !p.locked && !g.cam.fixed && objEl.innerHTML.trim() && g.firstControlAt == null) g.firstControlAt = g.time; // (the studio's tests read when the player first had control: free, with something to do)
-    hudEl.classList.toggle('cine', g.started && p.locked && !!g.cam.fixed);              // a staged scene: the gauges step aside, the words stay
+    hudEl.classList.toggle('cine', g.started && p.locked && !!g.cam.fixed && !objEl.innerHTML.trim()); // a staged scene: the gauges step aside, the words stay (but a scene that asks for a key keeps its objective in view)
     { // a mission is on, he is free to move and there is somewhere to go, but nothing says so: say where (after a moment, so a mission's own line wins)
       const blank = g.missionActive && !p.locked && g.markers.length > 0 && !objEl.innerHTML.trim();
       if (!blank) blankSince = 0; else if (!blankSince) blankSince = g.time; else if (g.time - blankSince > 1.5) { hud.objective('Head for the <b>marker</b>.'); blankSince = 0; }
