@@ -50,14 +50,31 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
+// The loading bar under the Start button: each stage of the boot is named, and a frame is let through so the bar is drawn
+// (a background tab gets no frames, so a short timer stands in). game.bootTimes keeps how long each stage took, in ms.
+const bootTimes = {};
+let bootStage = null, bootT0 = performance.now();
+const loading = (label, k) => {
+  const now = performance.now();
+  if (bootStage) bootTimes[bootStage] = Math.round(now - bootT0);
+  bootStage = label; bootT0 = now;
+  const btn = document.getElementById('start'), fill = document.getElementById('loadFill');
+  if (btn?.disabled) btn.textContent = label ? `Loading ${label}…` : 'Loading…';
+  if (fill) fill.style.width = Math.round(k * 100) + '%';
+  return new Promise(r => { requestAnimationFrame(() => setTimeout(r, 0)); setTimeout(r, 60); });
+};
+
 async function boot() {
+  await loading('fonts', 0.02);
   // Signs are drawn to canvas textures, so the web fonts have to be ready first.
   await Promise.race([
     Promise.all(['64px "Mr Dafoe"', '64px "Bebas Neue"'].map(f => document.fonts.load(f))).catch(() => {}),
     new Promise(r => setTimeout(r, 2500)),
   ]);
 
+  await loading('people', 0.1);
   await loadPeople();
+  await loading('city', 0.35);
 
   const rand = mulberry32(77);
   const hud = new Hud();
@@ -74,6 +91,7 @@ async function boot() {
   };
   const places = buildWorld(scene);
   if (LIGHT) places.sky.scale.setScalar(0.22); // the sky dome (1500 m) inside the nearer far plane
+  await loading('cars', 0.65);
 
   // ----- Cars: Nico's SUV, parked cars at the kerb, traffic -----
   const g_scenery = [];
@@ -102,6 +120,7 @@ async function boot() {
     g_scenery.push(show, lift);
   }
 
+  await loading('the crowd', 0.75);
   // ----- Pedestrians -----
   // A random block within `far` of a point, never Nico's own.
   const blockNear = (at, far) => {
@@ -145,17 +164,21 @@ async function boot() {
     untrack(obj) { scene.remove(obj); g.tracked.delete(obj); },
     wait(seconds) { const t0 = g.time; return g.until(() => g.time - t0 >= seconds); },
     consume(code) { return pressed.delete(code); },
-    // The calendar: a minute of the clock is a second of play, and each finished job moves it on (`dayBase`).
-    dayBase: 0,
-    day() { return Math.floor(g.dayBase + (18 * 60 + 30 + g.time + (g.clockOffset || 0)) / 1440); },
+    // The calendar: each finished job moves it on (`dayBase`). Until the story is told the hour stays at the evening the sky shows;
+    // after that a minute of the clock is a second of play (`clockRun`), and the nights turn with it.
+    dayBase: 0, clockRun: 0,
+    day() { return Math.floor(g.dayBase + (18 * 60 + 30 + g.clockRun + (g.clockOffset || 0)) / 1440); },
     addMoney(n) { g.cash += n; hud.money(g.cash); },
 
+    // A marker: a low ring on the ground, and out of doors a thin beam up from its middle to find it by from far off.
+    // (It was a 2.4 m wall all the way round: a car's marker hid the car and the road.) The beam shares the ring's material.
     addMarker(x, z, r, color = 0xff5fd2) {
       const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(r, r, 2.4, 28, 1, true),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false }),
+        new THREE.CylinderGeometry(r, r, 0.7, 28, 1, true),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }),
       );
-      mesh.position.set(x, 1.2, z);
+      mesh.position.set(x, 0.35, z);
+      if (!roomAt(x, z, 1)) { const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 26, 8, 1, true), mesh.material); beam.position.y = 13; mesh.add(beam); }
       scene.add(mesh);
       const m = { x, z, r, mesh, color: '#ff7adf' };
       g.markers.push(m);
@@ -427,8 +450,26 @@ async function boot() {
     if (thirdBtn) { thirdBtn.textContent = NEXUS ? 'Port Paloma · The Bellacostas' : 'Blade Runner 2049'; thirdBtn.addEventListener('click', () => { location.search = NEXUS ? '' : '?city=nexus'; }); }
     if (yearBtn && !NEXUS) { yearBtn.hidden = false; yearBtn.textContent = 'Blade Runner · 2019'; yearBtn.addEventListener('click', () => { location.search = '?city=nexus&story=2019'; }); }
   }
+  await loading('shaders', 0.85);
   // Every material is compiled now, behind the title, not the first time it comes into view (a frame of a second or more, mid-drive).
   try { renderer.compile(scene, camera); } catch (err) { console.warn('shader warm-up skipped', err); }
+  await loading(null, 1);
+  g.bootTimes = bootTimes;
+  { const bar = document.getElementById('loadbar'); if (bar) bar.hidden = true; }
+  // And one picture of Dr. Vos's office, with the sun's shadow over it: the two of them in their chairs and the room's own textures
+  // are sent to the card now, and the shadow shaders built, not when the first session fades in (57, then 44 fps at the cut).
+  // (Drawn in the same task as the first frame, which draws over it: it is never seen.)
+  if (places.office?.cast) {
+    const o = places.office, was = camera.position.clone(), turned = camera.quaternion.clone();
+    try {
+      camera.position.copy(o.cam); camera.lookAt(o.look);
+      sun.target.position.copy(o.look); sun.position.copy(o.look).addScaledVector(SUN_DIR, 200);
+      places.lightRoom(roomAt(o.cam.x, o.cam.z, 3));
+      renderer.compile(scene, camera); renderer.render(scene, camera);
+    } catch (err) { console.warn('office warm-up skipped', err); }
+    places.lightRoom(null);
+    camera.position.copy(was); camera.quaternion.copy(turned);
+  }
   // What's new: the latest entries in a small card in the corner of the title (never over Start). Closed, it folds to a tab until
   // there is something newer than what was last seen.
   { const box = document.getElementById('whatsnew'), list = WHATS_NEW.slice(0, 3);
@@ -490,7 +531,7 @@ async function boot() {
 
   const still = { x: 0, y: 0 };
   const hudEl = document.getElementById('hud'), objEl = document.getElementById('objective');
-  let blankSince = 0;
+  let blankSince = 0, gapSince = 0, gapHint = null;
   let indoors = false;
   function updatePlayer(dt) {
     const car = p.car, stick = g.stick || still;
@@ -822,6 +863,7 @@ async function boot() {
     }
     if (places.bridge && g.started && !p.locked && !p.inside && (p.pos.x - places.bridge.far.x) * places.bridge.dir > 0 && Math.abs(p.pos.z - places.bridge.far.z) < 12) crossBridge();
     g.time += dt;
+    if (g.storyDone) g.clockRun += dt;
 
     updatePlayer(dt);
     updateCars(dt);
@@ -860,10 +902,23 @@ async function boot() {
     g.waiters = g.waiters.filter(w => { if (!w.fn()) return true; w.resolve(); return false; });
 
     if (g.started && !p.locked && !g.cam.fixed && objEl.innerHTML.trim() && g.firstControlAt == null) g.firstControlAt = g.time; // (the studio's tests read when the player first had control: free, with something to do)
+    if (g.started && !p.locked && !g.cam.fixed && g.firstUnlockedAt == null) g.firstUnlockedAt = g.time; // (and when he was first free at all, objective or not)
     hudEl.classList.toggle('cine', g.started && p.locked && !!g.cam.fixed && !objEl.innerHTML.trim()); // a staged scene: the gauges step aside, the words stay (but a scene that asks for a key keeps its objective in view)
     { // a mission is on, he is free to move and there is somewhere to go, but nothing says so: say where (after a moment, so a mission's own line wins)
       const blank = g.missionActive && !p.locked && g.markers.length > 0 && !objEl.innerHTML.trim();
       if (!blank) blankSince = 0; else if (!blankSince) blankSince = g.time; else if (g.time - blankSince > 1.5) { hud.objective('Head for the <b>marker</b>.'); blankSince = 0; }
+    }
+    { // In the story, free to move, and nothing said at all (a call after a scene, the moment after a job): a line to fill the gap,
+      // taken down again the moment a scene starts or the mission says something of its own.
+      const said = objEl.innerHTML.trim();
+      if (gapHint && said !== gapHint) gapHint = null;
+      if (gapHint && (p.locked || g.cam.fixed)) { hud.objective(); gapHint = null; }
+      const gap = g.started && !g.storyDone && !g.visitor && !p.locked && !g.cam.fixed && !p.dying && !g.markers.length && !said;
+      if (!gap) gapSince = 0; else if (!gapSince) gapSince = g.time; else if (g.time - gapSince > 0.8) {
+        const car = tonyCar && !tonyCar.wreck && !p.car && !p.inside && Math.hypot(tonyCar.pos.x - p.pos.x, tonyCar.pos.z - p.pos.z) < 60;
+        hud.objective(car ? 'Get in your <b>car</b>.' : 'Hold on: the next order is coming.');
+        gapHint = objEl.innerHTML.trim(); gapSince = 0;
+      }
     }
 
     const me = p.human;
@@ -877,7 +932,7 @@ async function boot() {
     const raised = !p.car && !p.locked && !p.hidden && !p.down && !p.jumping && !p.onPhone && (p.aiming || (g.lockTarget && p.weapon !== 'fist'));
     me.layer(raised ? 'aim' : p.topPose || null);
 
-    for (const m of g.markers) m.mesh.material.opacity = 0.3 + Math.sin(g.time * 4) * 0.1;
+    for (const m of g.markers) m.mesh.material.opacity = 0.24 + Math.sin(g.time * 4) * 0.08;
 
     updateCamera(dt);
     { const q = roomAt(camera.position.x, camera.position.z, 3); places.lightRoom(q); setClimate(q?.climate || null); if (!!q !== indoors) markIndoors(indoors = !!q); } // (the crash guard: detail.js)
@@ -895,7 +950,7 @@ async function boot() {
 
     // Once the story is told, the days turn on their own: dark from a quarter past eight until a quarter to six.
     if (g.storyDone && !g.missionActive) {
-      const minute = (18 * 60 + 30 + g.time + (g.clockOffset || 0)) % 1440, dusk = 20 * 60 + 15, dawn = 5 * 60 + 45;
+      const minute = (18 * 60 + 30 + g.clockRun + (g.clockOffset || 0)) % 1440, dusk = 20 * 60 + 15, dawn = 5 * 60 + 45;
       const want = minute > dusk ? Math.min(1, (minute - dusk) / 30) : minute < dawn ? 1 : Math.max(0, 1 - (minute - dawn) / 30);
       if (Math.abs(want - g.night) > 0.003) g.setNight(g.night + (want - g.night) * (1 - Math.exp(-dt * 0.6)));
     }
@@ -922,11 +977,11 @@ async function boot() {
         surface, foot: !p.car && !p.hidden && !p.locked && p.motion && p.motion !== 'idle' ? (p.motion === 'sprint' ? 7.6 : 3.7) : 0,
         shore: clamp(1 - edges[0] / 140, 0, 1) * edges[3], seaward: { x: edges[1], z: edges[2] }, exposed: deck ? 1 : 0,
         green: GREEN.has(kind) ? 1 : kind ? 0.15 : 0.4, dense: kind ? (DENSE.has(kind) ? 1 : GREEN.has(kind) ? 0.25 : 0.55) : 0.1,
-        hour: Math.floor(((18 * 60 + 30 + g.time + (g.clockOffset || 0)) % 1440) / 60), cars: near4,
+        hour: Math.floor(((18 * 60 + 30 + g.clockRun + (g.clockOffset || 0)) % 1440) / 60), cars: near4,
       });
     }
     muteEl.classList.toggle('on', g.started && sfx.state !== 'running' && sfx.state !== 'off'); // say so, rather than leave him wondering
-    hud.clock(g.time + (g.clockOffset || 0), g.day());
+    hud.clock(g.clockRun + (g.clockOffset || 0), g.day());
     hud.radar(p.pos, p.car ? p.car.heading : p.heading, [...g.markers, ...g.blips, ...(g.hostiles || [])], landmarks);
     hud.map(g.mapOpen, { focus: p.pos, heading: p.car ? p.car.heading : p.heading, blips: [...g.markers, ...g.blips], landmarks });
     { // How far to where he is going, and which way, beside the objective. And the state of the car he is in.

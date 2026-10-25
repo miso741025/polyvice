@@ -2172,7 +2172,7 @@ async function theWedding(g) {
     p.locked = false;
   }
   // Twenty years of things a man keeps.
-  const spots = [spot(home.car, 0.5, -25), home.grill, home.pool], notes = [
+  const spots = [spot(home.drive, 0, -31), home.grill, home.pool], notes = [
     'Behind the paint cans in the garage: two shoe boxes, heavier than shoes.',
     'Under the gas grill, in an oven glove: a pistol he had forgotten he owned.',
     'In the housing of the pool filter: the jewellery Gina pretended not to know the price of.'];

@@ -71,7 +71,7 @@ function installStakes(g) {
   const { hud, places, player: p } = g, live = [];
   if (CITY === 'la') return { update() {}, pay() {}, load() {}, out: () => ({}) };
   let last = {}, done = 0, shown = false, busy = false, tick = 0, sig = '';
-  const WEEK = 7, now = () => g.dayBase + (18 * 60 + 30 + g.time + (g.clockOffset || 0)) / 1440;
+  const WEEK = 7, now = () => g.dayBase + (18 * 60 + 30 + g.clockRun + (g.clockOffset || 0)) / 1440;
   // What is waiting at a place: nothing until a week after the last envelope, then a week's worth for every week gone by.
   const owed = s2 => done < s2.from || last[s2.key] === undefined ? 0 : Math.min(s2.cap, Math.floor((now() - last[s2.key]) / WEEK) * s2.rate * 3);
   const due = new Proxy({}, { get: (_, k) => { const s2 = STAKES.find(x => x.key === k); return s2 ? owed(s2) : 0; }, set: () => true });

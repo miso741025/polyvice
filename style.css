@@ -118,6 +118,9 @@ body:not(.la):not(.nexus) #start { background: #ffd9a8; box-shadow: 0 0 0 3px #1
 }
 #start:hover { background: #fff; }
 #start:disabled { opacity: .5; cursor: wait; }
+#loadbar { width: min(320px, 70vw); height: 8px; margin-top: -14px; border-radius: 4px; background: rgba(18, 10, 28, .6); box-shadow: 0 0 0 2px #120a1c; overflow: hidden; }
+#loadbar[hidden] { display: none; }
+#loadFill { width: 0; height: 100%; background: linear-gradient(90deg, #ffb347, #ff7a59 45%, #3ad6b4); transition: width .25s; }
 #fresh {
   pointer-events: auto; cursor: pointer; margin-top: -14px; padding: 6px 22px; background: none; border: 0;
   font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 4px; color: #e6dcf5; text-decoration: underline; text-underline-offset: 5px;

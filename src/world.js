@@ -1039,7 +1039,7 @@ export function buildWorld(scene) {
       road: { x: c.x - 20.5, z: c.z + 34 }, guest: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 },
       spawn: { x: c.x - 4, z: c.z - 6 },
       pool: { x: pool.x - pool.w / 2 - 1.6, z: pool.z },
-      car: { x: c.x - 21, z: c.z + 14, h: 0 },
+      car: { x: c.x - 20.5, z: c.z + 27, h: 0 }, // at the end of the drive, in the gap in the hedge, nose to the road (further in, a drive to anywhere east went through the fountain and the hedge)
       wake: { x: c.x - 18.2, z: c.z + 12 },
       ducks,
     };
@@ -4684,7 +4684,8 @@ function buildSky(scene, updaters) {
   sun.lookAt(0, 0, 0);
   group.add(dome, sun);
   if (NEXUS) sun.visible = false;
-  // Other worlds in the sky. From Port Paloma and Los Angeles: a grey planet with a dish in it, like a station somebody built and left. From Nexus: the pink one they came from.
+  // Other worlds in the sky, on Nexus only: the pink one they came from, and a grey planet with a dish in it, like a station somebody
+  // built and left. (Port Paloma's and Los Angeles's sky has none: the grey one sat over the radar and the clock in the story.)
   const planet = (r, dir, draw, lit = 1) => {
     const tex = texture(512, 256, draw), m = new THREE.Mesh(new THREE.SphereGeometry(r, 36, 24), new THREE.MeshLambertMaterial({ map: tex, fog: false, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.18 * lit }));
     m.position.copy(dir).normalize().multiplyScalar(1320); m.rotation.y = 2.2; group.add(m); return m;
@@ -4704,7 +4705,6 @@ function buildSky(scene, updaters) {
     c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(0, 0, w, 14); c.fillRect(0, h - 14, w, 14);
   };
   if (NEXUS) { planet(95, new THREE.Vector3(0.35, 0.22, -0.9), home, 1.4); planet(26, new THREE.Vector3(-0.8, 0.5, 0.3), station, 0.6); }
-  else planet(130, new THREE.Vector3(-0.55, 0.3, -0.78), station, LA ? 0.5 : 0.8);
   scene.add(group);
   const dusk = new THREE.Color(0xfff3c4), moon = new THREE.Color(0xe6ecff);
   group.userData.setNight = k => {
