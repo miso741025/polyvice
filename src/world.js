@@ -879,6 +879,8 @@ export function buildWorld(scene) {
     for (const s of [-1, 1]) { slab(0xf3efe6, 4.4, 3, 0.12, c.x - 20.5 + s * 2.6, y, c.z - 13.95); for (let n = 1; n < 4; n++) slab(0xcfc8ba, 4.4, 0.05, 0.14, c.x - 20.5 + s * 2.6, y + n * 0.75, c.z - 13.95); }
     flat(M.paint, 0x9a94a2, 9.5, 43, c.x - 20.5, y + 0.09, c.z + 7.5);
     flat(M.paint, 0xd8d0c4, 2, 12, c.x - 4, y + 0.09, c.z - 2);                                  // path to the door
+    slab(0x3a2418, 1.3, 2.5, 0.12, c.x + 8.5, y, c.z - 0.95); slab(0xcfe8ff, 0.8, 0.9, 0.04, c.x + 8.5, y + 1.3, c.z - 0.88, M.glow); slab(0xe8c040, 0.08, 0.1, 0.08, c.x + 9, y + 1.05, c.z - 0.86); // the back door, from the living room out to the pool
+    flat(M.paint, 0xd8d0c4, 2, 1.4, c.x + 8.5, y + 0.09, c.z - 0.2);
     // Hedges around the garden, open at the driveway.
     for (const [w, d, x, z] of [[BLOCK - 5, 1.2, c.x, c.z - 27.6], [1.2, BLOCK - 5, c.x + 27.6, c.z], [1.2, BLOCK - 5, c.x - 27.6, c.z], [43, 1.2, c.x + 6.2, c.z + 27.6]]) {
       slab(0x2f7d46, w, 1.3, d, x, y, z, M.grass, 3);
@@ -1038,6 +1040,7 @@ export function buildWorld(scene) {
       grill: { x: gx, z: gz + 1.1 }, patio: { x: c.x - 2, z: c.z + 5 }, drive: { x: c.x - 20.5, z: c.z + 20 },
       road: { x: c.x - 20.5, z: c.z + 34 }, guest: { x: c.x + 8, z: c.z + 34, h: Math.PI / 2 },
       spawn: { x: c.x - 4, z: c.z - 6 },
+      back: { x: c.x + 8.5, z: c.z + 0.6, h: 0 },                                                // outside the back door, the pool in front of him
       pool: { x: pool.x - pool.w / 2 - 1.6, z: pool.z },
       car: { x: c.x - 20.5, z: c.z + 27, h: 0 }, // at the end of the drive, in the gap in the hedge, nose to the road (further in, a drive to anywhere east went through the fountain and the hedge)
       wake: { x: c.x - 18.2, z: c.z + 12 },
@@ -2449,12 +2452,13 @@ export function buildWorld(scene) {
   // ----- Inside the Bellacosta house: the kitchen, the table, and the den -----
   function buildHouseRoom() {
     const X = 2840, Y = -0.1, Z = 0, CREAM = 0xf3e9d8, WOOD = 0x8a5a44;
-    const q = { minX: X - 8.85, maxX: X + 8.85, minZ: Z - 5.7, maxZ: Z + 19.35, lights: [] };   // both storeys: the upper one lies to the south (see the stairs, below)
+    const q = { minX: X - 8.85, maxX: X + 18.85, minZ: Z - 5.7, maxZ: Z + 19.35, lights: [] };   // both storeys: the upper one lies to the south (see the stairs, below); the living room and his den lie to the east
     interiors.push(q);
     slab(0xd9b48a, 16, 0.2, 12, X, Y - 0.2, Z, M.wood, 2);
     slab(0xf6f1e6, 14.5, 0.2, 12, X - 0.75, Y + 3.4, Z); slab(0xf6f1e6, 1.5, 0.2, 7, X + 7.25, Y + 3.4, Z - 2.5);   // the ceiling, open over the stairs
     slab(0xf6ead2, 16, 3.6, 0.3, X, Y, Z - 6.15); slab(0xf6ead2, 14.8, 3.6, 0.3, X - 0.9, Y, Z + 6.15); slab(0xf6ead2, 1.8, 3.2, 0.3, X + 7.4, Y, Z + 6.3);
-    for (const s of [-1, 1]) slab(0xf6ead2, 0.3, 3.6, 12, X + s * 8.15, Y, Z);
+    slab(0xf6ead2, 0.3, 3.6, 12, X - 8.15, Y, Z);
+    slab(0xf6ead2, 0.3, 3.6, 4.9, X + 8.15, Y, Z - 3.7); slab(0xf6ead2, 0.3, 3.6, 5.3, X + 8.15, Y, Z + 3.5); slab(0xf6ead2, 0.3, 1.2, 2.1, X + 8.15, Y + 2.4, Z - 0.2); // the east wall, open into the living room
     // Kitchen along the west wall: counters, the island, the fridge and stove.
     slab(WOOD, 1, 0.9, 9, X - 7.4, Y, Z - 1, M.wood, 1); slab(0x2a2a30, 1.1, 0.05, 9.1, X - 7.4, Y + 0.9, Z - 1); collide(X - 7.4, Z - 1, 1, 9, 1);
     slab(WOOD, 7, 0.9, 1, X - 3.5, Y, Z - 5.4, M.wood, 1); slab(0x2a2a30, 7.1, 0.05, 1.1, X - 3.5, Y + 0.9, Z - 5.4); collide(X - 3.5, Z - 5.4, 7, 1, 1);
@@ -2537,7 +2541,57 @@ export function buildWorld(scene) {
       post(0x3a2418, 0.03, 1.8, X + 3.5, Y, Z + 5.6, 6); for (let n = 0; n < 4; n++) slab(0x3a2418, 0.2, 0.03, 0.03, X + 3.5 + Math.cos(n * 1.57) * 0.1, Y + 1.7, Z + 5.6 + Math.sin(n * 1.57) * 0.1); slab(0x6f5a44, 0.3, 0.9, 0.16, X + 3.62, Y + 0.8, Z + 5.6); slab(0x23232b, 0.26, 0.7, 0.14, X + 3.4, Y + 0.95, Z + 5.68);
       slab(0x3a2418, 0.5, 2.1, 0.34, X + 5, Y, Z + 5.8, M.wood, 1); put(M.plain, new THREE.CylinderGeometry(0.17, 0.17, 0.03, 16).rotateX(Math.PI / 2).translate(X + 5, Y + 1.75, Z + 5.62), 0xf1ece0); slab(BRASS, 0.03, 0.5, 0.02, X + 5, Y + 0.8, Z + 5.62); ball(BRASS, 0.06, X + 5, Y + 0.78, Z + 5.62); collide(X + 5, Z + 5.8, 0.6, 0.4, 2.1);
       slab(0x8a2f3a, 0.9, 0.012, 0.6, X + 2, Y + 0.005, Z + 5.4);                                                                                                                              // the mat
-      slab(BRASS, 0.04, 0.5, 0.4, X + 7.96, Y + 1.7, Z - 0.6); slab(0x8a1c1c, 0.045, 0.42, 0.32, X + 7.95, Y + 1.74, Z - 0.6);
+      for (const s of [-1, 1]) slab(0xffffff, 0.2, 2.4, 0.07, X + 8.15, Y, Z - 0.2 + s * 1.05); slab(0xffffff, 0.2, 0.07, 2.17, X + 8.15, Y + 2.37, Z - 0.2);   // the arch through to the living room
+    }
+    // ----- The living room, his den, and the back door to the pool: east of the den, through the arch -----
+    let backIn, living, study, wingLights;
+    {
+      const WALL = 0xf6ead2, BRASS = 0xd9a520, LEATHER = 0x5a2a1c, W0 = 8.15, W1 = 18.15;
+      slab(0xd9b48a, W1 - W0, 0.2, 12, X + (W0 + W1) / 2, Y - 0.2, Z, M.wood, 2); slab(0xf6f1e6, W1 - W0, 0.2, 12, X + (W0 + W1) / 2, Y + 3.4, Z);
+      slab(WALL, W1 - W0, 3.6, 0.3, X + (W0 + W1) / 2, Y, Z - 6.15); slab(WALL, 0.3, 3.6, 12, X + W1, Y, Z);
+      slab(WALL, 7.6, 3.6, 0.3, X + 12, Y, Z + 6.15); slab(WALL, 1.05, 3.6, 0.3, X + 17.62, Y, Z + 6.15); slab(WALL, 1.4, 1.1, 0.3, X + 16.5, Y + 2.5, Z + 6.15); // the south wall, and the back door's opening
+      collide(X + 8.15, Z - 3.75, 0.3, 5, 8); collide(X + 8.15, Z + 3.6, 0.3, 5.5, 8);                                   // either side of the arch
+      collide(X + 18.6, Z, 1.2, 12.6, 8); collide(X + 13.6, Z + 6.3, 10.5, 0.4, 8);                                    // the wing's outside walls
+      for (const s of [-1, 1]) { slab(0xffffff, W1 - W0 - 0.3, 0.12, 0.04, X + (W0 + W1) / 2, Y, Z + s * 5.98); slab(0xffffff, W1 - W0 - 0.3, 0.12, 0.1, X + (W0 + W1) / 2, Y + 3.28, Z + s * 5.95); }
+      // The den's two walls: along x 13.8, and along z -1.2 with its door.
+      slab(WALL, 0.16, 3.6, 4.95, X + 13.8, Y, Z - 3.67); collide(X + 13.8, Z - 3.67, 0.3, 4.95, 8);
+      slab(WALL, 0.8, 3.6, 0.16, X + 14.2, Y, Z - 1.2); slab(WALL, 2.45, 3.6, 0.16, X + 16.93, Y, Z - 1.2); slab(WALL, 1.1, 1.45, 0.16, X + 15.15, Y + 2.15, Z - 1.2);
+      collide(X + 14.2, Z - 1.2, 0.8, 0.3, 8); collide(X + 16.93, Z - 1.2, 2.45, 0.3, 8);
+      for (const e of [14.6, 15.7]) slab(0xffffff, 0.07, 2.15, 0.2, X + e, Y, Z - 1.2); slab(0xffffff, 1.17, 0.07, 0.2, X + 15.15, Y + 2.12, Z - 1.2); slab(0x5a3320, 0.05, 2.05, 1, X + 14.66, Y, Z - 0.7, M.wood, 1); // its door, stood open
+      // The living room: the long couch in front of the television, his chair, the rug, a lamp, the photographs.
+      slab(0x2c3a5a, 4.6, 0.012, 3.6, X + 11, Y + 0.004, Z - 3.6); slab(0xd9c7a0, 4.2, 0.014, 3.2, X + 11, Y + 0.005, Z - 3.6); slab(0x7a2f3a, 3.8, 0.016, 2.8, X + 11, Y + 0.006, Z - 3.6);
+      slab(0x3a2418, 2.4, 0.6, 0.55, X + 11, Y, Z - 5.7, M.wood, 1); collide(X + 11, Z - 5.7, 2.4, 0.6, 1);
+      slab(0x1c1c22, 1.5, 0.95, 0.45, X + 11, Y + 0.6, Z - 5.7); slab(0x9fd0f5, 1.3, 0.75, 0.04, X + 11, Y + 0.7, Z - 5.46, M.glow);               // the big set
+      for (const s of [-1, 1]) slab(0x1c1c22, 0.3, 0.8, 0.3, X + 11 + s * 1.5, Y + 0.6, Z - 5.75); slab(0x23232b, 0.5, 0.1, 0.34, X + 10.4, Y + 0.6, Z - 5.6);
+      slab(0x6f4a32, 3.4, 0.5, 1.1, X + 11, Y, Z - 2.2); slab(0x6f4a32, 3.4, 0.55, 0.3, X + 11, Y + 0.5, Z - 1.8); for (const s of [-1, 1]) slab(0x5e3e2a, 0.3, 0.3, 1.1, X + 11 + s * 1.55, Y + 0.5, Z - 2.2); collide(X + 11, Z - 2.1, 3.5, 1.2, 1);
+      for (let n = 0; n < 3; n++) slab(0x7a5038, 1, 0.1, 0.9, X + 10 + n, Y + 0.5, Z - 2.3);                                                            // the cushions, worn to his shape on the left
+      slab(0x3a2418, 1.2, 0.4, 0.6, X + 11, Y, Z - 3.9, M.wood, 1); slab(0xe9e2cf, 0.3, 0.02, 0.22, X + 10.7, Y + 0.41, Z - 3.9); slab(0x1c1c22, 0.16, 0.03, 0.05, X + 11.3, Y + 0.41, Z - 3.8); put(M.plain, new THREE.CylinderGeometry(0.12, 0.09, 0.08, 12).translate(X + 11, Y + 0.44, Z - 4), 0xcfe8ff); collide(X + 11, Z - 3.9, 1.2, 0.6, 0.6);
+      slab(LEATHER, 1, 0.5, 1, X + 9.1, Y, Z - 3.8); slab(LEATHER, 0.3, 0.6, 1, X + 8.75, Y + 0.5, Z - 3.8); for (const s of [-1, 1]) slab(0x4a2216, 1, 0.25, 0.22, X + 9.1, Y + 0.5, Z - 3.8 + s * 0.42); collide(X + 9.1, Z - 3.8, 1.1, 1.1, 1);
+      post(0x1c1c22, 0.03, 1.5, X + 13.3, Y, Z - 2, 6); put(M.glow, new THREE.ConeGeometry(0.3, 0.38, 12, 1, true).translate(X + 13.3, Y + 1.7, Z - 2), 0xffe2a6);
+      slab(0x5a3320, 3.6, 0.85, 0.5, X + 11.5, Y, Z + 5.7, M.wood, 1); slab(0x3a2418, 3.7, 0.04, 0.55, X + 11.5, Y + 0.85, Z + 5.7); collide(X + 11.5, Z + 5.7, 3.7, 0.6, 1); // the sideboard
+      for (let n = 0; n < 6; n++) { slab(BRASS, 0.22, 0.28, 0.04, X + 10 + n * 0.6, Y + 0.89, Z + 5.75); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac][n % 3], 0.17, 0.22, 0.045, X + 10 + n * 0.6, Y + 0.92, Z + 5.73); }       // the family, in frames, on the sideboard
+      for (let n = 0; n < 8; n++) { const fx = X + 9.5 + (n % 4) * 1, fy = Y + 1.55 + Math.floor(n / 4) * 0.75; slab(0x3a2418, 0.6 - (n % 2) * 0.14, 0.5 + (n % 3) * 0.06, 0.03, fx, fy, Z + 5.98); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac, 0xc9b6a0][n % 4], 0.5 - (n % 2) * 0.14, 0.4 + (n % 3) * 0.06, 0.035, fx, fy + 0.05, Z + 5.97); } // and on the wall over it: weddings, communions, the beach
+      slab(BRASS, 0.04, 1, 1.3, X + 17.99, Y + 1.5, Z + 2.2); slab(0xe9e2cf, 0.04, 0.86, 1.16, X + 17.96, Y + 1.57, Z + 2.2);  // the two of them on their wedding day, the big one
+      slab(0xcfe8ff, 0.04, 1.6, 2.2, X + 17.98, Y + 1, Z + 4.5, M.glow); for (const s of [-1, 1]) slab(0x7a2f3a, 0.1, 2, 0.3, X + 17.9, Y + 0.8, Z + 4.5 + s * 1.25);    // the window on the pool
+      // The back door, out to the pool: half glass, the mat, his slippers by it.
+      slab(0x3a2418, 1.4, 2.5, 0.1, X + 16.5, Y, Z + 6.02); slab(0xcfe8ff, 0.9, 1, 0.04, X + 16.5, Y + 1.3, Z + 5.96, M.glow); slab(BRASS, 0.06, 0.12, 0.05, X + 17, Y + 1.05, Z + 5.94);
+      slab(0x8a2f3a, 0.9, 0.012, 0.6, X + 16.5, Y + 0.005, Z + 5.4); for (const sx of [-0.1, 0.12]) slab(0x5a3320, 0.11, 0.05, 0.26, X + 15.6 + sx, Y, Z + 5.6);
+      for (const [px, pz] of [[14.4, 5.5], [17.6, -0.6]]) { post(0xb5523b, 0.24, 0.45, X + px, Y, Z + pz, 10); ball(0x2f7d46, 0.4, X + px, Y + 0.85, Z + pz); collide(X + px, Z + pz, 0.6, 0.6, 1, true); } // plants
+      // Nico's den: the desk, his chair, the safe, the books he does not read, the photographs he does look at.
+      slab(0x5a3320, 1.9, 0.76, 0.9, X + 16, Y, Z - 4.4, M.wood, 1); slab(0x2a1a12, 2, 0.04, 1, X + 16, Y + 0.76, Z - 4.4); collide(X + 16, Z - 4.4, 2, 1, 1);
+      slab(0x2f5a3f, 0.6, 0.012, 0.4, X + 16, Y + 0.785, Z - 4.3); post(BRASS, 0.02, 0.36, X + 15.4, Y + 0.78, Z - 4.7, 5); slab(0x2f7d46, 0.4, 0.12, 0.18, X + 15.4, Y + 1.12, Z - 4.7, M.glow);   // the blotter, the green lamp
+      slab(0x1c1c22, 0.24, 0.1, 0.2, X + 16.7, Y + 0.78, Z - 4.6); slab(0xefe4cf, 0.2, 0.05, 0.08, X + 16.7, Y + 0.88, Z - 4.6);                                        // his own telephone
+      for (let n = 0; n < 3; n++) { slab(BRASS, 0.2, 0.26, 0.04, X + 15.7 + n * 0.32, Y + 0.78, Z - 4.82); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac][n], 0.15, 0.2, 0.045, X + 15.7 + n * 0.32, Y + 0.81, Z - 4.8); }  // Lucia, Benny, Gina
+      slab(LEATHER, 0.7, 0.5, 0.7, X + 16, Y, Z - 5.3); slab(LEATHER, 0.7, 0.8, 0.16, X + 16, Y + 0.5, Z - 5.62); collide(X + 16, Z - 5.3, 0.8, 0.8, 1);
+      slab(0x3a3a44, 0.8, 0.9, 0.7, X + 14.35, Y, Z - 5.5); put(M.plain, new THREE.CylinderGeometry(0.1, 0.1, 0.03, 12).rotateX(Math.PI / 2).translate(X + 14.35, Y + 0.55, Z - 5.14), 0xc9cbd2); slab(0xc9cbd2, 0.04, 0.2, 0.03, X + 14.62, Y + 0.45, Z - 5.14); collide(X + 14.35, Z - 5.5, 0.9, 0.8, 1); // the safe
+      slab(0x5a3320, 0.45, 2.3, 2.4, X + 17.8, Y, Z - 4.2, M.wood, 2); for (let r = 0; r < 4; r++) { slab(0x3a2418, 0.46, 0.04, 2.4, X + 17.79, Y + 0.5 + r * 0.5, Z - 4.2); for (let n = 0; n < 8; n++) if ((n + r) % 3) slab([0x8a1c1c, 0x1f3a2c, 0x2c3a5a, 0xd9c7a0, 0x16161c][(n + r) % 5], 0.3, 0.32, 0.14, X + 17.72, Y + 0.54 + r * 0.5, Z - 5.1 + n * 0.25); } collide(X + 17.8, Z - 4.2, 0.6, 2.5, 2.3);
+      slab(LEATHER, 0.9, 0.45, 0.9, X + 17, Y, Z - 2.2); slab(LEATHER, 0.9, 0.6, 0.2, X + 17, Y + 0.45, Z - 1.85); collide(X + 17, Z - 2.2, 0.9, 0.9, 1);                         // the chair for whoever he is talking to
+      for (let n = 0; n < 4; n++) { slab(0x3a2418, 0.03, 0.5, 0.4, X + 13.9, Y + 1.5 + (n % 2) * 0.62, Z - 4.8 + Math.floor(n / 2) * 0.6); slab([0xd8d2c8, 0xb9b3ac][n % 2], 0.035, 0.42, 0.32, X + 13.91, Y + 1.54 + (n % 2) * 0.62, Z - 4.8 + Math.floor(n / 2) * 0.6); } // his father, the old crew, a boat
+      for (const [lx, lz] of [[11, -3], [13, 2.6], [16, -3.6]]) put(M.glow, new THREE.CylinderGeometry(0.14, 0.14, 0.03, 10).translate(X + lx, Y + 3.38, Z + lz), 0xfff2c0);
+      backIn = { x: X + 16.5, z: Z + 4.9, h: Math.PI };
+      living = { couch: { x: X + 10.3, z: Z - 2.3, h: Math.PI }, x: X + 11, z: Z - 0.6, arch: { x: X + 7, z: Z - 0.9 } }; // (arch: the kitchen side of the way through; a straight line from there clears the furniture both ways)
+      study = { desk: { x: X + 16, z: Z - 5.3 }, chair: { x: X + 17, z: Z - 2.2 }, door: { x: X + 15.15, z: Z - 0.4 } };
+      wingLights = [{ x: X + 11, y: Y + 3.1, z: Z - 2.6, hex: 0xfff0d0, power: 40, reach: 13 }, { x: X + 14.5, y: Y + 3, z: Z + 3, hex: 0xffe8c0, power: 32, reach: 12 }, { x: X + 16, y: Y + 2.7, z: Z - 3.6, hex: 0xffd9a8, power: 28, reach: 9 }];
     }
     roomLamp(q, X - 3.6, Y + 3.1, Z - 2, 0xfff0d0, 46, 14); roomLamp(q, X + 4.8, Y + 2.8, Z - 2.4, 0xffd9a8, 34, 12); roomLamp(q, X + 0.5, Y + 2.4, Z + 1.6, 0xffe8c0, 26, 9);
     // ===== The stairs, and upstairs (owner: a house you walk up through, a room with a door for each of them, and a
@@ -2559,7 +2613,7 @@ export function buildWorld(scene) {
       for (let n = 0; n < 5; n++) { slab(0x3a2418, 0.03, 0.42, 0.34, X + 7.98, Y + 1.7 + n * 0.6, Z + 1.6 + n * 0.94); slab([0xd8d2c8, 0xe9e2cf, 0xb9b3ac][n % 3], 0.035, 0.34, 0.26, X + 7.97, Y + 1.74 + n * 0.6, Z + 1.6 + n * 0.94); }         // the children, year by year, up the stairs
       collide(X + 6.5, Z + 3.7, 0.16, 4.5, 8, true);                                                    // the rail: the flight is entered at its foot
       // What holds the ground floor in now that the house is bigger than it: its side walls, and the wall the front door is in.
-      collide(X - 8.6, Z + 0.15, 1.2, 12.6, 8); collide(X + 8.65, Z + 0.15, 1.3, 12.6, 8); collide(X - 0.9, Z + 6.15, 14.8, 0.3, 8);
+      collide(X - 8.6, Z + 0.15, 1.2, 12.6, 8); collide(X - 0.9, Z + 6.15, 14.8, 0.3, 8);   // (the east wall, with its arch, is with the living room)
 
       // ----- Upstairs -----
       const lay = (tex, w, d, x, z, shiny = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), shiny ? new THREE.MeshPhongMaterial({ map: tex, shininess: shiny, specular: 0x555555 }) : new THREE.MeshLambertMaterial({ map: tex })); m.position.set(X + x, Y2 + 0.005, Z + z); scene.add(m); };
@@ -2677,7 +2731,10 @@ export function buildWorld(scene) {
     slab(0xfff6d8, 0.02, 1.2, 0.9, X - 6.8, Y + 0.08, Z + 4.5, M.glow); for (let k = 0; k < 3; k++) { slab(0xcfe8ff, 0.3, 0.02, 0.86, X - 6.95, Y + 0.3 + k * 0.4, Z + 4.5); for (let n = 0; n < 4; n++) slab([0xd8342c, 0xf4f4f0, 0x2f7d46, 0xffe066, 0xc8705a, 0x8a5a2a][(n + k) % 6], 0.14, 0.16 + (n % 2) * 0.06, 0.14, X - 6.9, Y + 0.32 + k * 0.4, Z + 4.15 + n * 0.22); }
     const carmela = makeLook('carmela');
     carmela.group.position.set(X - 4, Y, Z - 3.6); carmela.group.rotation.y = Math.PI; scene.add(carmela.group);
-    places.houseRoom = { ambient: [carmela], inside: { x: X + 2, z: Z + 3.2, h: Math.PI }, fridge: { door: fridgeDoor, at: { x: X - 6, z: Z + 4.5 }, from: { x: X - 6.8, y: Y + 0.8, z: Z + 4.5 } } };
+    // Six lights is all a room gets: in the living room and the den, theirs take the place of upstairs' (which cannot reach down there).
+    const downAndWing = [...q.lights.slice(0, 3), ...wingLights];
+    q.lightsAt = c => c.x > X + 8.15 ? downAndWing : q.lights;
+    places.houseRoom = { ambient: [carmela], inside: { x: X + 2, z: Z + 3.2, h: Math.PI }, backIn, living, study, fridge: { door: fridgeDoor, at: { x: X - 6, z: Z + 4.5 }, from: { x: X - 6.8, y: Y + 0.8, z: Z + 4.5 } } };
   }
   buildHouseRoom();
 
@@ -4395,15 +4452,17 @@ export function buildWorld(scene) {
     { name: 'the Brandt office', outside: places.kolar.door, inside: rooms.OFFICE.inside },
     ...shopList,
   ];
+  if (!NEXUS && !LA && places.home.back) places.doors.push({ name: 'the back door', outside: places.home.back, inside: places.houseRoom.backIn, pair: 'home' }); // the same house as 'home': either door lets him out (main.js)
   if (places.sets?.vegas) places.doors.push({ name: 'the casino', outside: places.sets.vegas.door, inside: rooms.CASINO.inside });
   // The lights inside rooms are a handful of shared lights that follow the camera from room to room.
   const rig = Array.from({ length: 6 }, () => { const l = new THREE.PointLight(0xffffff, 0, 1); scene.add(l); return l; });
-  let litRoom = null;
-  places.lightRoom = q => {
-    if (q === litRoom) return;
-    litRoom = q;
+  let litRoom = null, litSet = null;
+  places.lightRoom = (q, at) => {
+    const set = q && (q.lightsAt && at ? q.lightsAt(at) : q.lights);
+    if (q === litRoom && set === litSet) return;
+    litRoom = q; litSet = set;
     rig.forEach((l, n) => {
-      const s = q?.lights[n];
+      const s = set?.[n];
       l.intensity = s ? s.power : 0;
       if (s) { l.position.set(s.x, s.y, s.z); l.color.set(s.hex); l.distance = s.reach; }
     });

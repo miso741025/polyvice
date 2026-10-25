@@ -823,32 +823,33 @@ export async function roomScene(g, room, arrange, play, { night: dark = 0 } = {}
   g.setNight(night);
 }
 // Through a door on foot, and free to walk about inside: the room's own people are there, and whoever the mission adds.
-export async function enter(g, room) {
+export async function enter(g, room, by = null) { // (by: a particular door of a room with two, such as the back door at home)
   const p = g.player;
   p.locked = true;
   await fade(g, 1, 0.45);
   if (p.car) { p.car.speed = 0; g.leaveCar(); }
   g.sfx?.door();
-  const door = g.places.doors.filter(d => d.inside === room.inside).sort((a, b) => Math.hypot(a.outside.x - p.pos.x, a.outside.z - p.pos.z) - Math.hypot(b.outside.x - p.pos.x, b.outside.z - p.pos.z))[0]
+  const door = by || g.places.doors.filter(d => d.inside === room.inside).sort((a, b) => Math.hypot(a.outside.x - p.pos.x, a.outside.z - p.pos.z) - Math.hypot(b.outside.x - p.pos.x, b.outside.z - p.pos.z))[0]
     || { inside: room.inside, outside: { x: p.pos.x, z: p.pos.z, h: p.heading + Math.PI }, name: 'the house' }; // a house of somebody's own: its door is wherever he came in // several shops share a room: the door he is standing at
   for (const h of door.hide || []) h.group.visible = false;
   p.inside = door;
-  p.pos.set(room.inside.x, 0, room.inside.z); p.heading = g.cam.yaw = room.inside.h;
+  const at = by ? by.inside : room.inside;
+  p.pos.set(at.x, 0, at.z); p.heading = g.cam.yaw = at.h;
   g.cam.fixed = null;
   await fade(g, 0, 0.45);
   p.locked = false;
   return door;
 }
 // And out again, onto the step outside (unless the player has already walked out by himself).
-export async function leave(g) {
-  const p = g.player, door = p.inside;
+export async function leave(g, by = null) {
+  const p = g.player, door = p.inside, out = (by || door)?.outside;
   if (!door) return;
   p.locked = true;
   await fade(g, 1, 0.45);
   g.sfx?.door();
   for (const h of door.hide || []) h.group.visible = true;
   p.inside = null;
-  p.pos.set(door.outside.x, 0, door.outside.z); p.heading = g.cam.yaw = door.outside.h;
+  p.pos.set(out.x, 0, out.z); p.heading = g.cam.yaw = out.h;
   await fade(g, 0, 0.45);
   p.locked = false;
 }
@@ -908,14 +909,14 @@ function propCar(g, at, heading, color, kind = 'sedan') {
 }
 const between = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
 // Walk out of the room the player is in: a marker at its door, and then the street.
-export async function walkOut(g, room, text) {
-  const p = g.player;
+export async function walkOut(g, room, text, by = null) {
+  const p = g.player, at = by ? by.inside : room.inside;
   g.hud.objective(text);
-  const m = g.addMarker(room.inside.x, room.inside.z, 1.5);
-  await g.until(() => !p.inside || near(p.pos, room.inside, 1.9));
+  const m = g.addMarker(at.x, at.z, 1.5);
+  await g.until(() => !p.inside || near(p.pos, at, 1.9));
   g.removeMarker(m);
   g.hud.objective();
-  await leave(g);
+  await leave(g, by);
 }
 
 // ---------- 1. Starter Motor ----------
@@ -2944,9 +2945,10 @@ async function didntHurtNobody(g) {
   weave.stop();
   await reach(g, front, 'Find the <b>front door</b>.', { r: 1.8, how: 'foot' });
   g.hud.panic(0.12);
-  await roomScene(g, inRoom(kitchen(g), [-3.6, 2.8], [-4, -1.5], 1.5, 0.9), q => ({
-    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
-    tony: actor(g, 'tony', roomSpot(q, -2, -0.2), WEST, 'crouch'),
+  // In the living room, by the couch he will not get as far as by himself.
+  await roomScene(g, inRoom(kitchen(g), [14.6, 2.6], [11.8, -1], 1.5, 0.9), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, 13, -0.2), toward(roomSpot(q, 13, -0.2), roomSpot(q, 11.6, -0.9))),
+    tony: actor(g, 'tony', roomSpot(q, 11.6, -0.9), EAST, 'crouch'),
   }), async cast => {
     await talk(g, [
       [CARMELA, 'Nico? It was on the news. They arrested the coach from Our Lady of the Bay.', cast.carmela],
@@ -3591,22 +3593,45 @@ export async function runStory(g) {
 // Benny's birthday. Nico's ducks leave the pool, he collapses, and ends up in a psychiatrist's office.
 
 async function theDucks(g) {
-  const { home, melfi } = g.places, p = g.player;
+  const { home, melfi, houseRoom } = g.places, p = g.player, K = kitchen(g), back = g.places.doors.find(d => d.name === 'the back door');
 
+  // The morning of the party starts in the kitchen: Gina at the counter with the trays, Nico with a heel of bread in his pocket.
   p.locked = true;
-  p.pos.set(home.spawn.x, 0, home.spawn.z);
-  g.cam.yaw = p.heading = Math.atan2(home.pool.x - home.spawn.x, home.pool.z - home.spawn.z);
+  if (back) {
+    p.inside = g.places.doors.find(d => d.name === 'home');
+    p.pos.set(K.X - 2.2, 0, K.Z - 3.4); g.cam.yaw = p.heading = WEST;
+  } else {
+    p.pos.set(home.spawn.x, 0, home.spawn.z);
+    g.cam.yaw = p.heading = Math.atan2(home.pool.x - home.spawn.x, home.pool.z - home.spawn.z);
+  }
   g.cam.pitch = 0.22;
   g.cam.fixed = null;
   const carmela = actor(g, 'carmela', home.grill, WEST), meadow = actor(g, 'meadow', spot(home.patio, -3, 2.5), EAST), aj = actor(g, 'aj', spot(home.pool, -1.2, 4), EAST);
+  const stove = houseRoom?.ambient[0];
+  if (stove) stove.group.visible = true;
   await g.wait(0.5);
   g.hud.show(true);
   g.hud.fade(0, 1.5);
   await titleCard(g, 'The Flamingos', 'North Shore, Port Paloma');
+  if (back) {
+    stove.group.rotation.y = toward(stove.group.position, p.pos);
+    frame(g, p.pos, stove.group.position, { dist: 4 });
+    await talk(g, [
+      [CARMELA, 'Sixty people at two o\'clock, Nico. The sausage is not going to carry itself out to the grill.', stove],
+      [TONY, 'I am going out. I got one thing first.', p],
+      [CARMELA, 'Is that my good bread in your pocket? Your son turns thirteen today and you are feeding birds.', stove],
+      [TONY, 'They gotta eat too. One minute.', p],
+    ]);
+    g.cam.fixed = null; p.locked = false;
+    await reach(g, houseRoom.living.arch, 'Go out to the <b>pool</b> by the <b>back door</b>: walk through the living room.', { r: 1.4, how: 'foot' });
+    await walkOut(g, houseRoom, 'Go out to the <b>pool</b>: the <b>back door</b>.', back);
+    stove.group.visible = false;   // she has gone out the front with the trays: she is at the grill now
+    p.locked = true;
+  }
   await talk(g, [
     [TONY, 'There they are. The whole family, right in my pool.', p],
-    [CARMELA, 'Nico! The coals are dying and your son turns thirteen today. Leave the flamingos alone.', carmela],
-    [TONY, 'One minute. They gotta eat too.', p],
+    [CARMELA, back ? 'Nico! The coals are dying out here. Leave the flamingos alone.' : 'Nico! The coals are dying and your son turns thirteen today. Leave the flamingos alone.', carmela],
+    [TONY, back ? 'Two minutes, Gina!' : 'One minute. They gotta eat too.', p],
   ]);
 
   p.locked = false;
@@ -3644,6 +3669,7 @@ async function theDucks(g) {
   await fade(g, 1, 1.2);
   calm();
   dismiss(g, carmela, meadow, aj);
+  if (stove) stove.group.visible = true;
 
   await say(g, '', "Nico blacked out by the pool, in front of everyone at his son's birthday.");
   await say(g, '', 'His neighbour, Dr. Feldman, ran every test there is. His heart was fine.');
@@ -4429,8 +4455,9 @@ async function secondOpinion(g) {
     }
     return true;
   });
-  let atEnd = 0;
+  let atEnd = 0, inCar = false;
   await g.until(() => { // he is at the end and Doyle is still on the way: after six seconds Doyle is there (he used to be caught on the rail for good)
+    if (!!p.car !== inCar) { inCar = !!p.car; g.hud.objective(inCar ? 'Walk Doyle to the <b>end of the pier</b>: on foot. Get out of the car here.' : 'Walk Doyle to the <b>end of the pier</b>.'); } // (driven up the pier, nothing said to leave the car: a player could sit there for good)
     if (p.car || !near(p.pos, m, 3)) { atEnd = g.time; return false; }
     if (near(c.pos, m, 10)) return true;
     if (g.time - atEnd > 6) { c.pos.set(m.x - 2, 0, m.z + 1); pushOut(c.pos, 0.4); return true; }
@@ -4631,8 +4658,9 @@ function benefitDress(g) {
 // Benny's birthday, the second attempt. Everyone comes, including the two people who should not be talking.
 
 async function theParty(g) {
-  const { home, houseRoom, melfi, house2 } = g.places, p = g.player, K = kitchen(g), front = g.places.doors.find(d => d.name === 'home');
+  const { home, houseRoom, melfi, house2 } = g.places, p = g.player, K = kitchen(g), front = g.places.doors.find(d => d.name === 'home'), back = g.places.doors.find(d => d.name === 'the back door');
   const cast = {}, crowd = [];
+  let cake = null;
 
   // He wakes upstairs in his own bed. The garden is already full: everything out there is in place before he comes down.
   p.locked = true;
@@ -4692,7 +4720,7 @@ async function theParty(g) {
   g.untrack(tray);
   p.locked = false;
   await walkOut(g, houseRoom, 'Go out to the <b>garden</b>: the front door.');
-  for (const a of houseRoom.ambient) a.group.visible = true;
+  if (!back) for (const a of houseRoom.ambient) a.group.visible = true;
   p.locked = true;
   shot(g, spot(front.outside, -3, -0.2), at(1, 4), 2.2, 1.2);       // the whole garden, from the step
   await say(g, '', 'Balloons on the mailbox. Sixty people. A man he had never seen was running his bar.', 3.4);
@@ -4715,7 +4743,20 @@ async function theParty(g) {
   g.cam.fixed = null;
   p.locked = false;
 
-  await reach(g, cast.carmela.group.position, 'Talk to <b>Gina</b>.', { r: 1.6, how: 'foot' });
+  // Gina goes in to light the candles. What he has to tell her is not for sixty people: he tells her in the kitchen.
+  if (back) {
+    cake = new THREE.Group();
+    { const white = new THREE.MeshLambertMaterial({ color: 0xf4f0e6 }), pink = new THREE.MeshLambertMaterial({ color: 0xff8ad8 }), wax = new THREE.MeshLambertMaterial({ color: 0x49a0e0 });
+      const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.14, 16), white); t1.position.y = 0.07; const t2 = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.1, 16), pink); t2.position.y = 0.19; cake.add(t1, t2);
+      for (let k = 0; k < 13; k++) { const cd = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.07, 4), wax), a = k * Math.PI * 2 / 13; cd.position.set(Math.sin(a) * 0.17, 0.17, Math.cos(a) * 0.17); cake.add(cd); } }
+    cake.position.set(K.X - 3, K.Y + 0.95, K.Z - 1.5); g.track(cake);
+    cast.carmela.group.position.set(K.X - 1.9, K.Y, K.Z - 1.5); cast.carmela.group.rotation.y = WEST;
+    await say(g, CARMELA, 'The candles. Thirteen of them, and I cannot find the matches. Nico, come inside a minute.', 3);
+    await reach(g, back.outside, 'Gina went in for the <b>cake</b>. Go <b>in</b> by the back door, by the pool.', { r: 1.8, how: 'foot' });
+    await enter(g, houseRoom, back);
+    await reach(g, houseRoom.living.arch, 'Gina is in the <b>kitchen</b>: walk through the living room.', { r: 1.4, how: 'foot' });
+  }
+  await reach(g, cast.carmela.group.position, back ? 'Talk to <b>Gina</b>, in the kitchen.' : 'Talk to <b>Gina</b>.', { r: 1.6, how: 'foot' });
   p.locked = true;
   approach(g, cast.carmela);
   frame(g, p.pos, cast.carmela.group.position, { dist: 4 });
@@ -4726,6 +4767,23 @@ async function theParty(g) {
     [CARMELA, "I think that's wonderful. I think it's the bravest thing you've done in years.", cast.carmela],
     [TONY, "Brave. If it gets out, I'm dead. That's how brave.", p],
   ]);
+  if (back) {
+    await talk(g, [
+      [CARMELA, 'Then it stays in this kitchen. Here. Matches. You carry it, I will sing.', cast.carmela],
+    ]);
+    g.cam.fixed = null; p.locked = false;
+    let carrying = true;
+    g.updaters.push(() => { if (!carrying) return false; cake.position.set(p.pos.x + Math.sin(p.heading) * 0.45, groundAt(p.pos.x, p.pos.z) + 1.05, p.pos.z + Math.cos(p.heading) * 0.45); return true; }); // in his two hands, out in front
+    await reach(g, houseRoom.living.arch, 'Take the cake out by the <b>back door</b>: walk through the living room.', { r: 1.4, how: 'foot' });
+    await walkOut(g, houseRoom, 'Take the cake out to the <b>garden</b>: the <b>back door</b>.', back);
+    carrying = false;
+    const table = at(4.2, -4.1);
+    cake.position.set(table.x, groundAt(table.x, table.z) + 0.86, table.z);
+    cast.carmela.group.position.set(table.x + 0.9, groundAt(table.x, table.z), table.z + 1); cast.carmela.group.rotation.y = toward(cast.carmela.group.position, table);
+    for (const a of houseRoom.ambient) a.group.visible = true;
+    p.locked = true;
+    await say(g, '', 'Sixty people sang. Benny blew them out in one go and pretended not to be pleased.', 3.2);
+  }
   g.cam.fixed = null;
   p.locked = false;
 
@@ -4773,6 +4831,7 @@ async function theParty(g) {
   await say(g, '', 'The last of them left at nine. On Thursday he had somewhere to be.');
   dismiss(g, ...Object.values(cast));
   for (const who of crowd) g.untrack(who.group);
+  if (cake) g.untrack(cake);
   dress.clear();
   g.setNight(0);
   p.pos.set(home.wake.x, 0, home.wake.z); g.cam.yaw = p.heading = 0;

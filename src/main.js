@@ -617,7 +617,7 @@ async function boot() {
       }
     }
 
-    const door = !p.locked && places.doors.find(d => !d.closed?.() && (p.inside ? d === p.inside && near(p.pos, d.inside, 1.8) : near(p.pos, d.outside, 1.8)));
+    const door = !p.locked && places.doors.find(d => !d.closed?.() && (p.inside ? (d === p.inside || (d.pair && d.pair === p.inside.name) || (p.inside.pair && p.inside.pair === d.name)) && near(p.pos, d.inside, 1.8) : near(p.pos, d.outside, 1.8))); // (a house with two doors: either one lets him out)
     if (door) {
       hud.prompt(p.inside ? 'F  ·  Leave' : `F  ·  Enter ${door.name}`);
       if (g.consume('KeyF')) g.useDoor(door);
@@ -935,7 +935,7 @@ async function boot() {
     for (const m of g.markers) m.mesh.material.opacity = 0.24 + Math.sin(g.time * 4) * 0.08;
 
     updateCamera(dt);
-    { const q = roomAt(camera.position.x, camera.position.z, 3); places.lightRoom(q); setClimate(q?.climate || null); if (!!q !== indoors) markIndoors(indoors = !!q); } // (the crash guard: detail.js)
+    { const q = roomAt(camera.position.x, camera.position.z, 3); places.lightRoom(q, camera.position); setClimate(q?.climate || null); if (!!q !== indoors) markIndoors(indoors = !!q); } // (the crash guard: detail.js)
     updatePeople(dt, camera.position);
     sun.target.position.copy(focus);
     sun.position.copy(focus).addScaledVector(SUN_DIR, 200);
@@ -1002,6 +1002,14 @@ async function boot() {
   const clock = new THREE.Clock();
   // A frame that took over half a second is written down, with when, which mission and where (game.slowFrames, the last 50), to find where the dips are.
   g.slowFrames = [];
+  // Dips: every 2 s whose frames averaged over 22 ms (under 45 fps) are written down too (game.fpsDips, the last 50), with the
+  // mission, where, and the nearest landmark, so the fix can be aimed. While they last the picture drops a quarter of a pixel
+  // (not below 0.75), and it climbs back a quarter at a time after 10 s of steady frames. At a steady 60 nothing changes.
+  g.fpsDips = [];
+  const fullRatio = renderer.getPixelRatio();
+  let ratio = fullRatio, span = 0, spanN = 0, steady = 0;
+  g.pixelRatio = ratio;
+  const setRatio = r => { ratio = r; g.pixelRatio = r; renderer.setPixelRatio(r); };
   function frame() {
     requestAnimationFrame(frame);
     const dt = clock.getDelta();
@@ -1009,6 +1017,21 @@ async function boot() {
       const at = p.car ? p.car.pos : p.pos, q = g.progress, e = { t: +g.time.toFixed(1), ms: Math.round(dt * 1000), mission: q ? `${q.n} ${q.mission}` : '-', active: g.missionActive, x: Math.round(at.x), z: Math.round(at.z), car: !!p.car, inside: p.inside?.name || null, hidden: document.hidden };
       g.slowFrames.push(e); if (g.slowFrames.length > 50) g.slowFrames.shift();
       console.warn('[slow frame]', JSON.stringify(e));
+    }
+    if (!g.started || document.hidden || dt > 0.25) { span = spanN = 0; } // (a hitch is a slow frame, above, not a dip)
+    else if ((span += dt, ++spanN, span >= 2)) {
+      const ms = span / spanN * 1000;
+      if (ms > 22) {
+        const at = p.car ? p.car.pos : p.pos, q = g.progress;
+        let close = null, d0 = Infinity; for (const l of landmarks) { const d = Math.hypot(l.x - at.x, l.z - at.z); if (d < d0) { d0 = d; close = l.name; } }
+        const e = { t: +g.time.toFixed(1), avgMs: Math.round(ms), fps: Math.round(1000 / ms), mission: q ? `${q.n} ${q.mission}` : '-', active: g.missionActive, x: Math.round(at.x), z: Math.round(at.z), near: p.inside ? p.inside.name : close, car: !!p.car, ratio };
+        g.fpsDips.push(e); if (g.fpsDips.length > 50) g.fpsDips.shift();
+        console.warn('[fps dip]', JSON.stringify(e));
+        if (ratio > 0.75) setRatio(Math.max(0.75, ratio - 0.25));
+        steady = 0;
+      } else if (ratio < fullRatio && ms < 18 && (steady += span) >= 10) { setRatio(Math.min(fullRatio, ratio + 0.25)); steady = 0; }
+      else if (ms >= 18) steady = 0;
+      span = spanN = 0;
     }
     step(Math.min(dt, 0.05));
   }

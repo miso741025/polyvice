@@ -1,6 +1,11 @@
 [
  {
   "date": "2026-10-25",
+  "en": "Nico's house is open: walk into the Bellacosta home.",
+  "zh": "Nico 的家開放了：走進 Bellacosta 家。"
+ },
+ {
+  "date": "2026-10-25",
   "en": "Port Paloma opens faster, and shows you how far along it is.",
   "zh": "Port Paloma 開得更快，還會顯示載入進度。"
  },
