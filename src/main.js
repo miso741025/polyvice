@@ -804,7 +804,7 @@ async function boot() {
       { key: 'Digit8', label: 'Missions', hint: 'play any mission again, or skip ahead' },
       { key: 'KeyP', label: 'People', hint: `${people(g).length} met so far` },
       { key: 'KeyL', label: 'Earnings', hint: `$${Object.values(g.ledger || {}).reduce((a, r) => a + r.m, 0).toLocaleString('en-US')} from ${Object.keys(g.ledger || {}).length} missions` },
-      { key: 'Escape', label: 'Resume' },
+      { key: 'Escape', label: 'Resume', hint: 'continue the game' }, // ("continue": the autopilot taps this one, not the first item)
       { key: 'Digit0', label: 'Quit to the title screen', hint: 'progress is saved after each mission' },
     ].filter(i => i.label), code => {
       if (code === 'Digit1') settings.volume = Math.max(0, +(settings.volume - 0.1).toFixed(1));

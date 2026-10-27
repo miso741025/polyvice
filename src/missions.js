@@ -154,7 +154,9 @@ export async function talk(g, lines) {
       if (gesture) a.layer(gesture);
       else if (standing(a)) { a.set('talk'); talked = true; }
     }
-    await say(g, who, text);
+    const mouth = a === p ? p.human : a; // whoever has the line moves their mouth while it is up
+    if (mouth) mouth.speaking = true;
+    try { await say(g, who, text); } finally { if (mouth) mouth.speaking = false; }
     if (a === p) { p.pose = pose0; p.topPose = null; }
     else if (a) { if (!a.topOnce) a.layer(null); if (talked && a.state === 'talk') a.set(was === 'talk' ? 'talk' : 'idle'); }
     // Someone listening nods, now and then.
@@ -5313,14 +5315,16 @@ async function millersCar(g) {
   g.blips.splice(g.blips.indexOf(blip), 1);
   g.hud.objective();
 
+  let restart = { x: melfi.park.x - 14, z: melfi.park.z - 3, h: EAST }; // (a dent starts the leg again, not the whole drive)
   const load = careful(g, 'Bodywork', 'A teacher will not take a car with the front pushed in. They went and found another.', () => {
     if (p.car) g.leaveCar();
-    target.pos.set(melfi.park.x - 14, 0, melfi.park.z - 3); target.heading = EAST; target.speed = 0;
+    target.pos.set(restart.x, 0, restart.z); target.heading = restart.h; target.speed = 0;
     g.enterCar(target);
   });
   await load.to(bodyshop.kerb, "Drive it to <b>Mo's body shop</b>. Don't dent it.", target);
   // Into the middle bay teal, and out of it tan.
   await respray(g, target, { x: bodyshop.door.x, z: bodyshop.door.z + 3 }, SOUTH, 0xcdb98a, "Mo's cousin sprayed it tan. Close to tan.");
+  restart = { x: target.pos.x, z: target.pos.z, h: target.heading };
   await load.to(school.gate, 'Deliver it to <b>Our Lady of the Bay School</b>.', target);
   load.stop();
 

@@ -854,6 +854,12 @@ const woodMat = new THREE.MeshLambertMaterial({ color: 0x6a4a34 });
 const blasterMat = new THREE.MeshPhongMaterial({ color: 0x3a3a44, shininess: 90, specular: 0x8a8a96 }), ledOrange = new THREE.MeshBasicMaterial({ color: 0xff8a2c }), ledRed = new THREE.MeshBasicMaterial({ color: 0xff2a3c });
 const shadeMat = new THREE.MeshBasicMaterial({ color: 0x0b0b10 });
 const lensMat = new THREE.MeshBasicMaterial({ color: 0xcfe4ee, transparent: true, opacity: 0.22, depthWrite: false });
+// A face that moves, without repainting it: a dark mouth that opens and shuts while its owner has a line, and lids that
+// drop over the painted eyes for a blink. One small box each, shared by everybody; hidden the rest of the time.
+const faceBox = new THREE.BoxGeometry(1, 1, 1);
+const mouthMat = new THREE.MeshBasicMaterial({ color: 0x2a1212 });
+const lidMats = { light: new THREE.MeshLambertMaterial({ color: 0xd2a084 }), dark: new THREE.MeshLambertMaterial({ color: 0x6e4632 }) };
+let faceClock = 0;
 
 // ---------- A character ----------
 
@@ -962,6 +968,18 @@ export function makeHuman(opts = {}) {
     wear(geo.hat, hatMat(hatColor ?? (hat === 'cap' ? 0x2f56c8 : 0x3a3230))).castShadow = true;
     wear(geo.band, hatMat(hatBand ?? (hat === 'cap' ? hatColor ?? 0x2f56c8 : 0x1a1512)));
   }
+  // The mouth and the eyelids (see faceBox), placed from the tip of the nose the way the paint places the lips and eyes.
+  const feature = (mat, x, y, z, w, h, d) => {
+    const m = new THREE.Mesh(faceBox, mat);
+    m.position.set(x, y, z); m.scale.set(w, h, d); m.visible = false;
+    root.add(m); root.updateMatrixWorld(true); headBone.attach(m);
+    m.userData.h = m.scale.y;
+    return m;
+  };
+  const N = B.nose, lidMat = o.dark ? lidMats.dark : lidMats.light;
+  const mouth = feature(mouthMat, 0, N.y - 0.031, N.z - 0.026, 0.032, 0.011, 0.02);
+  const lids = [-1, 1].map(s => feature(lidMat, s * 0.032, N.y + 0.037, N.z - 0.032, 0.024, 0.013, 0.012));
+  let blinkAt = faceClock + 1 + Math.random() * 4;
   headBone.scale.setScalar(o.head);
 
   // Guns in the right hand, shown only while armed: a pistol, a submachine gun, a shotgun.
@@ -1057,6 +1075,16 @@ export function makeHuman(opts = {}) {
       a.paused = false; a.enabled = true; a.timeScale = -1.7; a.time = a.getClip().duration; a.play();
     },
     get busy() { return this.after !== null; },
+    speaking: false, // set by a scene while this character's line is up (missions.js talk)
+    // The mouth while speaking, a blink every 3 to 6 seconds; only for a face close enough to the camera to see.
+    face(near) {
+      const open = near && this.speaking;
+      mouth.visible = open;
+      if (open) mouth.scale.y = mouth.userData.h * (0.25 + 0.95 * Math.abs(Math.sin(faceClock * 11 + Math.sin(faceClock * 4.3) * 2)));
+      if (faceClock > blinkAt + 0.12) blinkAt = faceClock + 3 + Math.random() * 3;
+      const shut = near && faceClock >= blinkAt;
+      for (const l of lids) l.visible = shut;
+    },
     arm(on) { for (const k in guns) guns[k].visible = on === true ? k === 'pistol' : on === k; },
     // Which long guns hang on his back: a list of kinds (the one in his hands is never among them).
     sling(kinds = []) { let n = 0; for (const k in slung) { slung[k].visible = kinds.includes(k) && n === 0; if (slung[k].visible) n++; } },
@@ -1073,12 +1101,14 @@ export function makeHuman(opts = {}) {
 
 // Advance every character's animation; ones far from the camera or out of the scene are skipped.
 export function updatePeople(dt, eye) {
+  faceClock += dt;
   for (const p of people) {
     let top = p.group;
     while (top.parent) top = top.parent;
     if (!top.isScene) continue;
-    const g = p.group.position;
-    if (Math.hypot(g.x - eye.x, g.y - eye.y, g.z - eye.z) < 160) p.mixer.update(dt);
+    const g = p.group.position, d = Math.hypot(g.x - eye.x, g.y - eye.y, g.z - eye.z);
+    if (d < 160) p.mixer.update(dt);
+    p.face(d < 30);
   }
 }
 

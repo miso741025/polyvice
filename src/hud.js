@@ -96,13 +96,35 @@ export class Hud {
     el.style.transition = `opacity ${seconds}s ease-out`; el.style.opacity = 0;
   }
   // A menu of choices: items are { label, hint, key }, keys are what to press. `pick(key)` is called on a choice.
-  menu(title, items, pick) {
+  // Every menu says how to answer it (a line at the bottom), and says it again if it sits untouched for 30 s.
+  // { choice: true } is a dialogue choice: Enter takes the first option, other keys are ignored, and after 30 s
+  // untouched the first option is taken, so a scene can never wait on it for minutes.
+  menu(title, items, pick, { choice = false } = {}) {
     const el = $('menu');
-    if (!title) { el.classList.remove('on'); this.onMenu = null; return; }
-    el.innerHTML = `<h2>${title}</h2>` + items.map(i => !i.key ? `<div class="info">${i.label}<span class="hint">${i.hint || ''}</span></div>` : `<div class="item" data-key="${i.key}"><b>${i.key.replace('Digit', '').replace('Key', '').replace('Escape', 'Esc')}</b> ${i.label}${i.hint ? `<span class="hint">${i.hint}</span>` : ''}</div>`).join('');
+    clearTimeout(this.menuIdle);
+    if (!title) { if (this.onMenu) console.log('[menu] closed'); el.classList.remove('on'); this.onMenu = null; return; }
+    const keys = items.filter(i => i.key).map(i => i.key), first = keys[0];
+    const tip = choice ? `Press ${keys.map(k => k.replace('Digit', '').replace('Key', '')).join('/')} or tap an option. Enter takes the first.` : 'Press a key shown, or tap an option.';
+    el.innerHTML = `<h2>${title}</h2>` + items.map(i => !i.key ? `<div class="info">${i.label}<span class="hint">${i.hint || ''}</span></div>` : `<div class="item" data-key="${i.key}"><b>${i.key.replace('Digit', '').replace('Key', '').replace('Escape', 'Esc')}</b> ${i.label}${i.hint ? `<span class="hint">${i.hint}</span>` : ''}</div>`).join('') +
+      `<div class="tip">${tip}</div>`;
     el.classList.add('on');
-    this.onMenu = pick;
-    for (const d of el.querySelectorAll('.item')) d.onclick = () => pick(d.dataset.key);
+    const answer = code => {
+      if (choice) { // closed before the answer goes back, so a pick can never leave it open
+        if (code === 'Enter') code = first;
+        if (!keys.includes(code)) return;
+        this.menu();
+      }
+      console.log(`[menu] "${title}" answered: ${code}`);
+      pick(code);
+    };
+    this.onMenu = answer;
+    console.log(`[menu] "${title}" shown: ${keys.join(' ')}`);
+    for (const d of el.querySelectorAll('.item')) d.onclick = () => answer(d.dataset.key);
+    this.menuIdle = setTimeout(() => {
+      if (this.onMenu !== answer) return;
+      if (choice && first) { console.log(`[menu] "${title}" idle 30 s: taking ${first}`); answer(first); }
+      else el.querySelector('.tip')?.classList.add('nudge');
+    }, 30000);
   }
   // The city map: the whole island, where things are, and where the player is.
   map(on, { focus, heading, blips = [], landmarks = [] } = {}) {
