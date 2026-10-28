@@ -2662,7 +2662,8 @@ async function aGift(g) {
   truck.speed = 0;
   await say(g, '', 'It took two men and a blanket, and Augie supervised.');
   p.locked = false;
-  const load = careful(g, 'The screen', 'Something inside the box went "tink". He turned round and went back for another.', () => { if (p.car) g.leaveCar(); truck.pos.set(pawn.kerb.x, 0, pawn.kerb.z); truck.heading = pawn.kerb.h; truck.speed = 0; g.enterCar(truck); });
+  // Three knocks cost a stop by the kerb, not the whole drive again (the likely cause of a 448 s bot clear).
+  const load = careful(g, 'The screen', 'Something inside the box went "tink". Augie pulled over, listened to it for a while, and drove on slower.', () => { if (p.car !== truck) { if (p.car) g.leaveCar(); g.enterCar(truck); } truck.speed = 0; });
   await load.to(his.kerb, "<b>Drive</b> it to the coach's house. Glass side up.", truck);
   load.stop();
   await reach(g, step, 'Carry it to the <b>door</b>.', { r: 1.5, how: 'foot' });

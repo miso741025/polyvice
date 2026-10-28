@@ -3291,6 +3291,16 @@ export function buildWorld(scene) {
     for (const [k, hex] of [0x2f7d46, 0xf4f4f0, 0xc8312a].entries()) slab(hex, 0.5, 0.9, 0.04, q.X - 8 + k * 0.5, q.Y + 2.3, q.Z + 6.62);
     q.person(pick(PED_ROOM_LOOKS), -5.9, -2, Math.PI / 2, 'sit');
     q.person(pick(PED_ROOM_LOOKS), -0.1, 2, -Math.PI / 2, 'sit');
+    // A Sunday crowd: a couple across from the first diner, a family table by the window, an old regular on his own. Looks the city already paints; no rand(), so the rooms after this are dealt as before.
+    q.person(PED_ROOM_LOOKS[2], -4.1, -2, -Math.PI / 2, 'sit');
+    q.person(OLD_LOOKS[1], -5, 5.98, Math.PI, 'sit'); q.person(PED_ROOM_LOOKS[3], -5, 4.02, 0, 'sit');
+    q.person(OLD_LOOKS[0], 2.02, 1, Math.PI / 2, 'sit');
+    // Dolores keeps the book at the host's stand, facing whoever comes in.
+    q.host = q.person('charmaine', 2.3, 4.8, 0);
+    // The glass doors out to the terrace, east of the front door, with the afternoon behind them.
+    slab(0x3a2418, 1.6, 2.6, 0.08, q.X + 7, q.Y, q.Z + 6.58, M.wood, 1);
+    for (const dx of [-0.36, 0.36]) q.glowPanel(0xffe8c0, 0.56, 2.1, 7 + dx, 6.53, 1.25, Math.PI);
+    slab(0xd9a520, 0.04, 0.3, 0.04, q.X + 6.9, q.Y + 1.05, q.Z + 6.5); slab(0xd9a520, 0.04, 0.3, 0.04, q.X + 7.1, q.Y + 1.05, q.Z + 6.5);
   }
   { // Il Gabbiano's kitchen, behind the dining room: a range under a hood, a brick oven, a steel table in the middle, the pass, the dish pit, a walk-in
     const d0 = rooms.VESUVIO, q = rooms.VKITCHEN = room(13, 8, 3.4, { floor: M.paver, floorTint: 0xe9e4dc, floorScale: 1, wallTint: 0xf4f4f0, ceil: 0xf6f6f2, door: 0xc9cbd2, doorX: -4, at: [d0.X + 4, d0.Z - 12.5] });
@@ -3322,6 +3332,9 @@ export function buildWorld(scene) {
     for (let k = 0; k < 5; k++) put(M.plain, new THREE.CylinderGeometry(0.14, 0.14, 0.02, 12).rotateZ(0.9).translate(q.X - 1.5 + k * 0.1, q.Y + 1.05, q.Z + 3.2), 0xffffff);
     slab(0xb9bcc4, 0.08, 2.3, 1.3, q.X + 6.3, q.Y, q.Z - 1); slab(0x8a8d96, 0.06, 0.4, 0.06, q.X + 6.24, q.Y + 1.1, q.Z - 0.55); sign('WALK-IN', q.X + 6.3, q.Y + 2.6, q.Z - 1, -Math.PI / 2, { w: 1.1, h: 0.26, color: '#1c2740', bg: '#c9cbd2', size: 0.8, glow: false });
     for (let k = 0; k < 4; k++) { slab(0xd9c7a0, 0.5, 0.36, 0.4, q.X + 5.6, q.Y + (k % 2) * 0.37, q.Z + 1.2 + Math.floor(k / 2) * 0.5); } post(0x2f5a3f, 0.05, 0.3, q.X + 5.6, q.Y + 0.74, q.Z + 1.3, 6);
+    // Steam off the gravy and the pasta water, rising into the hood.
+    const steam = [[1, 1.16], [1, 1.16], [3, 1.38], [3, 1.38]].map(([x, y]) => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 4), new THREE.MeshBasicMaterial({ color: 0xf4f4f0, transparent: true, opacity: 0.3, depthWrite: false })); m.userData.at = [q.X + x, q.Y + y]; scene.add(m); return m; });
+    updaters.push(t => steam.forEach((m, n) => { const k = (t * 0.45 + n * 0.5) % 1, [sx, sy] = m.userData.at; m.position.set(sx + Math.sin(t + n) * 0.06, sy + k * 0.8, q.Z - 3.3); m.scale.setScalar(0.6 + k * 1.4); m.material.opacity = 0.3 * (1 - k); }));
     q.light(1.5, 3, -1.5, 0xf4f8ff, 120, 20); q.light(-4.6, 1.6, -1.6, 0xff8a30, 26, 8);
     q.person({ shirt: 0xf4f4f4, sleeves: 'long', tucked: true, pants: 0x55525a, hair: 0x2b1b12, hairMesh: 'buzzed', hat: 'cap', hatColor: 0xf4f4f4, bulk: 1.1 }, 0.4, -2.3, Math.PI);
     q.person({ shirt: 0xf4f4f4, tee: true, pants: 0x23232b, hair: 0x111111, hairMesh: 'buzzed', dark: true, bulk: 0.95 }, -1.6, 2.4, 0);
