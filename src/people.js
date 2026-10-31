@@ -889,9 +889,25 @@ let faceClock = 0;
 //   sleeves    'short' | 'long'
 //   tee, tucked, badge, chain, watch   details
 //   stripe     colour of side stripes down arms and legs (tracksuit)
-export function makeHuman(opts = {}) {
+const lookOpts = opts => {
   const o = { body: 'male', shirt: 0xffffff, pants: 0x23232b, hair: 0x2b1b12, bulk: 1, height: 1, head: 1.06, hairStyle: 'short', sleeves: 'short', ...opts };
   if (o.coat !== undefined && o.jacket === undefined && o.coatAlpha === undefined) o.jacket = o.coat; // a coat is a jacket that goes on down (a see-through one is geometry only)
+  return o;
+};
+const paintKey = o => { const { hairMesh, hairScale, hairShift, beardMesh, glasses, glassesScale, hat, hatColor, hatBand, bulk, belly, height, head, face, ...k } = o; return JSON.stringify(k); };
+// Paint a look's skin before anybody wears it (a whole-texture pass, a long frame): a mission's cast, while he is still on his way to its marker.
+// (A name from LOOKS, or a look written out by a mission.)
+export function paintLook(name) {
+  const look = typeof name === 'string' ? LOOKS[name] : name;
+  if (!look) return false;
+  const o = lookOpts(look), key = paintKey(o);
+  if (textures.has(key) || !bodies[o.body]) return false;
+  textures.set(key, paint(bodies[o.body], o));
+  return true;
+}
+
+export function makeHuman(opts = {}) {
+  const o = lookOpts(opts);
   const B = bodies[o.body];
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';
@@ -900,8 +916,8 @@ export function makeHuman(opts = {}) {
   root.position.y = 0.04; // the clips plant the heels a little under the ground; stand on top of it
   group.add(root);
 
-  const { hairMesh, hairScale, hairShift, beardMesh, glasses, glassesScale, hat, hatColor, hatBand, bulk, belly, height, head, face, ...paintKey } = o;
-  const key = JSON.stringify(paintKey);
+  const { hairMesh, hairScale, hairShift, beardMesh, glasses, glassesScale, hat, hatColor, hatBand } = o;
+  const key = paintKey(o);
   if (!textures.has(key)) textures.set(key, paint(B, o));
 
   let headBone;

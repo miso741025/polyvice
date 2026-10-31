@@ -453,6 +453,21 @@ async function boot() {
   await loading('shaders', 0.85);
   // Every material is compiled now, behind the title, not the first time it comes into view (a frame of a second or more, mid-drive).
   try { renderer.compile(scene, camera); } catch (err) { console.warn('shader warm-up skipped', err); }
+  // compile() sends nothing to the card: the city's meshes and textures went up the first time each came into view, several 200 m squares in
+  // one frame at a corner (the dips while driving, 27 fps in 8-11 and 59-65). So they go up now, a twelfth at a time, drawn into one pixel behind the title.
+  await loading('streets', 0.9);
+  const street = [];
+  scene.traverseVisible(o => { if (o.isMesh && o.frustumCulled) street.push(o); });
+  renderer.setScissorTest(true); renderer.setScissor(0, 0, 1, 1);
+  try {
+    for (let n = 0, every = Math.ceil(street.length / 12); n < street.length; n += every) {
+      const some = street.slice(n, n + every);
+      for (const o of some) o.frustumCulled = false;
+      try { renderer.render(scene, camera); } finally { for (const o of some) o.frustumCulled = true; }
+      await loading('streets', 0.9 + 0.1 * n / street.length);
+    }
+  } catch (err) { console.warn('street warm-up skipped', err); }
+  renderer.setScissorTest(false);
   await loading(null, 1);
   g.bootTimes = bootTimes;
   { const bar = document.getElementById('loadbar'); if (bar) bar.hidden = true; }
@@ -643,8 +658,10 @@ async function boot() {
   }
 
   const honk = car => { if (Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) < 45 && !p.inside) sfx.horn(0.6 + Math.random() * 0.6); };
+  const obstacles = []; // (one list, refilled each frame)
   function updateCars(dt) {
-    const obstacles = cars.filter(c => (c.alt || 0) < 1.6).map(c => c.pos); // traffic does not brake for something flying over it
+    obstacles.length = 0;
+    for (const c of cars) if ((c.alt || 0) < 1.6) obstacles.push(c.pos); // traffic does not brake for something flying over it
     if (!p.car && !p.hidden) obstacles.push(p.pos);
     for (const car of cars) {
       if (car.ai) { car.spinWheels(dt); continue; } // driven by combat.js
@@ -656,12 +673,14 @@ async function boot() {
   }
 
   // Smoke from a car that has been knocked about, fire from one that is finished, and then the bang.
-  const smokeGeo = new THREE.SphereGeometry(0.5, 7, 5), smokers = new Map();
+  const smokeGeo = new THREE.SphereGeometry(0.5, 7, 5), smokers = new Map(), smokePool = []; // (spent plumes are hidden and kept for the next car, not rebuilt)
+  const smokeOff = car => { const old = smokers.get(car); if (old) { old.visible = false; smokePool.push(old); smokers.delete(car); } };
   function updateDamage(dt) {
     for (const car of cars) {
       const hp = car.hp ?? 100;
-      if (hp >= 60 || Math.abs(car.pos.x - p.pos.x) > 110 || Math.abs(car.pos.z - p.pos.z) > 110) { const old = smokers.get(car); if (old) { scene.remove(old); smokers.delete(car); } continue; }
+      if (hp >= 60 || Math.abs(car.pos.x - p.pos.x) > 110 || Math.abs(car.pos.z - p.pos.z) > 110) { smokeOff(car); continue; }
       let puffs = smokers.get(car);
+      if (!puffs && (puffs = smokePool.pop())) { puffs.visible = true; if (!puffs.parent) scene.add(puffs); smokers.set(car, puffs); }
       if (!puffs) {
         puffs = new THREE.Group();
         for (let k = 0; k < 5; k++) { const m = new THREE.Mesh(smokeGeo, new THREE.MeshBasicMaterial({ color: 0x8d8a8e, transparent: true, opacity: 0.4, depthWrite: false })); m.userData.t = k / 5; puffs.add(m); }
@@ -687,7 +706,7 @@ async function boot() {
       else if (d < 8) g.damagePlayer(70 * (1 - d / 8), car.pos);
       for (const ped of peds) if (!ped.dead && Math.hypot(ped.pos.x - car.pos.x, ped.pos.z - car.pos.z) < 7) ped.hurt(200, car.pos, { knock: 1.5, down: true });
     }
-    for (const car of [...cars]) if (car.wreck && car.goneAt && g.time > car.goneAt && car !== p.car && Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) > 60) { const old = smokers.get(car); if (old) { scene.remove(old); smokers.delete(car); } g.removeCar(car); }
+    for (const car of [...cars]) if (car.wreck && car.goneAt && g.time > car.goneAt && car !== p.car && Math.hypot(car.pos.x - p.pos.x, car.pos.z - p.pos.z) > 60) { smokeOff(car); g.removeCar(car); }
   }
 
   // Pull the camera in when a building is between it and the player.
@@ -875,9 +894,9 @@ async function boot() {
     peds.forEach((ped, i) => {
       if (ped.parked) return;
       ped.update(dt, cars, scare);
-      if (ped.dead && ped.diedAt > 20) { // the dead are replaced by someone new on another block
-        scene.remove(ped.human.group);
-        peds[i] = new Ped(scene, blockNear(p.pos, 240), rand);
+      if (ped.dead && ped.diedAt > 20) { // the dead are replaced by someone new on another block (the body reused)
+        ped.revive(blockNear(p.pos, 240), rand);
+        if (!ped.human.group.parent) scene.add(ped.human.group);
       }
     });
     // The crowd and the traffic keep to the part of the city the player is in: whoever is left far
@@ -1001,7 +1020,7 @@ async function boot() {
 
   const clock = new THREE.Clock();
   // A frame that took over half a second is written down, with when, which mission and where (game.slowFrames, the last 50), to find where the dips are.
-  g.slowFrames = [];
+  g.slowFrames = []; g.frameLog = [];
   // Dips: every 2 s whose frames averaged over 22 ms (under 45 fps) are written down too (game.fpsDips, the last 50), with the
   // mission, where, and the nearest landmark, so the fix can be aimed. While they last the picture drops a quarter of a pixel
   // (not below 0.75), and it climbs back a quarter at a time after 10 s of steady frames. At a steady 60 nothing changes.
@@ -1013,6 +1032,11 @@ async function boot() {
   function frame() {
     requestAnimationFrame(frame);
     const dt = clock.getDelta();
+    if (dt > 0.025 && g.started && !document.hidden) { // every frame over 25 ms, the last 80 (game.frameLog): when, which mission, where
+      const at = p.car ? p.car.pos : p.pos;
+      g.frameLog.push({ t: +g.time.toFixed(1), ms: Math.round(dt * 1000), mission: g.progress?.mission, x: Math.round(at.x), z: Math.round(at.z) });
+      if (g.frameLog.length > 80) g.frameLog.shift();
+    }
     if (dt > 0.5 && g.started) {
       const at = p.car ? p.car.pos : p.pos, q = g.progress, e = { t: +g.time.toFixed(1), ms: Math.round(dt * 1000), mission: q ? `${q.n} ${q.mission}` : '-', active: g.missionActive, x: Math.round(at.x), z: Math.round(at.z), car: !!p.car, inside: p.inside?.name || null, hidden: document.hidden };
       g.slowFrames.push(e); if (g.slowFrames.length > 50) g.slowFrames.shift();

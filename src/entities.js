@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CITY, NX, NZ, ROAD, LANE, CELL, nodeX, nodeZ, clamp, wrapAngle, pushOut, pushOutAbove, groundAt } from './grid.js';
-import { makeHuman, makeLook, makeTony, LOOKS, loadPeople, updatePeople } from './people.js';
+import { makeHuman, makeLook, makeTony, LOOKS, loadPeople, updatePeople, paintLook } from './people.js';
 
 // Headings: an angle h means "facing (sin h, cos h)" in (x, z); local +z of a mesh is its front.
 
@@ -12,7 +12,7 @@ export function box(w, h, d, color, basic = false) {
 
 // ---------- People ----------
 // The character model lives in people.js; re-exported here for the modules that build scenes.
-export { makeHuman, makeLook, makeTony, LOOKS, loadPeople, updatePeople };
+export { makeHuman, makeLook, makeTony, LOOKS, loadPeople, updatePeople, paintLook };
 
 export function makeDuck() {
   const group = new THREE.Group();
@@ -146,6 +146,12 @@ export class Ped {
     this.flight = 0; this.returning = false; this.down = 0; this.loiter = rand() < 0.2 ? 20 + rand() * 60 : 0;
     this.human.group.rotation.y = this.pathPoint(this.pos);
     this.human.group.position.set(this.pos.x, groundAt(this.pos.x, this.pos.z), this.pos.z);
+  }
+  // The dead walk again on another block: the same body reused, not a new one built and painted (that cost a frame mid-drive).
+  revive(center, rand) {
+    this.dead = false; this.health = 100; this.diedAt = 0; this.fly = null; this.lootable = undefined;
+    this.human.after = null; this.human.set('idle');
+    this.relocate(center, rand);
   }
   // Run from `from` for a while.
   flee(from, seconds = 8) {

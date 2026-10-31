@@ -494,8 +494,10 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
     hud.wanted(Math.floor(g.wanted));
     if (Math.floor(g.wanted) > before) sendPolice();
   };
+  let owed = false; // cruisers still to come: one per frame, so two are never built in the same frame
   const sendPolice = () => {
-    while (cops.cars.length < Math.floor(g.wanted)) {
+    owed = cops.cars.length + 1 < Math.floor(g.wanted);
+    if (cops.cars.length < Math.floor(g.wanted)) {
       const car = g.spawnCar(0, 0, 0, 0xf4f4f4, 'police');
       car.mission = false; // the police outlive a failed mission
       for (let tries = 0; tries < 30; tries++) { // a few blocks away, on the road
@@ -678,6 +680,7 @@ export function installCombat(g, { scene, hud, peds, cars, keys }) {
 
     // The police.
     if (g.wanted > 0) {
+      if (owed) sendPolice();
       for (const car of cops.cars) policeCar(car, dt);
       const nearCop = cops.cars.some(c => Math.hypot(c.pos.x - p.pos.x, c.pos.z - p.pos.z) < 110);
       calm = nearCop ? 0 : calm + dt;

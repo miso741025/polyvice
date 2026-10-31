@@ -1,0 +1,67 @@
+{
+ "num": 10,
+ "name": "Episode Ten",
+ "title": "The Waiting Room",
+ "follows": "Episode Nine, No Harm Done: Sergio sits in the dark wondering what a nephew who talks to a doctor might say.",
+ "arc": "Sergio has Nico's Thursdays watched. Nico keeps Dr. Vos's door out of it with a back doctor's card, a ruined roll of film and a careful lunch, and keeps his appointment. Sergio decides to let him think it worked.",
+ "missions": [
+  {
+   "n": 60,
+   "title": "Parked Outside",
+   "fn": "parkedOutside",
+   "start": "melfi",
+   "mechanic": "stake-out (sit still 0:20 out of Joey's 16 m), long-lens photo, tail the grey sedan",
+   "objectives": ["Stake-out. Sit tight and keep away from the grey sedan: don't let him see you. 0:20", "Photograph the man by the grey sedan: click, or press E.", "Follow the grey sedan, and don't lose it. Not too close."],
+   "story": "Sergio's doubt from the end of Episode Nine: his driver is outside the office. Where Joey reports to is who sent him.",
+   "fallbacks": "seen 3 times: the stake-out passes; tail lost twice: it skips to the luncheonette"
+  },
+  {
+   "n": 61,
+   "title": "Fifty Minutes",
+   "fn": "fiftyMinutes",
+   "start": "melfi",
+   "mechanic": "therapy with a #menu choice (tell her / say nothing), saved as choices.vos",
+   "objectives": ["Thursday. Drive to Dr. Vos's office.", "Go in."],
+   "story": "He cannot keep the watcher away from her door, so the question is whether he tells her. The answer decides where the card in mission 62 comes from."
+  },
+  {
+   "n": 62,
+   "title": "The Card",
+   "fn": "theCard",
+   "start": "home",
+   "mechanic": "stealth delivery past a pacing watcher (red blip, r 7); the 'say nothing' path first picks up the card from Morty at Low Tide Records",
+   "objectives": ["Drive to Low Tide Records. Morty has a back man's card. (quiet path only)", "Morty is at the door.", "Drive to the luncheonette. Park up the street, past the grey sedan.", "Slip the card into Joey's car without being seen. Keep away from Joey: he is red on the radar."],
+   "story": "Joey has to report something; better that he finds a dull reason himself, on his own car seat.",
+   "fallbacks": "caught twice: Joey goes in to pay and the step has no watcher"
+  },
+  {
+   "n": 63,
+   "title": "Camera Shy",
+   "fn": "cameraShy",
+   "start": "melfi",
+   "mechanic": "foot chase (flee AI, yellow arrow), fists only, take the film",
+   "objectives": ["Drive to Dr. Vos's office.", "Chase down the man with the camera: follow the yellow arrow."],
+   "story": "A back is not enough for Sergio; he pays a wedding photographer for a picture of the door.",
+   "fallbacks": "75 s of chasing without a hit: he trips"
+  },
+  {
+   "n": 64,
+   "title": "Lunch",
+   "fn": "lunch",
+   "start": "home",
+   "mechanic": "three #menu choices (Calm / Respect / Deal first), then shake a tail",
+   "objectives": ["Drive to the luncheonette. Uncle Sergio is buying.", "Lose the grey sedan before you go anywhere near Dr. Vos's."],
+   "story": "Sergio finally asks to his face, and sends Joey after him anyway."
+  },
+  {
+   "n": 65,
+   "title": "Four O'Clock",
+   "fn": "fourOClock",
+   "start": "home",
+   "mechanic": "timed drive (2:30), therapy, closing scene",
+   "objectives": ["Drive to Dr. Vos's office. She starts at four, with you or without you. m:ss", "Go in."],
+   "story": "He keeps the appointment that started it all; Sergio decides to let him think it worked.",
+   "fallbacks": "late twice: she waited, and the mission goes on"
+  }
+ ]
+}
