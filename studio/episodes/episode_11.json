@@ -1,0 +1,68 @@
+{
+ "episode": "Episode Eleven",
+ "num": 11,
+ "name": "Episode Eleven",
+ "title": "A Name in the Book",
+ "follows": "Episode Ten, Four O'Clock: Sergio decides to let Nico think the back doctor fooled him.",
+ "arc": "Sergio offers Enzo his name in the book for a job and for what Nico says on Thursdays. Nico does the job for him, squares it with Aldo Ferro, finds it was a trap either way, and carries the cake to the dinner.",
+ "missions": [
+  {
+   "n": 66,
+   "title": "New Suit",
+   "fn": "newSuit",
+   "start": "home",
+   "mechanic": "tail the red coupe, then a 0:24 stake-out out of Joey's 12 m",
+   "objectives": ["Drive to Enzo's place. Park up the street from the red coupe.", "Follow the red coupe, and don't lose it. Not too close.", "Stake-out. Sit tight and keep away from Joey: don't let him see you. 0:24"],
+   "story": "Nico cannot ask what Enzo is doing without telling Sergio he knows.",
+   "fallbacks": "tail lost twice: it skips to the luncheonette; seen 3 times: the stake-out passes"
+  },
+  {
+   "n": 67,
+   "title": "Overtime",
+   "fn": "overtime",
+   "start": "melfi",
+   "mechanic": "therapy with a #menu choice, saved as choices.enzo ('watch' or 'stop')",
+   "objectives": ["Thursday. Drive to Dr. Vos's office.", "Go in."],
+   "story": "Why he has held Enzo's name back. The answer decides how the job in 68 goes."
+  },
+  {
+   "n": 68,
+   "title": "Closed for the Season",
+   "fn": "closedForTheSeason",
+   "start": "home",
+   "mechanic": "night heist: stealth past one watchman (two on the 'stop' path; red blips, r 5; his beat stays 7.6 m from the booth), hold F on the drawer, shake a tail",
+   "objectives": ["Drive to Enzo's place. Have it out with him. ('stop' path only)", "He is on the step. ('stop' path only)", "Drive to Funland. Park by the road.", "Get to the ticket booth without being seen. Keep away from the watchman: he is red on the radar.", "Force the cash drawer: press F and hold it.", "Get in the car.", "Lose the blue sedan."],
+   "story": "The job Sergio named. Enzo freezes; Nico does it and gives him the credit.",
+   "fallbacks": "30 s no nearer the booth: a hint; 90 s no nearer, or caught twice: the watchmen go for coffee and the step has no watcher"
+  },
+  {
+   "n": 69,
+   "title": "Company",
+   "fn": "company",
+   "start": "home",
+   "mechanic": "timed escort: 2:30 there, 2:00 back with Bianca, then a kitchen scene with Gina",
+   "objectives": ["Drive to Enzo's place. He waved at her. m:ss", "She is on the step.", "Get in the car with Bianca.", "Drive Bianca to your house before he finishes his coffee. m:ss", "Take her in."],
+   "story": "The bill for the heist comes to the door of the one person who did nothing. Gina's doubts.",
+   "fallbacks": "late twice on the way there: she waited; late on the way back: the scene goes on"
+  },
+  {
+   "n": 70,
+   "title": "The Far End",
+   "fn": "farEnd",
+   "start": "home",
+   "mechanic": "negotiation: three #menu choices (Calm / Respect / Deal first), then runDown on the collector's car",
+   "objectives": ["Drive to the pier.", "Walk out to Aldo Ferro, at the far end.", "Stop the blue sedan. Ram it until it gives up."],
+   "story": "Aldo wants an answer. The man in a nice tie from Camera Shy told the collector which night: Sergio won either way."
+  },
+  {
+   "n": 71,
+   "title": "A Name in the Book",
+   "fn": "nameInTheBook",
+   "start": "home",
+   "mechanic": "cargo drive (careful, the cake meter), closing scenes",
+   "objectives": ["Drive to the Bean Scene. The cake is paid for.", "Drive the cake to the Pink Pelican. Gently."],
+   "story": "A boss making a captain carry a cake is a message. Enzo gets his name, and Sergio asks about Thursdays.",
+   "fallbacks": "three bumps: the cake is redone and the drive starts over"
+  }
+ ]
+}
