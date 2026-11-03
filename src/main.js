@@ -455,9 +455,11 @@ async function boot() {
   try { renderer.compile(scene, camera); } catch (err) { console.warn('shader warm-up skipped', err); }
   // compile() sends nothing to the card: the city's meshes and textures went up the first time each came into view, several 200 m squares in
   // one frame at a corner (the dips while driving, 27 fps in 8-11 and 59-65). So they go up now, a twelfth at a time, drawn into one pixel behind the title.
+  // Not on the light (phone) tier: there every street and room on the card at once kills the tab at boot (iPhone Safari, v28 to v30).
+  // A phone sends them up when they first come into view, as before v28.
   await loading('streets', 0.9);
   const street = [];
-  scene.traverseVisible(o => { if (o.isMesh && o.frustumCulled) street.push(o); });
+  if (!LIGHT) scene.traverseVisible(o => { if (o.isMesh && o.frustumCulled) street.push(o); });
   renderer.setScissorTest(true); renderer.setScissor(0, 0, 1, 1);
   try {
     for (let n = 0, every = Math.ceil(street.length / 12); n < street.length; n += every) {
