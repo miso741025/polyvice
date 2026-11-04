@@ -14,7 +14,7 @@ import { PEOPLE_MAP } from './detail.js';
 //     what covers that spot.
 
 const DIR = 'assets/models/';
-const MAP = PEOPLE_MAP;           // texture size per character (1024; 512 on a phone, see detail.js)
+const MAP = PEOPLE_MAP;           // texture size per character (1024; 256 on a phone, see detail.js)
 const STAND_FRAME = 0.25;         // point in the walk cycle whose upper body is used for standing still
 const SEAT_HEIGHT = 0.6;          // hip height when sitting in a chair
 const bodies = {};                // 'male' | 'female' -> prepared base body

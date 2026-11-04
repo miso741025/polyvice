@@ -89,7 +89,7 @@ async function boot() {
     scene.traverse(o => { if (o.material) { for (const m of [].concat(o.material)) m.needsUpdate = true; } });
     try { localStorage.setItem(SETTINGS, JSON.stringify(settings)); } catch { /* play on */ }
   };
-  const places = buildWorld(scene);
+  const places = await buildWorld(scene);
   if (LIGHT) places.sky.scale.setScalar(0.22); // the sky dome (1500 m) inside the nearer far plane
   await loading('cars', 0.65);
 
