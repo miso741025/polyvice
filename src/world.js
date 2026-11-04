@@ -268,7 +268,11 @@ function shopfronts(rand) {
 
 // ---------- The city ----------
 
-export function buildWorld(scene) {
+// (async: it pauses a few times while it builds, below)
+export async function buildWorld(scene) {
+  // A pause between the big parts of the build, so the browser can clear away what each part threw out before the next one
+  // piles on: in one go, an iPhone's Safari held all of it at once at the top of the load (about 250 MB over where it settles).
+  const breathe = () => new Promise(r => setTimeout(r, 50));
   const rand = mulberry32(NEXUS ? 2049 : LA ? 4127 : 1999); // each city is dealt its own hand
   const pick = list => list[Math.floor(rand() * list.length)];
   const places = {}, updaters = [];
@@ -320,10 +324,22 @@ export function buildWorld(scene) {
     tintOf.set(hex);
     for (let i = 0; i < n; i++) tintOf.toArray(a, i * 3);
     geo.setAttribute('color', new THREE.BufferAttribute(a, 3));
-    if (!buckets.has(mat)) buckets.set(mat, []);
-    buckets.get(mat).push(geo);
+    // Sorted as it comes into its material's 200 m square (see merged), and every PACK pieces of a square are merged there and then:
+    // the city is some 46,000 pieces, and held one by one until the end they came to 250 MB, the page's high point at boot, and the
+    // reason an iPhone's Safari closed the tab. Packed in the order they came, they merge to the same meshes.
+    geo.computeBoundingBox();
+    const c = geo.boundingBox.min.clone().add(geo.boundingBox.max).multiplyScalar(0.5), key = `${Math.floor(c.x / CHUNK)},${Math.floor(c.z / CHUNK)}`;
+    if (!buckets.has(mat)) buckets.set(mat, new Map());
+    const squares = buckets.get(mat);
+    if (!squares.has(key)) squares.set(key, { packed: [], loose: [] });
+    const sq = squares.get(key);
+    sq.loose.push(geo);
+    if (sq.loose.length >= PACK) { sq.packed.push(join(sq.loose)); sq.loose = []; }
     return geo;
   };
+  const CHUNK = 200, PACK = 16;
+  // Pieces with and without an index merge as unindexed ones.
+  const join = list => mergeGeometries(list.some(g => !g.index) ? list.map(g => (g.index ? g.toNonIndexed() : g)) : list);
   const boxAt = (w, h, d, x, y0, z) => new THREE.BoxGeometry(w, h, d).translate(x, y0 + h / 2, z); // standing on y0
   // Repeat a box's texture every `s` metres. Faces come in groups of 4 vertices: +x, -x, +y, -y, +z, -z.
   const tiled = (geo, w, h, d, s) => {
@@ -363,21 +379,14 @@ export function buildWorld(scene) {
   };
 
   // One mesh per material and 200 m square from a set of buckets, so what is behind the camera is culled.
-  const CHUNK = 200;
+  // (Each square lets go of its pieces as soon as it is merged, so the pieces and the merged city are never all held at once.)
   const merged = map => {
     const group = new THREE.Group();
-    for (const [mat, list] of map) {
-      const chunks = new Map();
-      for (const g of list) {
-        g.computeBoundingBox();
-        const c = g.boundingBox.min.clone().add(g.boundingBox.max).multiplyScalar(0.5);
-        const key = `${Math.floor(c.x / CHUNK)},${Math.floor(c.z / CHUNK)}`;
-        if (!chunks.has(key)) chunks.set(key, []);
-        chunks.get(key).push(g);
-      }
-      for (const part of chunks.values()) {
-        const mixed = part.some(g => !g.index);
-        const mesh = new THREE.Mesh(mergeGeometries(mixed ? part.map(g => (g.index ? g.toNonIndexed() : g)) : part), mat);
+    for (const [mat, squares] of map) {
+      for (const [key, sq] of squares) {
+        const part = [...sq.packed, ...sq.loose];
+        squares.delete(key);
+        const mesh = new THREE.Mesh(part.length === 1 && sq.loose.length === 0 ? part[0] : join(part), mat);
         const solid = mat !== M.glow && mat !== M.sign && mat !== M.pool;
         mesh.castShadow = solid && mat !== M.grass && mat !== M.paint && mat !== M.tarmac; mesh.receiveShadow = solid;
         if (mat === M.pool) mesh.renderOrder = 2;
@@ -405,8 +414,11 @@ export function buildWorld(scene) {
   const atlas = document.createElement('canvas');
   const AH = 4096; // tall enough for every sign in either city
   const AW = 4096; // eight columns of slots. (At four the atlas filled up before the city was finished, and whatever was built last went without its sign: the bridge's, for one.)
-  atlas.width = AW; atlas.height = AH;
+  // A phone paints it at half the size (16 MB, not 64), drawn to the same plan: it goes to the GPU at a quarter of the size anyway (below).
+  const AS = LIGHT_DETAIL ? 0.5 : 1;
+  atlas.width = AW * AS; atlas.height = AH * AS;
   const ag = atlas.getContext('2d'), shelves = [0, 0, 0, 0, 0, 0, 0, 0];
+  ag.scale(AS, AS);
   let signsLost = 0;
   M.sign = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(atlas) });
   M.sign.map.colorSpace = THREE.SRGBColorSpace; M.sign.map.anisotropy = 8;
@@ -430,7 +442,7 @@ export function buildWorld(scene) {
       rows.forEach((row, i) => {
         ag.font = `${Math.round(ph / rows.length * size)}px ${font}`;
         const cx = px + pw * (0.5 + shift), cy = py + ph * (i + 0.5) / rows.length;
-        if (glow) { ag.shadowColor = color; ag.shadowBlur = 14; }
+        if (glow) { ag.shadowColor = color; ag.shadowBlur = 14 * AS; }
         const fit = pw * (0.92 - Math.abs(shift) * 2);
         ag.fillStyle = color; ag.fillText(row, cx, cy, fit);
         ag.shadowBlur = 0;
@@ -735,6 +747,7 @@ export function buildWorld(scene) {
       }
     }
   }
+  await breathe();
 
   // ----- Blocks -----
   // Districts: industry in the north-west corner, houses along the west and south, hotels on the beach,
@@ -2204,6 +2217,7 @@ export function buildWorld(scene) {
     places.freeway = { under: { x, z: nodeZ(6) + CELL / 2 }, north: { x, z: nodeZ(5) + CELL / 2 }, south: { x, z: nodeZ(7) + CELL / 2 }, x };
   }
   if (LA) buildFreeway();
+  await breathe();
 
   // ----- Inside the Pink Pelican: an interior set far below the city, like the therapy office -----
   function buildBingRoom() {
@@ -2448,6 +2462,7 @@ export function buildWorld(scene) {
     places.shopRoom = { ambient: [butcher], inside: { x: X, z: Z + 3.2, h: Math.PI } };
   }
   buildShopRoom();
+  await breathe();
 
   // ----- Inside the Bellacosta house: the kitchen, the table, and the den -----
   function buildHouseRoom() {
@@ -2787,6 +2802,7 @@ export function buildWorld(scene) {
     places.wardRoom = { inside: { x: X + 2, z: Z + 3.2, h: Math.PI }, bed: { x: X - 2.5, y: Y + 0.95, z: Z - 2.6 }, chair: { x: X + 1.4, y: Y, z: Z - 3.3 }, cam: { pos: new THREE.Vector3(X + 1.2, Y + 1.9, Z + 1.6), look: new THREE.Vector3(X - 2, Y + 1.1, Z - 2.6) } };
   }
   buildWardRoom();
+  await breathe();
 
   // ----- The other rooms: one behind every landmark's door, and one of each kind of shop, shared by all its doors -----
   // A box of a room with its door on the south wall; furniture goes in afterwards. Rooms stand 80 m apart out over the water.
@@ -3746,6 +3762,7 @@ export function buildWorld(scene) {
     q.light(-4, 3, 0, 0xf0f6ff, 40, 14); q.light(4, 3, 0, 0xf0f6ff, 40, 14);
     q.person(pick(KID_LOOKS), -2, 0, Math.PI / 2, 'talk'); q.person(pick(KID_LOOKS), -0.6, 0, -Math.PI / 2);
   }
+  await breathe();
 
   // ----- Los Angeles has its own rooms: the same kinds of place, laid out and dressed differently -----
   if (LA) {
@@ -4413,6 +4430,7 @@ export function buildWorld(scene) {
   if (OLD) places.sets = buildSets2019({ scene, M, put, slab, post, ball, collide, sign, halo, updaters, places, rooms, interiors, floors, room, texture, CURB });
   if (NEXUS && !OLD) places.sets = buildSets2049({ scene, M, put, slab, post, ball, collide, sign, halo, updaters, places, rooms, interiors, terrains, floors, room, texture });
 
+  await breathe();
   // ----- Merge everything into one mesh per material -----
   M.sign.map.needsUpdate = true;
   scene.add(merged(buckets));
@@ -4548,7 +4566,7 @@ export function buildWorld(scene) {
     M.pool.opacity = 0.3 + k * 0.35;
     for (const m of [M.shop, M.deco, M.balcony, M.stucco]) m.emissiveIntensity = 0.85 + k * 0.25;
   };
-  // On a phone the sign atlas (4096 px square, 64 MB) is handed to the GPU at a quarter of the size or less; the slots
+  // On a phone the sign atlas (painted at 2048 px square, see above) is handed to the GPU at 1024 or less; the slots
   // are placed by fractions of the atlas, so every sign still finds its own.
   // On a phone the city's own geometry lets go of its JavaScript copy once the GPU has it (about 100 MB): the city never
   // changes shape. Not people (their bones move their meshes), not instanced or animated meshes.

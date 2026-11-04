@@ -13,8 +13,9 @@ const stored = k => { try { return localStorage.getItem(k); } catch { return nul
 const asked = new URLSearchParams(location.search).get('quality') || stored(DETAIL_KEY);
 export const LIGHT = asked === 'low' || (asked !== 'high' && TOUCH);
 export const EXTRA_LIGHT = LIGHT && stored(CRASH_KEY) === '1';
-// Painted character textures, per look, and the largest a world texture may be.
-export const PEOPLE_MAP = EXTRA_LIGHT ? 256 : LIGHT ? 512 : 1024;
+// Painted character textures, per look, and the largest a world texture may be. A phone paints people at 256: some 90 looks are
+// painted at boot, and at 512 they alone came to 120 MB of the page (an iPhone's Safari closed the tab while loading, v32).
+export const PEOPLE_MAP = LIGHT ? 256 : 1024;
 export const WORLD_MAP = EXTRA_LIGHT ? 512 : LIGHT ? 1024 : 4096;
 
 // Indoors marks the visit; coming back out (or leaving the page normally) clears the mark.
