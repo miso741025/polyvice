@@ -5043,6 +5043,437 @@ async function anytime(g) {
   await passed(g, 'Episode fourteen complete', 5000);
 }
 
+// ========== Episode Fifteen: The Button ==========
+// The books are open for one name. Enzo is sure it is his; Aldo Ferro puts up his sister's boy, who is already collecting
+// on Nico's streets. Nico has to decide if the boy is ready, and win it for him. Every line is written for the game.
+
+const MARCO = 'Marco Pellegrini';
+
+// ---------- 1. Open Books ----------
+// Sergio's news on the bench, and then the rounds: everybody Nico asks has already had a visit from the same nice shoes.
+
+async function openBooks(g) {
+  const { park, pawn, bodyshop, bar } = g.places, p = g.player, bench = park.bench, ways = [pawn, bodyshop, bar].map(s => kerbWay(s.kerb, s.door));
+  // Who he asks at each stop, and what they tell him. A look of null is a passer-by; a line with no third entry is Nico's.
+  const stops = [
+    [null, 'Pawnbroker', [
+      ['Pawnbroker', 'Your nephew came Tuesday. No, not your nephew. The other one, with the nice shoes. Marco. He said the rate went up.', 1],
+      [TONY, 'Up from what? You pay me.'],
+      ['Pawnbroker', 'That is what I told him. He said, "Not any more, grandpa." I am fifty-one.', 1],
+    ]],
+    ['pussy', PUSSY, [
+      [PUSSY, 'Marco Pellegrini. Aldo Ferro\'s sister\'s boy. He came in, he looked at my lifts, he said he likes my lifts. He said it twice.', 1],
+      [TONY, 'Did you pay him?'],
+      [PUSSY, 'I gave him a tyre. A tyre is not paying. A tyre is manners.', 1],
+    ]],
+    [null, 'Barman', [
+      ['Barman', 'The kid in the shoes? He sat right there and told everybody the book has his name in it already. Then he put his drinks on your tab.', 1],
+      [TONY, 'My tab.'],
+      ['Barman', 'He said you were practically family now.', 1],
+    ]],
+  ];
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Open Books', 'The park');
+  await phone(g, JUNIOR, 'Come to the park. Bring the boy. I have news, and I want to see his face when he hears it.');
+  g.hud.card();
+  const junior = actor(g, 'junior', spot(bench, 0, 0.2), SOUTH, 'sit'), enzo = actor(g, 'christopher', spot(bench, -2.4, 1.2), EAST);
+  await reach(g, park.kerb, 'Drive to the <b>park</b>.');
+  await reach(g, spot(bench, 1.8, 1.6), 'Uncle Sergio is on the <b>bench</b>.', { r: 1.6, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, junior.group.position);
+  shot(g, spot(bench, 0.6, 5), spot(bench, 0.4, 0.6), 1.6, 1.1);
+  await talk(g, [
+    [JUNIOR, 'The books are open. One name this year. One. Like a raffle, except nobody wins a ham.', junior],
+    [CHRIS, 'One name. Uncle Serge, I already bought the suit. I did not find a rat, I bought Petey a sandwich like Nico said. That has to count.', enzo],
+    [JUNIOR, 'Aldo Ferro has a name too. His sister\'s boy, Marco. And Marco is out on your streets, Nico, collecting, so everybody can see what a good earner he is.', junior],
+    [TONY, 'On my streets.', p],
+    [JUNIOR, 'Go and look. Then tell me whose name I put forward.', junior],
+    [CHRIS, 'Mine. Obviously mine. Right, Nico?', enzo],
+    [TONY, 'Go home, Enzo. Hang the suit up. I will do the looking.', p],
+  ]);
+  await cut(g, () => { dismiss(g, junior, enzo); g.cam.fixed = null; });
+  p.locked = false;
+  if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+  await rounds(g, ways.map(w => w(0)), "<b>Drive</b> round and ask who Marco has been collecting from: the <b>pawnbroker</b>, Mo's <b>body shop</b>, the <b>bar</b>.", async k => {
+    const [look, , lines] = stops[k], at = ways[k](3, -2.4), who = look ? actor(g, look, at, toward(at, p.pos)) : extraAt(g, at, toward(at, p.pos));
+    p.locked = true;
+    if (p.car) p.car.speed = 0;
+    frame(g, p.pos, at, { dist: 4.6 });
+    await talk(g, lines.map(([name, text, them]) => [name, text, them ? who : null]));
+    g.cam.fixed = null;
+    dismiss(g, who);
+    p.locked = false;
+  }, { r: 6 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, TONY, 'Three stops, the same shoes every time. The kid is not collecting. He is campaigning.', 3.2);
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 2. Somebody Else's Street ----------
+// Marco at Bean Scene, telling the waitress he is going to be made. Nico puts him down in front of Enzo, with fists,
+// because there is a sit-down coming, and he will not let the boy finish it.
+
+async function somebodyElses(g) {
+  const { cafe } = g.places, p = g.player, way = kerbWay(cafe.kerb, cafe.door);
+  const mp = way(2, -3), f1 = way(3.6, -2), f2 = way(0.4, -2), ep = way(-6, -1.6), stand = way(-1.2, -1.6);
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card("Somebody Else's Street", 'Bean Scene');
+  await phone(g, CHRIS, 'Nico, he is at Bean Scene right now, at a table outside, telling the waitress he is going to be made. I am across the street. Can I...');
+  await phone(g, TONY, 'You can wait. Do not move until I get there.');
+  g.hud.card();
+  const marco = actor(g, 'dealer', mp, toward(mp, stand)), pals = [actor(g, 'trucker', f1, toward(f1, stand)), actor(g, 'kolar', f2, toward(f2, stand))];
+  const enzo = actor(g, 'christopher', ep, toward(ep, mp));
+  await reach(g, way(-14), '<b>Drive</b> to <b>Bean Scene</b>. Marco is at a table outside.', { r: 7 });
+  await reach(g, stand, 'Walk up to his <b>table</b>.', { r: 1.8, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, mp);
+  frame(g, p.pos, mp, { dist: 4.8 });
+  await talk(g, [
+    [MARCO, 'Nico Bellacosta. My uncle says you are a reasonable man. Sit down, I will buy you a coffee. On your tab.', marco],
+    [TONY, 'The pawnbroker. Mo. The bar. Those are mine, and they have been mine since you were in short trousers.', p],
+    [MARCO, 'Things change. One name goes in the book this year. Everybody likes a man who brings money in.', marco],
+    [CHRIS, 'Nico, let me...', enzo],
+    [TONY, 'Stay there. Watch. No guns, nobody dies on a café terrace.', p],
+  ]);
+  g.cam.fixed = null;
+  // His two friends stand up first. Fists only, and they stay down once they are down.
+  const foes = pals.map(h => {
+    const foe = g.makeEnemy(h, { health: 70, damage: 7, cash: 20 });
+    foe.die = () => { foe.health = 1; foe.dead = true; foe.ai = null; h.after = null; h.set('down'); };
+    return foe;
+  });
+  fistsOnly(g, true);
+  g.noHeat = true;
+  p.locked = false;
+  g.hud.objective("Marco's friends stand up. <b>Deal with</b> them. Fists only.");
+  await allDown(g, foes);
+  g.hud.objective();
+  // And Marco runs.
+  await say(g, MARCO, 'Hey, hey, this is a new jacket!', 1.8);
+  const runner = g.addNpc(marco, { health: 500, ai: 'flee', cash: 0, stays: true });
+  runner.threat = p.pos.clone();
+  const found = quarry(g, runner);
+  g.hud.objective('<b>Chase down</b> Marco: he ran. Follow the <b>yellow arrow</b>.');
+  await g.until(() => runner.health < 500);
+  found();
+  g.hud.objective();
+  g.removeNpc(marco);
+  fistsOnly(g, false);
+  p.locked = true;
+  approach(g, marco, 1.2);
+  enzo.group.position.set(marco.group.position.x + 1.6, marco.group.position.y, marco.group.position.z + 1.2);
+  enzo.group.rotation.y = toward(enzo.group.position, marco.group.position);
+  frame(g, p.pos, marco.group.position, { dist: 4.2, height: 1.3, lift: 0.5 });
+  await talk(g, [
+    [MARCO, 'Okay! Okay. You made your point. Not the face, I have a sit-down coming.', marco],
+    [TONY, 'So do I. Tell your uncle my streets are not a job interview.', p],
+    [CHRIS, 'Give me one minute with him, Nico. One.', enzo],
+    [TONY, 'No. You do not win the book by hitting a man who is already on the ground. You win it by being the one who did not have to.', p],
+  ]);
+  await cut(g, () => { dismiss(g, marco, enzo, ...pals); g.cam.fixed = null; });
+  g.noHeat = false;
+  g.pardon();
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 3. Sponsor ----------
+// He wants the boy to have it, and to never have it. What he decides here is whether Enzo comes along on the next job.
+
+async function sponsor(g) {
+  const p = g.player, office = g.places.doors.find(d => d.name === "Dr. Vos's office");
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Sponsor', "Thursday, four o'clock");
+  await say(g, '', 'He had a speech ready about his nephew. He gave it to the steering wheel twice on the way, and it got worse both times.');
+  g.hud.card();
+  await toMelfi(g, "Thursday. Drive to <b>Dr. Vos's office</b>.");
+  await therapy(g, [
+    [TONY, 'My nephew wants something. A promotion, you could say. My uncle can put one name forward, and there is another kid, with nice shoes, who wants it too.'],
+    [MELFI, 'And what do you want?'],
+    [TONY, 'I want him to have it. I also want him to never have it. Both at once, in the same chest.'],
+    [MELFI, 'Last week you told me he went looking for someone to hurt, because he thought it would earn him something.'],
+    [TONY, 'He found the man who answers our phone. The man has a nurse. It was a whole thing.'],
+    [MELFI, 'Then perhaps the question is not whether he wants it. It is whether he is ready, and who decides that.'],
+  ]);
+  const along = await choose(g, 'Enzo and the book', ['Take him along on the next job, and watch how he does (recommended)', 'Let him do it alone, and prove it to everybody']) === 0;
+  (g.choices ??= {}).button = along ? 'along' : 'alone';
+  await therapy(g, along ? [
+    [TONY, 'I take him with me. He watches. He keeps his mouth shut. If he can do that, he can do anything.'],
+    [MELFI, 'And if he cannot?'],
+    [TONY, 'Then I find out before anybody else does.'],
+  ] : [
+    [TONY, 'I let him do it alone. A man has to show them he can stand up by himself.'],
+    [MELFI, 'Is that what someone did for you?'],
+    [TONY, '...Nobody ever let me do anything alone. Maybe that is why I want it for him.'],
+  ]);
+  if (p.car) g.leaveCar();
+  place(g, office.outside, SOUTH);
+  g.cam.fixed = null;
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 4. Night Shift ----------
+// Marco's friends parked a stolen Haskell pickup in the Pelican's own car park, and Haskell pays Nico. With Enzo beside
+// him, they follow it. If Enzo went alone, he was seen, and Nico has to stop the car that is chasing him.
+
+async function nightShift(g) {
+  const { bing, motel } = g.places, p = g.player, along = g.choices?.button !== 'alone', mway = kerbWay(motel.kerb, motel.office);
+  const lot = spot(bing.park, 9, 6), stop = mway(10), mp = mway(4, -3), watch = mway(-26);
+  let van;
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('Night Shift', 'The Pink Pelican, midnight');
+  await phone(g, SILVIO, 'Nico, there is a Haskell pickup in my car park. Forty cases of olive oil under a tarp, and Haskell\'s name on the door. Marco\'s friends are at my bar buying rounds.');
+  g.hud.card();
+  if (along) {
+    van = propCar(g, lot, EAST, 0xf2f0ea, 'pickup');
+    await phone(g, TONY, 'Enzo. Get your coat. Tonight you watch, and you keep your mouth shut.');
+    await reach(g, bing.park, '<b>Drive</b> to the <b>Pink Pelican</b> and wait in the car park.', { r: 7 });
+    p.locked = true;
+    if (p.car) p.car.speed = 0;
+    await say(g, '', 'Enzo got in beside him with two coffees. At closing two of Marco\'s friends came out and drove the pickup away like men who had paid for it.', 4);
+    p.locked = false;
+    const hush = banter(g, [
+      [CHRIS, 'We could just take it off them at the lights. Two of them, two of us.'],
+      [TONY, 'And then what? Then we know nothing. Hang back. Let them show us.'],
+      [CHRIS, 'Hanging back. I am hanging back. This is me hanging back.'],
+    ]);
+    for (let tries = 0; ; tries++) {
+      if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+      dispatch(g, van, van.pos, motel.kerb, 9);
+      if (await tail(g, van, motel.kerb, '<b>Follow</b> the Haskell pickup, and don\'t lose it. Not too close.')) break;
+      if (tries >= 1) { await say(g, CHRIS, 'I know where they went. Marco\'s cousin keeps a room at the motor lodge. I asked around. Quietly!', 3.4); break; }
+      p.locked = true;
+      await say(g, '', 'Gone. They went back to the Pelican for the friend who had been in the bathroom.', 3);
+      await cut(g, () => { atWheel(g, bing.park); van.nav = null; van.pos.set(lot.x, 0, lot.z); van.heading = EAST; van.speed = 0; van.sync?.(); });
+      p.locked = false;
+    }
+    hush();
+  } else {
+    const sedan = propCar(g, lot, EAST, GREY);
+    await phone(g, CHRIS, 'Nico! I followed the pickup by myself, like you said I could. They saw me. There is a grey sedan on my bumper and they are not slowing down!');
+    if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+    await runDown(g, sedan, '<b>Stop the</b> grey sedan before it puts Enzo in the canal: ram it, or block its way.');
+    p.locked = true;
+    if (p.car) p.car.speed = 0;
+    await say(g, '', 'Two of Marco\'s friends got out of the grey sedan and ran in two different directions, which was the smartest thing they did all night.', 3.6);
+    await phone(g, CHRIS, 'Thank you. I am fine. I am totally fine. They took the pickup to the motor lodge. I saw the sign before they saw me. Mostly before.');
+    await cut(g, () => { g.removeCar(sedan); g.pardon(); });
+    p.locked = false;
+  }
+  // The motor lodge, from up the street: the pickup at the kerb, and Marco beside it, admiring it.
+  if (!van) van = propCar(g, stop, motel.kerb.h, 0xf2f0ea, 'pickup');
+  const marco = actor(g, 'dealer', mp, toward(mp, stop));
+  if (along) {
+    p.locked = true;
+    await cut(g, () => { van.nav = null; van.pos.set(stop.x, 0, stop.z); van.heading = motel.kerb.h; van.speed = 0; van.sync?.(); atWheel(g, watch); g.cam.fixed = null; });
+    p.locked = false;
+  } else await reach(g, watch, '<b>Drive</b> to the <b>motor lodge</b>. Park up the street.', { how: 'car', r: 7 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, '', 'Marco came out of room four to look at the pickup the way other men look at a new car. He walked round it twice.', 3.4);
+  p.locked = false;
+  // (No g.eavesdrop here: this one is "stay where you are", like the pier in Party Line.)
+  const blip = { x: mp.x, z: mp.z, color: '#ff3b4a', r: 14 };
+  g.blips.push(blip);
+  for (let tries = 0; ; tries++) {
+    let t = 0, last = g.time, seen = false;
+    await g.until(() => {
+      const dt = Math.min(0.1, g.time - last), d = Math.hypot(p.pos.x - mp.x, p.pos.z - mp.z);
+      last = g.time;
+      if (!p.locked && !g.paused) t += dt;
+      seen = d < 14;
+      g.hud.objective(`Stake-out. <b>Sit tight</b> up the street and keep away from Marco: don't let him see you. <b>0:${String(Math.max(0, Math.ceil(20 - t))).padStart(2, '0')}</b>`);
+      return seen || t >= 20;
+    });
+    g.hud.objective();
+    if (!seen || tries >= 2) break;
+    p.locked = true;
+    await fade(g, 1, 0.6);
+    await say(g, '', 'Marco looked up the street. Nico turned the radio on and became a man waiting for his wife.', 3);
+    atWheel(g, watch);
+    await fade(g, 0, 0.6);
+    p.locked = false;
+  }
+  g.blips.splice(g.blips.indexOf(blip), 1);
+  p.locked = true;
+  marco.play?.('interact', 'idle');
+  await photograph(g, marco, 'Marco with the Haskell pickup', spot(p.pos, 0, 0));
+  g.cam.fixed = null;
+  await say(g, TONY, along ? 'Good. You hung back. Tomorrow night we take it back, when his lookout is half asleep.' : 'Tomorrow night I take it back. And this time the boy stays home.', 3.4);
+  await cut(g, () => { dismiss(g, marco); g.removeCar(van); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 5. Load Out ----------
+// Three in the morning. The pickup goes back to Haskell from under the lookout's nose, whole: that is the point of it.
+
+async function loadOut(g) {
+  const { motel, comley } = g.places, p = g.player, along = g.choices?.button !== 'alone', mway = kerbWay(motel.kerb, motel.office);
+  const stop = mway(10), door = mway(10, -3.6), park = mway(32), lp = mway(-7, -3), turn = mway(-1, -3);
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('Load Out', 'The motor lodge, three in the morning');
+  await say(g, '', along ? 'Enzo had worked out where the lookout liked to stand, and how often he looked at his watch. It was a start.' : 'Enzo was at home with his suit, sulking. Nico had the address and the patience, which was most of it.');
+  g.hud.card();
+  const van = propCar(g, stop, motel.kerb.h, 0xf2f0ea, 'pickup'), look = actor(g, 'trucker', lp, toward(lp, turn));
+  await reach(g, park, '<b>Drive</b> to the <b>motor lodge</b>. Park up the street from the pickup.', { how: 'car', r: 7 });
+  p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  await say(g, '', 'One lookout, walking up and down in front of the office with a coffee, the way a man walks when he is paid by the hour.', 3.4);
+  // He walks the pavement in front of the office. The cab door is on his side of the pickup, past the end of his walk
+  // (11 m past it: the pilot will not step within 9.5 m of a watcher, so a shorter gap only ever ended in the coffee fallback).
+  const walk = beat(g, look, [lp, turn], { r: 5, speed: 1.3 });
+  const from = { x: p.pos.x, z: p.pos.z };
+  let out = false; // the last try: the lookout goes in for more coffee, and the pavement is empty
+  const coffee = () => { out = true; walk.on = false; look.group.visible = false; };
+  for (let tries = 0; !out; tries++) {
+    walk.seen = false;
+    p.locked = false;
+    const m = g.addMarker(door.x, door.z, 1.5);
+    g.hud.objective('Get to the <b>pickup</b> on foot without being seen. Keep away from the <b>lookout</b>: he is red on the radar.');
+    let best = Infinity, still = 0, last = g.time;
+    await g.until(() => {
+      const d = Math.hypot(p.pos.x - door.x, p.pos.z - door.z), dt = Math.min(0.1, g.time - last);
+      last = g.time;
+      if (d < best - 1) { best = d; still = 0; } else if (!p.locked && !g.paused) still += dt;
+      return still > 90 || walk.seen || (near(p.pos, door, 1.9) && !p.car);
+    });
+    g.removeMarker(m);
+    g.hud.objective();
+    if (!walk.seen && still <= 90) break;
+    if (!walk.seen) { await cut(g, coffee); break; } // ninety seconds getting no nearer: the step stops being the thing in his way
+    p.locked = true;
+    await say(g, 'Lookout', 'Hey. Hey! Who is that? We are full!', 2.2);
+    await fade(g, 1, 0.8);
+    await say(g, '', 'Nico asked him the way to the highway, walked back up the street the long way round, and waited.', 3.4);
+    place(g, from, toward(from, stop));
+    walk.reset();
+    if (tries >= 1) coffee();
+    await fade(g, 0, 0.8);
+  }
+  if (out) {
+    p.locked = false;
+    await reach(g, door, 'The lookout went in for more coffee. Get to the <b>pickup</b> now.', { r: 1.5, how: 'foot' });
+  }
+  walk.on = false;
+  p.locked = true;
+  await cut(g, () => { van.driverless = false; g.enterCar(van); });
+  await say(g, '', along ? 'The keys were under the sun visor. Enzo had bet him five dollars they would be, and Enzo was right.' : 'The keys were under the sun visor. They always are.', 3.2);
+  look.group.visible = true;
+  p.locked = false;
+  await say(g, 'Lookout', 'Marco! MARCO! The oil!', 1.8);
+  await shake(g, '<b>Lose the</b> grey sedan before you take the pickup anywhere near Haskell.', { color: GREY });
+  const at = { x: van.pos.x, z: van.pos.z, h: van.heading };
+  const load = careful(g, 'The oil', 'A case went over the tailgate on a corner, and the street smelled like a salad for a block. He stacked it again and started over.', () => { if (p.car) g.leaveCar(); van.pos.set(at.x, 0, at.z); van.heading = at.h; van.speed = 0; g.enterCar(van); });
+  await load.to(comley.gate, '<b>Drive</b> the pickup back to <b>Haskell Trucking</b>. Gently.', van);
+  load.stop();
+  p.locked = true;
+  await fade(g, 1, 1);
+  await say(g, '', 'He left it at the dock with the keys under the sun visor, and forty cases of olive oil without a crack in one of them.');
+  await say(g, '', 'In the morning old Haskell sent a case of it to the house, which Gina said was the first useful thing anybody had ever sent there.', 3.6);
+  dismiss(g, look);
+  g.removeCar(van);
+  homeAsTony(g, p.human);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, '$2,000', 2000);
+}
+
+// ---------- 6. The Button ----------
+// The sit-down, with the telephone under a tea towel. Whoever walks in second is the one asking. Then Gina.
+
+async function theButton(g) {
+  const { bing } = g.places, p = g.player, along = g.choices?.button !== 'alone';
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('The Button', 'Friday night');
+  await phone(g, JUNIOR, 'Aldo wants a sit-down about his sister\'s boy and the oil. Tonight, the Pelican. Be there first. The man who walks in second is the man who is asking.');
+  g.hud.card();
+  if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+  const first = await against(g, bing.park, '<b>Drive</b> to the <b>Pink Pelican</b> before Aldo Ferro does.', 90, { r: 7 });
+  if (!first) {
+    await say(g, '', 'Aldo\'s car was already outside, which he would mention. Twice.', 3);
+    await reach(g, bing.park, 'Drive to the <b>Pink Pelican</b>.', { how: 'car', r: 7 });
+  }
+  await bingRoom(g, 'tableCam', room => {
+    const sit = (look, n) => actor(g, look, room.seats[n], room.seats[n].h, 'sit');
+    return { tony: sit('tony', 5), junior: sit('junior', 0), aldo: sit('johnnysack', 1), marco: sit('dealer', 2), chris: sit('christopher', 4) };
+  }, async cast => {
+    await say(g, '', 'Frankie had moved the telephone to the far end of the bar and put a tea towel over it, like a birdcage.', 3.6);
+    await talk(g, [
+      [JOHNNY, first ? 'Nico. You were here first. Good. Then you can tell me why my nephew\'s oil is back at Haskell.' : 'Nico. I was beginning to think you were not coming. Why is my nephew\'s oil back at Haskell?', cast.aldo],
+      [TONY, 'Because it was never his oil. Haskell has paid me since before he could drive.', cast.tony],
+      [MARCO, 'I found that pickup. Nobody can prove where.', cast.marco],
+    ]);
+    const a = await choose(g, 'How does Nico answer?', ['Respect: let Aldo finish, then show him the photograph (recommended)', 'Put the photograph on the table now']);
+    await talk(g, a === 0 ? [
+      [TONY, 'Go on, Aldo. Say the rest.', cast.tony],
+      [JOHNNY, '...The rest is that he is young, and he wants to be seen. Like yours.', cast.aldo],
+      [TONY, 'Then here he is, being seen. Outside the motor lodge, with Haskell\'s name on the door behind him.', cast.tony],
+      [JOHNNY, 'You let me finish first. That I will remember.', cast.aldo],
+    ] : [
+      [TONY, 'Here. Your nephew, the pickup, Haskell\'s name on the door. Taken from up the street, with a long lens.', cast.tony],
+      [JOHNNY, 'You put a picture of my sister\'s boy on the table before I finished my sentence. That I will remember.', cast.aldo],
+    ]);
+    const b = await choose(g, 'The deal', ["Deal: Marco keeps off your streets, and the name is Enzo's (recommended)", "Ask for Marco's bar tab back as well"]);
+    await talk(g, b === 0 ? [
+      [TONY, 'Marco stays off my streets. The pawnbroker, Mo, the bar. And this year the name is mine to give.', cast.tony],
+      [JOHNNY, 'Fine. Next year, Marco. If he learns to hang back.', cast.aldo],
+    ] : [
+      [TONY, 'And the tab. Every drink he put on it, back in an envelope.', cast.tony],
+      [JOHNNY, 'The name, yes. The tab, Nico, is beneath both of us. But fine. Marco, pay the man.', cast.aldo],
+      [MARCO, 'Eleven dollars. You did all this for eleven dollars.', cast.marco],
+    ]);
+    await talk(g, [
+      [JUNIOR, 'Then the name I put forward this year is Enzo Ricci. Sit up straight, it is your name.', cast.junior],
+      ...(along ? [
+        [CHRIS, 'Thank you, Uncle Serge. Nico. I will not let you down.', cast.chris],
+      ] : [
+        [CHRIS, 'I knew it! I said so! I said it at the park!', cast.chris],
+        [TONY, 'Sit down, Enzo.', cast.tony],
+      ]),
+    ]);
+  });
+  // Home, late. Enzo has been round already.
+  await roomScene(g, inRoom(kitchen(g), [-3.6, 2.8], [-4, -1.5], 1.6, 1.15), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    tony: actor(g, 'tony', roomSpot(q, -1.7, -1.5), WEST),
+  }), async cast => {
+    await talk(g, [
+      [CARMELA, 'Enzo was here. He would not sit down. He kept saying "it is done, it is done", like a boy who won a goldfish.', cast.carmela],
+      [CARMELA, 'Is that what you wanted for him, Nico? To be you?', cast.carmela],
+    ]);
+    const c = await choose(g, 'Gina is waiting for an answer', ['Calm: tell her he earned it, and you will keep him close (recommended)', 'Tell her you nearly said no']);
+    await talk(g, c === 0 ? [
+      [TONY, 'He earned it. He hung back when I told him to. I will keep him close.', cast.tony],
+      [CARMELA, 'Close. Closer than you keep the rest of it, I hope.', cast.carmela],
+    ] : [
+      [TONY, 'I nearly said no. Twice. Once to a doctor and once to a steering wheel.', cast.tony],
+      [CARMELA, 'Next time, say it to him. He might listen to you. Nobody else in this family does.', cast.carmela],
+    ]);
+    await talk(g, [[CARMELA, 'And the olive oil is very good. Tell Haskell thank you. Not you. Haskell.', cast.carmela]]);
+  }, { night: 1 });
+  homeAsTony(g, p.human);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Episode fifteen complete', 5000);
+}
+
 // ---------- The episodes ----------
 
 const EPISODES = [
@@ -5074,6 +5505,8 @@ const EPISODES = [
     titles: ['Local Postmark', 'Tuesday Visitor', 'Fourteen Years', 'Room Two', 'Under the Seat', 'The Night Truck'] },
   { name: 'Episode Fourteen', title: 'Anytime', missions: [whoKnew, afterHours, anythingAtAll, lastOrders, partyLine, anytime],
     titles: ['Who Knew', 'After Hours', 'Anything at All', 'Last Orders', 'Party Line', 'Anytime'] },
+  { name: 'Episode Fifteen', title: 'The Button', missions: [openBooks, somebodyElses, sponsor, nightShift, loadOut, theButton],
+    titles: ['Open Books', "Somebody Else's Street", 'Sponsor', 'Night Shift', 'Load Out', 'The Button'] },
 ];
 
 // ---------- Medals, and a bonus goal on every mission ----------
@@ -5171,6 +5604,12 @@ const MEDALS = [
   [150, 210, 'noGun', 'Petey is innocent: no shots fired'], // est.
   [150, 210, 'cargo', 'Not one cannoli on the road'], // est.
   [150, 210, 'quickLeg', 'At Bean Scene in 1:15', { leg: 'before she says', secs: 75 }], // est.
+  [150, 210, 'noStar', 'Ask round quietly: no police'], // est.
+  [150, 210, 'noGun', "Marco's friends get fists, not bullets"], // est.
+  [150, 210, 'noStar', 'Thursday stays quiet: no police'], // est.
+  [150, 210, 'noStar', 'A quiet night shift: no police'], // est.
+  [150, 210, 'cargo', 'Not one case of oil on the road'], // est.
+  [150, 210, 'quickLeg', 'At the Pelican in 1:30', { leg: 'before Aldo', secs: 90 }], // est.
 ];
 // The checks a bonus goal can make, all on what the game already keeps: stars (g.wanted), checkpoint returns (g.revived,
 // main.js), shots (g.shots, combat.js), passers-by he killed (Ped.killed, entities.js), cargo meters that failed (g.spills,
@@ -5607,7 +6046,7 @@ const HUBS = {
 const STARTS = {
   sitDown: 'satriale', fortySixLong: 'bing', theMotel: 'bing', complaints: 'bing', inThePaper: 'bing', didntHurtNobody: 'bing', figurehead: 'bing',
   theTail: 'melfi', denial: 'melfi', starterMotor: 'melfi', theBoard: 'melfi', nineteenSixtySeven: 'melfi', sundaes: 'melfi',
-  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi',
+  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi', sponsor: 'melfi',
   farEastPacific: 'kates',
 };
 // Who a job's first scenes put in the street. Their skins are painted while he is on his way to its marker, one every half
@@ -5627,6 +6066,7 @@ const CAST = new Map([
   [secondHalf, ['mikey', 'eddie']], [firstNight, ['christopher', 'carmela', 'tony']], [darkroom, ['mikey', 'rocco']], [faceDown, ['junior', 'tony', 'silvio', 'mikey', 'christopher']], [overTheBridge, ['mikey', 'junior', 'christopher']],
   [localPostmark, ['rocco', 'hesh', 'pussy']], [tuesdayVisitor, ['mikey', 'agent', 'junior']], [roomTwo, ['mikey', 'christopher']], [underTheSeat, ['christopher']], [nightTruck, ['mikey', 'carmela', 'tony']],
   [whoKnew, ['paulie', 'pussy', 'junior']], [afterHours, ['georgie', 'perrilyn']], [lastOrders, ['silvio', 'christopher', 'georgie']], [partyLine, ['silvio', 'tony', 'paulie', 'agent']], [anytime, ['carmela', 'agent', 'tony']],
+  [openBooks, ['junior', 'christopher', 'pussy']], [somebodyElses, ['dealer', 'trucker', 'kolar', 'christopher']], [nightShift, ['dealer']], [loadOut, ['trucker']], [theButton, ['junior', 'johnnysack', 'dealer', 'christopher', 'tony', 'carmela']],
 ]);
 // These follow straight on from the one before: the story does not stop between them.
 const CHAIN = new Set(['fredPeters', 'homeSick', 'theStakeout', 'theInterview', 'oneFace', 'theStreet', 'theRunway', 'ridelandSunday', 'closingTime', 'theBradbury']);
