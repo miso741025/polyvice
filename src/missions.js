@@ -6658,6 +6658,432 @@ async function firstToKnow(g) {
   await passed(g, 'Episode eighteen complete', 5000);
 }
 
+// ========== Episode Nineteen: Four in the Morning ==========
+// Marco went up the coast to his uncle's cousin's bakery. Three weeks later the bakery's van brings bread into Port Paloma
+// before dawn, with Marco at the wheel and a numbers book in the bread bags. Every line is written for the game.
+
+const DARIO = 'Dario Venn', BREAD = 0xe8dcc0;
+
+// ---------- 1. Fresh Bread ----------
+// A man sent away to bake does not drive back into the town he was sent from unless he wants something in it.
+
+async function freshBread(g) {
+  const { cafe, motel } = g.places, p = g.player, way = kerbWay(cafe.kerb, cafe.door), mway = kerbWay(motel.kerb, motel.office);
+  const lot = way(6), watch = way(-14), stop = mway(10), door = mway(10, -3.6), park = mway(32), NEED = 30;
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('Fresh Bread', 'Tuesday, four in the morning');
+  await phone(g, SILVIO, 'Nico. Sorry. I know what time it is. The bread for the bar just came, in a van. Guess who was driving the van.');
+  await phone(g, TONY, 'Frankie, it is four in the morning. I am not guessing anything.');
+  await phone(g, SILVIO, 'Marco. In a little white hat. He said Bean Scene is next, like I asked him for his whole route.');
+  g.hud.card();
+  const van = propCar(g, lot, cafe.kerb.h, BREAD, 'van');
+  await reach(g, watch, '<b>Drive</b> to <b>Bean Scene</b>. Park up the street from the bread van.', { how: 'car', r: 7 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, '', 'Lights off. A man in a little white hat, carrying trays of rolls into a coffee bar at a quarter past four. It was Marco.', 3.6);
+  p.locked = false;
+  // The stake-out, as at the pier: the clock runs only while he is at the wheel up the street, and still.
+  { const m = g.addMarker(watch.x, watch.z, 8);
+    let sat = 0, free = 0, last = g.time;
+    await g.until(() => {
+      const dt = Math.min(0.1, g.time - last);
+      last = g.time;
+      if (p.locked || g.paused) return false;
+      free += dt;
+      const still = p.car && Math.abs(p.car.speed) < 1 && near(p.pos, watch, 12);
+      if (still) sat += dt;
+      const left = clock(Math.max(0, Math.ceil(NEED - sat)));
+      g.hud.objective(still ? `Stake out Bean Scene: stay in the car and keep still. &nbsp; <b>${left}</b>` : `Get in the <b>car</b> up the street from Bean Scene, and keep still. &nbsp; <b>${left}</b>`);
+      return sat >= NEED || free > 120; // (two minutes of free play and the van leaves anyway: the bot is never left waiting)
+    });
+    g.removeMarker(m);
+    g.hud.objective(); }
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, '', 'The trays went in full and came out empty. Then a small paper bag came out on its own, and went on the passenger seat as if it were made of glass.', 3.8);
+  p.locked = false;
+  for (let tries = 0; ; tries++) {
+    if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+    dispatch(g, van, van.pos, motel.kerb, 9);
+    if (await tail(g, van, motel.kerb, '<b>Follow</b> the bread van, and don\'t lose it. Not too close: Marco knows your car.')) break;
+    if (tries >= 1) { await say(g, TONY, 'Lost him. I lost a bread van. Fine. The motor lodge: they always go back to the motor lodge.', 3.4); break; }
+    p.locked = true;
+    await say(g, '', 'Gone. Nico went back to Bean Scene, and so did the van: Marco had forgotten a tray.', 3);
+    await cut(g, () => { atWheel(g, watch); van.nav = null; van.pos.set(lot.x, 0, lot.z); van.heading = cafe.kerb.h; van.speed = 0; van.sync?.(); });
+    p.locked = false;
+  }
+  p.locked = true;
+  const marco = actor(g, 'dealer', door, toward(door, park));
+  await cut(g, () => { van.nav = null; van.pos.set(stop.x, 0, stop.z); van.heading = motel.kerb.h; van.speed = 0; van.sync?.(); atWheel(g, park); g.cam.fixed = null; });
+  await say(g, '', 'The motor lodge. Room four. Marco knocked twice, and a man in a windbreaker took the paper bag off him as if it were his breakfast.', 3.8);
+  await say(g, TONY, 'A bakery up the coast, and he still keeps a room in my town. What kind of bread needs a motor lodge?', 3.4);
+  await cut(g, () => { dismiss(g, marco); g.removeCar(van); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 2. Sesame ----------
+// The slip turned up in his own son's lunch. The quickest way to know how far the book reaches is to ask the men who buy the bread.
+
+async function sesame(g) {
+  const { satriale, bodyshop, diner } = g.places, p = g.player, ways = [satriale, bodyshop, diner].map(s => kerbWay(s.kerb, s.door));
+  // Who tells him what comes in the bread at each stop. A look of null is a passer-by.
+  const stops = [
+    ['paulie', PAULIE, [
+      [PAULIE, 'Bread comes at five. Sesame rolls in a paper bag, on top. In the bag, a slip. You write a number, you put in two dollars, the bag goes back on the van.', 1],
+      [TONY, 'And you play?'],
+      [PAULIE, 'Only Thursdays. Thursdays I feel lucky. I thought it was your book, Nico. Who else would dare, on this street?', 1],
+    ]],
+    ['pussy', PUSSY, [
+      [PUSSY, 'The boys in the shop love it. A roll for lunch, a number for the afternoon. The man who collects says it is all approved.', 1],
+      [TONY, 'Approved by who?'],
+      [PUSSY, 'He did not say. He had a very confident moustache. I assumed you.', 1],
+    ]],
+    [null, 'Counterman', [
+      ['Counterman', 'I sell the rolls with the slips in. I keep ten cents in the dollar. On Fridays a man called Dario comes for the envelope, and I do not ask.', 1],
+      [TONY, 'You sold one to a lady, for her son\'s lunch.'],
+      ['Counterman', '...The lady with the earrings? Mr. Bellacosta, I did not know. I would like to send her a cake.', 1],
+    ]],
+  ];
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Sesame', 'Wednesday afternoon');
+  await say(g, '', 'Benny came home from school with forty dollars, and Gina came into the kitchen holding a little slip of paper between two fingers.', 3.6);
+  g.hud.card();
+  await roomScene(g, inRoom(kitchen(g), [-3.6, 2.8], [-4, -1.5], 1.6, 1.15), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    tony: actor(g, 'tony', roomSpot(q, -1.7, -1.5), WEST),
+  }), async cast => {
+    await talk(g, [
+      [CARMELA, 'This was in the roll in Benny\'s lunch. From the luncheonette. "Sleepy Biscotti, fourth race, two dollars to win." He says the horse won.', cast.carmela],
+      [CARMELA, 'Is this yours, Nico? Look at me. Is my son\'s lunch your business now?', cast.carmela],
+      [TONY, 'It is not mine. On the kids. Which is why I am going to find out whose it is.', cast.tony],
+      [CARMELA, 'Then go and find out. And he is not keeping the forty dollars.', cast.carmela],
+    ]);
+  });
+  homeAsTony(g, p.human);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+  await rounds(g, ways.map(w => w(0)), "<b>Drive</b> round and ask the men who buy the bread what comes in it: <b>Mancuso's</b>, Mo's <b>body shop</b>, the <b>luncheonette</b>.", async k => {
+    const [look, , lines] = stops[k], at = ways[k](3, -2.4), who = look ? actor(g, look, at, toward(at, p.pos)) : extraAt(g, at, toward(at, p.pos));
+    p.locked = true;
+    if (p.car) p.car.speed = 0;
+    frame(g, p.pos, at, { dist: 4.6 });
+    await talk(g, lines.map(([name, text, them]) => [name, text, them ? who : null]));
+    who.play?.('interact', 'idle');
+    g.cam.fixed = null;
+    dismiss(g, who);
+    p.locked = false;
+  }, { r: 6 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, '', 'Three shops, three bread baskets, one van. A numbers book on his own streets, delivered warm, by the man his own table had sent away to bake.', 3.8);
+  await say(g, TONY, 'They did not send him to a bakery. They sent him to a bakery with a van.', 3);
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 3. Bread and Butter ----------
+// He showed Aldo respect last time and got his streets taken for it. Proof for the table, or the van, is decided here.
+
+async function breadAndButter(g) {
+  const p = g.player, office = g.places.doors.find(d => d.name === "Dr. Vos's office");
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Bread and Butter', "Thursday, four o'clock");
+  await say(g, '', 'He had eaten two sesame rolls on the way, out of spite. Neither of them had anything in it but sesame.');
+  g.hud.card();
+  await toMelfi(g, "Thursday. Drive to <b>Dr. Vos's office</b>.");
+  await therapy(g, [
+    [TONY, 'Three weeks ago I did a man a courtesy. I let his family deal with his family. Now he is selling my own bread back to me.'],
+    [MELFI, 'Selling you bread?'],
+    [TONY, 'It is a figure of speech. It is also actual bread. That part does not matter.'],
+    [MELFI, 'It sounds as if you feel your courtesy was taken for weakness.'],
+    [TONY, 'I could go to his uncle again, with proof, the polite way. Or I could just take away the thing he is using. A van, say.'],
+    [MELFI, 'Which of those would you respect, if somebody did it to you?'],
+  ]);
+  const proof = await choose(g, 'The bread van', ["Respect: bring proof to Aldo's table, the polite way (recommended)", 'Deal: take the van, bread, book and all']) === 0;
+  (g.choices ??= {}).van = proof ? 'proof' : 'take';
+  await therapy(g, proof ? [
+    [TONY, 'The polite way. I get his book, and I put it on the table in front of his uncle. Then nobody can say I started anything.'],
+    [MELFI, 'You seem to care a great deal about who started it.'],
+    [TONY, 'In my business, who started it is the whole business.'],
+  ] : [
+    [TONY, 'I take the van. A van does not need a sit-down. A van needs a driver.'],
+    [MELFI, 'And his uncle?'],
+    [TONY, 'His uncle can have it back. Empty. Smelling of rolls. That is a sentence too.'],
+  ]);
+  if (p.car) g.leaveCar();
+  place(g, office.outside, SOUTH);
+  g.cam.fixed = null;
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 4. The Back of the Van ----------
+// Proof: the book is in the glove box while Marco has breakfast in room four, and Dario walks the pavement.
+// Take: the van stands outside Bean Scene with the engine warm, while Marco carries the trays in.
+
+async function backOfTheVan(g) {
+  const { motel, cafe, satriale } = g.places, p = g.player, proof = g.choices?.van !== 'take';
+
+  await g.wait(1);
+  if (proof) {
+    const mway = kerbWay(motel.kerb, motel.office), stop = mway(10), park = mway(32), lp = mway(-7, -3), turn = mway(-1, -3), seat = mway(10, -2.2);
+    g.setNight(1);
+    g.hud.card('The Back of the Van', 'The motor lodge, half past five');
+    await say(g, '', 'After the round Marco had breakfast in room four, and the van sat outside with the book in the glove box. Every morning. Bakers are creatures of habit.', 3.8);
+    g.hud.card();
+    const van = propCar(g, stop, motel.kerb.h, BREAD, 'van'), look = actor(g, 'kolar', lp, toward(lp, turn));
+    await reach(g, park, '<b>Drive</b> to the <b>motor lodge</b>. Park up the street from the bread van.', { how: 'car', r: 7 });
+    p.locked = true;
+    if (p.car) { p.car.speed = 0; g.leaveCar(); }
+    await say(g, '', 'The man in the windbreaker walked up and down in front of the office eating a roll, with one eye on the van. Dario.', 3.4);
+    // The same beat as Bait: the van's door is 11 m past the end of his walk (the pilot keeps 9.5 m from a watcher).
+    const walk = beat(g, look, [lp, turn], { r: 5, speed: 1.3 });
+    const from = { x: p.pos.x, z: p.pos.z };
+    let out = false; // the last try: Dario goes in for a coffee, and the pavement is empty
+    const coffee = () => { out = true; walk.on = false; look.group.visible = false; };
+    for (let tries = 0; !out; tries++) {
+      walk.seen = false;
+      p.locked = false;
+      const m = g.addMarker(seat.x, seat.z, 1.5);
+      g.hud.objective('Get to the <b>bread van</b> on foot without being seen. Keep away from <b>Dario</b>: he is red on the radar.');
+      let best = Infinity, still = 0, last = g.time;
+      await g.until(() => {
+        const d = Math.hypot(p.pos.x - seat.x, p.pos.z - seat.z), dt = Math.min(0.1, g.time - last);
+        last = g.time;
+        if (d < best - 1) { best = d; still = 0; } else if (!p.locked && !g.paused) still += dt;
+        return still > 90 || walk.seen || (near(p.pos, seat, 1.9) && !p.car);
+      });
+      g.removeMarker(m);
+      g.hud.objective();
+      if (!walk.seen && still <= 90) break;
+      if (!walk.seen) { await cut(g, coffee); break; } // ninety seconds getting no nearer: Dario goes in for his coffee
+      p.locked = true;
+      await say(g, DARIO, 'Hey! The bread is sold, pal! All of it!', 2.2);
+      await fade(g, 1, 0.8);
+      await say(g, '', 'Nico said he only wanted one roll. Dario said they were all spoken for. Nico walked back up the street and waited.', 3.4);
+      place(g, from, toward(from, stop));
+      walk.reset();
+      if (tries >= 1) coffee();
+      await fade(g, 0, 0.8);
+    }
+    if (out) {
+      p.locked = false;
+      await reach(g, seat, 'Dario went in for a coffee. Get to the <b>bread van</b> now.', { r: 1.5, how: 'foot' });
+    }
+    walk.on = false;
+    p.locked = true;
+    p.heading = toward(p.pos, stop);
+    p.human.play('interact', 'idle');
+    { let held = 0, last = g.time;
+      await g.until(() => {
+        const dt = Math.min(0.1, g.time - last); last = g.time;
+        held = g.keys.KeyF ? held + dt : Math.max(0, held - dt * 0.35);
+        if (g.consume('KeyF')) held += 0.5;
+        const pips = Math.min(8, Math.floor(held / 2.4 * 8));
+        g.hud.objective(`Open the van door quietly: press <b>F</b> and hold it. &nbsp; <b>${'▮'.repeat(pips)}${'▯'.repeat(8 - pips)}</b>`);
+        return held >= 2.4;
+      });
+      g.hud.objective(); }
+    g.sfx?.carDoor();
+    await say(g, '', 'In the glove box, under a paper bag of rolls: a school exercise book. Mancuso\'s, the body shop, the luncheonette, and every two dollars since the first of the month.', 4);
+    await handover(g, null, { from: { x: seat.x, z: seat.z }, hex: 0x2f56c8 });
+    p.locked = false;
+    await reach(g, park, '<b>Walk</b> back to your car, quietly.', { r: 3, how: 'foot' });
+    p.locked = true;
+    await fade(g, 1, 1);
+    dismiss(g, look);
+    g.removeCar(van);
+    await say(g, '', 'He read it over a coffee. Marco had very neat handwriting, for a man who used to have people to write for him.', 3.4);
+    await fade(g, 0, 1);
+  } else {
+    const way = kerbWay(cafe.kerb, cafe.door), sway = kerbWay(satriale.kerb, satriale.door), lot = way(6), watch = way(-14);
+    g.setNight(1);
+    g.hud.card('The Back of the Van', 'Bean Scene, a quarter past four');
+    await say(g, '', 'Marco left the engine running while he carried the trays in. Every morning. Bakers are creatures of habit, and so are men who have never had a van taken off them.', 4);
+    g.hud.card();
+    const van = propCar(g, lot, cafe.kerb.h, BREAD, 'van');
+    await reach(g, watch, '<b>Drive</b> to <b>Bean Scene</b>. Park up the street from the bread van.', { how: 'car', r: 7 });
+    p.locked = true;
+    if (p.car) { p.car.speed = 0; g.leaveCar(); }
+    await say(g, '', 'Marco went in with the first tray. Ten trays, a minute a tray, and he stops to tell the girl at the counter about his uncle.', 3.4);
+    p.locked = false;
+    await wantCar(g, van, 'Get in the <b>bread van</b> while Marco is inside with the trays.');
+    p.locked = true;
+    van.speed = 0;
+    await say(g, DARIO, 'Marco! MARCO! The van!', 1.8);
+    p.locked = false;
+    await shake(g, '<b>Lose the</b> grey sedan before you take the van anywhere near Mancuso\'s.', { color: GREY });
+    const at = { x: van.pos.x, z: van.pos.z, h: van.heading };
+    const load = careful(g, 'The bread', 'A rack of rolls went over on a corner, and the van smelled like a bakery after a fight. He stacked it again and started over.', () => { if (p.car) g.leaveCar(); van.pos.set(at.x, 0, at.z); van.heading = at.h; van.speed = 0; g.enterCar(van); });
+    await load.to(sway(0), '<b>Drive</b> the van to <b>Mancuso\'s</b>. Gently: the bread is on open racks.', van);
+    load.stop();
+    p.locked = true;
+    if (p.car) p.car.speed = 0;
+    await fade(g, 1, 1);
+    await say(g, '', 'Augie unloaded forty dozen rolls into the back of the shop, and found the book in the glove box: every two dollars since the first of the month, in very neat handwriting.', 4.2);
+    await say(g, PAULIE, 'Free rolls for the whole street today, Nico. Sesame. And nothing inside but sesame.', 3);
+    g.removeCar(van);
+    homeAsTony(g, p.human);
+    await fade(g, 0, 1);
+  }
+  g.pardon();
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 5. Rolling Pin ----------
+// A book has a collector, and collectors come on Fridays. A chase, not a beating: Nico needs him talking.
+
+async function rollingPin(g) {
+  const { satriale } = g.places, p = g.player, proof = g.choices?.van !== 'take', sway = kerbWay(satriale.kerb, satriale.door);
+  const ap = sway(3, -2.4), dp = sway(-5, -2.4);
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Rolling Pin', 'Friday morning');
+  await phone(g, PAULIE, proof
+    ? 'Nico. It is Friday. The fella with the moustache is outside my shop for the bread money, like nothing happened. Do I give it to him?'
+    : 'Nico. It is Friday. The fella with the moustache is outside my shop asking who took his van. He is being very loud about rolls.');
+  await phone(g, TONY, 'Give him a coffee. Keep him talking. I am coming.');
+  g.hud.card();
+  const augie = actor(g, 'paulie', ap, toward(ap, dp)), dario = actor(g, 'kolar', dp, toward(dp, ap));
+  await reach(g, sway(0), '<b>Drive</b> to <b>Mancuso\'s</b>. Augie is keeping Dario talking.', { r: 6 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  frame(g, p.pos, dp, { dist: 4.6 });
+  await say(g, DARIO, 'That is his car. That is Bellacosta. Augie, you said he was in Florida!', 2.6);
+  await say(g, PAULIE, 'I said he was in a car. I may have mumbled.', 2.2);
+  g.cam.fixed = null;
+  dismiss(g, augie);
+  fistsOnly(g, true);
+  g.noHeat = true;
+  const runner = g.addNpc(dario, { health: 500, ai: 'flee', cash: 0, stays: true });
+  runner.threat = p.pos.clone();
+  const found = quarry(g, runner);
+  p.locked = false;
+  g.hud.objective('<b>Chase down</b> Dario: he ran with the bread money. Follow the <b>yellow arrow</b>.');
+  // A baker is no sprinter: boxed in behind the shop, or out of breath, he gives up once Nico is on him.
+  let mark = { x: runner.pos.x, z: runner.pos.z }, still = g.time;
+  const t0 = g.time;
+  await g.until(() => {
+    const near = Math.hypot(runner.pos.x - p.pos.x, runner.pos.z - p.pos.z);
+    if (Math.hypot(runner.pos.x - mark.x, runner.pos.z - mark.z) > 1.5) { mark = { x: runner.pos.x, z: runner.pos.z }; still = g.time; }
+    return runner.health < 500 || (!p.car && near < 2.5) || (near < 12 && g.time - still > 5) || (near < 30 && g.time - t0 > 100);
+  });
+  found();
+  g.hud.objective();
+  g.removeNpc(dario);
+  fistsOnly(g, false);
+  p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  approach(g, dario, 1.2);
+  frame(g, p.pos, dario.group.position, { dist: 4.2, height: 1.3, lift: 0.5 });
+  await talk(g, [
+    [DARIO, 'Okay! Okay! I bake! I am a baker! I only collect on Fridays!', dario],
+    [TONY, 'Who is the book for, Dario? Aldo?', p],
+    [DARIO, 'Aldo? Aldo does not know. If Aldo knew, I would be at the bottom of a flour sack. It is Marco\'s. All Marco\'s.', dario],
+    [DARIO, proof
+      ? 'He says when he has enough, he walks into his uncle\'s house with a suitcase of money, and his uncle has to take him back. A book of his own, he calls it.'
+      : 'Without the van he cannot collect, and without the book he does not even know who owes. He sat in the bakery last night and cried into the dough.', dario],
+    [TONY, 'And what are you?', p],
+    [DARIO, 'Honestly? The guy who drives on the days Marco oversleeps.', dario],
+  ]);
+  await handover(g, dario, { hex: 0xb08a5a });
+  g.cam.fixed = null;
+  await say(g, TONY, 'A nephew with a book of his own, and his uncle has no idea. I know exactly how that dinner is going to go.', 3.4);
+  await cut(g, () => { dismiss(g, dario); g.cam.fixed = null; });
+  g.noHeat = false;
+  g.pardon();
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 6. Four in the Morning ----------
+// Family against business, answered twice: by Aldo at the table about his nephew, and by Gina at the kitchen table about her son.
+
+async function fourInTheMorning(g) {
+  const { bing } = g.places, p = g.player, proof = g.choices?.van !== 'take';
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('Four in the Morning', 'Saturday night');
+  await phone(g, JUNIOR, proof
+    ? 'Nico. Aldo has read your exercise book. He went very quiet. The Pelican, tonight. He is bringing the baker.'
+    : 'Nico. Aldo wants his cousin\'s van back, and he would like to know why it smells of sesame and money. The Pelican, tonight.');
+  g.hud.card();
+  await reach(g, bing.park, '<b>Drive</b> to the <b>Pink Pelican</b>. Aldo is bringing Marco.', { r: 7 });
+  await bingRoom(g, 'tableCam', room => {
+    const sit = (look, n) => actor(g, look, room.seats[n], room.seats[n].h, 'sit');
+    return { tony: sit('tony', 5), junior: sit('junior', 0), aldo: sit('johnnysack', 1), marco: sit('dealer', 2), chris: sit('christopher', 4) };
+  }, async cast => {
+    await say(g, '', 'Frankie put a basket of rolls in the middle of the table. Nobody touched it. Aldo moved it to the floor.', 3.2);
+    await talk(g, [
+      [JOHNNY, 'Three weeks. I send my sister\'s son up the coast to learn honest work, and he comes back down the coast with a book.', cast.aldo],
+      [MARCO, 'It was going to be a present, Uncle. A suitcase of money. You would have had to take me back.', cast.marco],
+      [JUNIOR, proof ? 'Nico brought you the book himself, Aldo. He could have kept it. Remember that.' : 'Nico took the van off your nephew outside a coffee bar. He could have done it outside a newspaper. Remember that.', cast.junior],
+    ]);
+    const a = await choose(g, 'What does Nico ask for?', ['Respect: Aldo decides about his nephew; Nico asks only for his streets back (recommended)', 'Deal: the bread route stays, and it is Nico\'s now']);
+    await talk(g, a === 0 ? [
+      [TONY, 'He is your family, Aldo. You decide. I only want my streets back, and my son\'s lunch to be a sandwich.', cast.tony],
+      [JOHNNY, 'Done. Every two dollars goes back to the shops, out of my pocket. And my nephew goes further up the coast. A bakery with no van. He can deliver on a bicycle.', cast.aldo],
+    ] : [
+      [TONY, 'The route is good. The bread is good. The van and the route are mine now, and Marco keeps his fingers out of both.', cast.tony],
+      [JUNIOR, 'He is right, Aldo. It is a nice little business. It was only ever in the wrong hands.', cast.junior],
+      [JOHNNY, 'Fine. The van is yours. My nephew goes further up the coast, to a bakery with no van. He can deliver on a bicycle.', cast.aldo],
+    ]);
+    await say(g, '', 'Enzo leaned across the table. He had been waiting all evening to say something, and everybody could see it.', 3);
+    const b = await choose(g, 'Enzo wants to run the bread route', ['Calm: tell him a made man does not drive a bread van (recommended)', 'Let him have it, for one month']);
+    await talk(g, b === 0 ? [
+      [TONY, 'You are a made man, Enzo. Made men do not get up at four to carry rolls. Find somebody who needs the work.', cast.tony],
+      [CHRIS, 'Okay. But I get the first sesame roll. Every day. For life.', cast.chris],
+    ] : [
+      [TONY, 'One month. Four in the morning. If you are late once, it goes to Augie.', cast.tony],
+      [CHRIS, 'Four in the morning. Okay. What time is that, exactly?', cast.chris],
+    ]);
+    const c = await choose(g, 'Marco looks at Nico for the last time', ['Agree: shake his hand, and wish him luck with the bicycle (recommended)', 'Say nothing']);
+    await talk(g, c === 0 ? [
+      [MARCO, '...Thank you. I think. Nobody has wished me luck since I was nine.', cast.marco],
+      [JOHNNY, 'You see, Marco? That is what a courtesy looks like. Learn it on the bicycle.', cast.aldo],
+    ] : [
+      [MARCO, 'You know the worst part? I was good at it. The bread, I mean. The bread was very good.', cast.marco],
+      [JUNIOR, 'It was. That is the only thing anybody will say in your favour tonight.', cast.junior],
+    ]);
+  });
+  // Home, late. She waited up, with the slip still on the table.
+  await roomScene(g, inRoom(kitchen(g), [-3.6, 2.8], [-4, -1.5], 1.6, 1.15), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    tony: actor(g, 'tony', roomSpot(q, -1.7, -1.5), WEST),
+  }), async cast => {
+    await talk(g, [
+      [CARMELA, 'Well? Is my son\'s lunch your business?', cast.carmela],
+      [TONY, 'Nobody\'s business. From Monday the bread is just bread again.', cast.tony],
+      [CARMELA, 'And the forty dollars? He has already spent eleven of it on a model aeroplane.', cast.carmela],
+    ]);
+    const d = await choose(g, 'The forty dollars Benny won', ['Calm: it goes back, and Nico pays the eleven himself (recommended)', 'Let him keep it: he picked the horse']);
+    await talk(g, d === 0 ? [
+      [TONY, 'It goes back. All forty. I pay the eleven. He keeps the aeroplane, and the lesson.', cast.tony],
+      [CARMELA, 'Thank you. For a minute I thought you were going to tell me he earned it.', cast.carmela],
+    ] : [
+      [TONY, 'He picked the horse, Gina. Nobody picks a horse called Sleepy Biscotti. The kid has an eye.', cast.tony],
+      [CARMELA, 'That is exactly what I was afraid you would say. I married a man who thinks that is a compliment.', cast.carmela],
+    ]);
+    await talk(g, [[CARMELA, 'Go to bed. And tomorrow, buy the bread somewhere with a bell on the door, and no van.', cast.carmela]]);
+  }, { night: 1 });
+  homeAsTony(g, p.human);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Episode nineteen complete', 5000);
+}
+
 // ---------- The episodes ----------
 
 const EPISODES = [
@@ -6697,6 +7123,8 @@ const EPISODES = [
     titles: ['Envelopes', 'Table for One', 'Negatives', 'Room Four', 'The Table', 'A Nice One'] },
   { name: 'Episode Eighteen', title: 'Question Marks', missions: [questionMarks, longLens, twoUncles, bait, lastRide, firstToKnow],
     titles: ['Question Marks', 'Long Lens', 'Two Uncles', 'Bait', 'Last Ride', 'First to Know'] },
+  { name: 'Episode Nineteen', title: 'Four in the Morning', missions: [freshBread, sesame, breadAndButter, backOfTheVan, rollingPin, fourInTheMorning],
+    titles: ['Fresh Bread', 'Sesame', 'Bread and Butter', 'The Back of the Van', 'Rolling Pin', 'Four in the Morning'] },
 ];
 
 // ---------- Medals, and a bonus goal on every mission ----------
@@ -6817,6 +7245,12 @@ const MEDALS = [
   [150, 210, 'noStar', 'Friday stays quiet: no police'], // est.
   [150, 210, 'noGun', 'Nobody hears a thing: no shots fired'], // est.
   [150, 210, 'noGun', 'In one piece, Aldo said: no shots fired'], // est.
+  [150, 210, 'noStar', 'A family matter: no police'], // est.
+  [150, 210, 'noStar', 'A quiet stake-out at four: no police'], // est.
+  [150, 210, 'noGun', 'Bread, not bullets: no shots fired'], // est.
+  [150, 210, 'noStar', 'Thursday stays quiet: no police'], // est.
+  [150, 210, 'noGun', 'In and out of the van: no shots fired'], // est.
+  [150, 210, 'noGun', 'Dario gets fists, not bullets'], // est.
   [150, 210, 'noStar', 'A family matter: no police'], // est.
 ];
 // The checks a bonus goal can make, all on what the game already keeps: stars (g.wanted), checkpoint returns (g.revived,
@@ -7254,7 +7688,7 @@ const HUBS = {
 const STARTS = {
   sitDown: 'satriale', fortySixLong: 'bing', theMotel: 'bing', complaints: 'bing', inThePaper: 'bing', didntHurtNobody: 'bing', figurehead: 'bing',
   theTail: 'melfi', denial: 'melfi', starterMotor: 'melfi', theBoard: 'melfi', nineteenSixtySeven: 'melfi', sundaes: 'melfi',
-  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi', sponsor: 'melfi', benefitOfDoubt: 'melfi', negatives: 'melfi', twoUncles: 'melfi',
+  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi', sponsor: 'melfi', benefitOfDoubt: 'melfi', negatives: 'melfi', twoUncles: 'melfi', breadAndButter: 'melfi',
   farEastPacific: 'kates',
 };
 // Who a job's first scenes put in the street. Their skins are painted while he is on his way to its marker, one every half
@@ -7278,6 +7712,7 @@ const CAST = new Map([
   [copies, ['rocco']], [thursdayNights, ['christopher', 'agent']], [straightAnswer, ['christopher', 'tony']], [onLoan, ['agent', 'christopher']], [sundayBest, ['junior', 'silvio', 'paulie', 'christopher', 'tony', 'carmela']],
   [envelopes, ['paulie', 'pussy', 'trucker']], [tableForOne, ['dealer']], [roomFour, ['kolar', 'junior']], [theTable, ['junior', 'johnnysack', 'dealer', 'christopher', 'tony']], [aNiceOne, ['christopher', 'carmela', 'tony']],
   [questionMarks, ['paulie', 'pussy', 'junior']], [longLens, ['dealer', 'agent']], [bait, ['johnnysack', 'dealer', 'agent', 'kolar']], [lastRide, ['dealer']], [firstToKnow, ['carmela', 'tony', 'junior', 'johnnysack', 'dealer', 'christopher']],
+  [freshBread, ['dealer']], [sesame, ['carmela', 'tony', 'paulie', 'pussy']], [backOfTheVan, ['kolar']], [rollingPin, ['paulie', 'kolar']], [fourInTheMorning, ['junior', 'johnnysack', 'dealer', 'christopher', 'tony', 'carmela']],
 ]);
 // These follow straight on from the one before: the story does not stop between them.
 const CHAIN = new Set(['fredPeters', 'homeSick', 'theStakeout', 'theInterview', 'oneFace', 'theStreet', 'theRunway', 'ridelandSunday', 'closingTime', 'theBradbury']);
