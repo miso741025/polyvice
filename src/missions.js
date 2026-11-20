@@ -7084,6 +7084,414 @@ async function fourInTheMorning(g) {
   await passed(g, 'Episode nineteen complete', 5000);
 }
 
+// ========== Episode Twenty: Sleepy Biscotti ==========
+// Benny won forty dollars on a horse called Sleepy Biscotti, and somebody noticed. Two weeks later there is a book at
+// Our Lady of the Bay, lunch money on horses, and Benny is the bookie. Every line is written for the game.
+
+const HOLLIS = 'Hollis Grebe', WAGON = 0x4a6b3a;
+
+// ---------- 1. Lunch Money ----------
+// He follows instead of grabbing the boy: he has to know who the man in the wagon is before Benny knows he is known.
+
+async function lunchMoney(g) {
+  const { school, park } = g.places, p = g.player, wait = spot(school.gate, -16, 0), mp = spot(school.gate, -3, 3), bp = spot(school.gate, 1.5, 3.4);
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Lunch Money', 'Monday, a quarter to three');
+  await phone(g, PRINCIPAL, 'Mr. Bellacosta? Our Lady of the Bay. We found betting slips in eleven lunch boxes this morning. Horses. Every slip is initialled "B.B."');
+  await phone(g, TONY, 'B.B. Could be anybody. Could be a Bobby.');
+  await phone(g, PRINCIPAL, 'We have no Bobby. School is out at three. I would like a word at the gate before he goes home.');
+  g.hud.card();
+  const wagon = propCar(g, school.gate, EAST, WAGON, 'suv'), principal = actor(g, 'principal', mp, toward(mp, wait));
+  await reach(g, wait, '<b>Drive</b> to <b>Our Lady of the Bay</b>. Park up the street from the gate.', { how: 'car', r: 7 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  frame(g, p.pos, mp, { dist: 4.6 });
+  await talk(g, [
+    [PRINCIPAL, 'Two dollars to win, a dollar each way. Eleven children, the same three horses. The handwriting on the slips is beautiful. We have been trying to teach him that for years.', principal],
+    [TONY, 'He is thirteen. Where does a thirteen-year-old get horses?'],
+    [PRINCIPAL, 'I hoped you would tell me. And Mr. Bellacosta: that car by the gate is not anybody\'s mother.', principal],
+  ]);
+  const aj = actor(g, 'aj', bp, toward(bp, school.gate));
+  g.cam.fixed = null;
+  walkTo(g, aj, [school.gate], 1.4).catch(() => {});
+  await say(g, '', 'Benny came out of the gate with his bag on one shoulder, looked both ways like a grown man, and got into the front of a green station wagon.', 3.8);
+  await cut(g, () => { aj.walking = null; dismiss(g, aj, principal); g.cam.fixed = null; }, 0.5);
+  p.locked = false;
+  for (let tries = 0; ; tries++) {
+    if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+    dispatch(g, wagon, school.gate, park.kerb, 9);
+    if (await tail(g, wagon, park.kerb, '<b>Follow</b> the green station wagon, and don\'t lose it. Not too close: Benny knows your car.')) break;
+    if (tries >= 1) { await say(g, TONY, 'Gone. Fine. A man who gives children horses gives them in the park. They always go to the park.', 3.4); break; }
+    p.locked = true;
+    await say(g, '', 'Gone. Nico went back to the gate, and so did the wagon: Benny had left his lunch box on the wall.', 3);
+    await cut(g, () => { atWheel(g, wait); wagon.nav = null; wagon.pos.set(school.gate.x, 0, school.gate.z); wagon.heading = EAST; wagon.speed = 0; wagon.sync?.(); });
+    p.locked = false;
+  }
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  wagon.nav = null; wagon.speed = 0;
+  await say(g, '', 'The park. The man from the wagon walked Benny to the pond and gave him a newspaper folded open at the races, the way you give a boy a comic.', 4);
+  await say(g, TONY, 'Thirteen. He is thirteen, and somebody is giving him a form guide.', 3);
+  await cut(g, () => { g.removeCar(wagon); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 2. The Form Guide ----------
+// A father cannot ask his son what he is doing without the son lying. He can listen. The picture is how Augie names the man.
+
+async function formGuide(g) {
+  const { park } = g.places, p = g.player, bench = park.bench, bp = spot(bench, 0, 1.2), hp = spot(bench, 1.4, 1.2);
+  const overheard = [
+    [HOLLIS, 'Tuesday at the coast track. Number four, Velvet Ankle. Mr. Kilbane says she cannot lose. Mr. Kilbane is never wrong.'],
+    [AJ, 'He was wrong about the last three. Theo lost a whole week of lunches on Dutch Admiral.'],
+    [HOLLIS, 'That is the game, kid. You write the slips, you bring me the money, the money goes in the tin. Ten cents in the dollar is yours.'],
+    [AJ, 'My dad would say ten cents is an insult. My dad would say twenty.'],
+  ];
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('The Form Guide', 'Tuesday, after school');
+  await say(g, '', 'He told Gina he was going to the bank. He went to the park, and sat in the car with the engine off, like a man waiting for his own son.', 3.8);
+  g.hud.card();
+  const aj = actor(g, 'aj', bp, toward(bp, hp)), hollis = actor(g, 'trucker', hp, toward(hp, bp));
+  await reach(g, park.kerb, '<b>Drive</b> to the <b>park</b>. Benny is on the bench by the pond.', { r: 8 });
+  p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  await say(g, '', 'On the bench by the pond: Benny, and the man from the wagon, with a racing paper between them like a chessboard.', 3.6);
+  p.locked = false;
+  // Close enough to hear, not so close the boy looks round. Benny is red on the radar; his radius is how near is too near.
+  const blip = { x: bp.x, z: bp.z, color: '#ff3b4a', r: 4 };
+  g.blips.push(blip);
+  for (let tries = 0; ; tries++) {
+    let heard = 0, free = 0, last = g.time, seen = false, line = -1;
+    await g.until(() => {
+      const dt = Math.min(0.1, g.time - last), d = Math.hypot(p.pos.x - bp.x, p.pos.z - bp.z), close = !p.car && d < 12; // (12 m: the pilot keeps 9.5 m from a watcher)
+      last = g.time;
+      if (!p.locked && !g.paused) { free += dt; if (close) heard += dt; }
+      seen = !p.car && d < 4;
+      const k = Math.floor(heard / 4);
+      if (close && k !== line && overheard[k]) { line = k; g.hud.subtitle(...overheard[k]); }
+      g.eavesdrop = { near: close, seen, radius: 12, meter: Math.min(1, heard / 16) };
+      const pips = Math.round(Math.min(1, heard / 16) * 8);
+      g.hud.objective(`<b>Walk</b> close enough to hear them, on foot, but keep away from Benny: don't let him see you. &nbsp; <b>${'▮'.repeat(pips)}${'▯'.repeat(8 - pips)}</b>`);
+      return seen || heard >= 16 || free > 90; // (90 s and he has heard enough: the bot is not left standing in the park)
+    });
+    g.hud.objective();
+    g.hud.subtitle();
+    if (!seen || tries >= 2) break;
+    p.locked = true;
+    await fade(g, 1, 0.6);
+    await say(g, '', 'Benny started to look round. Nico became very interested in a duck, and followed the duck all the way back to the car.', 3.4);
+    place(g, park.kerb, toward(park.kerb, bp));
+    await fade(g, 0, 0.6);
+    p.locked = false;
+  }
+  g.eavesdrop = null;
+  g.blips.splice(g.blips.indexOf(blip), 1);
+  p.locked = true;
+  hollis.play?.('interact', 'idle');
+  await say(g, '', 'Benny counted out a stack of dollar bills. The man put them in a biscuit tin with a little terrier on the lid.', 3.6);
+  await photograph(g, hollis, 'the man with the form guide', spot(p.pos, 0, 0));
+  g.cam.fixed = null;
+  await cut(g, () => { dismiss(g, aj, hollis); g.cam.fixed = null; });
+  await say(g, '', 'Augie looked at the picture for about a second.', 2.4);
+  await phone(g, PAULIE, 'Hollis Grebe. He touts for Dusty Kilbane, who used to sell by that same pond. Kilbane went straight, he says. Horses are straight, he says.');
+  await say(g, TONY, 'My son is working for Dusty Kilbane. For ten cents in the dollar.', 3);
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 3. Like Father ----------
+// Benny copied Marco's scheme in miniature, and copied Nico. Family (talk to the boy) or business (the man) is decided here.
+
+async function likeFather(g) {
+  const p = g.player, office = g.places.doors.find(d => d.name === "Dr. Vos's office");
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Like Father', "Wednesday, four o'clock");
+  await say(g, '', 'He had the slips in his pocket. Eleven of them. He had read them all twice, and the handwriting was very good.');
+  g.hud.card();
+  await toMelfi(g, "Wednesday. Drive to <b>Dr. Vos's office</b>.");
+  await therapy(g, [
+    [TONY, 'My son is running a book at his school. Lunch money. Horses. He keeps very neat records.'],
+    [MELFI, 'How do you feel about that?'],
+    [TONY, 'Proud. And then sick. And then proud again, which makes me sicker.'],
+    [MELFI, 'Children copy what they admire. Sometimes the copy shows us the original more clearly than we would like.'],
+    [TONY, 'There is a man who gives him the horses. I could talk to my son first. Or I could go and talk to the man, the way I talk to men.'],
+    [MELFI, 'Which conversation are you more afraid of?'],
+  ]);
+  const son = await choose(g, 'Benny and the book', ['Calm: talk to Benny first, father to son (recommended)', 'Deal: go straight at the man with the biscuit tin']) === 0;
+  (g.choices ??= {}).book = son ? 'son' : 'tout';
+  await therapy(g, son ? [
+    [TONY, 'The boy. In the car, on the way to school. Twenty minutes, nobody can walk out.'],
+    [MELFI, 'You chose the place where he cannot leave.'],
+    [TONY, 'It is where my father talked to me. It is the only place anybody in my family ever says anything.'],
+  ] : [
+    [TONY, 'The man. A grown man gives my kid a form guide, he answers to me, not my kid.'],
+    [MELFI, 'And Benny?'],
+    [TONY, 'Benny will hear about it. In this town everybody hears about it. That is a conversation too.'],
+  ]);
+  if (p.car) g.leaveCar();
+  place(g, office.outside, SOUTH);
+  g.cam.fixed = null;
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 4. Before the Bell ----------
+// Calm: father and son in a car with a clock running, the only place Nico ever talks to Benny.
+// Deal: a tout who runs is a tout who talks. Either way, the stakes are in a biscuit tin at the motor lodge.
+
+async function beforeTheBell(g) {
+  const { home, school, park } = g.places, p = g.player, son = g.choices?.book !== 'tout';
+
+  await g.wait(1);
+  g.setNight(0);
+  if (son) {
+    g.hud.card('Before the Bell', 'Thursday, twenty to nine');
+    await say(g, '', 'Nico said he would drive Benny to school. Gina put the coffee pot down so slowly that it did not make a sound.', 3.6);
+    g.hud.card();
+    await reach(g, home.road, '<b>Drive</b> home. Benny is waiting by the drive.', { how: 'car', r: 7 });
+    const aj = actor(g, 'aj', spot(home.drive, 2, 0), WEST), ride = follower(g, aj, { pace: 3 });
+    if (!p.car) { g.hud.objective('Get in the <b>car</b> with Benny.'); await g.until(() => p.car); }
+    p.locked = true;
+    p.car.speed = 0;
+    await say(g, '', 'Benny got in with his bag on his knees, and something flat inside his jacket, where a boy keeps a thing his mother must not find.', 3.8);
+    await say(g, TONY, 'The bell is at nine. We have twenty minutes and one subject, and it is not the weather.', 3.2);
+    p.locked = false;
+    if (!await against(g, school.gate, '<b>Drive</b> Benny to <b>Our Lady of the Bay</b> before the bell.', 100, { r: 8 })) {
+      await say(g, AJ, 'We are late. Mrs. Albright is going to look at me like a slip with bad handwriting.', 3.2);
+      await reach(g, school.gate, '<b>Drive</b> to <b>Our Lady of the Bay</b>.', { how: 'car', r: 8 });
+    }
+    p.locked = true;
+    ride.on = false;
+    if (p.car) { p.car.speed = 0; g.leaveCar(); }
+    const by = spot(p.pos, 1.6, 0);
+    aj.group.position.set(by.x, groundAt(by.x, by.z), by.z); aj.group.visible = true; aj.set('idle');
+    approach(g, aj, 1.7);
+    frame(g, p.pos, aj.group.position, { dist: 4.2, height: 1.3, lift: 0.9 });
+    await talk(g, [
+      [AJ, 'Is this about the horses? It is about the horses. Mom found a slip. Mom finds everything.', aj],
+      [TONY, 'Mrs. Albright found eleven. Where does a kid get a man with a station wagon, Benny?', p],
+      [AJ, 'He found me. After Sleepy Biscotti. He said I had an eye. He said you would be proud.', aj],
+      [TONY, '...Give me the book.', p],
+      [AJ, 'The money is not in it. Mr. Grebe keeps it in a biscuit tin in the back of his wagon, at the motor lodge. Saturday it all goes on one race. Mr. Kilbane\'s man walks up and down next to it.', aj],
+    ]);
+    await handover(g, aj, { hex: 0x2f56c8 });
+    await say(g, TONY, 'Go to class. And Benny: the handwriting is very nice. Do not tell your mother I said so.', 3.4);
+    await cut(g, () => { dismiss(g, aj); g.cam.fixed = null; });
+  } else {
+    const hp = spot(park.bench, 1.4, 1.2);
+    g.hud.card('Before the Bell', 'Thursday, a quarter to nine');
+    await say(g, '', 'Hollis Grebe was at the pond before school, waiting for the boys who bring him the slips. Nico meant to get there before the boys did.', 3.8);
+    g.hud.card();
+    const hollis = actor(g, 'trucker', hp, toward(hp, park.kerb));
+    await reach(g, park.kerb, '<b>Drive</b> to the <b>park</b> before the boys get there.', { r: 8 });
+    p.locked = true;
+    if (p.car) p.car.speed = 0;
+    await say(g, HOLLIS, 'That car. That is the kid\'s father\'s car. Nobody said the father had a car!', 2.6);
+    fistsOnly(g, true);
+    g.noHeat = true;
+    const runner = g.addNpc(hollis, { health: 500, ai: 'flee', cash: 0, stays: true });
+    runner.threat = p.pos.clone();
+    const found = quarry(g, runner);
+    p.locked = false;
+    g.hud.objective('<b>Chase down</b> Hollis Grebe: he ran with the form guide. Follow the <b>yellow arrow</b>.');
+    // A tout is no sprinter: boxed in, or out of breath, he gives up once Nico is on him (as Dario did at Mancuso's).
+    let mark = { x: runner.pos.x, z: runner.pos.z }, still = g.time;
+    const t0 = g.time;
+    await g.until(() => {
+      const near = Math.hypot(runner.pos.x - p.pos.x, runner.pos.z - p.pos.z);
+      if (Math.hypot(runner.pos.x - mark.x, runner.pos.z - mark.z) > 1.5) { mark = { x: runner.pos.x, z: runner.pos.z }; still = g.time; }
+      return runner.health < 500 || (!p.car && near < 2.5) || (near < 12 && g.time - still > 5) || (near < 30 && g.time - t0 > 100);
+    });
+    found();
+    g.hud.objective();
+    g.removeNpc(hollis);
+    fistsOnly(g, false);
+    p.locked = true;
+    if (p.car) { p.car.speed = 0; g.leaveCar(); }
+    approach(g, hollis, 1.2);
+    frame(g, p.pos, hollis.group.position, { dist: 4.2, height: 1.3, lift: 0.5 });
+    await talk(g, [
+      [HOLLIS, 'Okay! Okay! I am a tout, I am not a runner! Look at my shoes!', hollis],
+      [TONY, 'You gave my son a form guide. He is thirteen.', p],
+      [HOLLIS, 'He has an eye, Mr. Bellacosta! Sleepy Biscotti! Nobody picks Sleepy Biscotti! Mr. Kilbane said a kid with an eye like that brings in the whole school.', hollis],
+      [TONY, 'Where is the money?', p],
+      [HOLLIS, 'A biscuit tin, in the back of my wagon, at the motor lodge. Saturday it all goes on one race. Mr. Kilbane\'s man walks up and down next to it.', hollis],
+    ]);
+    await handover(g, hollis, { hex: 0xc8a23c });
+    g.cam.fixed = null;
+    await say(g, TONY, 'The key to the back of the wagon. Now go and tell Kilbane you lost it in the pond.', 3.2);
+    await cut(g, () => { dismiss(g, hollis); g.cam.fixed = null; });
+    g.noHeat = false;
+    g.pardon();
+  }
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 5. The Biscuit Tin ----------
+// The money is the kids'. Taking it back quietly, before Saturday's race, leaves Kilbane nothing to bargain with.
+
+async function biscuitTin(g) {
+  const { motel } = g.places, p = g.player, mway = kerbWay(motel.kerb, motel.office);
+  const stop = mway(10), park = mway(32), lp = mway(-7, -3), turn = mway(-1, -3), seat = mway(10, -2.2);
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('The Biscuit Tin', 'The motor lodge, Friday night');
+  await say(g, '', 'The green wagon was parked outside the office with a blanket over something in the back. Kilbane\'s man walked the pavement with a sandwich, guarding eleven children\'s lunches.', 4);
+  g.hud.card();
+  const wagon = propCar(g, stop, motel.kerb.h, WAGON, 'suv'), look = extraAt(g, lp, toward(lp, turn));
+  await reach(g, park, '<b>Drive</b> to the <b>motor lodge</b>. Park up the street from the green wagon.', { how: 'car', r: 7 });
+  p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  // The same beat as The Back of the Van: the wagon is 11 m past the end of his walk (the pilot keeps 9.5 m from a watcher).
+  const walk = beat(g, look, [lp, turn], { r: 5, speed: 1.3 });
+  const from = { x: p.pos.x, z: p.pos.z };
+  let out = false; // the last try: he goes in for another sandwich, and the pavement is empty
+  const lunch = () => { out = true; walk.on = false; look.group.visible = false; };
+  for (let tries = 0; !out; tries++) {
+    walk.seen = false;
+    p.locked = false;
+    const m = g.addMarker(seat.x, seat.z, 1.5);
+    g.hud.objective('Get to the <b>green wagon</b> on foot without being seen. Keep away from <b>Kilbane\'s man</b>: he is red on the radar.');
+    let best = Infinity, still = 0, last = g.time;
+    await g.until(() => {
+      const d = Math.hypot(p.pos.x - seat.x, p.pos.z - seat.z), dt = Math.min(0.1, g.time - last);
+      last = g.time;
+      if (d < best - 1) { best = d; still = 0; } else if (!p.locked && !g.paused) still += dt;
+      return still > 90 || walk.seen || (near(p.pos, seat, 1.9) && !p.car);
+    });
+    g.removeMarker(m);
+    g.hud.objective();
+    if (!walk.seen && still <= 90) break;
+    if (!walk.seen) { await cut(g, lunch); break; } // ninety seconds getting no nearer: he goes in for another sandwich
+    p.locked = true;
+    await say(g, 'Lookout', 'Hey! That wagon is spoken for, pal!', 2.2);
+    await fade(g, 1, 0.8);
+    await say(g, '', 'Nico said he thought it was his brother-in-law\'s. The lookout said everybody\'s brother-in-law has a green wagon. Nico walked back up the street and waited.', 3.6);
+    place(g, from, toward(from, stop));
+    walk.reset();
+    if (tries >= 1) lunch();
+    await fade(g, 0, 0.8);
+  }
+  if (out) {
+    p.locked = false;
+    await reach(g, seat, 'Kilbane\'s man went in for another sandwich. Get to the <b>green wagon</b> now.', { r: 1.5, how: 'foot' });
+  }
+  walk.on = false;
+  p.locked = true;
+  p.heading = toward(p.pos, stop);
+  p.human.play('interact', 'idle');
+  { let held = 0, last = g.time;
+    await g.until(() => {
+      const dt = Math.min(0.1, g.time - last); last = g.time;
+      held = g.keys.KeyF ? held + dt : Math.max(0, held - dt * 0.35);
+      if (g.consume('KeyF')) held += 0.5;
+      const pips = Math.min(8, Math.floor(held / 2.4 * 8));
+      g.hud.objective(`Open the back of the wagon quietly: press <b>F</b> and hold it. &nbsp; <b>${'▮'.repeat(pips)}${'▯'.repeat(8 - pips)}</b>`);
+      return held >= 2.4;
+    });
+    g.hud.objective(); }
+  g.sfx?.carDoor();
+  await say(g, '', 'Under the blanket: a biscuit tin with a little terrier on the lid, heavy with dollar bills, and a list of eleven names in Benny\'s best handwriting.', 3.8);
+  await handover(g, null, { from: { x: seat.x, z: seat.z }, hex: 0xc0c4c8 });
+  p.locked = false;
+  await reach(g, park, '<b>Walk</b> back to your car, quietly.', { r: 3, how: 'foot' });
+  p.locked = true;
+  await say(g, 'Lookout', 'Hey! The blanket! Where is the tin? MR. KILBANE!', 2.4);
+  await cut(g, () => { dismiss(g, look); g.removeCar(wagon); }, 0.5);
+  p.locked = false;
+  await shake(g, '<b>Lose the</b> grey sedan before it follows you home with the tin.', { color: GREY });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, TONY, 'Eleven lunches, in a tin with a dog on it. The things I do for this family.', 3.2);
+  g.pardon();
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 6. Sleepy Biscotti ----------
+// The table settles the rival, which is business. The kitchen settles the son, which is family. Gina has the last word.
+
+async function sleepyBiscotti(g) {
+  const { bing } = g.places, p = g.player, son = g.choices?.book !== 'tout';
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('Sleepy Biscotti', 'Saturday night');
+  await phone(g, JUNIOR, 'Nico. Dusty Kilbane rang me. Me! Somebody took a biscuit tin off him, and he would like it back, with an apology. The Pelican, tonight. I said I would bring the biscuits.');
+  g.hud.card();
+  await reach(g, bing.park, '<b>Drive</b> to the <b>Pink Pelican</b>. Uncle Sergio is hearing Kilbane out.', { r: 7 });
+  await bingRoom(g, 'tableCam', room => {
+    const sit = (look, n) => actor(g, look, room.seats[n], room.seats[n].h, 'sit');
+    return { tony: sit('tony', 5), junior: sit('junior', 0), rusty: sit('rusty', 1), hollis: sit('trucker', 2), augie: sit('paulie', 4) };
+  }, async cast => {
+    await say(g, '', 'The biscuit tin sat in the middle of the table with the terrier facing Kilbane. Augie had turned it that way on purpose.', 3.4);
+    await talk(g, [
+      [RUSTY, 'That money was bet, fair and square. Tonight it was going on a horse. If the horse wins, the kids win. That is business.', cast.rusty],
+      [JUNIOR, 'Children\'s lunch money, Dusty. In my day we took it off grown men, like gentlemen.', cast.junior],
+      [HOLLIS, son ? 'The kid gave his father the book. His own father. I never had a chance.' : 'He chased me round a pond. In front of the ducks. I had a reputation with those ducks.', cast.hollis],
+    ]);
+    const a = await choose(g, 'What does Nico ask for?', ['Respect: every dollar goes back to the kids, and Kilbane stays away from schools (recommended)', 'Deal: Kilbane keeps his horses, and pays Nico for the streets they run on']);
+    await talk(g, a === 0 ? [
+      [TONY, 'Every dollar goes back to the child it came from. You stay a mile from every school in Port Paloma. And you pay for the tin.', cast.tony],
+      [RUSTY, 'Pay for the... it is my tin!', cast.rusty],
+      [JUNIOR, 'It was your tin, Dusty. Tenses matter.', cast.junior],
+    ] : [
+      [TONY, 'The kids get their lunches back. I am not an animal. You keep your horses, and on the first of the month Augie comes round for my end of the streets they run on.', cast.tony],
+      [RUSTY, 'That is... that is fair, actually. Why does fair feel worse?', cast.rusty],
+      [JUNIOR, 'Because it is business, Dusty. Business always feels worse.', cast.junior],
+    ]);
+    const b = await choose(g, 'Hollis Grebe looks at Nico', ["Calm: he works the counter at Mancuso's, where Augie can see him (recommended)", 'Send him up the coast, to the bakery with the bicycle']);
+    await talk(g, b === 0 ? [
+      [TONY, 'Hollis works the counter at Mancuso\'s. Six in the morning, where Augie can see him.', cast.tony],
+      [PAULIE, 'Can he slice?', cast.augie],
+      [HOLLIS, 'I can learn to slice. I am very good with my hands. Tins, mostly.', cast.hollis],
+    ] : [
+      [TONY, 'There is a bakery up the coast with a bicycle and a vacancy. Tell them Nico sent you.', cast.tony],
+      [HOLLIS, 'The one with the nephew? I heard about the nephew.', cast.hollis],
+      [JUNIOR, 'Everybody heard about the nephew.', cast.junior],
+    ]);
+  });
+  // Home, late. The tin is on the kitchen table, and so are eleven envelopes.
+  await roomScene(g, inRoom(kitchen(g), [-3.6, 2.8], [-4, -1.5], 1.6, 1.15), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    aj: actor(g, 'aj', roomSpot(q, -4, 0.6), NORTH),
+    tony: actor(g, 'tony', roomSpot(q, -1.7, -1.5), WEST),
+  }), async cast => {
+    await talk(g, [
+      [CARMELA, 'Eleven envelopes. I wrote the names on them myself. Theo, Wendell, the little Ortega girl...', cast.carmela],
+      [AJ, 'I can give them back on Monday. I will say it was a mistake.', cast.aj],
+      [CARMELA, 'It was not a mistake. A mistake is a wrong sum. This was a business.', cast.carmela],
+    ]);
+    const d = await choose(g, 'How does Benny give the money back?', ['Calm: Benny takes every envelope round himself, and says sorry at every door (recommended)', 'Nico gives it back for him, quietly, at the school gate']);
+    await talk(g, d === 0 ? [
+      [TONY, 'He takes them round himself. Every door. He says sorry to every mother, and he does not say the word "odds".', cast.tony],
+      [AJ, 'Even the Ortegas? Mrs. Ortega yells.', cast.aj],
+      [CARMELA, 'Especially the Ortegas.', cast.carmela],
+    ] : [
+      [TONY, 'I give it back at the gate on Monday. Quietly. Nobody needs a scene.', cast.tony],
+      [CARMELA, 'Quietly. Everything in this house is quietly. Just once I would like one of my men to say sorry out loud.', cast.carmela],
+    ]);
+    await talk(g, [
+      [AJ, 'Dad? Sleepy Biscotti ran today. It was on the radio. He came last. He stopped to eat a flower.', cast.aj],
+      [TONY, 'Good. Remember that horse, Benny. That is the only tip I am ever giving you.', cast.tony],
+    ]);
+  }, { night: 1 });
+  homeAsTony(g, p.human);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Episode twenty complete', 5000);
+}
+
 // ---------- The episodes ----------
 
 const EPISODES = [
@@ -7125,6 +7533,8 @@ const EPISODES = [
     titles: ['Question Marks', 'Long Lens', 'Two Uncles', 'Bait', 'Last Ride', 'First to Know'] },
   { name: 'Episode Nineteen', title: 'Four in the Morning', missions: [freshBread, sesame, breadAndButter, backOfTheVan, rollingPin, fourInTheMorning],
     titles: ['Fresh Bread', 'Sesame', 'Bread and Butter', 'The Back of the Van', 'Rolling Pin', 'Four in the Morning'] },
+  { name: 'Episode Twenty', title: 'Sleepy Biscotti', missions: [lunchMoney, formGuide, likeFather, beforeTheBell, biscuitTin, sleepyBiscotti],
+    titles: ['Lunch Money', 'The Form Guide', 'Like Father', 'Before the Bell', 'The Biscuit Tin', 'Sleepy Biscotti'] },
 ];
 
 // ---------- Medals, and a bonus goal on every mission ----------
@@ -7251,6 +7661,12 @@ const MEDALS = [
   [150, 210, 'noStar', 'Thursday stays quiet: no police'], // est.
   [150, 210, 'noGun', 'In and out of the van: no shots fired'], // est.
   [150, 210, 'noGun', 'Dario gets fists, not bullets'], // est.
+  [150, 210, 'noStar', 'A family matter: no police'], // est.
+  [150, 210, 'noStar', 'A quiet tail from the school gate: no police'], // est.
+  [150, 210, 'noStar', 'Benny must not notice: no police'], // est.
+  [150, 210, 'noStar', 'Wednesday stays quiet: no police'], // est.
+  [150, 210, 'quickLeg', 'At the gate before the bell: 1:30', { leg: 'before the bell', secs: 90 }], // est.
+  [150, 210, 'noGun', 'In and out of the wagon: no shots fired'], // est.
   [150, 210, 'noStar', 'A family matter: no police'], // est.
 ];
 // The checks a bonus goal can make, all on what the game already keeps: stars (g.wanted), checkpoint returns (g.revived,
@@ -7688,7 +8104,7 @@ const HUBS = {
 const STARTS = {
   sitDown: 'satriale', fortySixLong: 'bing', theMotel: 'bing', complaints: 'bing', inThePaper: 'bing', didntHurtNobody: 'bing', figurehead: 'bing',
   theTail: 'melfi', denial: 'melfi', starterMotor: 'melfi', theBoard: 'melfi', nineteenSixtySeven: 'melfi', sundaes: 'melfi',
-  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi', sponsor: 'melfi', benefitOfDoubt: 'melfi', negatives: 'melfi', twoUncles: 'melfi', breadAndButter: 'melfi',
+  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi', sponsor: 'melfi', benefitOfDoubt: 'melfi', negatives: 'melfi', twoUncles: 'melfi', breadAndButter: 'melfi', likeFather: 'melfi',
   farEastPacific: 'kates',
 };
 // Who a job's first scenes put in the street. Their skins are painted while he is on his way to its marker, one every half
@@ -7713,6 +8129,7 @@ const CAST = new Map([
   [envelopes, ['paulie', 'pussy', 'trucker']], [tableForOne, ['dealer']], [roomFour, ['kolar', 'junior']], [theTable, ['junior', 'johnnysack', 'dealer', 'christopher', 'tony']], [aNiceOne, ['christopher', 'carmela', 'tony']],
   [questionMarks, ['paulie', 'pussy', 'junior']], [longLens, ['dealer', 'agent']], [bait, ['johnnysack', 'dealer', 'agent', 'kolar']], [lastRide, ['dealer']], [firstToKnow, ['carmela', 'tony', 'junior', 'johnnysack', 'dealer', 'christopher']],
   [freshBread, ['dealer']], [sesame, ['carmela', 'tony', 'paulie', 'pussy']], [backOfTheVan, ['kolar']], [rollingPin, ['paulie', 'kolar']], [fourInTheMorning, ['junior', 'johnnysack', 'dealer', 'christopher', 'tony', 'carmela']],
+  [lunchMoney, ['principal', 'aj']], [formGuide, ['aj', 'trucker']], [beforeTheBell, ['aj', 'trucker']], [sleepyBiscotti, ['junior', 'rusty', 'trucker', 'paulie', 'tony', 'carmela', 'aj']],
 ]);
 // These follow straight on from the one before: the story does not stop between them.
 const CHAIN = new Set(['fredPeters', 'homeSick', 'theStakeout', 'theInterview', 'oneFace', 'theStreet', 'theRunway', 'ridelandSunday', 'closingTime', 'theBradbury']);
