@@ -7868,6 +7868,356 @@ async function eachWay(g) {
   await passed(g, 'Episode twenty-one complete', 5000);
 }
 
+// ========== Episode 22: The Fern Man ==========
+// Agent Pembrook was handed a notebook about a fern, and now he wants to see the fern; then he asks Gina about Enzo,
+// who has been telling the bar his name is going in the book. Every line is written for the game.
+
+const FERN = 0x3f7a3a, YELLOW = 0xe0b020;
+
+// ---------- 1. Fern Season ----------
+// Augie's notebook only works if it is true: a fed who reads "N.B. watered the fern" drives past to look in the window.
+
+async function fernSeason(g) {
+  const { grove, home } = g.places, p = g.player, gp = spot(grove.gate, 0, 1.6);
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Fern Season', 'Monday');
+  await phone(g, PAULIE, 'Nico. I been thinking about the fern. A fed reads "N.B. watered the fern", what does a fed do? He drives past the house to look at the fern.');
+  await phone(g, TONY, 'I do not have a fern, Augie.');
+  await phone(g, PAULIE, 'That is what I been thinking about. The gardener up at Seabreeze Manor sells them out the back. Get a big one. A fern a man would write down.');
+  g.hud.card();
+  const gardener = extraAt(g, gp, toward(gp, grove.kerb));
+  await reach(g, grove.kerb, '<b>Drive</b> to <b>Seabreeze Manor</b>. The gardener is at the gate.', { how: 'car', r: 8 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  frame(g, p.pos, gp, { dist: 4.6 });
+  await talk(g, [
+    ['Gardener', 'The big one? That fern is older than my van, sir. It wants shade, water twice a week, and no bumps.', gardener],
+    [TONY, 'No bumps.'],
+    ['Gardener', 'They feel it in the fronds. Drive like you have your mother in the back.', gardener],
+  ]);
+  await handover(g, gardener, { hex: FERN });
+  g.cam.fixed = null;
+  dismiss(g, gardener);
+  p.locked = false;
+  if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+  const back = () => { const c = p.car || g.tonyCar; if (!p.car) g.enterCar(c); c.pos.set(grove.kerb.x, 0, grove.kerb.z); c.heading = grove.kerb.h; c.speed = 0; c.sync?.(); };
+  const fern = careful(g, 'The fern', 'A frond snapped at the third bump. Nico drove back to the Manor, paid for a second fern, and did not look at the gardener.', back);
+  await fern.to(home.road, '<b>Drive</b> the fern <b>home</b>. No bumps: they feel it in the fronds.');
+  fern.stop();
+  const sedan = propCar(g, home.guest, home.guest.h, BROWN);
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, '', 'Across the road, where guests park: a brown sedan, and a man in a raincoat reading a newspaper he had not turned a page of.', 3.8);
+  p.locked = false;
+  await reach(g, home.spawn, '<b>Walk</b> the fern to the <b>front door</b>, where the raincoat can see it.', { r: 1.8, how: 'foot' });
+  p.locked = true;
+  p.human.play('pickup', 'idle');
+  const gs = spot(home.spawn, 1.6, 0.8), gina = actor(g, 'carmela', gs, toward(gs, p.pos));
+  p.heading = toward(p.pos, gs);
+  frame(g, p.pos, gs, { dist: 4.2 });
+  await talk(g, [
+    [CARMELA, 'Since when do we have a fern?', gina],
+    [TONY, 'Since today. I like ferns. I water them. Twice a week.', p],
+    [CARMELA, 'Nico, you have never watered anything in your life. You let the gnomes fade.', gina],
+    [TONY, 'Leave it in the window, Gina. Please. And do not ask me why it is in the window.', p],
+  ]);
+  await say(g, '', 'The brown sedan started up and went past very slowly. The man in the raincoat looked at the fern for a long time.', 3.6);
+  await cut(g, () => { dismiss(g, gina); g.removeCar(sedan); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 2. Lemon Cake ----------
+// "Ask about the wife": Pembrook does it himself now. Nico cannot walk up to his own wife's table while the fed is at it, so he listens.
+
+async function lemonCake(g) {
+  const { church } = g.places, p = g.player, gp = spot(church.lawn, -0.8, 0), ap = spot(church.lawn, 0.9, 0.6);
+  const overheard = [
+    [AGENT, 'The lemon one, please. My mother made a lemon cake. Too much lemon, on purpose, to keep my father humble.'],
+    [CARMELA, 'Two dollars. It is for the church roof. You are not from this parish.'],
+    [AGENT, 'From out of town, Mrs. Bellacosta. I hear your husband has a very fine fern. And a nephew, Enzo, who says a great deal in bars.'],
+    [CARMELA, 'Enzo says a great deal everywhere. Two dollars, and the roof thanks you. Goodbye.'],
+  ];
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Lemon Cake', 'Saturday, the church bake sale');
+  await say(g, '', 'Gina had been baking for the church roof since six in the morning. Nico was to carry the tables out and then go away, which he was good at.', 3.8);
+  g.hud.card();
+  const gina = actor(g, 'carmela', gp, toward(gp, ap)), agent = actor(g, 'agent', ap, toward(ap, gp)), sedan = propCar(g, church.street, church.kerb.h, BROWN);
+  await reach(g, church.kerb, '<b>Drive</b> to the <b>church</b>. The bake sale is on the lawn.', { r: 8 });
+  p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  await say(g, '', 'At Gina\'s table, choosing between the lemon cake and the coffee cake as if they were evidence: the man in the raincoat.', 3.6);
+  p.locked = false;
+  // Close enough to hear, not so close the fed turns round. Pembrook is red on the radar; his radius is how near is too near.
+  const blip = { x: ap.x, z: ap.z, color: '#ff3b4a', r: 4 };
+  g.blips.push(blip);
+  for (let tries = 0; ; tries++) {
+    let heard = 0, free = 0, last = g.time, seen = false, line = -1;
+    await g.until(() => {
+      const dt = Math.min(0.1, g.time - last), d = Math.hypot(p.pos.x - ap.x, p.pos.z - ap.z), close = !p.car && d < 12; // (12 m: the pilot keeps 9.5 m from a watcher)
+      last = g.time;
+      if (!p.locked && !g.paused) { free += dt; if (close) heard += dt; }
+      seen = !p.car && d < 4;
+      const k = Math.floor(heard / 4);
+      if (close && k !== line && overheard[k]) { line = k; g.hud.subtitle(...overheard[k]); }
+      g.eavesdrop = { near: close, seen, radius: 12, meter: Math.min(1, heard / 16) };
+      const pips = Math.round(Math.min(1, heard / 16) * 8);
+      g.hud.objective(`<b>Walk</b> close enough to hear them, on foot, but keep away from Pembrook: don't let him see you. &nbsp; <b>${'▮'.repeat(pips)}${'▯'.repeat(8 - pips)}</b>`);
+      return seen || heard >= 16 || free > 90; // (90 s and he has heard enough: the bot is not left standing on the lawn)
+    });
+    g.hud.objective();
+    g.hud.subtitle();
+    if (!seen || tries >= 2) break;
+    p.locked = true;
+    await fade(g, 1, 0.6);
+    await say(g, '', 'Pembrook began to turn round. Nico picked up a tray of brownies and carried it, quickly, somewhere else.', 3.4);
+    place(g, church.kerb, toward(church.kerb, ap));
+    await fade(g, 0, 0.6);
+    p.locked = false;
+  }
+  g.eavesdrop = null;
+  g.blips.splice(g.blips.indexOf(blip), 1);
+  p.locked = true;
+  await say(g, '', 'Pembrook paid in exact change, touched his hat to Gina, and carried the cake to the brown sedan level in both hands, like a man carrying a confession.', 3.8);
+  await say(g, TONY, 'He asked my wife about Enzo. Over a cake. On church grass.', 3);
+  await cut(g, () => { dismiss(g, gina, agent); g.removeCar(sedan); atWheel(g, church.kerb); g.cam.fixed = null; });
+  p.locked = false;
+  await shake(g, '<b>Drive.</b> Lose the brown sedan: Pembrook wants to see where you go next.', { color: BROWN });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await phone(g, PAULIE, 'He followed you? With a cake on the seat? That is a man who has lost his sense of proportion, Nico.');
+  await phone(g, TONY, 'He lost a fern. Now he wants a nephew.');
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 3. Third Party ----------
+// Gina is in it now, whether Nico likes it or not. Whether she is a partner (family trust) or a risk to put away (business) is decided here.
+
+async function thirdParty(g) {
+  const p = g.player, office = g.places.doors.find(d => d.name === "Dr. Vos's office");
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Third Party', "Monday, four o'clock");
+  await say(g, '', 'On the drive over he caught himself checking the mirror for brown, and then checking the window boxes he passed for ferns.');
+  g.hud.card();
+  await toMelfi(g, "Monday. Drive to <b>Dr. Vos's office</b>.");
+  await therapy(g, [
+    [TONY, 'The government bought a lemon cake from my wife. Two dollars. For the church roof.'],
+    [MELFI, 'How did that make you feel?'],
+    [TONY, 'Like a man who has had a stranger in his kitchen. And the stranger was polite. I hate it when they are polite.'],
+    [MELFI, 'Did Gina tell you about it, or did you find out some other way?'],
+    [TONY, 'I was behind the brownies. ...She did not tell me yet. Maybe she does not know it is a thing to tell.'],
+    [MELFI, 'Or maybe she is waiting to see whether you will tell her. What do you want her to be in this?'],
+  ]);
+  const trust = await choose(g, 'Gina and the man in the raincoat', ['Calm: tell her everything, and let her handle him her way (recommended)', "Deal: keep her out of it: send her to her sister's until it blows over"]) === 0;
+  (g.choices ??= {}).gina = trust ? 'trust' : 'away';
+  await therapy(g, trust ? [
+    [TONY, 'I tell her. All of it, the fern too. She handles priests and my mother. She can handle a man with a cake.'],
+    [MELFI, 'That sounds like respect.'],
+    [TONY, 'It sounds like being scared of my wife. With her it is the same thing.'],
+  ] : [
+    [TONY, 'I send her to her sister Marisol, over the bridge. A week. Nobody buys cakes over there.'],
+    [MELFI, 'And what will Gina think you are protecting her from?'],
+    [TONY, 'Me, probably. She will think it is me. She is usually right.'],
+  ]);
+  if (p.car) g.leaveCar();
+  place(g, office.outside, SOUTH);
+  g.cam.fixed = null;
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 4. The Second Cup ----------
+// Calm: she does it her way, and all he can do is watch. Deal: protecting her costs her a week and him a clock.
+// Either way the fed's real interest comes out: Enzo's mouth.
+
+async function secondCup(g) {
+  const { cafe, home, bridge } = g.places, p = g.player, trust = g.choices?.gina !== 'away';
+
+  await g.wait(1);
+  g.setNight(0);
+  if (trust) {
+    const way = kerbWay(cafe.kerb, cafe.door), tp = way(-2, -3), cp = way(-3.2, -3), watch = way(30), NEED = 45;
+    const seen = [
+      'Pembrook took out a notebook. Gina put a biscotto on it.',
+      'Gina laughed at something he said. Nico knew that laugh. It was the one she kept for his mother.',
+      'Pembrook leaned in and said a name. Gina touched her left earring, which is what she said she would do if the name was Enzo.',
+    ];
+    g.hud.card('The Second Cup', 'Tuesday, eleven in the morning');
+    await say(g, '', 'Gina called the number on Pembrook\'s card herself. Coffee, she said, at Bean Scene. She would tell him nothing, and be very nice about it.', 3.8);
+    g.hud.card();
+    const agent = actor(g, 'agent', tp, toward(tp, cp)), gina = actor(g, 'carmela', cp, toward(cp, tp));
+    await reach(g, watch, '<b>Drive</b> to <b>Bean Scene</b>. Park up the street, where Gina told you to.', { how: 'car', r: 7 });
+    // A stake-out: the clock runs only while he sits in the car at the marker. Pembrook is red on the radar.
+    const blip = { x: tp.x, z: tp.z, color: '#ff3b4a', r: 7 }, m = g.addMarker(watch.x, watch.z, 5);
+    g.blips.push(blip);
+    let free = 0, watched = 0, last = g.time, line = -1;
+    await g.until(() => {
+      const dt = Math.min(0.1, g.time - last), on = p.car && near(p.pos, watch, 6.5);
+      last = g.time;
+      if (!p.locked && !g.paused) { free += dt; if (on) watched += dt; }
+      const k = Math.floor(watched / 12);
+      if (on && k !== line && seen[k]) { line = k; g.hud.subtitle('', seen[k]); }
+      g.hud.objective(`Watch them from your car at the <b>marker</b>. Stay in the car: Pembrook is red on the radar. &nbsp; <b>${clock(Math.max(0, Math.ceil(NEED - watched)))}</b>`);
+      return watched >= NEED || free > 90; // (90 s and the coffee is finished anyway)
+    });
+    g.removeMarker(m);
+    g.blips.splice(g.blips.indexOf(blip), 1);
+    g.hud.objective();
+    g.hud.subtitle();
+    p.locked = true;
+    if (p.car) p.car.speed = 0;
+    await cut(g, () => { dismiss(g, agent, gina); g.cam.fixed = null; });
+    await say(g, '', 'Pembrook paid for both coffees and left. Two minutes later Gina got into the passenger seat as if she did it every day.', 3.6);
+    await say(g, CARMELA, 'I told him the fern was a present from my mother. He wrote it down. He writes everything down, that man. He wrote down the biscotti.', 3.8);
+  } else {
+    g.hud.card('The Second Cup', 'Tuesday, five in the afternoon');
+    await say(g, '', 'Gina packed for her sister Marisol\'s, over the bridge. She said it was for a week, in the voice she uses for "forever".', 3.8);
+    g.hud.card();
+    await reach(g, home.road, '<b>Drive</b> home. Gina is waiting by the drive with a suitcase.', { how: 'car', r: 7 });
+    const gina = actor(g, 'carmela', spot(home.drive, 2, 0), WEST), ride = follower(g, gina, { pace: 3 });
+    if (!p.car) { g.hud.objective('Get in the <b>car</b> with Gina.'); await g.until(() => p.car); }
+    p.locked = true;
+    p.car.speed = 0;
+    await say(g, '', 'Marisol would meet them at the bridge at six, and Marisol did not wait for anybody. She had not waited at her own wedding.', 3.6);
+    p.locked = false;
+    if (!await against(g, bridge.start, '<b>Drive</b> Gina to the <b>bridge</b> before Marisol gives up on her.', 110, { r: 8 })) {
+      await say(g, CARMELA, 'She will have gone round the block twice. I will hear about it for a year.', 3.2);
+      await reach(g, bridge.start, '<b>Drive</b> to the <b>bridge</b>.', { how: 'car', r: 8 });
+    }
+    p.locked = true;
+    ride.on = false;
+    if (p.car) p.car.speed = 0;
+    dismiss(g, gina);
+    await say(g, '', 'Marisol\'s car was there, with Marisol leaning on the horn. Gina got out with her suitcase, and leaned back in at the window.', 3.6);
+    await say(g, CARMELA, 'He called the house this morning. Pembrook. You did not know that. Now you know it, and I am going to my sister\'s anyway.', 3.8);
+  }
+  await say(g, CARMELA, 'Every question was Enzo. When did he start coming to the house. Who does he drive for. Does he talk about a book. Nico, what book?', 4);
+  await say(g, TONY, 'The book is nothing. Enzo is the something.', 2.6);
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 5. Big Talk ----------
+// The nephew who wants to be made thinks hurting a fed is how you prove it. Nico stops him the family way: with a bumper.
+
+async function bigTalk(g) {
+  const { bar } = g.places, p = g.player, way = kerbWay(bar.kerb, bar.door), stop = way(8);
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('Big Talk', 'Wednesday night');
+  await phone(g, ADRIANA, 'Nico? It is Bianca. Enzo had four drinks at the bar, and now there is a baseball bat in his coupe. He says he is going to the motor lodge to explain things to the government.');
+  await phone(g, TONY, 'Explain what things?');
+  await phone(g, ADRIANA, 'He says a made man does not let a fed ask his aunt about him over a cake. He is not a made man, Nico. He is a man with a bat.');
+  g.hud.card();
+  const coupe = propCar(g, stop, bar.kerb.h, YELLOW, 'coupe');
+  await reach(g, way(-20), '<b>Drive</b> to the <b>bar</b>. Enzo\'s yellow coupe is outside.', { how: 'car', r: 8 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, '', 'Enzo saw his uncle\'s car in the mirror, put his foot down, and went the wrong way round the block. Which was, at least, away from the motor lodge.', 3.8);
+  p.locked = false;
+  g.noHeat = true;
+  if (!p.car) { g.hud.objective('Get in the <b>car</b>.'); await g.until(() => p.car); }
+  await runDown(g, coupe, '<b>Stop the</b> yellow coupe: ram it, or block its way. Enzo is in it.', { speed: 13 });
+  p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  const side = { x: coupe.pos.x + Math.cos(coupe.heading) * 1.9, z: coupe.pos.z - Math.sin(coupe.heading) * 1.9 }, enzo = actor(g, 'christopher', side, toward(side, p.pos));
+  g.sfx?.carDoor();
+  approach(g, enzo, 1.7);
+  frame(g, p.pos, enzo.group.position, { dist: 4.2 });
+  await talk(g, [
+    [CHRIS, 'You hit my car! I just had it waxed! For tonight!', enzo],
+    [TONY, 'You were going to hit a federal agent with a bat, Enzo. At a motor lodge. With your own face.', p],
+    [CHRIS, 'He asked Aunt Gina about me! Over a cake! A made guy does something about that. Everybody at the bar says I am next.', enzo],
+    [TONY, 'A made guy waits. That is the whole job: waiting, and not talking in bars. Tonight you failed at both.', p],
+    [CHRIS, '...Is Uncle Sergio going to hear about this?', enzo],
+    [TONY, 'Uncle Sergio hears about everything. Give me the bat.', p],
+  ]);
+  await handover(g, enzo, { hex: 0x8a6a3a, sound: false });
+  g.cam.fixed = null;
+  await say(g, TONY, 'Saturday, the Pelican. Wear a clean shirt, and bring no bat.', 3);
+  await cut(g, () => { dismiss(g, enzo); g.removeCar(coupe); g.cam.fixed = null; });
+  g.noHeat = false;
+  g.pardon();
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 6. The Fern Man ----------
+// The table settles Enzo, which is business. The kitchen settles the fern, which is family: the one honest thing in the house.
+
+async function fernMan(g) {
+  const { bing } = g.places, p = g.player, trust = g.choices?.gina !== 'away';
+  let wait = true;
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('The Fern Man', 'Saturday night');
+  await phone(g, JUNIOR, 'Nico. I heard about a bat. I heard about a cake. I heard about a fern. The Pelican, tonight. Bring the boy.');
+  g.hud.card();
+  await reach(g, bing.park, '<b>Drive</b> to the <b>Pink Pelican</b>. Uncle Sergio wants Enzo at the table.', { r: 7 });
+  await bingRoom(g, 'tableCam', room => {
+    const sit = (look, n) => actor(g, look, room.seats[n], room.seats[n].h, 'sit');
+    return { tony: sit('tony', 5), junior: sit('junior', 0), chris: sit('christopher', 1), augie: sit('paulie', 4) };
+  }, async cast => {
+    await say(g, '', 'Enzo sat with his hands flat on the table, where everybody could see them, like a boy at his first communion.', 3.6);
+    await talk(g, [
+      [JUNIOR, 'A bat. For a federal agent. In my day a young man who wanted to impress his uncles brought them a cannoli.', cast.junior],
+      [CHRIS, 'I was only going to talk to him, Uncle Sergio. With the bat nearby.', cast.chris],
+      [PAULIE, 'The fed asked Gina about him, Sergio. Not about you, not about me. About him. Because he talks.', cast.augie],
+    ]);
+    wait = await choose(g, 'What does Nico do with Enzo?', ['Respect: he waits a year for the book, and keeps his mouth shut in bars (recommended)', "Deal: he sweeps floors at Mo's body shop until the fed forgets his name"]) === 0;
+    await talk(g, wait ? [
+      [TONY, 'A year, Enzo. No bar talk, no bats. You want your name in the book, learn to keep names out of other people\'s.', cast.tony],
+      [CHRIS, 'A year. Okay. A year is nothing.', cast.chris],
+      [JUNIOR, 'A year is everything. Ask the fed. He has been waiting for you for six months.', cast.junior],
+    ] : [
+      [TONY, 'Mo\'s. A broom. Floors. Until the raincoat forgets what you look like.', cast.tony],
+      [CHRIS, 'Mo plays the radio while you sweep. Opera. All day!', cast.chris],
+      [PAULIE, 'Good. Learn the words. It is the only singing you are allowed.', cast.augie],
+    ]);
+    const b = await choose(g, 'Pembrook will drive past the house again', ['Calm: let him look at the fern. A fern is not a crime (recommended)', "Have Augie park across from the fed's motel and read a newspaper"]);
+    await talk(g, b === 0 ? [
+      [TONY, 'Let him look. It is a very good fern. Twice a week, no bumps.', cast.tony],
+      [JUNIOR, 'My nephew, a man of ferns. Your father would have laughed until he fell off this chair.', cast.junior],
+    ] : [
+      [PAULIE, 'I will take the paper with the crossword. I will not turn a page.', cast.augie],
+      [TONY, 'Two can sit in a parked car, Agent Pembrook. That is all I am saying.', cast.tony],
+    ]);
+  });
+  // Home, late. She has had the fed in her week, one way or another, and she has a view on the plant.
+  await roomScene(g, inRoom(kitchen(g), [-3.6, 2.8], [-4, -1.5], 1.6, 1.15), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    tony: actor(g, 'tony', roomSpot(q, -1.7, -1.5), WEST),
+  }), async cast => {
+    await talk(g, [
+      [CARMELA, trust ? 'He called again. Pembrook. He wanted to know if the fern was really from my mother. I said my mother hates ferns. Now that is in his notebook too.' : 'Marisol sends her love, and asks why a man in a raincoat drove past her house on Thursday.', cast.carmela],
+      [TONY, wait ? 'He is fishing, Gina. He is fishing for Enzo, and Enzo is going to be very quiet for a year.' : 'He is fishing, Gina. He is fishing for Enzo, and Enzo is in the back of Mo\'s with a broom.', cast.tony],
+      [CARMELA, 'And the fern?', cast.carmela],
+    ]);
+    const d = await choose(g, 'Gina wants to know about the fern', ['Calm: the fern stays, and he waters it himself (recommended)', 'It goes out with the trash. It was business']);
+    await talk(g, d === 0 ? [
+      [TONY, 'The fern stays. It is the only thing in this house the government knows the truth about.', cast.tony],
+      [CARMELA, 'Then you water it. Twice a week. I am not doing the housework for your alibi.', cast.carmela],
+    ] : [
+      [TONY, 'It goes out with the trash on Tuesday. It was business.', cast.tony],
+      [CARMELA, 'You bought a plant for a policeman, and now you throw it away for him too? No. It stays. It is the first thing you ever brought home that did not fall off a truck.', cast.carmela],
+    ]);
+  }, { night: 1 });
+  homeAsTony(g, p.human);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Episode twenty-two complete', 5000);
+}
+
 // ---------- The episodes ----------
 
 const EPISODES = [
@@ -7913,6 +8263,8 @@ const EPISODES = [
     titles: ['Lunch Money', 'The Form Guide', 'Like Father', 'Before the Bell', 'The Biscuit Tin', 'Sleepy Biscotti'] },
   { name: 'Episode 21', title: 'Each Way', missions: [paidEarly, askingAround, winOrPlace, roundThePond, twoNotebooks, eachWay],
     titles: ['Paid Early', 'Asking Around', 'Win or Place', 'Round the Pond', 'Two Notebooks', 'Each Way'] },
+  { name: 'Episode 22', title: 'The Fern Man', missions: [fernSeason, lemonCake, thirdParty, secondCup, bigTalk, fernMan],
+    titles: ['Fern Season', 'Lemon Cake', 'Third Party', 'The Second Cup', 'Big Talk', 'The Fern Man'] },
 ];
 
 // ---------- Medals, and a bonus goal on every mission ----------
@@ -8051,6 +8403,12 @@ const MEDALS = [
   [150, 210, 'noStar', 'Wednesday stays quiet: no police'], // est.
   [150, 210, 'noStar', 'The ducks see nothing: no police'], // est.
   [150, 210, 'noGun', 'Two notebooks, no shots fired'], // est.
+  [150, 210, 'noStar', 'A family matter: no police'], // est.
+  [150, 210, 'cargo', 'Not one frond on the road'], // est.
+  [150, 210, 'noStar', 'A church bake sale: no police'], // est.
+  [150, 210, 'noStar', 'A family matter: no police'], // est.
+  [150, 210, 'noStar', 'Her day stays quiet: no police'], // est.
+  [150, 210, 'noGun', 'Enzo is family: no shots fired'], // est.
   [150, 210, 'noStar', 'A family matter: no police'], // est.
 ];
 // The checks a bonus goal can make, all on what the game already keeps: stars (g.wanted), checkpoint returns (g.revived,
@@ -8488,7 +8846,7 @@ const HUBS = {
 const STARTS = {
   sitDown: 'satriale', fortySixLong: 'bing', theMotel: 'bing', complaints: 'bing', inThePaper: 'bing', didntHurtNobody: 'bing', figurehead: 'bing',
   theTail: 'melfi', denial: 'melfi', starterMotor: 'melfi', theBoard: 'melfi', nineteenSixtySeven: 'melfi', sundaes: 'melfi',
-  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi', sponsor: 'melfi', benefitOfDoubt: 'melfi', negatives: 'melfi', twoUncles: 'melfi', breadAndButter: 'melfi', likeFather: 'melfi', winOrPlace: 'melfi',
+  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi', sponsor: 'melfi', benefitOfDoubt: 'melfi', negatives: 'melfi', twoUncles: 'melfi', breadAndButter: 'melfi', likeFather: 'melfi', winOrPlace: 'melfi', thirdParty: 'melfi',
   farEastPacific: 'kates',
 };
 // Who a job's first scenes put in the street. Their skins are painted while he is on his way to its marker, one every half
@@ -8515,6 +8873,7 @@ const CAST = new Map([
   [freshBread, ['dealer']], [sesame, ['carmela', 'tony', 'paulie', 'pussy']], [backOfTheVan, ['kolar']], [rollingPin, ['paulie', 'kolar']], [fourInTheMorning, ['junior', 'johnnysack', 'dealer', 'christopher', 'tony', 'carmela']],
   [lunchMoney, ['principal', 'aj']], [formGuide, ['aj', 'trucker']], [beforeTheBell, ['aj', 'trucker']], [sleepyBiscotti, ['junior', 'rusty', 'trucker', 'paulie', 'tony', 'carmela', 'aj']],
   [paidEarly, ['paulie', 'rusty', 'agent']], [askingAround, ['pussy']], [roundThePond, ['rusty']], [twoNotebooks, ['agent', 'rusty']], [eachWay, ['junior', 'rusty', 'paulie', 'tony', 'carmela']],
+  [fernSeason, ['carmela']], [lemonCake, ['carmela', 'agent']], [secondCup, ['carmela', 'agent']], [bigTalk, ['christopher']], [fernMan, ['junior', 'christopher', 'paulie', 'tony', 'carmela']],
 ]);
 // These follow straight on from the one before: the story does not stop between them.
 const CHAIN = new Set(['fredPeters', 'homeSick', 'theStakeout', 'theInterview', 'oneFace', 'theStreet', 'theRunway', 'ridelandSunday', 'closingTime', 'theBradbury']);
