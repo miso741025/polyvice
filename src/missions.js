@@ -9011,6 +9011,389 @@ async function weeklyColumn(g) {
   await passed(g, 'Episode twenty-four complete', 5000);
 }
 
+// ========== Episode 25: Situations Vacant ==========
+// Aldo Ferro has let go of the driver who read the lifebuoy box, and the driver wants a job with Nico.
+// Every line is written for the game.
+
+// ---------- 1. Help Wanted ----------
+// A rival crew putting a man out on the street outside Nico's shop is a message to Nico. Fists, so it is remembered, not reported.
+
+async function helpWanted(g) {
+  const { satriale } = g.places, p = g.player, way = kerbWay(satriale.kerb, satriale.door);
+  const lp = way(2, -2.4), m1 = way(3.6, -1.6), m2 = way(0.4, -1.6), hp = way(5.4, -2.4), ep = way(-6, -1.6), stand = way(-1.2, -1.6);
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Help Wanted', 'Monday morning');
+  await phone(g, PAULIE, 'Nico. Aldo\'s driver, the one in the windcheater, is sitting on our bench with a cardboard box. And now Lyle Teague is here with two big fellas, and nobody is buying sausage.');
+  await phone(g, TONY, 'On our bench.');
+  await phone(g, PAULIE, 'Our bench, Nico. I painted it Sunday.');
+  g.hud.card();
+  const lyle = actor(g, 'eddie', lp, toward(lp, stand)), men = [actor(g, 'trucker', m1, toward(m1, stand)), actor(g, 'kolar', m2, toward(m2, stand))];
+  const hobie = extraAt(g, hp, toward(hp, lp), 'idle', LUSK_LOOK), enzo = actor(g, 'christopher', ep, toward(ep, lp));
+  await reach(g, way(-14), '<b>Drive</b> to <b>Mancuso\'s</b>. Lyle Teague is outside with two of Aldo\'s men.', { r: 7 });
+  await reach(g, stand, '<b>Walk</b> up to Lyle Teague.', { r: 1.8, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, lp);
+  frame(g, p.pos, lp, { dist: 4.8 });
+  await talk(g, [
+    [TEAGUE, 'Nico. Nothing for you. Mr. Ferro let this one go on Friday, and he still has the car keys. And a week\'s pay he did not earn.', lyle],
+    [HOBIE, 'I gave you the keys, Lyle. On Saturday. You put them in your pocket.', hobie],
+    [TEAGUE, 'Then the boys will look for them. In his pockets. Then in his teeth.', lyle],
+    [CHRIS, 'Nico, he came to us. He is ours now, kind of. Let me...', enzo],
+    [TONY, 'Stay there. Lyle, this is my bench, and my street, and Augie just painted it.', p],
+  ]);
+  g.cam.fixed = null;
+  // His two men step up. Fists only, and they stay down once they are down.
+  const foes = men.map(h => {
+    const foe = g.makeEnemy(h, { health: 70, damage: 7, cash: 20 });
+    foe.die = () => { foe.health = 1; foe.dead = true; foe.ai = null; h.after = null; h.set('down'); };
+    return foe;
+  });
+  fistsOnly(g, true);
+  g.noHeat = true;
+  p.locked = false;
+  g.hud.objective("Lyle's two men step up. <b>Deal with</b> them. Fists only.");
+  await allDown(g, foes);
+  g.hud.objective();
+  fistsOnly(g, false);
+  p.locked = true;
+  approach(g, lyle, 1.7);
+  frame(g, p.pos, lyle.group.position, { dist: 4.4 });
+  await talk(g, [
+    [TEAGUE, 'Okay. Okay. Mr. Ferro is going to hear about this.', lyle],
+    [TONY, 'Good. While you are telling him, tell him you found the keys. In your pocket.', p],
+  ]);
+  await cut(g, () => { dismiss(g, lyle, ...men); hobie.group.rotation.y = toward(hp, p.pos); g.cam.fixed = null; });
+  frame(g, p.pos, hp, { dist: 4.6 });
+  await talk(g, [
+    [HOBIE, 'Mr. Bellacosta. I can drive. I can read. I know which nights Mr. Ferro does what. I would like a job.', hobie],
+    [TONY, 'Last Friday you were reading my mail with a lighter.', p],
+    [HOBIE, 'That was a job. This would also be a job. I am very loyal to whoever pays me on Fridays.', hobie],
+    [CHRIS, 'Give him to me, Nico. Everybody who is anybody has a guy. I would be a guy with a guy.', enzo],
+    [TONY, 'One week. He rides with me first. Then we find out whose guy he is.', p],
+  ]);
+  await cut(g, () => { dismiss(g, hobie, enzo); g.cam.fixed = null; });
+  g.noHeat = false;
+  g.pardon?.();
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 2. Trial Run ----------
+// Before he trusts a man who read other people's mail, Nico watches what he does with his own crew's envelopes.
+
+async function trialRun(g) {
+  const { satriale, pawn, bodyshop, bar } = g.places, p = g.player, sway = kerbWay(satriale.kerb, satriale.door), ways = [pawn, bodyshop, bar].map(s => kerbWay(s.kerb, s.door));
+  const hp = sway(-6, -2.4);
+  // What gets said at each stop: a look for whoever comes out to the car (null: nobody does), and the lines.
+  const stops = [
+    [null, [[HOBIE, 'Your pawnbroker counts it twice and smiles once. Mr. Ferro\'s counts it once and never smiles. I like yours better.'], [TONY, 'You are not here to like.']]],
+    ['pussy', [[PUSSY, 'Who is this?'], [HOBIE, 'Hobie. I am on trial.'], [PUSSY, 'We all are, kid. Mine is in March.']]],
+    [null, [[HOBIE, 'Mr. Ferro\'s people do a bar on Thursdays too. Lyle collects. Lyle always counts it in the car before he drives it back. Nobody else counts it in the car.'], [TONY, 'Why does that matter?'], [HOBIE, 'Because when Lyle counts, it comes out shorter.']]],
+  ];
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Trial Run', 'Tuesday');
+  await phone(g, CHRIS, 'Uncle Nico, he is outside Mancuso\'s for eight, like you said. He has been there since seven. He polished a bumper. It was not even yours.');
+  g.hud.card();
+  const hobie = extraAt(g, hp, toward(hp, sway(-6)), 'idle', LUSK_LOOK);
+  await reach(g, sway(-6), '<b>Drive</b> to <b>Mancuso\'s</b> and pick up Hobie.', { how: 'car', r: 7 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, HOBIE, 'Good morning, Mr. Bellacosta. Three envelopes, Augie said. I will not touch them. I will not even look at them.', 3.4);
+  const f = follower(g, hobie);
+  p.locked = false;
+  if (!p.car) { g.hud.objective('Get in the <b>car</b>. Hobie will follow.'); await g.until(() => p.car); }
+  await rounds(g, ways.map(w => w(0)), '<b>Drive</b> the week\'s round with Hobie: the <b>pawnbroker</b>, Mo\'s <b>body shop</b>, the <b>bar</b>.', async k => {
+    const [look, lines] = stops[k], at = ways[k](3, -2.4), who = look ? actor(g, look, at, toward(at, p.pos)) : null;
+    p.locked = true;
+    if (p.car) p.car.speed = 0;
+    if (who) frame(g, p.pos, at, { dist: 4.6 });
+    await talk(g, lines.map(([name, text]) => [name, text, name === PUSSY ? who : null]));
+    g.cam.fixed = null;
+    if (who) dismiss(g, who);
+    p.locked = false;
+  }, { r: 6 });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, HOBIE, 'Mr. Bellacosta. Do not look. There is a grey sedan two cars back. It was at the pawnbroker\'s too.', 3.4);
+  await say(g, TONY, 'Friends of yours?', 2);
+  await say(g, HOBIE, 'I do not have friends. I had a job.', 2.4);
+  p.locked = false;
+  await shake(g, '<b>Lose the</b> grey sedan. Whoever it is, he does not get to see where the money goes.', { color: GREY });
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, '', 'Hobie watched the mirror until the grey sedan was gone for good, and then let out a breath he had been holding since the bar.', 3.4);
+  await say(g, TONY, 'If they were his friends, he is a very good actor. If they were not, somebody wants to know where he goes now.', 3.4);
+  await cut(g, () => { f.on = false; dismiss(g, hobie); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 3. Probation ----------
+// The nephew who wants to be made wants a man under him. Letting Enzo be trusted with a person (family) or the safe
+// move (business) is decided here.
+
+async function probation(g) {
+  const p = g.player, office = g.places.doors.find(d => d.name === "Dr. Vos's office");
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Probation', "Wednesday, four o'clock");
+  await say(g, '', 'In the waiting room there was a sign: "Help wanted, front desk, apply within." Nico read it three times, as if it were about him.');
+  g.hud.card();
+  await toMelfi(g, "Wednesday. Drive to <b>Dr. Vos's office</b>.");
+  await therapy(g, [
+    [TONY, 'My nephew hired a man. Well. I hired him. My nephew calls him "my guy".'],
+    [MELFI, 'Who is the man?'],
+    [TONY, 'He used to read my mail for the other side. Then he got scared and came over. Now a grey sedan follows him around. Or follows me.'],
+    [MELFI, 'You sound as though you like him.'],
+    [TONY, 'He is honest about being dishonest. In my business that is practically a reference.'],
+    [MELFI, 'And Enzo?'],
+    [TONY, 'Enzo wants somebody under him so badly, he would hire a coat stand.'],
+    [MELFI, 'So what does Enzo learn if you let him keep this man? And what does he learn if you send him back?'],
+  ]);
+  const keep = await choose(g, 'Hobie Lusk', ['Calm: keep him on, as Enzo\'s man, and see who comes looking (recommended)', 'Deal: send him back to Aldo, and let him be your ear over there']) === 0;
+  (g.choices ??= {}).hobie = keep ? 'keep' : 'send';
+  await therapy(g, keep ? [
+    [TONY, 'He stays. Enzo looks after him. If Enzo can keep one man out of trouble, maybe one day he can keep himself out of it.'],
+    [MELFI, 'You are giving your nephew someone to be responsible for.'],
+    [TONY, 'And somebody to blame. Everybody needs both.'],
+  ] : [
+    [TONY, 'He goes back to Aldo. If he likes me so much, he can tell me from over there what Aldo\'s people do on Wednesdays.'],
+    [MELFI, 'And Enzo?'],
+    [TONY, 'Enzo gets a speech about patience. He loves a speech, as long as it is his.'],
+  ]);
+  if (p.car) g.leaveCar();
+  place(g, office.outside, SOUTH);
+  g.cam.fixed = null;
+  await fade(g, 0, 1);
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 4. The Grey Sedan ----------
+// Following the follower is the only way to know whether Hobie is the one talking. The answer is somebody else.
+
+async function greySedan(g) {
+  const { motel } = g.places, p = g.player, keep = g.choices?.hobie !== 'send', mway = kerbWay(motel.kerb, motel.office);
+  const stop = mway(10), park = mway(32), lp = mway(6, -3), ap = mway(7.4, -3), NEED = 40;
+  // Said in the car while the clock runs: Hobie in the passenger seat, or Nico alone.
+  const waiting = keep ? [
+    [HOBIE, 'Mr. Ferro once had me sit outside a house for nine hours. It was the wrong house. He never told me whose.'],
+    [HOBIE, 'Do you want a mint? I have mints. A driver always has mints.'],
+    [TONY, 'Hobie. Quiet is also a thing a driver has.'],
+  ] : [
+    [TONY, 'A grey sedan, every Wednesday, at a motel. Either it is love, or it is business. In this town it is never love.'],
+    [TONY, 'Gina would say I should be home. Gina would be right. Gina is usually right on Wednesdays.'],
+  ];
+
+  await g.wait(1);
+  g.setNight(1);
+  g.hud.card('The Grey Sedan', 'Wednesday night');
+  if (keep) {
+    await phone(g, CHRIS, 'Uncle Nico, my guy found it! The grey sedan, at the motor lodge, outside the office. He will ride with you. It was his idea. I said it was a good idea.');
+    await phone(g, TONY, 'Tell your guy to bring nothing that rattles.');
+  } else {
+    await phone(g, HOBIE, 'Mr. Bellacosta, it is Hobie. I am back with Mr. Ferro, like you said. The grey sedan is at the motor lodge every Wednesday. Please do not tell anybody it was me.');
+    await phone(g, TONY, 'Nobody would believe it was you, Hobie. That is your gift.');
+  }
+  g.hud.card();
+  const sedan = propCar(g, stop, motel.kerb.h, GREY);
+  await reach(g, park, '<b>Drive</b> to the <b>motor lodge</b>. Park up the street from the grey sedan, lights off.', { how: 'car', r: 7 });
+  // The stake-out: in the car, on the yellow marker, while the clock runs. Out of the car, or driving, it stops.
+  const m = g.addMarker(park.x, park.z, 6);
+  { let sat = 0, free = 0, last = g.time, line = -1;
+    await g.until(() => {
+      const dt = Math.min(0.1, g.time - last); last = g.time;
+      const on = !!p.car && near(p.pos, park, 9) && Math.abs(p.car.speed) < 2;
+      if (!p.locked && !g.paused) { free += dt; if (on) sat += dt; }
+      const k = Math.floor(sat / 11);
+      if (on && k !== line && waiting[k]) { line = k; g.hud.subtitle(...waiting[k]); }
+      g.hud.objective(`${on ? 'Stay in the <b>car</b>' : 'Get in the <b>car</b>, back'} on the yellow marker, and watch the grey sedan. Don't drive off. &nbsp; <b>${clock(Math.max(0, Math.ceil(NEED - sat)))}</b>`);
+      return sat >= NEED || free > 90; // (90 s: the bot is not left parked all night)
+    });
+    g.hud.objective();
+    g.hud.subtitle(); }
+  g.removeMarker(m);
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  const lyle = actor(g, 'eddie', lp, toward(lp, ap)), agent = actor(g, 'agent', ap, toward(ap, lp));
+  await say(g, '', 'At eleven the office door opened. Lyle Teague came out with a man in a raincoat, and they stood by the grey sedan like two men waiting for the same bus.', 3.8);
+  await photograph(g, lyle, 'Lyle Teague and Agent Pembrook', spot(p.pos, 0, 0));
+  g.cam.fixed = null;
+  await say(g, keep ? HOBIE : TONY, keep
+    ? 'That is Lyle. Lyle has never stood that close to anybody who was not paying him.'
+    : 'Lyle Teague and the government, at a motor lodge, on a Wednesday. Aldo would like this picture very much.', 3.6);
+  await say(g, TONY, keep ? 'So the grey sedan was not following you, Hobie. It was following me, for him.' : 'So it was never Hobie the grey sedan was following. It was me.', 3.2);
+  await cut(g, () => { dismiss(g, lyle, agent); g.removeCar(sedan); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 5. Counts for Himself ----------
+// Lyle skims Aldo's money and sells the fed what he hears. His ledger proves both, and it is worth more than a threat.
+
+async function countsForHimself(g) {
+  const { diner } = g.places, p = g.player, keep = g.choices?.hobie !== 'send', way = kerbWay(diner.kerb, diner.door);
+  const lp = way(-2, -2.4), stop = way(12), seat = way(12, -2.2), watch = way(34), NEED = 120;
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Counts for Himself', 'Thursday, lunchtime');
+  await phone(g, keep ? CHRIS : HOBIE, keep
+    ? 'Uncle Nico, my guy says Lyle has cherry pie at the diner every Thursday, at the table outside, and he keeps a little book in the glove box. My guy knows everything. I am very proud of my guy.'
+    : 'Mr. Bellacosta, it is Hobie. Lyle eats pie at the diner every Thursday, at the table outside. There is a little book in his glove box. He locks the car. He never locks the passenger side.');
+  g.hud.card();
+  const sedan = propCar(g, stop, diner.kerb.h, GREY), lyle = actor(g, 'eddie', lp, toward(lp, way(-2)));
+  await reach(g, watch, '<b>Drive</b> to the <b>diner</b>. Park up the street from the grey sedan.', { how: 'car', r: 7 });
+  p.locked = true;
+  if (p.car) { p.car.speed = 0; g.leaveCar(); }
+  await say(g, '', 'Lyle Teague at the pavement table with a slice of cherry pie, and the grey sedan at the kerb with a ledger in the glove box. The pie takes him two minutes. It always does.', 4);
+  // Lyle is red on the radar at his table; the sedan's door is 14 m from him (the pilot keeps 9.5 m from a watcher).
+  const blip = { x: lp.x, z: lp.z, color: '#ff3b4a', r: 7 };
+  g.blips.push(blip);
+  const from = { x: p.pos.x, z: p.pos.z };
+  for (let tries = 0; ; tries++) {
+    p.locked = false;
+    const m = g.addMarker(seat.x, seat.z, 1.5);
+    let free = 0, last = g.time, seen = false;
+    await g.until(() => {
+      const dt = Math.min(0.1, g.time - last);
+      last = g.time;
+      if (!p.locked && !g.paused) free += dt;
+      seen = !p.car && near(p.pos, lp, 7);
+      g.hud.objective(`Get to the <b>grey sedan</b> on foot without being seen, before Lyle finishes his pie. Keep away from <b>Lyle</b>: he is red on the radar. &nbsp; <b>${clock(Math.max(0, Math.ceil(NEED - free)))}</b>`);
+      return seen || free >= NEED || (near(p.pos, seat, 1.9) && !p.car);
+    });
+    g.removeMarker(m);
+    g.hud.objective();
+    if (!seen && free < NEED) break;
+    p.locked = true;
+    await fade(g, 1, 0.8);
+    await say(g, '', seen
+      ? 'Lyle looked up from his pie. Nico became a man very interested in a parking meter, and walked back up the street.'
+      : 'Lyle finished his pie, and ordered another slice, because somebody else was paying for it. Aldo, as it turned out.', 3.6);
+    place(g, from, toward(from, stop));
+    const out = tries >= 1; // the last try: he goes in to pay, and the pavement is empty
+    if (out) { lyle.group.visible = false; g.blips.splice(g.blips.indexOf(blip), 1); }
+    await fade(g, 0, 0.8);
+    if (out) {
+      p.locked = false;
+      await reach(g, seat, 'He went in to pay. Get to the <b>grey sedan</b> now.', { r: 1.5, how: 'foot' });
+      break;
+    }
+  }
+  if (g.blips.includes(blip)) g.blips.splice(g.blips.indexOf(blip), 1);
+  p.locked = true;
+  p.heading = toward(p.pos, stop);
+  p.human.play('interact', 'idle');
+  await holdF(g, 'Lift the ledger out of the glove box, quietly', 2.4);
+  g.sfx?.carDoor();
+  await handover(g, null, { from: { x: seat.x, z: seat.z }, hex: 0x2a3a5a });
+  p.locked = false;
+  if (!await against(g, watch, '<b>Get clear</b>: back to your car before Lyle finishes his pie.', 45, { r: 6 })) {
+    await say(g, '', 'Lyle came out wiping his mouth, and walked straight past a man getting into a car. Pie does that to a man.', 3.4);
+    await reach(g, watch, 'Get in your <b>car</b>.', { how: 'car', r: 6 });
+  }
+  p.locked = true;
+  if (p.car) p.car.speed = 0;
+  await say(g, '', 'Two columns, in pencil. "A." for what Aldo got, and "L." for what Lyle got, and the L. column was longer. On the back page: "P. Wednesdays. 40."', 4);
+  await say(g, TONY, 'He robs Aldo, and sells the government what he hears while he is doing it. A man with two jobs. He must be exhausted.', 3.4);
+  await cut(g, () => { dismiss(g, lyle); g.removeCar(sedan); g.cam.fixed = null; });
+  p.locked = false;
+  await passed(g, 'Street cred +');
+}
+
+// ---------- 6. Situations Vacant ----------
+// The trade by the pond settles Lyle and Hobie, which is business. The kitchen settles who comes to the house, which is family.
+
+async function situationsVacant(g) {
+  const { park } = g.places, p = g.player, keep = g.choices?.hobie !== 'send', bench = park.bench, pond = park.pond;
+
+  await g.wait(1);
+  g.setNight(0);
+  g.hud.card('Situations Vacant', 'Friday morning');
+  await phone(g, JOHNNY, 'Nico. I hear you have something of mine. A driver, or a book, or both. I am by the pond. I like ducks. Ducks do not keep books.');
+  g.hud.card();
+  const aldo = actor(g, 'johnnysack', spot(bench, 0, 0.2), SOUTH, 'sit');
+  await reach(g, park.kerb, '<b>Drive</b> to the <b>park</b>.');
+  await reach(g, spot(bench, 1.8, 1.6), 'Aldo Ferro is on the <b>bench</b> by the pond.', { r: 1.6, how: 'foot' });
+  p.locked = true;
+  p.heading = toward(p.pos, aldo.group.position);
+  frame(g, p.pos, aldo.group.position, { dist: 4.4 });
+  await talk(g, [[JOHNNY, 'Walk with me. At my age, you sit too long, you do not get up again.', aldo]]);
+  g.cam.fixed = null;
+  aldo.set('idle');
+  aldo.group.position.set(bench.x + 0.6, groundAt(bench.x, bench.z), bench.z + 1.4);
+  const walk = follower(g, aldo, { gap: 1.5, pace: 2.6, runs: false });
+  walk.pos.copy(aldo.group.position);
+  p.locked = false;
+  // Two stretches of path, and what gets said on each.
+  const legs = [
+    [spot(pond, 11.5, 4), [[JOHNNY, keep ? 'My driver reads your napkins for a year, then one night he panics and goes to work for your nephew. You see how it looks.' : 'My driver comes back to me after one week with you, very polite, very rested. You see how it looks.'], [TONY, 'It looks like a man who was scared of me. That is not his fault. That is my reputation.']]],
+    [spot(pond, 2, 12), [[JOHNNY, 'And Lyle tells me you were at the motor lodge on Wednesday. Lyle tells me many things. Lyle is very helpful.'], [TONY, 'Lyle is so helpful, Aldo, he helps two people at once.']]],
+  ];
+  for (const [at, lines] of legs) {
+    await reach(g, at, '<b>Walk</b> round the <b>pond</b> with Aldo. Let him talk first.', { r: 2.2, how: 'foot' });
+    for (const [who, text] of lines) await say(g, who, text);
+  }
+  p.locked = true;
+  walk.stay = true;
+  aldo.group.rotation.y = toward(aldo.group.position, p.pos);
+  frame(g, p.pos, aldo.group.position, { dist: 4.4 });
+  await say(g, '', 'Nico gave him a photograph of a motel car park, and showed him a little ledger with "A." and "L." in it. Aldo looked at both for a long time, like a man reading a bill he had already paid twice.', 4);
+  const a = await choose(g, 'The photograph and the ledger', ['Respect: give Aldo both, as a gift between neighbours (recommended)', 'Deal: give him the photograph, and keep the ledger somewhere dry']);
+  (g.choices ??= {}).ledger = a === 0 ? 'gift' : 'kept';
+  await talk(g, a === 0 ? [
+    [TONY, 'Both. A gift. Between neighbours, a man should know who is counting his money in the car.', p],
+    [JOHNNY, 'From you a gift is a loan with a bow on it. ...Thank you, Nico. I mean it. A little.', aldo],
+  ] : [
+    [TONY, 'The picture is yours. The book stays with me, somewhere dry. In case one day you forget who told you.', p],
+    [JOHNNY, 'A man who keeps another man\'s book keeps a piece of the man. Fine. I will remember who has it.', aldo],
+  ]);
+  const b = await choose(g, 'What happens to Hobie?', keep
+    ? ['Calm: he stays with Enzo, and Aldo lets him go with no hard feelings (recommended)', 'Deal: he goes back to Aldo, as part of the trade']
+    : ['Calm: he stays with Aldo, and nobody lays a hand on him (recommended)', 'Deal: he comes to Enzo after all, as part of the trade']);
+  const enzo = keep === (b === 0);
+  g.choices.hobie = enzo ? 'enzo' : 'aldo';
+  await talk(g, enzo ? [
+    [TONY, 'Hobie stays with my nephew. He drives Enzo, he washes the cars, and he never reads anything again but the racing page.', p],
+    [JOHNNY, 'Take him. A man who panics is no use to me. Next to your nephew, he will look calm.', aldo],
+  ] : [
+    [TONY, 'Hobie drives for you again, and nobody looks in his teeth. He is the only one of your people who never lied to me.', p],
+    [JOHNNY, 'He drives for me. And Lyle walks. Lyle likes walking, I hear. To motels.', aldo],
+  ]);
+  await cut(g, () => { walk.on = false; dismiss(g, aldo); g.cam.fixed = null; });
+  // Home, late. Somebody has already been to the door with flowers.
+  await roomScene(g, inRoom(kitchen(g), [-3.6, 2.8], [-4, -1.5], 1.6, 1.15), q => ({
+    carmela: actor(g, 'carmela', roomSpot(q, -6.2, -1.5), EAST),
+    tony: actor(g, 'tony', roomSpot(q, -1.7, -1.5), WEST),
+  }), async cast => {
+    await talk(g, [
+      [CARMELA, 'A young man came to the door this morning with carnations. He said his name was Hobie, and that I was the one you listen to.', cast.carmela],
+      [TONY, 'He said that?', cast.tony],
+      [CARMELA, 'He said a lot of things. He has very clean shoes. Nico, who is he, and how does he know where we live?', cast.carmela],
+    ]);
+    const d = await choose(g, 'Gina wants to know about Hobie', ['Calm: tell her: he drove for Aldo, and now he wants a job (recommended)', 'Say he sells flowers door to door']);
+    await talk(g, d === 0 ? [
+      [TONY, 'He drove for Aldo Ferro. Aldo let him go, and he came to us. Enzo wanted him. I wanted to know who sent him.', cast.tony],
+      [CARMELA, 'And who sent him?', cast.carmela],
+      [TONY, 'Nobody. That is the strange part. He just wanted a job.', cast.tony],
+      [CARMELA, '...Tell him the carnations were very nice. And next time he comes to this house, he telephones first.', cast.carmela],
+    ] : [
+      [TONY, 'Flowers. Door to door. A very hard-working young man.', cast.tony],
+      [CARMELA, 'He had one bunch, Nico, and he knew my name. Put them in water. You can do that much.', cast.carmela],
+    ]);
+  }, { night: 1 });
+  homeAsTony(g, p.human);
+  await fade(g, 0, 1.2);
+  p.locked = false;
+  await passed(g, 'Episode twenty-five complete', 5000);
+}
+
 // ---------- The episodes ----------
 
 const EPISODES = [
@@ -9062,6 +9445,8 @@ const EPISODES = [
     titles: ['Twenty a Napkin', 'The Glove Box', 'Small Print', 'A Word with Wendell', 'The Lifebuoy', 'The Night Barman'] },
   { name: 'Episode 24', title: 'The Weekly Column', missions: [lettersPage, fanMail, writersBlock, tallOne, wrongBox, weeklyColumn],
     titles: ['Letters Page', 'Fan Mail', "Writer's Block", 'The Tall One', 'Wrong Box', 'The Weekly Column'] },
+  { name: 'Episode 25', title: 'Situations Vacant', missions: [helpWanted, trialRun, probation, greySedan, countsForHimself, situationsVacant],
+    titles: ['Help Wanted', 'Trial Run', 'Probation', 'The Grey Sedan', 'Counts for Himself', 'Situations Vacant'] },
 ];
 
 // ---------- Medals, and a bonus goal on every mission ----------
@@ -9218,6 +9603,12 @@ const MEDALS = [
   [150, 210, 'noStar', 'A family matter: no police'], // est.
   [150, 210, 'cargo', 'Not a scratch on the tall one'], // est.
   [150, 210, 'noGun', 'Hobie gets bumped, not shot'], // est.
+  [150, 210, 'noStar', 'A family matter: no police'], // est.
+  [150, 210, 'noGun', "Lyle's men get fists, not bullets"], // est.
+  [150, 210, 'noStar', 'A quiet trial run: no police'], // est.
+  [150, 210, 'noStar', 'A family matter: no police'], // est.
+  [150, 210, 'noStar', 'A quiet stake-out at the lodge: no police'], // est.
+  [150, 210, 'quickLeg', 'Clear of the diner in 0:40', { leg: 'back to your car before Lyle', secs: 40 }], // est.
   [150, 210, 'noStar', 'A family matter: no police'], // est.
 ];
 // The checks a bonus goal can make, all on what the game already keeps: stars (g.wanted), checkpoint returns (g.revived,
@@ -9655,7 +10046,7 @@ const HUBS = {
 const STARTS = {
   sitDown: 'satriale', fortySixLong: 'bing', theMotel: 'bing', complaints: 'bing', inThePaper: 'bing', didntHurtNobody: 'bing', figurehead: 'bing',
   theTail: 'melfi', denial: 'melfi', starterMotor: 'melfi', theBoard: 'melfi', nineteenSixtySeven: 'melfi', sundaes: 'melfi',
-  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi', sponsor: 'melfi', benefitOfDoubt: 'melfi', negatives: 'melfi', twoUncles: 'melfi', breadAndButter: 'melfi', likeFather: 'melfi', winOrPlace: 'melfi', thirdParty: 'melfi', smallPrint: 'melfi', writersBlock: 'melfi',
+  parkedOutside: 'melfi', fiftyMinutes: 'melfi', cameraShy: 'melfi', overtime: 'melfi', thePicture: 'melfi', fourteenYears: 'melfi', anythingAtAll: 'melfi', sponsor: 'melfi', benefitOfDoubt: 'melfi', negatives: 'melfi', twoUncles: 'melfi', breadAndButter: 'melfi', likeFather: 'melfi', winOrPlace: 'melfi', thirdParty: 'melfi', smallPrint: 'melfi', writersBlock: 'melfi', probation: 'melfi',
   farEastPacific: 'kates',
 };
 // Who a job's first scenes put in the street. Their skins are painted while he is on his way to its marker, one every half
@@ -9685,6 +10076,7 @@ const CAST = new Map([
   [fernSeason, ['carmela']], [lemonCake, ['carmela', 'agent']], [secondCup, ['carmela', 'agent']], [bigTalk, ['christopher']], [fernMan, ['junior', 'christopher', 'paulie', 'tony', 'carmela']],
   [twentyNapkin, [BARMAN_LOOK, 'agent']], [gloveBox, [BARMAN_LOOK]], [wordWithWendell, ['christopher', BARMAN_LOOK]], [lifebuoy, ['paulie']], [nightBarman, ['junior', 'christopher', 'paulie', 'tony', 'carmela']],
   [fanMail, ['paulie', 'adriana']], [tallOne, ['agent']], [wrongBox, [LUSK_LOOK]], [weeklyColumn, ['junior', 'christopher', 'paulie', 'tony', 'carmela']],
+  [helpWanted, ['eddie', 'trucker', 'kolar', LUSK_LOOK, 'christopher']], [trialRun, [LUSK_LOOK, 'pussy']], [greySedan, ['eddie', 'agent']], [countsForHimself, ['eddie']], [situationsVacant, ['johnnysack', 'carmela', 'tony']],
 ]);
 // These follow straight on from the one before: the story does not stop between them.
 const CHAIN = new Set(['fredPeters', 'homeSick', 'theStakeout', 'theInterview', 'oneFace', 'theStreet', 'theRunway', 'ridelandSunday', 'closingTime', 'theBradbury']);
